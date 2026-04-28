@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Dosya Çok Büyük — AcademicAR{% endblock %}
+{% block title %}File Too Large - AcademicAR{% endblock %}
 {% block content %}
 <div class="max-w-2xl mx-auto px-4 py-16 text-center">
-  <h1 class="font-serif text-3xl font-bold text-academic-900 mb-3">Dosya çok büyük</h1>
-  <p class="text-gray-600 mb-6">Yükleyebileceğiniz maksimum dosya boyutu {{ limit }}.</p>
-  <a href="{{ request.referrer or url_for('dashboard') }}" class="inline-block bg-academic-700 hover:bg-academic-800 text-white px-5 py-2.5 rounded-md font-semibold">Geri dön</a>
+  <h1 class="font-serif text-3xl font-bold text-academic-900 mb-3">File too large</h1>
+  <p class="text-gray-600 mb-6">The maximum upload size is {{ limit }}.</p>
+  <a href="{{ request.referrer or url_for('dashboard') }}" class="inline-block bg-academic-700 hover:bg-academic-800 text-white px-5 py-2.5 rounded-md font-semibold">Go back</a>
 </div>
 {% endblock %}

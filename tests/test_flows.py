@@ -320,7 +320,7 @@ def test_upload_rate_limit_blocks_repeated_attempts(client):
     )
     assert first.status_code == 200
     assert second.status_code == 200
-    assert "fazla yükleme denemesi" in second.get_data(as_text=True)
+    assert "Too many upload attempts" in second.get_data(as_text=True)
 
 
 def test_pilot_requires_real_secret_key():
