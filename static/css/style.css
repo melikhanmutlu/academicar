@@ -229,7 +229,7 @@ body {
 }
 
 .hero-live-model {
-  transform: scale(1.04) translateY(-1%);
+  transform: translateY(1%);
   transform-origin: center;
 }
 
