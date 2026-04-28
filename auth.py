@@ -74,6 +74,12 @@ def register():
         db.session.add(user)
         db.session.commit()
         login_user(user)
+        # Log registration for KVKK compliance
+        try:
+            from app import log_audit
+            log_audit("user_registered", user_id=user.id)
+        except Exception:
+            pass  # Fail silently if audit logging fails
         flash("Registration successful. Welcome.", "success")
         return redirect(url_for("dashboard"))
 
@@ -141,6 +147,7 @@ def google_callback():
         return redirect(url_for("auth.login"))
 
     user = User.query.filter_by(google_id=google_id).first()
+    is_new_user = False
     if not user:
         user = User.query.filter_by(email=email).first()
         if user:
@@ -155,8 +162,20 @@ def google_callback():
                 avatar_url=picture,
             )
             db.session.add(user)
+            is_new_user = True
     db.session.commit()
 
     login_user(user)
+
+    # Log registration/login for KVKK compliance
+    try:
+        from app import log_audit
+        if is_new_user:
+            log_audit("user_registered", user_id=user.id, details={"provider": "google"})
+        else:
+            log_audit("user_login", user_id=user.id, details={"provider": "google"})
+    except Exception:
+        pass  # Fail silently if audit logging fails
+
     flash(f"Welcome, {user.username}.", "success")
     return redirect(url_for("dashboard"))

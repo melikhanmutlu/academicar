@@ -42,6 +42,10 @@
             {% for e in form.confirm.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
           </div>
         </div>
+        <label class="flex items-start gap-3 text-sm text-[#5c6473]">
+          <input type="checkbox" name="accept_terms" required class="mt-1">
+          <span>I accept the <a href="{{ url_for('terms') }}" target="_blank" rel="noopener noreferrer" class="text-[#111827] underline underline-offset-2">Terms of Use</a>, <a href="{{ url_for('privacy') }}" target="_blank" rel="noopener noreferrer" class="text-[#111827] underline underline-offset-2">Privacy Policy</a>, and <a href="{{ url_for('kvkk') }}" target="_blank" rel="noopener noreferrer" class="text-[#111827] underline underline-offset-2">KVKK requirements</a></span>
+        </label>
         {{ form.submit(class="btn-primary w-full") }}
       </form>
 

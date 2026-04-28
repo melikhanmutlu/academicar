@@ -48,6 +48,9 @@ class Config:
     UPLOAD_RATE_LIMIT_COUNT = int(os.environ.get("UPLOAD_RATE_LIMIT_COUNT", 5))
     UPLOAD_RATE_LIMIT_WINDOW = int(os.environ.get("UPLOAD_RATE_LIMIT_WINDOW", 600))
 
+    # Compliance & Legal
+    TERMS_VERSION = os.environ.get("TERMS_VERSION", "1.0")
+
     # Google OAuth.
     GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
     GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")

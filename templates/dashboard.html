@@ -7,74 +7,186 @@
   {% set stats.total_models = stats.total_models + (paper.models|length) %}
 {% endfor %}
 {% set papers_with_pdf = papers|selectattr('pdf_path')|list|length if papers else 0 %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-  <div class="grid lg:grid-cols-[1fr_auto] gap-6 items-end mb-8 reveal-up">
+
+{# Avatar palette — cycles by paper id mod 6 #}
+{% set avatar_palettes = [
+  ['#dff2eb', '#1a7a5a'],
+  ['#dce8fb', '#1d4f9a'],
+  ['#fdeede', '#b84d10'],
+  ['#ede9fb', '#5b37b0'],
+  ['#fde9f0', '#a31f4b'],
+  ['#e5f3fb', '#1567a0']
+] %}
+
+<div class="max-w-[1760px] mx-auto px-5 sm:px-8 lg:px-14 py-10">
+
+  {# Header #}
+  <div class="flex items-end justify-between gap-6 mb-8 reveal-up">
     <div>
       <span class="eyebrow">Research workspace</span>
       <h1 class="font-serif text-4xl sm:text-5xl font-bold text-[#111827] mt-4">Dashboard</h1>
-      <p class="text-[#5c6473] mt-2">Manage publication pages, model uploads, QR codes, screenshots, and public viewer links.</p>
+      <p class="text-[#5c6473] mt-2">Manage publications, model uploads, QR codes, and public viewer links.</p>
     </div>
-    <a href="{{ url_for('paper_new') }}" class="btn-primary">+ New Publication</a>
+    <a href="{{ url_for('paper_new') }}" class="btn-primary shrink-0">+ New Publication</a>
   </div>
 
-  <div class="grid sm:grid-cols-3 gap-4 mb-8">
+  {# Stats #}
+  <div class="grid sm:grid-cols-3 gap-4 mb-10">
     <div class="surface rounded-xl p-5 reveal-up">
-      <p class="text-sm text-[#5c6473]">Publications</p>
-      <p class="text-3xl font-bold text-[#111827] mt-2">{{ papers|length }}</p>
+      <p class="text-xs uppercase tracking-[0.12em] text-[#9ca3af] font-medium">Publications</p>
+      <p class="text-4xl font-bold text-[#111827] mt-2">{{ papers|length }}</p>
+      <p class="text-xs text-[#9ca3af] mt-2">All time</p>
     </div>
     <div class="surface rounded-xl p-5 reveal-up delay-1">
-      <p class="text-sm text-[#5c6473]">3D models</p>
-      <p class="text-3xl font-bold text-[#111827] mt-2">{{ stats.total_models }}</p>
+      <p class="text-xs uppercase tracking-[0.12em] text-[#9ca3af] font-medium">3D Models</p>
+      <p class="text-4xl font-bold text-[#111827] mt-2">{{ stats.total_models }}</p>
+      <p class="text-xs text-[#9ca3af] mt-2">Uploaded</p>
     </div>
     <div class="surface rounded-xl p-5 reveal-up delay-2">
-      <p class="text-sm text-[#5c6473]">PDF attachments</p>
-      <p class="text-3xl font-bold text-[#111827] mt-2">{{ papers_with_pdf }}</p>
+      <p class="text-xs uppercase tracking-[0.12em] text-[#9ca3af] font-medium">PDF Attachments</p>
+      <p class="text-4xl font-bold text-[#111827] mt-2">{{ papers_with_pdf }}</p>
+      <p class="text-xs text-[#9ca3af] mt-2">Linked</p>
     </div>
   </div>
 
   {% if papers %}
-    <div class="grid md:grid-cols-2 xl:grid-cols-3 gap-5">
+    {# Section header with search #}
+    <div class="flex items-center justify-between gap-4 mb-4 reveal-up">
+      <h2 class="font-semibold text-lg text-[#111827]">Publications</h2>
+      <input
+        id="pubSearch"
+        type="search"
+        placeholder="Search publications..."
+        autocomplete="off"
+        class="field-input !w-auto text-sm py-2 px-3 rounded-lg"
+        style="min-width:220px;"
+      >
+    </div>
+
+    {# Publication list - Card Style #}
+    <div class="space-y-3" id="pubList">
       {% for p in papers %}
         {% set first_model = p.models[0] if p.models else none %}
-        <a href="{{ url_for('paper_detail', slug=p.slug) }}" class="group surface rounded-xl p-5 block overflow-hidden relative transition hover:-translate-y-1 reveal-up">
-          <div class="absolute inset-x-0 top-0 h-px bg-[#111827]/80"></div>
-          <div class="flex items-start justify-between gap-4">
-            <div class="min-w-0">
-              <div class="flex flex-wrap gap-2 mb-3">
-                <span class="text-[11px] px-2 py-1 rounded-full bg-[#111827] text-white">{{ p.field or 'General' }}</span>
-                <span class="text-[11px] px-2 py-1 rounded-full bg-white/70 text-[#5c6473]">{{ 'Academic' if p.package_type == 'academic' else 'Temporary' }}</span>
-                {% if p.pdf_path %}<span class="text-[11px] px-2 py-1 rounded-full bg-[#111827]/10 text-[#111827]">PDF</span>{% endif %}
-              </div>
-              <h3 class="font-serif font-semibold text-2xl leading-tight text-[#111827] line-clamp-2">{{ p.title }}</h3>
-              {% if p.authors %}<p class="text-sm text-[#5c6473] line-clamp-1 mt-2">{{ p.authors }}</p>{% endif %}
-            </div>
-            <div class="w-20 h-20 shrink-0 rounded-lg bg-[#111827] border border-white/10 grid place-items-center overflow-hidden">
-              {% if first_model and first_model.qr_code_path %}
-                <img src="{{ url_for('qr_image', model_id=first_model.id) }}" class="w-16 h-16 rounded-sm transition group-hover:scale-110" alt="QR code">
-              {% else %}
-                <div class="w-10 h-10 rounded-full border border-white/25 grid place-items-center text-white/80">3D</div>
-              {% endif %}
-            </div>
-          </div>
+        {% set palette = avatar_palettes[p.id % 6] %}
 
-          <div class="mt-6 grid grid-cols-3 gap-2 text-xs">
-            <div class="rounded-lg bg-white/50 p-3">
-              <p class="text-[#5c6473]">Models</p>
-              <p class="font-bold text-[#111827] mt-1">{{ p.models|length }}</p>
+        {# Compute 2-letter initials from authors or title #}
+        {% if p.authors %}
+          {% set words = p.authors.replace('Dr. ','').replace('Prof. ','').replace('Dr.','').replace('Prof.','').split() %}
+          {% set init = (words[0][0] ~ (words[1][0] if words|length > 1 else ''))|upper %}
+        {% else %}
+          {% set words = p.title.split() %}
+          {% set init = (words[0][0] ~ (words[1][0] if words|length > 1 else ''))|upper %}
+        {% endif %}
+
+        <a href="{{ url_for('paper_detail', slug=p.slug) }}"
+           class="pub-row group block bg-white border border-[var(--line)] hover:border-[var(--graphite-2)] hover:shadow-[0_4px_24px_rgba(15,23,42,0.08)] transition-all duration-200 reveal-up"
+           style="border-radius:6px;"
+           data-title="{{ p.title|lower }}"
+           data-authors="{{ (p.authors or '')|lower }}">
+
+          <div class="px-7 py-6">
+            <div class="flex items-center gap-6">
+
+              {# Avatar — monochrome #}
+              <div class="w-11 h-11 shrink-0 flex items-center justify-center text-sm font-bold select-none bg-[var(--paper-2)] text-[var(--graphite)] border border-[var(--line)]"
+                   style="border-radius:6px;">
+                {{ init }}
+              </div>
+
+              {# Main info — grows to fill space #}
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2.5 mb-1.5">
+                  <span class="text-[11px] font-medium px-2 py-0.5 border border-[var(--line)] text-[var(--muted)]" style="border-radius:4px;">
+                    {{ 'Published' if p.package_type == 'academic' else 'Temporary' }}
+                  </span>
+                  {% if p.year %}<span class="text-xs text-[var(--muted)]">{{ p.year }}</span>{% endif %}
+                </div>
+                <p class="font-semibold text-[var(--ink)] leading-snug group-hover:text-[var(--graphite-2)] transition-colors">{{ p.title }}</p>
+                <p class="text-sm text-[var(--muted)] mt-1">
+                  {{ p.authors if p.authors else '—' }}{% if p.institution %}<span class="mx-1.5 text-[var(--line-dark)]/40">·</span>{{ p.institution }}{% endif %}
+                </p>
+              </div>
+
+              {# Divider #}
+              <div class="hidden sm:block w-px h-10 bg-[var(--line)] shrink-0"></div>
+
+              {# Stats: Models #}
+              <div class="hidden sm:flex flex-col items-center justify-center gap-1 shrink-0 w-16">
+                <p class="text-[10px] uppercase tracking-[0.14em] text-[var(--muted)] font-medium">Models</p>
+                <p class="text-3xl font-bold text-[var(--ink)] leading-none tabular-nums">{{ p.models|length }}</p>
+              </div>
+
+              {# Divider #}
+              <div class="hidden sm:block w-px h-10 bg-[var(--line)] shrink-0"></div>
+
+              {# Stats: QR status #}
+              <div class="hidden sm:flex flex-col items-center justify-center gap-1.5 shrink-0 w-16">
+                <p class="text-[10px] uppercase tracking-[0.14em] text-[var(--muted)] font-medium">QR</p>
+                {% if p.models %}
+                  <span class="text-[11px] font-medium px-2.5 py-0.5 bg-[var(--ink)] text-white" style="border-radius:4px;">Ready</span>
+                {% else %}
+                  <span class="text-[11px] font-medium px-2.5 py-0.5 border border-[var(--line)] text-[var(--muted)]" style="border-radius:4px;">—</span>
+                {% endif %}
+              </div>
+
+              {# Divider #}
+              <div class="hidden sm:block w-px h-10 bg-[var(--line)] shrink-0"></div>
+
+              {# QR Code image #}
+              <div class="hidden sm:flex shrink-0">
+                <div class="w-[72px] h-[72px] bg-[var(--ink)] grid place-items-center overflow-hidden" style="border-radius:6px;">
+                  {% if first_model and first_model.qr_code_path %}
+                    <img src="{{ url_for('qr_image', model_id=first_model.id) }}"
+                         class="w-[60px] h-[60px] transition-transform duration-300 group-hover:scale-105"
+                         alt="QR">
+                  {% else %}
+                    <svg class="w-6 h-6 text-white/25" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <rect x="3" y="3" width="7" height="7" rx="1" stroke-width="1.5"/><rect x="14" y="3" width="7" height="7" rx="1" stroke-width="1.5"/><rect x="3" y="14" width="7" height="7" rx="1" stroke-width="1.5"/><path stroke-width="1.5" d="M14 14h2v2h-2zm4 0h3v3h-3zm0 4v3h-3v-3z"/>
+                    </svg>
+                  {% endif %}
+                </div>
+              </div>
+
             </div>
-            <div class="rounded-lg bg-white/50 p-3">
-              <p class="text-[#5c6473]">QR</p>
-              <p class="font-bold text-[#111827] mt-1">{{ 'Ready' if p.models else 'Waiting' }}</p>
+
+            {# 3D Model strip #}
+            {% if p.models %}
+            <div class="mt-5 pt-5 border-t border-[var(--line)] flex items-center gap-5">
+              <span class="text-[10px] uppercase tracking-[0.14em] text-[var(--muted)] font-medium shrink-0">3D Models</span>
+              <div class="flex gap-2.5 overflow-x-auto flex-1">
+                {% for model in p.models[:8] %}
+                  <div class="flex flex-col items-center gap-1.5 shrink-0">
+                    <div class="w-12 h-12 bg-[var(--paper-2)] border border-[var(--line)] group-hover:border-[var(--graphite-2)] flex items-center justify-center transition-colors" style="border-radius:6px;">
+                      <svg class="w-5 h-5 text-[var(--graphite-2)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                      </svg>
+                    </div>
+                    {% if model.display_name %}
+                      <span class="text-[10px] text-[var(--muted)] max-w-[48px] truncate text-center">{{ model.display_name }}</span>
+                    {% endif %}
+                  </div>
+                {% endfor %}
+                {% if p.models|length > 8 %}
+                  <div class="w-12 h-12 bg-[var(--paper-2)] border border-[var(--line)] flex items-center justify-center shrink-0" style="border-radius:6px;">
+                    <span class="text-xs font-medium text-[var(--muted)]">+{{ p.models|length - 8 }}</span>
+                  </div>
+                {% endif %}
+              </div>
             </div>
-            <div class="rounded-lg bg-white/50 p-3">
-              <p class="text-[#5c6473]">Expires</p>
-              <p class="font-bold text-[#111827] mt-1">{{ p.expires_at.strftime('%m.%d') if p.expires_at else 'None' }}</p>
-            </div>
+            {% endif %}
+
           </div>
         </a>
       {% endfor %}
     </div>
+
+    {# No-results message (hidden by default) #}
+    <p id="pubNoResults" class="hidden text-center text-[#9ca3af] py-12 text-sm">
+      No publications match your search.
+    </p>
+
   {% else %}
+    {# Empty state #}
     <div class="dark-surface rounded-xl p-10 sm:p-14 text-center overflow-hidden relative reveal-up">
       <div class="absolute inset-0 volumetric-grid opacity-30"></div>
       <div class="relative">
@@ -85,5 +197,27 @@
       </div>
     </div>
   {% endif %}
+
 </div>
+
+<script>
+  (() => {
+    const input = document.getElementById('pubSearch');
+    const rows = [...document.querySelectorAll('.pub-row')];
+    const noResults = document.getElementById('pubNoResults');
+    if (!input) return;
+    input.addEventListener('input', () => {
+      const q = input.value.trim().toLowerCase();
+      let visible = 0;
+      rows.forEach(row => {
+        const match = !q
+          || row.dataset.title.includes(q)
+          || row.dataset.authors.includes(q);
+        row.style.display = match ? '' : 'none';
+        if (match) visible++;
+      });
+      noResults.classList.toggle('hidden', visible > 0);
+    });
+  })();
+</script>
 {% endblock %}

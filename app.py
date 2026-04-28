@@ -21,7 +21,7 @@ from werkzeug.utils import secure_filename
 from auth import auth_bp, init_oauth
 from config import Config
 from converters import STLConverter
-from models import Model3D, Paper, User, db
+from models import AuditLog, Model3D, Paper, User, db
 from url_helpers import public_url
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -412,10 +412,40 @@ def register_error_handlers(app: Flask) -> None:
         return render_template("errors/500.html"), 500
 
 
+def log_audit(event_type: str, user_id: int | None = None, resource_id: str | None = None, details: dict | None = None) -> None:
+    """Log an audit event for compliance tracking (KVKK/GDPR)."""
+    try:
+        ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) if request else None
+        audit_log = AuditLog(
+            event_type=event_type,
+            user_id=user_id,
+            resource_id=resource_id,
+            details=details or {},
+            ip_address=ip_address,
+        )
+        db.session.add(audit_log)
+        db.session.commit()
+    except Exception as e:
+        logger.exception(f"Failed to log audit event {event_type}: {e}")
+        db.session.rollback()
+
+
 def register_routes(app: Flask) -> None:
     @app.route("/")
     def landing():
         return render_template("landing.html")
+
+    @app.route("/terms")
+    def terms():
+        return render_template("legal/terms.html")
+
+    @app.route("/privacy")
+    def privacy():
+        return render_template("legal/privacy.html")
+
+    @app.route("/kvkk")
+    def kvkk():
+        return render_template("legal/kvkk.html")
 
     @app.route("/view/<model_id>")
     def view_model(model_id):
@@ -436,7 +466,13 @@ def register_routes(app: Flask) -> None:
         if paper_is_expired(model.paper):
             abort(404)
         directory = os.path.join(app.config["CONVERTED_FOLDER"], unique_id)
-        return send_from_directory(directory, "model.glb", mimetype="model/gltf-binary")
+        response = send_from_directory(directory, "model.glb", mimetype="model/gltf-binary")
+        # Discourage casual download/caching by browsers and crawlers. The browser
+        # still needs the bytes to render, so this is friction, not a hard barrier.
+        response.headers["Content-Disposition"] = 'inline; filename="model.glb"'
+        response.headers["Cache-Control"] = "private, no-store, max-age=0"
+        response.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+        return response
 
     @app.route("/qr-image/<model_id>")
     def qr_image(model_id):
@@ -448,12 +484,13 @@ def register_routes(app: Flask) -> None:
         return send_from_directory(app.config["QR_FOLDER"], os.path.basename(model.qr_code_path))
 
     @app.route("/qr-print/<model_id>")
+    @login_required
     def qr_print(model_id):
         model = db.session.get(Model3D, model_id)
         if not model:
             abort(404)
-        if paper_is_expired(model.paper):
-            abort(404)
+        if model.user_id != current_user.id:
+            abort(403)
         return render_template("qr_page.html", model=model, paper=model.paper)
 
     @app.route("/pdfs/<int:paper_id>")
@@ -556,9 +593,11 @@ def register_routes(app: Flask) -> None:
         if paper.user_id != current_user.id:
             abort(403)
         file_paths = collect_paper_file_paths(app, paper)
+        paper_id = paper.id
         try:
             db.session.delete(paper)
             db.session.commit()
+            log_audit("paper_deleted", user_id=current_user.id, resource_id=str(paper_id))
         except SQLAlchemyError:
             db.session.rollback()
             logger.exception("Paper delete failed")
@@ -664,9 +703,11 @@ def register_routes(app: Flask) -> None:
                 ethics_responsibility_confirmed=True,
                 consent_confirmed_at=datetime.now(UTC),
                 consent_ip=request.headers.get("X-Forwarded-For", request.remote_addr),
+                terms_version=app.config.get("TERMS_VERSION", "1.0"),
             )
             db.session.add(model)
             db.session.commit()
+            log_audit("model_uploaded", user_id=current_user.id, resource_id=unique_id)
         except SQLAlchemyError:
             db.session.rollback()
             cleanup_dir(upload_dir)
@@ -722,6 +763,7 @@ def register_routes(app: Flask) -> None:
         try:
             db.session.delete(model)
             db.session.commit()
+            log_audit("model_deleted", user_id=current_user.id, resource_id=model_id)
         except SQLAlchemyError:
             db.session.rollback()
             logger.exception("Model delete failed")

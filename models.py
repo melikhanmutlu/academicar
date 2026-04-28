@@ -22,6 +22,7 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(256), nullable=True)  # NULL for Google-only users
     google_id = db.Column(db.String(100), unique=True, nullable=True, index=True)
     avatar_url = db.Column(db.String(500), nullable=True)
+    is_admin = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime, default=utc_now)
 
     papers = db.relationship(
@@ -90,7 +91,23 @@ class Model3D(db.Model):
     ethics_responsibility_confirmed = db.Column(db.Boolean, nullable=False, default=False)
     consent_confirmed_at = db.Column(db.DateTime, nullable=True)
     consent_ip = db.Column(db.String(100), nullable=True)
+    terms_version = db.Column(db.String(20), nullable=False, default="1.0")
     created_at = db.Column(db.DateTime, default=utc_now)
 
     def __repr__(self) -> str:
         return f"<Model3D {self.id}>"
+
+
+class AuditLog(db.Model):
+    __tablename__ = "audit_logs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    event_type = db.Column(db.String(50), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    resource_id = db.Column(db.String(255), nullable=True, index=True)
+    details = db.Column(db.JSON, nullable=True)
+    ip_address = db.Column(db.String(45), nullable=True)
+    timestamp = db.Column(db.DateTime, default=utc_now, index=True)
+
+    def __repr__(self) -> str:
+        return f"<AuditLog {self.event_type} @ {self.timestamp}>"

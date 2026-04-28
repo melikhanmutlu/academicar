@@ -28,6 +28,29 @@ body {
   font-family: "Inter", sans-serif;
 }
 
+.app-shell {
+  width: 100%;
+  max-width: 1760px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 3.5rem;
+  padding-right: 3.5rem;
+}
+
+@media (max-width: 1024px) {
+  .app-shell {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-shell {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+}
+
 .brand-mark {
   width: 2rem;
   height: 2rem;
@@ -109,14 +132,25 @@ body {
 
 .dark-surface {
   color: white;
-  background:
-    linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px),
-    linear-gradient(180deg, rgba(255,255,255,0.04) 1px, transparent 1px),
-    var(--ink);
-  background-size: 36px 36px;
+  background: linear-gradient(180deg, #111827 0%, #0f172a 100%);
   border: 1px solid var(--line-dark);
   box-shadow: none;
   border-radius: 6px !important;
+}
+
+.dark-surface .field-input,
+.dark-surface .field-select,
+.dark-surface .field-textarea,
+.dark-surface input[type="text"] {
+  background: rgba(255,255,255,0.095);
+  border-color: rgba(255,255,255,0.18);
+  color: white;
+}
+
+.dark-surface .field-input::placeholder,
+.dark-surface input[type="text"]::placeholder,
+.dark-surface .field-textarea::placeholder {
+  color: rgba(255,255,255,0.46);
 }
 
 .hero-stage {

@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}KVKK - AcademicAR{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+  <h1 class="font-serif text-4xl font-bold text-[#111827] mb-8">KVKK Açıklaması ve Kişisel Veri İşleme</h1>
+
+  <div class="prose prose-lg max-w-none space-y-8 text-[#374151]">
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">1. KVKK Nedir?</h2>
+      <p>6698 sayılı Kişisel Verilerin Korunması Kanunu (KVKK), Türk hukuk sisteminde kişisel verilerin işlenmesi ve korunmasını düzenleyen temel yasadır. AcademicAR, KVKK'nın tüm hükümlerine ve Kişisel Verileri Koruma Kurulu (KVKK) tarafından yayınlanan rehberlere uygun şekilde faaliyet göstermektedir.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">2. Tıbbi Verilerin Anonimleştirilmesi</h2>
+      <p><strong>UYARI:</strong> AcademicAR platformuna yüklenen 3D modeller tıbbi, biyolojik veya hastalık verilerini içermesi durumunda, bu veriler mutlaka anonimleştirilmiş olmalıdır.</p>
+      <ul class="list-disc pl-6 space-y-2">
+        <li>Hasta veya denek kimliğine ilişkin tüm bilgiler kaldırılmalıdır</li>
+        <li>Isim, kimlik numarası, hastane numarası vb. hiçbir tanımlayıcı bulunmamalıdır</li>
+        <li>Coğrafi veya demografik bilgiler de gizlenmelidir</li>
+        <li>Yükleme sırasında "Anonimleştirme Onayı" seçeneği işaretlenmesi zorunludur</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">3. Etik Onay ve Yasal Gereklilikleri Yerine Getirme</h2>
+      <p>Tıbbi araştırma veya human subject verilerini içeren modelleri yüklerken şunları taahhüt edersiniz:</p>
+      <ul class="list-disc pl-6 space-y-2">
+        <li>Araştırmanız için ilgili Etik Kurul onayı alınmıştır</li>
+        <li>Tüm denekler/hastalardan Aydınlatılmış Onam (Informed Consent) alınmıştır</li>
+        <li>Veri işleme aktiviteleri yasal çerçeve dahilindedir</li>
+        <li>Kurumsal veri sahibi onayı mevcuttur</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">4. Rıza ve Veri İşleme Kaydı</h2>
+      <p>Modeli yüklerken, aşağıdaki verileri kaydederiz:</p>
+      <ul class="list-disc pl-6 space-y-2">
+        <li><strong>IP Adresi:</strong> Yükleyen kişinin IP adresi kaydedilir</li>
+        <li><strong>Zaman Damgası:</strong> Yükleme tarihi ve saati tam olarak kaydedilir</li>
+        <li><strong>Rıza Metni Versiyonu:</strong> Hangi versiyon rızasının kabul edildiği kaydedilir</li>
+        <li><strong>Kontrol Listesi:</strong> Tüm onay checkboxları kaydedilir</li>
+      </ul>
+      <p>Bu kayıtlar, KVKK uyumluluğu ve yasal uyuşmazlıklar durumunda kanıt olarak saklanır.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">5. Veri İşleme Faaliyetleri</h2>
+      <p>AcademicAR, aşağıdaki amaçlarla kişisel veri işlemektedir:</p>
+      <ul class="list-disc pl-6 space-y-2">
+        <li>Hizmet sunabilmek için (hesap yönetimi, model depolama)</li>
+        <li>Güvenlik ve fraud tespiti</li>
+        <li>Yasal yükümlülükleri yerine getirmek</li>
+        <li>İstatistiksel analiz ve hizmet iyileştirme</li>
+        <li>İletişim ve destek hizmetleri</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">6. Veri Sorumlusu ve İşleyeni Ayrımı</h2>
+      <ul class="list-disc pl-6 space-y-2">
+        <li><strong>Veri Sorumlusu:</strong> Modeli yükleyen araştırmacı veya kurum. Hukuki ve etik sorumluluğu taşır</li>
+        <li><strong>Veri İşleyeni:</strong> AcademicAR, teknik altyapı sağlar ve Veri Sorumlusunun talimatı altında işlem yapar</li>
+      </ul>
+      <p>Veri Sorumlusu, yüklenen verinin anonimleştirilmiş ve tüm yasal şartları yerine getirdiğinden tam olarak sorumludur.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">7. Veri Güvenliği ve Şifreleme</h2>
+      <p>AcademicAR, aşağıdaki güvenlik önlemleri almaktadır:</p>
+      <ul class="list-disc pl-6 space-y-2">
+        <li>SSL/TLS şifrelemesi ile veri iletişimi korunur</li>
+        <li>Veritabanı seviyelinde şifreleme</li>
+        <li>Düzenli güvenlik denetleri</li>
+        <li>Erişim kontrolü ve yetkilendirme mekanizmaları</li>
+        <li>Veri ihlali durumunda KVKK'ya bildirim protokolü</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">8. Veri İhlali Bildirimi</h2>
+      <p>AcademicAR, kişisel verilerin yetkisiz erişim, kaybolma, değişiklik veya imha riski oluşturduğu hallerde:</p>
+      <ul class="list-disc pl-6 space-y-2">
+        <li>Derhal Kişisel Verileri Koruma Kuruluna bildirim yapılır</li>
+        <li>Etkilenen kişilere makul süre içinde bilgi verilir</li>
+        <li>Yasal ve teknik sorumlular belirtilir</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">9. Uluslararası Veri Transferleri</h2>
+      <p>Veriler genellikle Türkiye içinde işlenir. Ancak bazı teknik hizmetler (bulut depolama, CDN) uluslararası olabilir. Bu durumda:</p>
+      <ul class="list-disc pl-6 space-y-2">
+        <li>Veri Sorumlusu bildirimlerde ayrıntı belirtir</li>
+        <li>KVKK'nın 7. Maddesi çerçevesinde işlem yapılır</li>
+        <li>Alıcı ülkenin veri koruma seviyesi kontrol edilir</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">10. Kişi Hakları</h2>
+      <p>KVKK'nın 11. Maddesi uyarınca, kişiler aşağıdaki haklara sahiptir:</p>
+      <ul class="list-disc pl-6 space-y-2">
+        <li><strong>Erişim:</strong> Kendi kişisel verilerine erişme</li>
+        <li><strong>Düzeltme:</strong> Hatalı verileri düzeltme</li>
+        <li><strong>Silinme:</strong> "Unutulma Hakkı" (silme talebinde bulunma)</li>
+        <li><strong>Taşınabilirlik:</strong> Verileri başka platforma aktarma</li>
+        <li><strong>İtiraz:</strong> Otomatik karar vermeye itiraz</li>
+      </ul>
+      <p>Bu talepleri <a href="mailto:privacy@academicAR.com" class="text-blue-600 underline">privacy@academicAR.com</a> adresine sunabilirsiniz.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">⚠️ Sorumluluk ve Hukuki İhtarı</h2>
+      <div class="bg-red-50 border-l-4 border-red-500 p-4 my-4">
+        <p class="text-red-800"><strong>UYARI:</strong></p>
+        <ul class="list-disc pl-6 space-y-2 text-red-800">
+          <li>Model yükleme sırasında yanlış beyanda bulunulması (anonimleştirilmediğini söyleyerek anonimleştirilmiş sunmak veya tersi) KVKK uyarınca cezai işleme konu olabilir</li>
+          <li>Hasta/denek aydınlatılmış onamı olmadan veri yüklemek ciddi hukuki sonuçlar doğurabilir</li>
+          <li>Etik Kurul onayı olmadan insan deneklerine ilişkin veriler kullanılamaz</li>
+          <li>AcademicAR, Veri Sorumlusu (yükleyici) tarafından hukuka aykırı veri yüklenmesi halinde sorumlu değildir, fakat yükleyici tam sorumludur</li>
+        </ul>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">11. İletişim</h2>
+      <p>KVKK veya veri gizliliği konusunda sorularınız için:</p>
+      <p class="font-semibold text-[#111827]">
+        Email: privacy@academicAR.com<br>
+        Kişisel Verileri Koruma Kurulu (KVKK): <a href="https://www.kvkk.gov.tr" class="text-blue-600 underline" target="_blank" rel="noopener noreferrer">www.kvkk.gov.tr</a>
+      </p>
+    </section>
+
+    <section class="mt-12 pt-8 border-t border-[#e5e7eb]">
+      <p class="text-sm text-[#6b7280]">Son güncelleme: 28 Nisan 2026</p>
+      <p class="text-sm text-[#6b7280]">Versiyon: 1.0</p>
+    </section>
+
+  </div>
+</div>
+{% endblock %}

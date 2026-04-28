@@ -39,7 +39,7 @@
 <body class="font-sans bg-[#f7f7f5] text-[#141821] min-h-screen flex flex-col selection:bg-[#111111] selection:text-white">
 
   <header class="bg-white/88 border-b border-[#141821]/10 sticky top-0 z-40 backdrop-blur-xl">
-    <nav class="max-w-[1760px] mx-auto px-5 sm:px-8 lg:px-14 h-16 flex items-center justify-between">
+    <nav class="app-shell h-16 flex items-center justify-between">
       <a href="{{ url_for('landing') }}" class="flex items-center gap-2">
         <div class="brand-mark"><span>A</span></div>
         <span class="font-sans font-semibold text-lg text-[#111827] tracking-[-0.02em]">AcademicAR</span>
@@ -72,7 +72,7 @@
 
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
-      <div class="max-w-[1760px] mx-auto px-5 sm:px-8 lg:px-14 mt-4 w-full">
+      <div class="app-shell mt-4">
         {% for cat, msg in messages %}
           <div class="bg-white border border-[#d8d8d2] text-[#141821] px-4 py-3 rounded mb-2 text-sm">
             {{ msg }}
@@ -87,7 +87,7 @@
   </main>
 
   <footer class="bg-[#111827] border-t border-white/10 mt-16">
-    <div class="max-w-[1760px] mx-auto px-5 sm:px-8 lg:px-14 py-6 text-center text-sm text-white/60">
+    <div class="app-shell py-6 text-center text-sm text-white/60">
       © {{ current_year }} AcademicAR - 3D and AR model sharing for academic publications
     </div>
   </footer>
