@@ -1,0 +1,626 @@
+/* AcademicAR clinical medicine design system */
+
+:root {
+  --black: #020617;
+  --ink: #0f172a;
+  --graphite: #1e293b;
+  --graphite-2: #334155;
+  --paper: #f8fafc;
+  --paper-2: #f1f5f9;
+  --line: #e2e8f0;
+  --line-dark: #334155;
+  --muted: #64748b;
+  --clinical: #2563eb;
+}
+
+html {
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+}
+
+body {
+  overflow-x: hidden;
+  background:
+    linear-gradient(90deg, rgba(15,23,42,0.026) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(15,23,42,0.026) 1px, transparent 1px),
+    var(--paper);
+  background-size: 48px 48px;
+  font-family: "Inter", sans-serif;
+}
+
+.brand-mark {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  color: white;
+  font-weight: 800;
+  font-size: 0.85rem;
+  background: var(--ink);
+  border: 1px solid var(--ink);
+  box-shadow: none;
+}
+
+.nav-link {
+  color: var(--muted);
+  font-size: 0.875rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 4px;
+  transition: color 160ms ease, background 160ms ease;
+}
+.nav-link:hover {
+  color: var(--ink);
+  background: rgba(5, 5, 5, 0.06);
+}
+
+.btn-primary,
+.btn-secondary,
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 4px;
+  font-weight: 700;
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+.btn-primary {
+  color: white;
+  background: var(--ink);
+  border: 1px solid var(--ink);
+  box-shadow: none;
+}
+.btn-primary:hover,
+.btn-secondary:hover,
+.btn-ghost:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+}
+.btn-primary.compact,
+.btn-secondary.compact,
+.btn-ghost.compact {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+}
+.btn-primary:not(.compact),
+.btn-secondary:not(.compact),
+.btn-ghost:not(.compact) {
+  padding: 0.82rem 1.15rem;
+}
+.btn-secondary {
+  color: var(--ink);
+  border: 1px solid var(--line);
+  background: white;
+}
+.btn-ghost {
+  color: var(--ink);
+  border: 1px solid var(--line);
+  background: transparent;
+}
+
+.surface {
+  background: rgba(255,255,255,0.72);
+  border: 1px solid var(--line);
+  box-shadow: none;
+  backdrop-filter: none;
+  border-radius: 6px !important;
+}
+
+.dark-surface {
+  color: white;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255,255,255,0.04) 1px, transparent 1px),
+    var(--ink);
+  background-size: 36px 36px;
+  border: 1px solid var(--line-dark);
+  box-shadow: none;
+  border-radius: 6px !important;
+}
+
+.hero-stage {
+  position: relative;
+  overflow: hidden;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 72% 28%, rgba(37,99,235,0.12), transparent 24rem),
+    linear-gradient(90deg, rgba(15,23,42,0.035) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(15,23,42,0.035) 1px, transparent 1px),
+    #f8fafc;
+  background-size: 48px 48px;
+}
+
+.hero-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(255,255,255,0.9), transparent 42%, rgba(255,255,255,0.55));
+  pointer-events: none;
+}
+
+.hero-orbit {
+  position: absolute;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 999px;
+  transform: rotate(-16deg);
+  pointer-events: none;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border-radius: 3px;
+  padding: 0.35rem 0.7rem;
+  color: var(--ink);
+  background: rgba(255,255,255,0.76);
+  border: 1px solid var(--line);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.clinical-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.clinical-metrics > div {
+  padding: 1rem 1.1rem;
+  border-right: 1px solid var(--line);
+}
+
+.clinical-metrics > div:first-child {
+  padding-left: 0;
+}
+
+.clinical-metrics > div:last-child {
+  border-right: 0;
+}
+
+.clinical-metrics p {
+  color: var(--ink);
+  font-size: 1.6rem;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.045em;
+}
+
+.clinical-metrics span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-top: 0.35rem;
+}
+
+.clinical-model-stage {
+  position: relative;
+  border-radius: 2px;
+  border: 0;
+  transform: translate3d(0, var(--parallax-y, 0), 0);
+  transition: transform 120ms linear;
+  background:
+    radial-gradient(circle at 54% 45%, rgba(37,99,235,0.18), transparent 21rem),
+    radial-gradient(circle at 55% 62%, rgba(15,23,42,0.08), transparent 18rem);
+}
+
+.clinical-model-stage::before {
+  content: "";
+  position: absolute;
+  inset: 10% 8% 12%;
+  background:
+    linear-gradient(90deg, rgba(15,23,42,0.055) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(15,23,42,0.055) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: radial-gradient(circle at 50% 48%, black 0 42%, transparent 72%);
+  opacity: 0.7;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.clinical-model-stage model-viewer {
+  z-index: 2;
+  background: transparent;
+  filter: saturate(0.88) contrast(1.04) drop-shadow(0 34px 36px rgba(15,23,42,0.18));
+}
+
+.hero-live-model {
+  transform: scale(1.04) translateY(-1%);
+  transform-origin: center;
+}
+
+.clinical-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--ink);
+  background: rgba(255,255,255,0.82);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0.42rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  backdrop-filter: blur(10px);
+}
+
+.clinical-stage-legend {
+  position: absolute;
+  left: 1.25rem;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  background: rgba(255,255,255,0.58);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(12px);
+}
+
+.clinical-stage-legend > div {
+  padding: 1rem;
+  border-right: 1px solid var(--line);
+}
+
+.clinical-stage-legend > div:last-child {
+  border-right: 0;
+}
+
+.clinical-stage-legend p {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.clinical-stage-legend span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.workflow-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.86fr) minmax(520px, 1.14fr);
+  gap: clamp(3rem, 7vw, 9rem);
+  align-items: center;
+  min-height: 720px;
+}
+
+.workflow-visual {
+  position: relative;
+  min-height: 42rem;
+  display: grid;
+  place-items: center;
+  overflow: visible;
+  transform: translate3d(0, var(--parallax-y, 0), 0);
+  transition: transform 120ms linear;
+}
+
+.workflow-visual::before {
+  content: "";
+  position: absolute;
+  inset: 11% -5% 7%;
+  background:
+    radial-gradient(circle at 50% 46%, rgba(37,99,235,0.13), transparent 18rem),
+    linear-gradient(90deg, rgba(15,23,42,0.045) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(15,23,42,0.045) 1px, transparent 1px);
+  background-size: auto, 34px 34px, 34px 34px;
+  mask-image: radial-gradient(circle at center, black 0 42%, transparent 72%);
+  pointer-events: none;
+}
+
+.workflow-visual img {
+  position: relative;
+  z-index: 1;
+  width: min(980px, 126%);
+  max-width: none;
+  height: auto;
+  object-fit: contain;
+  filter: saturate(0.8) contrast(1.03) drop-shadow(0 28px 40px rgba(15,23,42,0.14));
+}
+
+.workflow-visual-caption {
+  position: absolute;
+  z-index: 2;
+  left: 4%;
+  bottom: 9%;
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.7rem 0.85rem;
+  background: rgba(255,255,255,0.66);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(14px);
+}
+
+.workflow-visual-caption span {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.workflow-visual-caption strong {
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+
+.clinical-steps {
+  display: grid;
+  grid-template-columns: 1fr;
+  border-top: 1px solid var(--line);
+}
+
+.clinical-steps > div {
+  min-height: 0;
+  padding: 1.25rem 0;
+  border-right: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.clinical-steps > div + div {
+  padding-left: 0;
+}
+
+.clinical-steps > div:last-child {
+  border-bottom: 0;
+}
+
+.workspace-section {
+  min-height: 680px;
+  display: grid;
+  align-items: center;
+}
+
+.workspace-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(520px, 1.05fr);
+  gap: clamp(3rem, 7vw, 9rem);
+  align-items: center;
+}
+
+.clinical-signal-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--line);
+}
+
+.clinical-signal-list > div {
+  padding: 1.4rem 1.5rem 1.4rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.clinical-signal-list > div:nth-child(even) {
+  padding-left: 1.5rem;
+  border-left: 1px solid var(--line);
+}
+
+.volumetric-grid {
+  background-image:
+    linear-gradient(rgba(255,255,255,0.065) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.065) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(circle at center, black, transparent 72%);
+}
+
+.scan-line {
+  position: relative;
+  overflow: hidden;
+}
+.scan-line::after {
+  content: "";
+  position: absolute;
+  inset: -40% 0 auto;
+  height: 28%;
+  background: linear-gradient(180deg, transparent, rgba(255,255,255,0.14), transparent);
+  animation: scan 5.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.field-input,
+.field-select,
+.field-textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: white;
+  padding: 0.82rem 1rem;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+.field-input:focus,
+.field-select:focus,
+.field-textarea:focus {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px rgba(5,5,5,0.08);
+  background: white;
+}
+.field-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: var(--ink);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.dark-field {
+  width: 100%;
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 4px;
+  background: rgba(255,255,255,0.08);
+  padding: 0.82rem 1rem;
+  color: white;
+  outline: none;
+}
+.dark-field::placeholder {
+  color: rgba(255,255,255,0.45);
+}
+.dark-field:focus {
+  border-color: white;
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.12);
+}
+
+.auth-shell {
+  min-height: calc(100vh - 4rem);
+  display: grid;
+  align-items: center;
+  padding: 3rem 1rem;
+}
+
+.auth-preview-model {
+  opacity: 0.36;
+  transform: translateX(18%) scale(1.04);
+  filter: grayscale(1) contrast(1.12);
+}
+
+.auth-copy-panel {
+  position: relative;
+  z-index: 2;
+  max-width: 23rem;
+  border-radius: 4px;
+  padding: 1.25rem;
+  background: rgba(5,5,5,0.76);
+  border: 1px solid rgba(255,255,255,0.14);
+  backdrop-filter: none;
+}
+
+.reveal-up {
+  opacity: 0;
+  transform: translate3d(0, calc(28px + var(--parallax-y, 0px)), 0);
+  transition: opacity 720ms ease, transform 720ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.reveal-up.is-visible {
+  opacity: 1;
+  transform: translate3d(0, var(--parallax-y, 0px), 0);
+}
+.delay-1 { transition-delay: 100ms; }
+.delay-2 { transition-delay: 180ms; }
+.delay-3 { transition-delay: 260ms; }
+
+.line-clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+input[type="file"]::-webkit-file-upload-button {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+.rounded-xl,
+.rounded-2xl,
+.rounded-lg,
+.rounded-md {
+  border-radius: 6px !important;
+}
+
+.rounded-full {
+  border-radius: 4px !important;
+}
+
+@keyframes scan {
+  0%, 100% { transform: translateY(0); opacity: 0; }
+  18% { opacity: 1; }
+  55% { transform: translateY(360%); opacity: 1; }
+  74% { opacity: 0; }
+}
+
+@keyframes floatSoft {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes pulseDot {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.3); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .reveal-up {
+    opacity: 1;
+    transform: none;
+  }
+
+  [data-parallax] {
+    transform: none !important;
+  }
+}
+
+@media (max-width: 1024px) {
+  .workflow-layout {
+    grid-template-columns: 1fr;
+    gap: 2.5rem;
+    min-height: 0;
+  }
+
+  .workflow-visual {
+    min-height: 34rem;
+  }
+
+  .workspace-layout {
+    grid-template-columns: 1fr;
+    gap: 3rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .workflow-visual {
+    min-height: 24rem;
+    margin-inline: -1rem;
+  }
+
+  .workflow-visual-caption {
+    left: 1rem;
+    bottom: 1rem;
+  }
+
+  .workflow-visual img {
+    width: 148%;
+  }
+
+  .clinical-metrics,
+  .clinical-steps,
+  .clinical-signal-list,
+  .clinical-stage-legend {
+    grid-template-columns: 1fr;
+  }
+
+  .clinical-metrics > div,
+  .clinical-steps > div,
+  .clinical-signal-list > div,
+  .clinical-stage-legend > div {
+    border-right: 0;
+    border-left: 0 !important;
+    border-bottom: 1px solid var(--line);
+    padding-left: 0;
+  }
+
+  .clinical-stage-legend {
+    left: 1rem;
+    right: 1rem;
+    bottom: 1rem;
+  }
+}

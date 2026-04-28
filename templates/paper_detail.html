@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}{{ paper.title }} — AcademicAR{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+  <a href="{{ url_for('dashboard') }}" class="nav-link inline-flex mb-5">&larr; Panele dön</a>
+
+  <section class="grid lg:grid-cols-[1fr_340px] gap-6 mb-6">
+    <div class="surface rounded-xl p-6 sm:p-8 reveal-up">
+      <div class="flex flex-wrap items-start justify-between gap-4 mb-5">
+        <div class="flex flex-wrap gap-2">
+          {% if paper.field %}<span class="text-xs px-2 py-1 bg-[#111827] text-white rounded-full">{{ paper.field }}</span>{% endif %}
+          {% if paper.year %}<span class="text-xs px-2 py-1 bg-white/70 text-[#5c6473] rounded-full">{{ paper.year }}</span>{% endif %}
+          {% if paper.pdf_path %}<span class="text-xs px-2 py-1 bg-[#111827]/10 text-[#111827] rounded-full">PDF ekli</span>{% endif %}
+        </div>
+        <form method="POST" action="{{ url_for('paper_delete', slug=paper.slug) }}" onsubmit="return confirm('Tez ve tüm modelleri silinecek. Emin misiniz?');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="text-sm text-red-600 hover:text-red-800">Tezi Sil</button>
+        </form>
+      </div>
+
+      <h1 class="font-serif text-3xl sm:text-5xl font-bold leading-tight text-[#111827]">{{ paper.title }}</h1>
+      <div class="mt-5 grid sm:grid-cols-2 gap-3 text-sm text-[#5c6473]">
+        {% if paper.authors %}<p><span class="font-semibold text-[#111827]">Yazarlar:</span> {{ paper.authors }}</p>{% endif %}
+        {% if paper.institution %}<p><span class="font-semibold text-[#111827]">Kurum:</span> {{ paper.institution }}</p>{% endif %}
+        {% if paper.doi %}<p><span class="font-semibold text-[#111827]">DOI:</span> <a href="https://doi.org/{{ paper.doi }}" target="_blank" rel="noopener noreferrer" class="text-[#111827] underline underline-offset-4">{{ paper.doi }}</a></p>{% endif %}
+        {% if paper.pdf_path %}<p><a href="{{ url_for('serve_pdf', paper_id=paper.id) }}" target="_blank" rel="noopener noreferrer" class="text-[#111827] underline underline-offset-4">PDF'i indir</a></p>{% endif %}
+      </div>
+
+      {% if paper.abstract %}
+        <div class="mt-6 pt-6 border-t border-[#141821]/10">
+          <h3 class="font-semibold text-[#111827] mb-2">Özet</h3>
+          <p class="text-[#5c6473] leading-relaxed text-sm whitespace-pre-line">{{ paper.abstract }}</p>
+        </div>
+      {% endif %}
+    </div>
+
+    <aside class="dark-surface rounded-xl p-5 text-white reveal-up delay-1">
+      <p class="text-sm text-white/60">Yayın durumu</p>
+      <div class="mt-4 space-y-3">
+        <div class="flex items-center justify-between rounded-lg bg-white/[0.06] p-3">
+          <span>Modeller</span><strong>{{ paper.models|length }}</strong>
+        </div>
+        <div class="flex items-center justify-between rounded-lg bg-white/[0.06] p-3">
+          <span>QR çıktısı</span><strong>{{ 'Hazır' if paper.models else 'Bekliyor' }}</strong>
+        </div>
+        <div class="flex items-center justify-between rounded-lg bg-white/[0.06] p-3">
+          <span>PDF</span><strong>{{ 'Ekli' if paper.pdf_path else 'Yok' }}</strong>
+        </div>
+      </div>
+    </aside>
+  </section>
+
+  <section class="dark-surface rounded-xl p-6 sm:p-8 mb-8 reveal-up">
+    <div class="grid lg:grid-cols-[0.85fr_1.15fr] gap-8">
+      <div>
+        <span class="eyebrow bg-white/10 text-white border-white/15">Conversion console</span>
+        <h2 class="font-serif text-3xl font-semibold text-white mt-4">STL modelinizi yayına hazırlayın.</h2>
+        <p class="text-white/60 text-sm leading-relaxed mt-3">Dosya yüklendiğinde dönüşüm zinciri başlar: doğrulama, GLB export ve QR üretimi. Kullanıcı boş ekrana bakmaz; akış görünür olur.</p>
+        <div class="mt-6 grid grid-cols-3 gap-2 text-xs">
+          {% for item in [('01', 'STL'), ('02', 'GLB'), ('03', 'QR')] %}
+            <div class="rounded-lg border border-white/10 bg-white/[0.06] p-3 text-center">
+              <p class="text-white font-bold">{{ item[0] }}</p>
+              <p class="text-white mt-1">{{ item[1] }}</p>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <form method="POST" action="{{ url_for('upload_model', slug=paper.slug) }}" enctype="multipart/form-data" class="space-y-4" data-upload-form>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="block rounded-xl border border-dashed border-white/30 bg-white/[0.06] p-6 cursor-pointer hover:bg-white/[0.09] transition">
+          <span class="block text-white font-semibold">STL dosyasını seçin</span>
+          <span class="block text-sm text-white/60 mt-1">Model dosyanız dönüştürme kuyruğuna alınır.</span>
+          <input type="file" name="file" accept=".stl" required class="mt-4 w-full text-sm text-white/70 file:mr-3 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-white file:text-[#111827] file:font-bold">
+        </label>
+        <div class="grid sm:grid-cols-2 gap-4">
+          <input type="text" name="display_name" placeholder="Model adı" class="rounded-lg border border-white/10 bg-white/[0.08] px-4 py-3 text-white placeholder:text-white/40 outline-none focus:border-white">
+          <input type="text" name="description" placeholder="Kısa açıklama" class="rounded-lg border border-white/10 bg-white/[0.08] px-4 py-3 text-white placeholder:text-white/40 outline-none focus:border-white">
+        </div>
+        <div class="flex flex-wrap items-center gap-4">
+          <label class="flex items-center gap-3 text-sm text-white/70">
+            <span>Model rengi</span>
+            <input type="color" name="color" value="#cccccc" class="h-10 w-16 rounded border border-white/20 bg-transparent">
+          </label>
+          <button type="submit" class="btn-primary" data-upload-submit>Yükle ve QR Üret</button>
+          <p class="hidden text-sm text-white rounded-full border border-white/25 bg-white/[0.08] px-4 py-2" data-upload-status>STL → GLB → QR çalışıyor...</p>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section>
+    <div class="flex items-end justify-between gap-4 mb-5">
+      <div>
+        <span class="eyebrow">Model registry</span>
+        <h2 class="font-serif text-3xl font-semibold text-[#111827] mt-3">Modeller ({{ paper.models|length }})</h2>
+      </div>
+    </div>
+
+    {% if paper.models %}
+      <div class="grid md:grid-cols-2 xl:grid-cols-3 gap-5">
+        {% for m in paper.models %}
+          <div class="surface rounded-xl p-4 group reveal-up">
+            <div class="rounded-lg bg-[#111827] aspect-[4/3] mb-4 grid place-items-center overflow-hidden relative">
+              <div class="absolute inset-0 volumetric-grid opacity-35"></div>
+              <img src="{{ url_for('qr_image', model_id=m.id) }}" class="w-32 h-32 rounded-sm transition group-hover:scale-110 relative" alt="QR">
+            </div>
+            <h3 class="font-serif text-xl font-semibold text-[#111827] truncate" title="{{ m.display_name or m.original_filename }}">{{ m.display_name or m.original_filename }}</h3>
+            <div class="flex items-center justify-between text-xs text-[#5c6473] mt-2">
+              <span>{{ format_file_size(m.file_size) }}</span>
+              <span>GLB hazır</span>
+            </div>
+            {% if m.description %}<p class="text-xs text-[#5c6473] mt-3 line-clamp-2">{{ m.description }}</p>{% endif %}
+            <div class="flex flex-wrap gap-2 mt-4">
+              <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="btn-primary compact">3D Görüntüle</a>
+              <a href="{{ url_for('qr_print', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="btn-secondary compact">QR Yazdır</a>
+              <a href="{{ url_for('model_edit', model_id=m.id) }}" class="btn-secondary compact">Düzenle</a>
+              <form method="POST" action="{{ url_for('model_delete', model_id=m.id) }}" onsubmit="return confirm('Modeli silmek istiyor musunuz?');" class="inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="text-xs text-red-600 hover:text-red-800 px-2 py-2">Sil</button>
+              </form>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="surface rounded-xl border border-dashed border-[#111827]/20 p-12 text-center reveal-up">
+        <h3 class="font-serif text-2xl font-semibold text-[#111827]">Henüz model yok.</h3>
+        <p class="text-[#5c6473] mt-2">Yukarıdaki conversion console ile ilk STL dosyanızı yükleyin.</p>
+      </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const uploadForm = document.querySelector('[data-upload-form]');
+  if (uploadForm) {
+    uploadForm.addEventListener('submit', () => {
+      const submit = uploadForm.querySelector('[data-upload-submit]');
+      const status = uploadForm.querySelector('[data-upload-status]');
+      if (submit) {
+        submit.disabled = true;
+        submit.textContent = 'Dönüştürülüyor...';
+        submit.classList.add('opacity-70', 'cursor-not-allowed');
+      }
+      if (status) status.classList.remove('hidden');
+    });
+  }
+</script>
+{% endblock %}

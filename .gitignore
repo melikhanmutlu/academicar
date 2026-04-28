@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+ENV/
+
+# Flask / IDE
+.env
+*.log
+.vscode/
+.idea/
+.DS_Store
+
+# Local visual QA captures
+/*.png
+
+# Database & migrations
+instance/
+migrations/versions/
+
+# Runtime klasörleri (kullanıcı yüklemeleri)
+uploads/
+converted/
+qr_codes/
+pdfs/
+tests_runtime/
+.pytest_cache/
+.test_tmp*/
+pytest-cache-files-*/
+
+# Distribution
+*.egg-info/
+dist/
+build/

@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ model.display_name or model.original_filename }} — AcademicAR</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script type="module" src="https://unpkg.com/@google/model-viewer@4.2.0/dist/model-viewer.min.js"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+  <style>
+    html, body { width: 100%; max-width: 100%; overflow: hidden; }
+    body { font-family: 'Inter', sans-serif; }
+    .font-serif { font-family: 'Inter', sans-serif; }
+    model-viewer {
+      width: 100%;
+      height: 100%;
+      --poster-color: transparent;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(255,255,255,0.04) 1px, transparent 1px),
+        radial-gradient(circle at 50% 48%, #2a2a2d 0, #111111 54%, #050505 100%);
+      background-size: 42px 42px, 42px 42px, auto;
+      opacity: 0;
+      transform: scale(1.015);
+      transition: opacity 700ms ease, transform 700ms ease;
+    }
+    model-viewer.is-loaded {
+      opacity: 1;
+      transform: scale(1);
+    }
+    .info-drawer {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(1rem);
+      visibility: hidden;
+      transition: opacity 220ms ease, transform 260ms ease, visibility 220ms ease;
+    }
+    .info-drawer.open {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(0);
+      visibility: visible;
+    }
+  </style>
+</head>
+<body class="bg-[#050505] text-white min-h-screen overflow-hidden max-w-[100vw]">
+
+  <main class="relative h-screen w-screen">
+    <div class="absolute inset-0 volumetric-grid opacity-25 z-0"></div>
+    <model-viewer
+      id="viewer"
+      class="absolute inset-0 z-10"
+      src="{{ url_for('serve_glb', unique_id=model.id, filename='model.glb') }}"
+      alt="3D model: {{ model.display_name or model.original_filename }}"
+      shadow-intensity="1.35"
+      shadow-softness="0.75"
+      exposure="1.05"
+      tone-mapping="neutral"
+      ar
+      ar-modes="webxr scene-viewer quick-look"
+      ar-scale="auto"
+      ar-placement="floor"
+      camera-controls
+      touch-action="pan-y"
+      auto-rotate
+      auto-rotate-delay="2500"
+      camera-orbit="35deg 70deg auto"
+      field-of-view="28deg"
+      bounds="tight"
+      reveal="auto">
+      <button slot="ar-button" class="absolute bottom-7 right-7 rounded-full bg-white text-[#111111] px-5 py-3 font-bold hover:scale-[1.02] transition">
+        AR ile Görüntüle
+      </button>
+    </model-viewer>
+
+    <header class="absolute left-0 right-0 top-0 z-30 p-4 sm:p-6 flex items-center justify-between pointer-events-none">
+      <a href="/" class="pointer-events-auto flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-2 backdrop-blur-xl">
+        <span class="brand-mark !w-7 !h-7">A</span>
+        <span class="font-serif font-semibold">AcademicAR</span>
+      </a>
+      <button id="infoBtn" class="pointer-events-auto rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white/80 backdrop-blur-xl hover:bg-white/15 transition">Bilgi</button>
+    </header>
+
+    <div id="viewerStatus" class="absolute left-1/2 top-1/2 z-40 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-white/10 bg-[#111111]/85 px-5 py-4 text-sm text-white/80 backdrop-blur-xl">
+      <div class="flex items-center gap-3">
+        <span class="h-2.5 w-2.5 rounded-full bg-white" style="animation: pulseDot 1.4s ease-in-out infinite;"></span>
+        <span>Model yükleniyor...</span>
+      </div>
+    </div>
+
+    <section class="absolute left-4 right-4 bottom-4 z-30 sm:left-6 sm:right-auto sm:w-[520px] rounded-xl border border-white/10 bg-[#111111]/76 p-4 backdrop-blur-2xl">
+      <p class="text-xs uppercase tracking-[0.18em] text-white/55">Live spatial viewer</p>
+      <h1 class="font-serif text-2xl sm:text-3xl font-semibold mt-1 line-clamp-1">{{ model.display_name or model.original_filename }}</h1>
+      <p class="text-sm text-white/60 mt-1 line-clamp-1">{{ paper.title }}</p>
+      <div class="mt-4 grid grid-cols-3 gap-2 text-xs">
+        <div class="rounded-lg bg-white/[0.06] p-3">
+        <p class="text-white/40">Format</p>
+          <p class="font-bold mt-1">GLB</p>
+        </div>
+        <div class="rounded-lg bg-white/[0.06] p-3">
+        <p class="text-white/40">Boyut</p>
+          <p class="font-bold mt-1">{{ format_file_size(model.file_size) if format_file_size is defined else model.file_size }}</p>
+        </div>
+        <div class="rounded-lg bg-white/[0.06] p-3">
+        <p class="text-white/40">AR</p>
+          <p class="font-bold mt-1">Hazır</p>
+        </div>
+      </div>
+    </section>
+
+    <aside id="infoPanel" class="info-drawer absolute top-0 right-0 bottom-0 z-40 w-full sm:w-[420px] bg-[#111111]/94 border-l border-white/10 overflow-y-auto p-6 backdrop-blur-2xl">
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <p class="text-xs uppercase tracking-[0.18em] text-white/55">Paper metadata</p>
+          <h2 class="font-serif text-2xl font-semibold mt-1">Tez Bilgisi</h2>
+        </div>
+        <button id="closeInfo" class="rounded-full border border-white/10 w-9 h-9 text-white/70 hover:text-white hover:bg-white/10">×</button>
+      </div>
+
+      <h3 class="font-semibold text-lg mb-4">{{ paper.title }}</h3>
+      <div class="space-y-3 text-sm text-white/70">
+        {% if paper.authors %}<p><span class="text-white/40">Yazarlar:</span> {{ paper.authors }}</p>{% endif %}
+        {% if paper.year %}<p><span class="text-white/40">Yıl:</span> {{ paper.year }}</p>{% endif %}
+        {% if paper.field %}<p><span class="text-white/40">Alan:</span> {{ paper.field }}</p>{% endif %}
+        {% if paper.institution %}<p><span class="text-white/40">Kurum:</span> {{ paper.institution }}</p>{% endif %}
+        {% if paper.doi %}<p><span class="text-white/40">DOI:</span> <a href="https://doi.org/{{ paper.doi }}" target="_blank" rel="noopener noreferrer" class="text-white underline underline-offset-4">{{ paper.doi }}</a></p>{% endif %}
+      </div>
+
+      {% if paper.abstract %}
+        <div class="mt-6 pt-6 border-t border-white/10">
+          <h4 class="font-semibold text-sm mb-2 text-white/80">Özet</h4>
+          <p class="text-sm text-white/60 leading-relaxed whitespace-pre-line">{{ paper.abstract }}</p>
+        </div>
+      {% endif %}
+
+      {% if model.description %}
+        <div class="mt-6 pt-6 border-t border-white/10">
+          <h4 class="font-semibold text-sm mb-2 text-white/80">Model Açıklaması</h4>
+          <p class="text-sm text-white/60">{{ model.description }}</p>
+        </div>
+      {% endif %}
+    </aside>
+  </main>
+
+  <script>
+    const infoBtn = document.getElementById('infoBtn');
+    const infoPanel = document.getElementById('infoPanel');
+    const closeInfo = document.getElementById('closeInfo');
+    const viewer = document.getElementById('viewer');
+    const viewerStatus = document.getElementById('viewerStatus');
+
+    infoBtn.addEventListener('click', () => infoPanel.classList.add('open'));
+    closeInfo.addEventListener('click', () => infoPanel.classList.remove('open'));
+
+    viewer.addEventListener('load', () => {
+      viewer.classList.add('is-loaded');
+      viewerStatus.classList.add('hidden');
+    });
+    viewer.addEventListener('error', () => {
+      viewerStatus.textContent = 'Model yüklenemedi. GLB dosyasına erişilemiyor veya dosya bozuk olabilir.';
+      viewerStatus.classList.remove('hidden');
+    });
+  </script>
+</body>
+</html>

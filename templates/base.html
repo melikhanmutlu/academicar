@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}AcademicAR{% endblock %}</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            serif: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            academic: {
+              50: '#f7f7f5',
+              100: '#eeeeea',
+              500: '#68686f',
+              600: '#2b2b30',
+              700: '#1c1c1f',
+              800: '#111111',
+              900: '#050505',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body class="font-sans bg-[#f7f7f5] text-[#141821] min-h-screen flex flex-col selection:bg-[#111111] selection:text-white">
+
+  <header class="bg-white/88 border-b border-[#141821]/10 sticky top-0 z-40 backdrop-blur-xl">
+    <nav class="max-w-[1760px] mx-auto px-5 sm:px-8 lg:px-14 h-16 flex items-center justify-between">
+      <a href="{{ url_for('landing') }}" class="flex items-center gap-2">
+        <div class="brand-mark"><span>A</span></div>
+        <span class="font-sans font-semibold text-lg text-[#111827] tracking-[-0.02em]">AcademicAR</span>
+      </a>
+
+      <div class="flex items-center gap-3">
+        {% if current_user.is_authenticated %}
+          <a href="{{ url_for('dashboard') }}" class="nav-link">Panelim</a>
+          <a href="{{ url_for('paper_new') }}" class="btn-primary compact">+ Yeni Tez</a>
+          <div class="flex items-center gap-2 ml-2 border-l border-[#141821]/10 pl-3">
+            {% if current_user.avatar_url %}
+              <img src="{{ current_user.avatar_url }}" class="w-8 h-8 rounded-full" alt="">
+            {% else %}
+              <div class="w-8 h-8 rounded-full bg-[#111827] text-white flex items-center justify-center text-sm font-semibold">
+                {{ current_user.username[0]|upper }}
+              </div>
+            {% endif %}
+            <form method="POST" action="{{ url_for('auth.logout') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="text-sm text-[#5c6473] hover:text-red-600">Çıkış</button>
+            </form>
+          </div>
+        {% else %}
+          <a href="{{ url_for('auth.login') }}" class="nav-link">Giriş</a>
+          <a href="{{ url_for('auth.register') }}" class="btn-primary compact">Kayıt Ol</a>
+        {% endif %}
+      </div>
+    </nav>
+  </header>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="max-w-[1760px] mx-auto px-5 sm:px-8 lg:px-14 mt-4 w-full">
+        {% for cat, msg in messages %}
+          <div class="bg-white border border-[#d8d8d2] text-[#141821] px-4 py-3 rounded mb-2 text-sm">
+            {{ msg }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <main class="flex-1">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="bg-[#111827] border-t border-white/10 mt-16">
+    <div class="max-w-[1760px] mx-auto px-5 sm:px-8 lg:px-14 py-6 text-center text-sm text-white/60">
+      © {{ current_year }} AcademicAR — Akademik 3D model paylaşım platformu
+    </div>
+  </footer>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

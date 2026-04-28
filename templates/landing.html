@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}AcademicAR - Clinical spatial publishing{% endblock %}
+
+{% block content %}
+<section class="hero-stage">
+  <div class="relative max-w-[1760px] mx-auto px-5 sm:px-8 lg:px-14 py-16 lg:py-20">
+    <div class="grid xl:grid-cols-[0.84fr_1.16fr] gap-10 2xl:gap-20 items-center">
+      <div class="reveal-up max-w-4xl">
+        <span class="eyebrow"><span class="w-2 h-2 rounded-full bg-[#2563eb]"></span> Clinical spatial layer</span>
+        <h1 class="font-sans text-[3.15rem] sm:text-[5.8rem] lg:text-[6.8rem] 2xl:text-[7.9rem] leading-[0.86] font-semibold mt-7 tracking-[-0.07em] text-[#0f172a]">
+          AcademicAR
+        </h1>
+        <p class="mt-7 text-2xl lg:text-3xl 2xl:text-[2rem] text-[#1e293b] max-w-3xl leading-tight tracking-[-0.03em]">
+          Akademik modelleri steril, yayına hazır 3D/AR çalışma alanına taşıyın.
+        </p>
+        <p class="mt-5 text-base lg:text-lg text-[#64748b] max-w-3xl leading-relaxed">
+          STL dosyasını yükleyin; GLB viewer bağlantısı ve baskıya hazır QR çıktısı üretin. Okuyucu modeli tarayıcıda inceler, destekleyen cihazlarda AR modunda açar.
+        </p>
+        <div class="mt-8 flex flex-wrap gap-3">
+          <a href="{{ url_for('auth.register') }}" class="btn-primary">Çalışma Alanı Oluştur</a>
+          <a href="#workflow" class="btn-secondary">Akışı Gör</a>
+        </div>
+
+        <div class="clinical-metrics mt-10 max-w-3xl">
+          <div>
+            <p>STL</p>
+            <span>Kaynak model</span>
+          </div>
+          <div>
+            <p>GLB</p>
+            <span>Web-ready çıktı</span>
+          </div>
+          <div>
+            <p>AR</p>
+            <span>Cihazda deneyim</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="relative min-h-[620px] lg:min-h-[760px] 2xl:min-h-[820px] reveal-up delay-2">
+        <div class="clinical-model-stage absolute inset-0 overflow-hidden" data-parallax="0.13">
+          <div class="absolute inset-0 volumetric-grid opacity-70"></div>
+          <div class="absolute left-5 top-5 right-5 z-10 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div class="clinical-chip">live GLB preview</div>
+            <div class="clinical-chip">
+              <span class="w-2 h-2 rounded-full bg-[#2563eb]" style="animation: pulseDot 1.6s ease-in-out infinite;"></span>
+              AR-ready
+            </div>
+          </div>
+
+          <model-viewer
+            src="{{ url_for('static', filename='models/demo-model.glb') }}"
+            alt="AcademicAR demo 3D model"
+            class="hero-live-model absolute inset-0 w-full h-full"
+            camera-controls
+            auto-rotate
+            rotation-per-second="18deg"
+            camera-orbit="35deg 64deg 2.05m"
+            field-of-view="28deg"
+            exposure="0.9"
+            shadow-intensity="0.86"
+            environment-image="neutral">
+          </model-viewer>
+
+          <div class="clinical-stage-legend">
+            <div>
+              <p>Conversion</p>
+              <span>STL -> GLB</span>
+            </div>
+            <div>
+              <p>Persistent URL</p>
+              <span>Viewer + QR</span>
+            </div>
+            <div>
+              <p>Reader Mode</p>
+              <span>Browser / AR</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="workflow" class="landing-section py-24 lg:py-28">
+  <div class="max-w-[1760px] mx-auto px-5 sm:px-8 lg:px-14">
+    <div class="workflow-layout">
+      <div class="reveal-up">
+        <span class="eyebrow">Research pipeline</span>
+        <h2 class="font-sans text-4xl lg:text-6xl 2xl:text-7xl font-semibold text-[#0f172a] mt-4 leading-[0.95] tracking-[-0.055em]">Modelden yayına tek akış.</h2>
+        <p class="text-[#64748b] leading-relaxed text-lg max-w-3xl mt-6">Upload formu, dönüşüm motoru, viewer ve QR çıktısı aynı ürün hissiyle çalışır. Araştırmacı teknik ayrıntıya boğulmaz; sonuç yayınlanabilir hale gelir.</p>
+
+        <div class="clinical-steps mt-12">
+          {% for step in [
+            ('01', 'Tezi yapılandır', 'Başlık, yazarlar, kurum, DOI ve özet alanlarını akademik kayıt gibi sakla.'),
+            ('02', 'STL modelini dönüştür', 'Modeli renklendir, GLB formatına çevir ve web viewer için optimize et.'),
+            ('03', 'QR ile yayınla', 'Kalıcı viewer linki ve baskıya hazır QR çıktısını araştırmanın içine yerleştir.')
+          ] %}
+            <div class="reveal-up delay-{{ loop.index }}">
+              <div class="text-sm font-bold text-[#2563eb]">{{ step[0] }}</div>
+              <h3 class="font-sans text-2xl font-semibold text-[#0f172a] mt-3 tracking-[-0.035em]">{{ step[1] }}</h3>
+              <p class="text-sm text-[#64748b] leading-relaxed mt-3">{{ step[2] }}</p>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="workflow-visual reveal-up delay-2" aria-hidden="true" data-parallax="-0.09">
+        <img src="{{ url_for('static', filename='images/clinical-spatial-hero.png') }}" alt="">
+        <div class="workflow-visual-caption">
+          <span>3D research context</span>
+          <strong>Paper -> model -> AR</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="workspace-section py-24 lg:py-32 bg-[#f8fafc] text-[#0f172a] overflow-hidden border-y border-[#e2e8f0]">
+  <div class="max-w-[1760px] mx-auto px-5 sm:px-8 lg:px-14">
+    <div class="workspace-layout">
+      <div class="reveal-up max-w-3xl">
+        <span class="eyebrow">Workspace signals</span>
+        <h2 class="font-sans text-4xl lg:text-6xl 2xl:text-7xl font-semibold mt-5 leading-[0.95] tracking-[-0.055em]">Dashboard klinik araştırma masası gibi davranır.</h2>
+        <p class="text-[#64748b] leading-relaxed mt-5 text-lg">Model sayısı, QR durumu, PDF varlığı ve son güncelleme bilgileri daha az görsel gürültüyle okunur. Boş durum bile kullanıcıyı ilk dönüşüme yönlendirir.</p>
+      </div>
+      <div class="clinical-signal-list reveal-up delay-2">
+        {% for item in [
+          ('Compact metadata', 'Alan, yıl, DOI ve model sayısı tek bakışta.'),
+          ('QR state', 'Her model için baskıya hazır QR önizlemesi.'),
+          ('Conversion console', 'Upload sırasında STL -> GLB -> QR aşamaları görünür.'),
+          ('Spatial viewer', 'Tam ekran model, bilgi paneli ve premium AR CTA.')
+        ] %}
+          <div>
+            <h3 class="font-semibold text-[#0f172a]">{{ item[0] }}</h3>
+            <p class="text-sm text-[#64748b] mt-2">{{ item[1] }}</p>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="py-24 lg:py-28">
+  <div class="max-w-[1760px] mx-auto px-5 sm:px-8 lg:px-14 text-center reveal-up">
+    <h2 class="font-sans text-4xl lg:text-6xl font-semibold text-[#0f172a] tracking-[-0.055em]">Bir sonraki modeliniz yayına hazır mı?</h2>
+    <p class="text-[#64748b] mt-4 text-lg">AcademicAR, teknik 3D dosyayı akademik yayın deneyimine bağlayan ince katmandır.</p>
+    <div class="mt-8">
+      <a href="{{ url_for('auth.register') }}" class="btn-primary">Ücretsiz Başla</a>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
+  <script>
+    (() => {
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const revealItems = [...document.querySelectorAll(".reveal-up")];
+
+      if (!reduceMotion && "IntersectionObserver" in window) {
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("is-visible");
+              observer.unobserve(entry.target);
+            }
+          });
+        }, { threshold: 0.16, rootMargin: "0px 0px -8% 0px" });
+
+        revealItems.forEach((item) => observer.observe(item));
+      } else {
+        revealItems.forEach((item) => item.classList.add("is-visible"));
+      }
+
+      const parallaxItems = [...document.querySelectorAll("[data-parallax]")];
+      if (!reduceMotion && parallaxItems.length) {
+        let ticking = false;
+        const updateParallax = () => {
+          parallaxItems.forEach((item) => {
+            const speed = Number(item.dataset.parallax || 0);
+            const rect = item.getBoundingClientRect();
+            const midpoint = rect.top + rect.height / 2 - window.innerHeight / 2;
+            item.style.setProperty("--parallax-y", `${midpoint * speed * -0.18}px`);
+          });
+          ticking = false;
+        };
+
+        const requestTick = () => {
+          if (!ticking) {
+            window.requestAnimationFrame(updateParallax);
+            ticking = true;
+          }
+        };
+
+        updateParallax();
+        window.addEventListener("scroll", requestTick, { passive: true });
+        window.addEventListener("resize", requestTick);
+      }
+    })();
+  </script>
+{% endblock %}

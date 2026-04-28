@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Yeni Tez — AcademicAR{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+  <a href="{{ url_for('dashboard') }}" class="nav-link inline-flex mb-5">&larr; Panele dön</a>
+
+  <div class="grid lg:grid-cols-[0.78fr_1.22fr] gap-6 items-start">
+    <aside class="dark-surface rounded-xl p-7 lg:p-8 sticky top-24 overflow-hidden">
+      <div class="absolute inset-0 volumetric-grid opacity-30"></div>
+      <div class="relative">
+        <span class="eyebrow bg-white/10 text-white border-white/15">Metadata console</span>
+        <h1 class="font-serif text-4xl lg:text-5xl font-bold text-white mt-5 leading-tight">Yeni tez / makale kaydı.</h1>
+        <p class="text-white/60 mt-4 leading-relaxed">Akademik bilgileri yapılandırın. Model yükleme ve QR üretimi sonraki detay ekranında conversion console üzerinden yapılır.</p>
+        <div class="mt-8 space-y-3 text-sm">
+          {% for item in ['Akademik kimlik', 'PDF erişim kontrolü', 'STL model registry', 'Kalıcı viewer linki'] %}
+            <div class="flex items-center gap-3 rounded-lg bg-white/[0.06] border border-white/10 p-3">
+              <span class="w-2 h-2 rounded-full bg-white"></span>
+              <span class="text-white/80">{{ item }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </aside>
+
+    <form method="POST" enctype="multipart/form-data" class="surface rounded-xl p-6 sm:p-8 space-y-6">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div>
+        <label class="field-label">Başlık <span class="text-red-500">*</span></label>
+        <input type="text" name="title" value="{{ form.get('title', '') }}" required class="field-input text-lg" placeholder="Çalışmanın tam başlığı">
+      </div>
+
+      <div>
+        <label class="field-label">Yazarlar</label>
+        <input type="text" name="authors" value="{{ form.get('authors', '') }}" placeholder="Ahmet Yılmaz, Ayşe Demir" class="field-input">
+        <p class="text-xs text-[#5c6473] mt-2">Virgülle ayırarak yazın.</p>
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div>
+          <label class="field-label">Yıl</label>
+          <input type="number" name="year" value="{{ form.get('year', '') }}" min="1900" max="2100" class="field-input">
+        </div>
+        <div>
+          <label class="field-label">Alan</label>
+          <select name="field" class="field-select">
+            <option value="">Seçiniz</option>
+            {% for f in ['Tıp', 'Diş Hekimliği', 'Mühendislik', 'Mimarlık', 'Biyoloji', 'Arkeoloji', 'Veteriner', 'Kimya', 'Diğer'] %}
+              <option value="{{ f }}" {% if form.get('field') == f %}selected{% endif %}>{{ f }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div>
+          <label class="field-label">Kurum / Dergi</label>
+          <input type="text" name="institution" value="{{ form.get('institution', '') }}" placeholder="Hacettepe Üniversitesi" class="field-input">
+        </div>
+        <div>
+          <label class="field-label">DOI</label>
+          <input type="text" name="doi" value="{{ form.get('doi', '') }}" placeholder="10.1234/example.2026" class="field-input">
+        </div>
+      </div>
+
+      <div>
+        <label class="field-label">Özet</label>
+        <textarea name="abstract" rows="6" class="field-textarea" placeholder="Çalışmanın kısa özeti">{{ form.get('abstract', '') }}</textarea>
+      </div>
+
+      <label class="block rounded-xl border border-dashed border-[#111827]/25 bg-white/55 p-5 cursor-pointer hover:bg-white/75 transition">
+        <span class="block font-semibold text-[#111827]">PDF ekle</span>
+        <span class="block text-sm text-[#5c6473] mt-1">PDF sadece çalışma sahibi tarafından indirilebilir.</span>
+        <input type="file" name="pdf" accept=".pdf" class="mt-4 w-full text-sm text-[#5c6473] file:mr-3 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-[#111827] file:text-white file:font-semibold">
+      </label>
+
+      <div class="flex items-center justify-end gap-3 pt-4 border-t border-[#141821]/10">
+        <a href="{{ url_for('dashboard') }}" class="btn-secondary">İptal</a>
+        <button type="submit" class="btn-primary">Kaydet ve Detaya Geç</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
