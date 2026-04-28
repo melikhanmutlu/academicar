@@ -4,7 +4,7 @@ import os
 import struct
 import time
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import qrcode
 from flask import Flask, abort, flash, redirect, render_template, request, send_from_directory, url_for
@@ -12,8 +12,10 @@ from flask_login import LoginManager, current_user, login_required
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFError, CSRFProtect
 from slugify import slugify
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
 
 from auth import auth_bp, init_oauth
@@ -30,11 +32,14 @@ upload_attempts: dict[int, list[float]] = {}
 
 def create_app(test_config: dict | None = None) -> Flask:
     app = Flask(__name__)
+    upload_attempts.clear()
     app.config.from_object(Config)
     if test_config:
         app.config.update(test_config)
     validate_secret_key(app)
     Config.init_app(app)
+    if app.config.get("APP_ENV") in {"production", "prod", "pilot"}:
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 
     db.init_app(app)
     Migrate(app, db)
@@ -66,12 +71,21 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     with app.app_context():
         db.create_all()
+        ensure_sqlite_schema()
 
     return app
 
 
 def allowed_stl(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() == "stl"
+
+
+def allowed_glb(filename: str) -> bool:
+    return "." in filename and filename.rsplit(".", 1)[1].lower() == "glb"
+
+
+def allowed_model(filename: str) -> bool:
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in {"stl", "glb"}
 
 
 def allowed_pdf(filename: str) -> bool:
@@ -110,6 +124,41 @@ def validate_secret_key(app: Flask) -> None:
         raise RuntimeError("SECRET_KEY must be set for pilot/production environments.")
 
 
+def ensure_sqlite_schema() -> None:
+    """Keep existing local SQLite databases usable until formal migrations run."""
+    if db.engine.dialect.name != "sqlite":
+        return
+
+    paper_columns = {row[1] for row in db.session.execute(text("PRAGMA table_info(papers)"))}
+    model_columns = {row[1] for row in db.session.execute(text("PRAGMA table_info(models)"))}
+    paper_additions = {
+        "package_type": "VARCHAR(30) DEFAULT 'temporary' NOT NULL",
+        "status": "VARCHAR(30) DEFAULT 'active' NOT NULL",
+        "is_public": "BOOLEAN DEFAULT 0 NOT NULL",
+        "payment_status": "VARCHAR(30) DEFAULT 'free' NOT NULL",
+        "payment_provider": "VARCHAR(50)",
+        "payment_reference": "VARCHAR(200)",
+        "pmid": "VARCHAR(100)",
+        "expires_at": "DATETIME",
+    }
+    model_additions = {
+        "source_format": "VARCHAR(10) DEFAULT 'stl' NOT NULL",
+        "anonymization_confirmed": "BOOLEAN DEFAULT 0 NOT NULL",
+        "rights_confirmed": "BOOLEAN DEFAULT 0 NOT NULL",
+        "ethics_responsibility_confirmed": "BOOLEAN DEFAULT 0 NOT NULL",
+        "consent_confirmed_at": "DATETIME",
+        "consent_ip": "VARCHAR(100)",
+    }
+
+    for name, definition in paper_additions.items():
+        if name not in paper_columns:
+            db.session.execute(text(f"ALTER TABLE papers ADD COLUMN {name} {definition}"))
+    for name, definition in model_additions.items():
+        if name not in model_columns:
+            db.session.execute(text(f"ALTER TABLE models ADD COLUMN {name} {definition}"))
+    db.session.commit()
+
+
 def check_upload_rate_limit(user_id: int, app: Flask) -> bool:
     limit = int(app.config.get("UPLOAD_RATE_LIMIT_COUNT", 5))
     window = int(app.config.get("UPLOAD_RATE_LIMIT_WINDOW", 600))
@@ -129,13 +178,13 @@ def check_upload_rate_limit(user_id: int, app: Flask) -> bool:
 def validate_stl_file(file_path: str) -> list[str]:
     """Return user-friendly STL validation errors before trimesh parsing."""
     if not os.path.exists(file_path) or not os.path.isfile(file_path):
-        return ["STL dosyası bulunamadı."]
+        return ["STL file was not found."]
 
     size = os.path.getsize(file_path)
     if size == 0:
-        return ["STL dosyası boş."]
+        return ["STL file is empty."]
     if size < 15:
-        return ["STL dosyası çok küçük veya bozuk görünüyor."]
+        return ["STL file is too small or appears to be corrupted."]
 
     with open(file_path, "rb") as f:
         header = f.read(512)
@@ -156,18 +205,29 @@ def validate_stl_file(file_path: str) -> list[str]:
             is_binary_stl = triangle_count > 0 and expected_size <= size
 
     if not is_ascii_stl and not is_binary_stl:
-        return ["STL başlığı tanınamadı veya dosya bozuk."]
+        return ["STL header could not be recognized or the file is corrupted."]
+    return []
+
+
+def validate_glb_file(file_path: str) -> list[str]:
+    if not os.path.exists(file_path) or not os.path.isfile(file_path):
+        return ["GLB file was not found."]
+    if os.path.getsize(file_path) < 20:
+        return ["GLB file is empty or too small."]
+    with open(file_path, "rb") as f:
+        if f.read(4) != b"glTF":
+            return ["GLB header is not valid."]
     return []
 
 
 def validate_pdf_file(file_path: str) -> list[str]:
     if not os.path.exists(file_path) or not os.path.isfile(file_path):
-        return ["PDF dosyası bulunamadı."]
+        return ["PDF file was not found."]
     if os.path.getsize(file_path) == 0:
-        return ["PDF dosyası boş."]
+        return ["PDF file is empty."]
     with open(file_path, "rb") as f:
         if f.read(5) != b"%PDF-":
-            return ["PDF dosyası geçerli bir PDF olarak görünmüyor."]
+            return ["PDF file does not appear to be a valid PDF."]
     return []
 
 
@@ -188,34 +248,40 @@ def validate_paper_form(form) -> tuple[dict, list[str]]:
     abstract = (form.get("abstract") or "").strip()
     doi = (form.get("doi") or "").strip()
     institution = (form.get("institution") or "").strip()
+    pmid = (form.get("pmid") or "").strip()
+    package_type = (form.get("package_type") or "temporary").strip()
     year_raw = (form.get("year") or "").strip()
     errors = []
 
     if not title:
-        errors.append("Baslik zorunludur.")
+        errors.append("Title is required.")
     elif len(title) > 500:
-        errors.append("Baslik en fazla 500 karakter olabilir.")
+        errors.append("Title can be at most 500 characters.")
+
+    if package_type not in {"temporary", "academic"}:
+        errors.append("Invalid publication package.")
 
     length_limits = {
-        "Yazarlar": (authors, 500),
-        "Alan": (field, 100),
+        "Authors": (authors, 500),
+        "Field": (field, 100),
         "DOI": (doi, 200),
-        "Kurum / Dergi": (institution, 300),
+        "Institution / Journal": (institution, 300),
+        "PMID": (pmid, 100),
     }
     for label, (value, limit) in length_limits.items():
         if len(value) > limit:
-            errors.append(f"{label} en fazla {limit} karakter olabilir.")
+            errors.append(f"{label} can be at most {limit} characters.")
 
     year_int = None
     if year_raw:
         try:
             year_int = int(year_raw)
         except ValueError:
-            errors.append("Yil sayisal olmalidir.")
+            errors.append("Year must be numeric.")
         else:
             max_year = datetime.now(UTC).year + 1
             if year_int < 1900 or year_int > max_year:
-                errors.append(f"Yil 1900 ile {max_year} arasinda olmalidir.")
+                errors.append(f"Year must be between 1900 and {max_year}.")
 
     return (
         {
@@ -226,9 +292,26 @@ def validate_paper_form(form) -> tuple[dict, list[str]]:
             "abstract": abstract or None,
             "doi": doi or None,
             "institution": institution or None,
+            "pmid": pmid or None,
+            "package_type": package_type,
         },
         errors,
     )
+
+
+def package_expires_at(package_type: str) -> datetime:
+    if package_type == "academic":
+        return datetime.now(UTC) + timedelta(days=365 * 3)
+    return datetime.now(UTC) + timedelta(days=3)
+
+
+def paper_is_expired(paper: Paper) -> bool:
+    if not paper.expires_at:
+        return False
+    expires_at = paper.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
+    return expires_at < datetime.now(UTC)
 
 
 def generate_qr(model_id: str, qr_folder: str, view_url: str) -> str:
@@ -305,13 +388,13 @@ def cleanup_paths(paths: list[tuple[str, str]]) -> None:
 def register_error_handlers(app: Flask) -> None:
     @app.errorhandler(CSRFError)
     def csrf_error(error):
-        flash("Oturum güvenlik doğrulaması başarısız oldu. Lütfen tekrar deneyin.", "danger")
+        flash("Session security validation failed. Please try again.", "danger")
         return render_template("errors/400.html", error=error), 400
 
     @app.errorhandler(RequestEntityTooLarge)
     def file_too_large(error):
         limit = human_file_size(app.config["MAX_CONTENT_LENGTH"])
-        flash(f"Dosya boyutu en fazla {limit} olabilir.", "danger")
+        flash(f"File size can be at most {limit}.", "danger")
         return render_template("errors/413.html", limit=limit), 413
 
     @app.errorhandler(403)
@@ -339,6 +422,8 @@ def register_routes(app: Flask) -> None:
         model = db.session.get(Model3D, model_id)
         if not model:
             abort(404)
+        if paper_is_expired(model.paper):
+            abort(404)
         return render_template("viewer.html", model=model, paper=model.paper)
 
     @app.route("/files/<unique_id>/<path:filename>")
@@ -348,6 +433,8 @@ def register_routes(app: Flask) -> None:
         model = db.session.get(Model3D, unique_id)
         if not model:
             abort(404)
+        if paper_is_expired(model.paper):
+            abort(404)
         directory = os.path.join(app.config["CONVERTED_FOLDER"], unique_id)
         return send_from_directory(directory, "model.glb", mimetype="model/gltf-binary")
 
@@ -356,12 +443,16 @@ def register_routes(app: Flask) -> None:
         model = db.session.get(Model3D, model_id)
         if not model or not model.qr_code_path:
             abort(404)
+        if paper_is_expired(model.paper):
+            abort(404)
         return send_from_directory(app.config["QR_FOLDER"], os.path.basename(model.qr_code_path))
 
     @app.route("/qr-print/<model_id>")
     def qr_print(model_id):
         model = db.session.get(Model3D, model_id)
         if not model:
+            abort(404)
+        if paper_is_expired(model.paper):
             abort(404)
         return render_template("qr_page.html", model=model, paper=model.paper)
 
@@ -398,6 +489,11 @@ def register_routes(app: Flask) -> None:
                 abstract=paper_data["abstract"],
                 doi=paper_data["doi"],
                 institution=paper_data["institution"],
+                pmid=paper_data["pmid"],
+                package_type=paper_data["package_type"],
+                is_public=paper_data["package_type"] == "academic",
+                payment_status="pending" if paper_data["package_type"] == "academic" else "free",
+                expires_at=package_expires_at(paper_data["package_type"]),
                 slug=make_slug(paper_data["title"]),
                 user_id=current_user.id,
             )
@@ -406,7 +502,7 @@ def register_routes(app: Flask) -> None:
             pdf_file = request.files.get("pdf")
             if pdf_file and pdf_file.filename:
                 if not allowed_pdf(pdf_file.filename):
-                    flash("Sadece .pdf dosyaları kabul edilir.", "danger")
+                    flash("Only .pdf files are accepted.", "danger")
                     return render_template("paper_new.html", form=request.form)
                 pdf_filename = f"{uuid.uuid4()}_{secure_filename(pdf_file.filename)}"
                 saved_pdf_path = os.path.join(app.config["PDF_FOLDER"], pdf_filename)
@@ -414,7 +510,7 @@ def register_routes(app: Flask) -> None:
                 pdf_errors = validate_pdf_file(saved_pdf_path)
                 if pdf_errors:
                     cleanup_file(saved_pdf_path)
-                    flash("PDF dosyası geçersiz: " + "; ".join(pdf_errors), "danger")
+                    flash("Invalid PDF file: " + "; ".join(pdf_errors), "danger")
                     return render_template("paper_new.html", form=request.form)
                 paper.pdf_path = pdf_filename
 
@@ -431,16 +527,16 @@ def register_routes(app: Flask) -> None:
                     db.session.rollback()
                     cleanup_file(saved_pdf_path)
                     logger.exception("Paper create failed after slug retry")
-                    flash("Tez kaydedilemedi. Lütfen tekrar deneyin.", "danger")
+                    flash("The publication could not be saved. Please try again.", "danger")
                     return render_template("paper_new.html", form=request.form)
             except SQLAlchemyError:
                 db.session.rollback()
                 cleanup_file(saved_pdf_path)
                 logger.exception("Paper create failed")
-                flash("Tez kaydedilemedi. Lütfen tekrar deneyin.", "danger")
+                flash("The publication could not be saved. Please try again.", "danger")
                 return render_template("paper_new.html", form=request.form)
 
-            flash("Tez/makale eklendi.", "success")
+            flash("Publication created.", "success")
             return redirect(url_for("paper_detail", slug=paper.slug))
 
         return render_template("paper_new.html", form={})
@@ -466,10 +562,10 @@ def register_routes(app: Flask) -> None:
         except SQLAlchemyError:
             db.session.rollback()
             logger.exception("Paper delete failed")
-            flash("Tez silinemedi. Lütfen tekrar deneyin.", "danger")
+            flash("The publication could not be deleted. Please try again.", "danger")
             return redirect(url_for("paper_detail", slug=slug))
         cleanup_paths(file_paths)
-        flash("Tez silindi.", "info")
+        flash("Publication deleted.", "info")
         return redirect(url_for("dashboard"))
 
     @app.route("/papers/<slug>/upload-model", methods=["POST"])
@@ -479,15 +575,24 @@ def register_routes(app: Flask) -> None:
         if paper.user_id != current_user.id:
             abort(403)
         if not check_upload_rate_limit(current_user.id, app):
-            flash("Çok kısa sürede fazla yükleme denemesi yaptınız. Lütfen birkaç dakika sonra tekrar deneyin.", "warning")
+            flash("Too many upload attempts in a short time. Please try again in a few minutes.", "warning")
             return redirect(url_for("paper_detail", slug=slug))
 
         file = request.files.get("file")
         if not file or not file.filename:
-            flash("Dosya seçilmedi.", "danger")
+            flash("No file selected.", "danger")
             return redirect(url_for("paper_detail", slug=slug))
-        if not allowed_stl(file.filename):
-            flash("Sadece .stl dosyaları kabul edilir.", "danger")
+        if not allowed_model(file.filename):
+            flash("Only .stl and .glb files are accepted in this MVP.", "danger")
+            return redirect(url_for("paper_detail", slug=slug))
+        if request.form.get("compliance_confirm") != "yes":
+            flash(
+                "You must confirm that the model is anonymized and that you have the right to share it.",
+                "danger",
+            )
+            return redirect(url_for("paper_detail", slug=slug))
+        if paper.package_type == "temporary" and paper.models:
+            flash("Temporary publications support one model. Upgrade to add multiple models.", "warning")
             return redirect(url_for("paper_detail", slug=slug))
 
         display_name = (request.form.get("display_name") or "").strip() or None
@@ -495,6 +600,7 @@ def register_routes(app: Flask) -> None:
         color = (request.form.get("color") or "").strip() or None
         unique_id = str(uuid.uuid4())
         original_name = secure_filename(file.filename)
+        source_format = original_name.rsplit(".", 1)[1].lower()
 
         upload_dir = os.path.join(app.config["UPLOAD_FOLDER"], unique_id)
         converted_dir = os.path.join(app.config["CONVERTED_FOLDER"], unique_id)
@@ -505,30 +611,39 @@ def register_routes(app: Flask) -> None:
 
         try:
             file.save(stl_path)
-            stl_errors = validate_stl_file(stl_path)
-            if stl_errors:
-                flash("STL dosyası geçersiz: " + "; ".join(stl_errors), "danger")
-                cleanup_dir(upload_dir)
-                cleanup_dir(converted_dir)
-                return redirect(url_for("paper_detail", slug=slug))
+            if source_format == "glb":
+                glb_errors = validate_glb_file(stl_path)
+                if glb_errors:
+                    flash("Invalid GLB file: " + "; ".join(glb_errors), "danger")
+                    cleanup_dir(upload_dir)
+                    cleanup_dir(converted_dir)
+                    return redirect(url_for("paper_detail", slug=slug))
+                os.replace(stl_path, glb_path)
+            else:
+                stl_errors = validate_stl_file(stl_path)
+                if stl_errors:
+                    flash("Invalid STL file: " + "; ".join(stl_errors), "danger")
+                    cleanup_dir(upload_dir)
+                    cleanup_dir(converted_dir)
+                    return redirect(url_for("paper_detail", slug=slug))
 
-            converter = STLConverter()
-            if not converter.validate(stl_path):
-                flash("STL dosyası geçersiz: " + converter_message(converter, "Dosya okunamadı."), "danger")
-                cleanup_dir(upload_dir)
-                cleanup_dir(converted_dir)
-                return redirect(url_for("paper_detail", slug=slug))
+                converter = STLConverter()
+                if not converter.validate(stl_path):
+                    flash("Invalid STL file: " + converter_message(converter, "The file could not be read."), "danger")
+                    cleanup_dir(upload_dir)
+                    cleanup_dir(converted_dir)
+                    return redirect(url_for("paper_detail", slug=slug))
 
-            success = converter.convert(stl_path, glb_path, color=color)
-            if not success or not os.path.exists(glb_path):
-                flash(
-                    "Dönüşüm başarısız: "
-                    + converter_message(converter, "STL dosyası GLB formatına dönüştürülemedi."),
-                    "danger",
-                )
-                cleanup_dir(upload_dir)
-                cleanup_dir(converted_dir)
-                return redirect(url_for("paper_detail", slug=slug))
+                success = converter.convert(stl_path, glb_path, color=color)
+                if not success or not os.path.exists(glb_path):
+                    flash(
+                        "Conversion failed: "
+                        + converter_message(converter, "The STL file could not be converted to GLB."),
+                        "danger",
+                    )
+                    cleanup_dir(upload_dir)
+                    cleanup_dir(converted_dir)
+                    return redirect(url_for("paper_detail", slug=slug))
 
             cleanup_dir(upload_dir)
             view_url = public_url("view_model", model_id=unique_id)
@@ -543,6 +658,12 @@ def register_routes(app: Flask) -> None:
                 glb_path=glb_path,
                 qr_code_path=qr_filename,
                 file_size=os.path.getsize(glb_path),
+                source_format=source_format,
+                anonymization_confirmed=True,
+                rights_confirmed=True,
+                ethics_responsibility_confirmed=True,
+                consent_confirmed_at=datetime.now(UTC),
+                consent_ip=request.headers.get("X-Forwarded-For", request.remote_addr),
             )
             db.session.add(model)
             db.session.commit()
@@ -552,7 +673,7 @@ def register_routes(app: Flask) -> None:
             cleanup_dir(converted_dir)
             cleanup_file(os.path.join(app.config["QR_FOLDER"], f"qr_{unique_id}.png"))
             logger.exception("Model save failed")
-            flash("Model kaydedilemedi. Lütfen tekrar deneyin.", "danger")
+            flash("The model could not be saved. Please try again.", "danger")
             return redirect(url_for("paper_detail", slug=slug))
         except Exception:
             db.session.rollback()
@@ -560,10 +681,10 @@ def register_routes(app: Flask) -> None:
             cleanup_dir(converted_dir)
             cleanup_file(os.path.join(app.config["QR_FOLDER"], f"qr_{unique_id}.png"))
             logger.exception("STL to GLB conversion failed")
-            flash("Dönüşüm sırasında beklenmeyen bir hata oluştu. Lütfen dosyayı kontrol edip tekrar deneyin.", "danger")
+            flash("Unexpected conversion error. Please check the file and try again.", "danger")
             return redirect(url_for("paper_detail", slug=slug))
 
-        flash("Model yüklendi ve QR kodu üretildi.", "success")
+        flash("Model uploaded and QR code generated.", "success")
         return redirect(url_for("paper_detail", slug=slug))
 
     @app.route("/models/<model_id>/edit", methods=["GET", "POST"])
@@ -582,9 +703,9 @@ def register_routes(app: Flask) -> None:
             except SQLAlchemyError:
                 db.session.rollback()
                 logger.exception("Model edit failed")
-                flash("Model bilgileri kaydedilemedi.", "danger")
+                flash("Model details could not be saved.", "danger")
                 return render_template("model_edit.html", model=model, paper=model.paper)
-            flash("Model bilgileri güncellendi.", "success")
+            flash("Model details updated.", "success")
             return redirect(url_for("paper_detail", slug=model.paper.slug))
         return render_template("model_edit.html", model=model, paper=model.paper)
 
@@ -604,14 +725,18 @@ def register_routes(app: Flask) -> None:
         except SQLAlchemyError:
             db.session.rollback()
             logger.exception("Model delete failed")
-            flash("Model silinemedi. Lütfen tekrar deneyin.", "danger")
+            flash("The model could not be deleted. Please try again.", "danger")
             return redirect(url_for("paper_detail", slug=slug))
         cleanup_paths(file_paths)
-        flash("Model silindi.", "info")
+        flash("Model deleted.", "info")
         return redirect(url_for("paper_detail", slug=slug))
 
 
 app = create_app()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=app.config.get("DEBUG", False))
+    app.run(
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 5000)),
+        debug=app.config.get("DEBUG", False),
+    )

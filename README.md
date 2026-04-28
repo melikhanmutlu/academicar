@@ -83,6 +83,42 @@ python -m pytest tests -p no:cacheprovider
 
 Windows üzerinde bazı kilitli pytest geçici klasörleri oluşursa `.gitignore` bunları dışarıda bırakır. Test runtime verileri `tests_runtime/` altında üretilir.
 
+## Railway Deploy
+
+Repository Railway'e baglandiginda `railway.json` ve `Procfile` su production komutunu kullanir:
+
+```bash
+gunicorn app:app --bind 0.0.0.0:$PORT
+```
+
+Railway panelinde onerilen kurulum:
+
+1. New Project -> Deploy from GitHub repo -> `melikhanmutlu/academicar`
+2. Add service -> PostgreSQL
+3. Flask service icin variables ekle:
+
+```env
+APP_ENV=production
+SECRET_KEY=<python -c "import secrets; print(secrets.token_hex(32))" ciktisi>
+DATABASE_URL=<Railway PostgreSQL tarafindan verilir>
+SITE_URL=https://<railway-domain>
+```
+
+Google OAuth kullanilacaksa ekle:
+
+```env
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+```
+
+Google Cloud Console redirect URI:
+
+```text
+https://<railway-domain>/auth/google/callback
+```
+
+Not: `uploads/`, `converted/`, `qr_codes/` ve `pdfs/` Railway uzerinde ephemeral dosya sistemine yazilir. Demo/pilot icin yeterlidir; kalici production dosyalari icin S3, Cloudflare R2 veya benzeri object storage'a tasinmalidir.
+
 ## Kullanıcı Akışı
 
 1. Kullanıcı landing page’den kayıt olur veya giriş yapar.

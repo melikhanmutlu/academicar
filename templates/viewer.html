@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -74,7 +74,7 @@
       bounds="tight"
       reveal="auto">
       <button slot="ar-button" class="absolute bottom-7 right-7 rounded-full bg-white text-[#111111] px-5 py-3 font-bold hover:scale-[1.02] transition">
-        AR ile Görüntüle
+        View in AR
       </button>
     </model-viewer>
 
@@ -83,13 +83,13 @@
         <span class="brand-mark !w-7 !h-7">A</span>
         <span class="font-serif font-semibold">AcademicAR</span>
       </a>
-      <button id="infoBtn" class="pointer-events-auto rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white/80 backdrop-blur-xl hover:bg-white/15 transition">Bilgi</button>
+      <button id="infoBtn" class="pointer-events-auto rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white/80 backdrop-blur-xl hover:bg-white/15 transition">Info</button>
     </header>
 
     <div id="viewerStatus" class="absolute left-1/2 top-1/2 z-40 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-white/10 bg-[#111111]/85 px-5 py-4 text-sm text-white/80 backdrop-blur-xl">
       <div class="flex items-center gap-3">
         <span class="h-2.5 w-2.5 rounded-full bg-white" style="animation: pulseDot 1.4s ease-in-out infinite;"></span>
-        <span>Model yükleniyor...</span>
+        <span>Loading model...</span>
       </div>
     </div>
 
@@ -103,7 +103,7 @@
           <p class="font-bold mt-1">GLB</p>
         </div>
         <div class="rounded-lg bg-white/[0.06] p-3">
-        <p class="text-white/40">Boyut</p>
+        <p class="text-white/40">Size</p>
           <p class="font-bold mt-1">{{ format_file_size(model.file_size) if format_file_size is defined else model.file_size }}</p>
         </div>
         <div class="rounded-lg bg-white/[0.06] p-3">
@@ -111,36 +111,44 @@
           <p class="font-bold mt-1">Hazır</p>
         </div>
       </div>
+      <div class="mt-3 flex flex-wrap gap-2 text-xs" data-screenshot-tools>
+        <button type="button" data-shot="front" class="rounded-full bg-white/[0.08] px-3 py-2 text-white/75 hover:bg-white/[0.14]">Front</button>
+        <button type="button" data-shot="right" class="rounded-full bg-white/[0.08] px-3 py-2 text-white/75 hover:bg-white/[0.14]">Right</button>
+        <button type="button" data-shot="left" class="rounded-full bg-white/[0.08] px-3 py-2 text-white/75 hover:bg-white/[0.14]">Left</button>
+        <button type="button" data-shot="top" class="rounded-full bg-white/[0.08] px-3 py-2 text-white/75 hover:bg-white/[0.14]">Top</button>
+        <button type="button" data-shot="perspective" class="rounded-full bg-white/[0.08] px-3 py-2 text-white/75 hover:bg-white/[0.14]">Perspective</button>
+      </div>
     </section>
 
     <aside id="infoPanel" class="info-drawer absolute top-0 right-0 bottom-0 z-40 w-full sm:w-[420px] bg-[#111111]/94 border-l border-white/10 overflow-y-auto p-6 backdrop-blur-2xl">
       <div class="flex items-center justify-between mb-6">
         <div>
-          <p class="text-xs uppercase tracking-[0.18em] text-white/55">Paper metadata</p>
-          <h2 class="font-serif text-2xl font-semibold mt-1">Tez Bilgisi</h2>
+          <p class="text-xs uppercase tracking-[0.18em] text-white/55">Publication metadata</p>
+          <h2 class="font-serif text-2xl font-semibold mt-1">Publication Info</h2>
         </div>
         <button id="closeInfo" class="rounded-full border border-white/10 w-9 h-9 text-white/70 hover:text-white hover:bg-white/10">×</button>
       </div>
 
       <h3 class="font-semibold text-lg mb-4">{{ paper.title }}</h3>
       <div class="space-y-3 text-sm text-white/70">
-        {% if paper.authors %}<p><span class="text-white/40">Yazarlar:</span> {{ paper.authors }}</p>{% endif %}
-        {% if paper.year %}<p><span class="text-white/40">Yıl:</span> {{ paper.year }}</p>{% endif %}
-        {% if paper.field %}<p><span class="text-white/40">Alan:</span> {{ paper.field }}</p>{% endif %}
-        {% if paper.institution %}<p><span class="text-white/40">Kurum:</span> {{ paper.institution }}</p>{% endif %}
+        {% if paper.authors %}<p><span class="text-white/40">Authors:</span> {{ paper.authors }}</p>{% endif %}
+        {% if paper.year %}<p><span class="text-white/40">Year:</span> {{ paper.year }}</p>{% endif %}
+        {% if paper.field %}<p><span class="text-white/40">Field:</span> {{ paper.field }}</p>{% endif %}
+        {% if paper.institution %}<p><span class="text-white/40">Institution:</span> {{ paper.institution }}</p>{% endif %}
         {% if paper.doi %}<p><span class="text-white/40">DOI:</span> <a href="https://doi.org/{{ paper.doi }}" target="_blank" rel="noopener noreferrer" class="text-white underline underline-offset-4">{{ paper.doi }}</a></p>{% endif %}
+        {% if paper.pmid %}<p><span class="text-white/40">PMID:</span> {{ paper.pmid }}</p>{% endif %}
       </div>
 
       {% if paper.abstract %}
         <div class="mt-6 pt-6 border-t border-white/10">
-          <h4 class="font-semibold text-sm mb-2 text-white/80">Özet</h4>
+          <h4 class="font-semibold text-sm mb-2 text-white/80">Description / Abstract</h4>
           <p class="text-sm text-white/60 leading-relaxed whitespace-pre-line">{{ paper.abstract }}</p>
         </div>
       {% endif %}
 
       {% if model.description %}
         <div class="mt-6 pt-6 border-t border-white/10">
-          <h4 class="font-semibold text-sm mb-2 text-white/80">Model Açıklaması</h4>
+          <h4 class="font-semibold text-sm mb-2 text-white/80">Model Note</h4>
           <p class="text-sm text-white/60">{{ model.description }}</p>
         </div>
       {% endif %}
@@ -153,6 +161,14 @@
     const closeInfo = document.getElementById('closeInfo');
     const viewer = document.getElementById('viewer');
     const viewerStatus = document.getElementById('viewerStatus');
+    const screenshotTools = document.querySelector('[data-screenshot-tools]');
+    const shotOrbits = {
+      front: '0deg 90deg auto',
+      right: '90deg 90deg auto',
+      left: '-90deg 90deg auto',
+      top: '0deg 0deg auto',
+      perspective: '35deg 70deg auto'
+    };
 
     infoBtn.addEventListener('click', () => infoPanel.classList.add('open'));
     closeInfo.addEventListener('click', () => infoPanel.classList.remove('open'));
@@ -162,9 +178,28 @@
       viewerStatus.classList.add('hidden');
     });
     viewer.addEventListener('error', () => {
-      viewerStatus.textContent = 'Model yüklenemedi. GLB dosyasına erişilemiyor veya dosya bozuk olabilir.';
+      viewerStatus.textContent = 'The model could not be loaded. The GLB file may be unavailable or invalid.';
       viewerStatus.classList.remove('hidden');
     });
+
+    const waitFrame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const downloadShot = async (viewName) => {
+      if (!viewer.loaded || typeof viewer.toDataURL !== 'function') return;
+      viewer.pause();
+      viewer.cameraOrbit = shotOrbits[viewName] || shotOrbits.perspective;
+      await waitFrame();
+      const link = document.createElement('a');
+      link.href = viewer.toDataURL('image/png');
+      link.download = `{{ (model.display_name or model.original_filename)|replace(' ', '-') }}-${viewName}.png`;
+      link.click();
+    };
+
+    if (screenshotTools) {
+      screenshotTools.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-shot]');
+        if (button) downloadShot(button.dataset.shot);
+      });
+    }
   </script>
 </body>
 </html>

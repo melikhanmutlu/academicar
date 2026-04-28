@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Panelim — AcademicAR{% endblock %}
+{% block title %}Dashboard - AcademicAR{% endblock %}
 
 {% block content %}
 {% set stats = namespace(total_models=0) %}
@@ -11,23 +11,23 @@
   <div class="grid lg:grid-cols-[1fr_auto] gap-6 items-end mb-8 reveal-up">
     <div>
       <span class="eyebrow">Research workspace</span>
-      <h1 class="font-serif text-4xl sm:text-5xl font-bold text-[#111827] mt-4">Panelim</h1>
-      <p class="text-[#5c6473] mt-2">Tezler, modeller, QR durumları ve yayın bağlantıları tek çalışma alanında.</p>
+      <h1 class="font-serif text-4xl sm:text-5xl font-bold text-[#111827] mt-4">Dashboard</h1>
+      <p class="text-[#5c6473] mt-2">Manage publication pages, model uploads, QR codes, screenshots, and public viewer links.</p>
     </div>
-    <a href="{{ url_for('paper_new') }}" class="btn-primary">+ Yeni Tez/Makale</a>
+    <a href="{{ url_for('paper_new') }}" class="btn-primary">+ New Publication</a>
   </div>
 
   <div class="grid sm:grid-cols-3 gap-4 mb-8">
     <div class="surface rounded-xl p-5 reveal-up">
-      <p class="text-sm text-[#5c6473]">Akademik kayıt</p>
+      <p class="text-sm text-[#5c6473]">Publications</p>
       <p class="text-3xl font-bold text-[#111827] mt-2">{{ papers|length }}</p>
     </div>
     <div class="surface rounded-xl p-5 reveal-up delay-1">
-      <p class="text-sm text-[#5c6473]">3D model</p>
+      <p class="text-sm text-[#5c6473]">3D models</p>
       <p class="text-3xl font-bold text-[#111827] mt-2">{{ stats.total_models }}</p>
     </div>
     <div class="surface rounded-xl p-5 reveal-up delay-2">
-      <p class="text-sm text-[#5c6473]">PDF ekli çalışma</p>
+      <p class="text-sm text-[#5c6473]">PDF attachments</p>
       <p class="text-3xl font-bold text-[#111827] mt-2">{{ papers_with_pdf }}</p>
     </div>
   </div>
@@ -41,8 +41,8 @@
           <div class="flex items-start justify-between gap-4">
             <div class="min-w-0">
               <div class="flex flex-wrap gap-2 mb-3">
-                <span class="text-[11px] px-2 py-1 rounded-full bg-[#111827] text-white">{{ p.field or 'Genel' }}</span>
-                {% if p.year %}<span class="text-[11px] px-2 py-1 rounded-full bg-white/70 text-[#5c6473]">{{ p.year }}</span>{% endif %}
+                <span class="text-[11px] px-2 py-1 rounded-full bg-[#111827] text-white">{{ p.field or 'General' }}</span>
+                <span class="text-[11px] px-2 py-1 rounded-full bg-white/70 text-[#5c6473]">{{ 'Academic' if p.package_type == 'academic' else 'Temporary' }}</span>
                 {% if p.pdf_path %}<span class="text-[11px] px-2 py-1 rounded-full bg-[#111827]/10 text-[#111827]">PDF</span>{% endif %}
               </div>
               <h3 class="font-serif font-semibold text-2xl leading-tight text-[#111827] line-clamp-2">{{ p.title }}</h3>
@@ -50,7 +50,7 @@
             </div>
             <div class="w-20 h-20 shrink-0 rounded-lg bg-[#111827] border border-white/10 grid place-items-center overflow-hidden">
               {% if first_model and first_model.qr_code_path %}
-                <img src="{{ url_for('qr_image', model_id=first_model.id) }}" class="w-16 h-16 rounded-sm transition group-hover:scale-110" alt="QR">
+                <img src="{{ url_for('qr_image', model_id=first_model.id) }}" class="w-16 h-16 rounded-sm transition group-hover:scale-110" alt="QR code">
               {% else %}
                 <div class="w-10 h-10 rounded-full border border-white/25 grid place-items-center text-white/80">3D</div>
               {% endif %}
@@ -59,16 +59,16 @@
 
           <div class="mt-6 grid grid-cols-3 gap-2 text-xs">
             <div class="rounded-lg bg-white/50 p-3">
-              <p class="text-[#5c6473]">Model</p>
+              <p class="text-[#5c6473]">Models</p>
               <p class="font-bold text-[#111827] mt-1">{{ p.models|length }}</p>
             </div>
             <div class="rounded-lg bg-white/50 p-3">
               <p class="text-[#5c6473]">QR</p>
-              <p class="font-bold text-[#111827] mt-1">{{ 'Hazır' if p.models else 'Bekliyor' }}</p>
+              <p class="font-bold text-[#111827] mt-1">{{ 'Ready' if p.models else 'Waiting' }}</p>
             </div>
             <div class="rounded-lg bg-white/50 p-3">
-              <p class="text-[#5c6473]">Tarih</p>
-              <p class="font-bold text-[#111827] mt-1">{{ p.created_at.strftime('%d.%m') }}</p>
+              <p class="text-[#5c6473]">Expires</p>
+              <p class="font-bold text-[#111827] mt-1">{{ p.expires_at.strftime('%m.%d') if p.expires_at else 'None' }}</p>
             </div>
           </div>
         </a>
@@ -78,10 +78,10 @@
     <div class="dark-surface rounded-xl p-10 sm:p-14 text-center overflow-hidden relative reveal-up">
       <div class="absolute inset-0 volumetric-grid opacity-30"></div>
       <div class="relative">
-        <div class="w-20 h-20 mx-auto rounded-2xl bg-white/10 border border-white/10 grid place-items-center text-white font-bold text-xl">STL</div>
-        <h2 class="font-serif text-3xl font-semibold text-white mt-6">İlk araştırma alanınızı oluşturun.</h2>
-        <p class="text-white/60 mt-3 max-w-xl mx-auto">Tez bilgilerini ekleyin, ardından STL modelinizi dönüştürüp QR çıktısını alın.</p>
-        <a href="{{ url_for('paper_new') }}" class="btn-primary mt-7">İlk Tezi Ekle</a>
+        <div class="w-20 h-20 mx-auto rounded-2xl bg-white/10 border border-white/10 grid place-items-center text-white font-bold text-xl">3D</div>
+        <h2 class="font-serif text-3xl font-semibold text-white mt-6">Create your first publication page.</h2>
+        <p class="text-white/60 mt-3 max-w-xl mx-auto">Add publication metadata, then upload an anonymized STL or GLB model and generate a viewer QR code.</p>
+        <a href="{{ url_for('paper_new') }}" class="btn-primary mt-7">Create Publication</a>
       </div>
     </div>
   {% endif %}

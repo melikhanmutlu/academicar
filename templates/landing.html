@@ -1,38 +1,38 @@
 {% extends "base.html" %}
-{% block title %}AcademicAR - Clinical spatial publishing{% endblock %}
+{% block title %}AcademicAR - 3D and AR models for academic publications{% endblock %}
 
 {% block content %}
 <section class="hero-stage">
   <div class="relative max-w-[1760px] mx-auto px-5 sm:px-8 lg:px-14 py-16 lg:py-20">
     <div class="grid xl:grid-cols-[0.84fr_1.16fr] gap-10 2xl:gap-20 items-center">
       <div class="reveal-up max-w-4xl">
-        <span class="eyebrow"><span class="w-2 h-2 rounded-full bg-[#2563eb]"></span> Clinical spatial layer</span>
-        <h1 class="font-sans text-[3.15rem] sm:text-[5.8rem] lg:text-[6.8rem] 2xl:text-[7.9rem] leading-[0.86] font-semibold mt-7 tracking-[-0.07em] text-[#0f172a]">
+        <span class="eyebrow"><span class="w-2 h-2 rounded-full bg-[#2563eb]"></span> Academic spatial publishing</span>
+        <h1 class="font-sans text-[3.15rem] sm:text-[5.8rem] lg:text-[6.8rem] 2xl:text-[7.9rem] leading-[0.86] font-semibold mt-7 text-[#0f172a]">
           AcademicAR
         </h1>
-        <p class="mt-7 text-2xl lg:text-3xl 2xl:text-[2rem] text-[#1e293b] max-w-3xl leading-tight tracking-[-0.03em]">
-          Akademik modelleri steril, yayına hazır 3D/AR çalışma alanına taşıyın.
+        <p class="mt-7 text-2xl lg:text-3xl 2xl:text-[2rem] text-[#1e293b] max-w-3xl leading-tight">
+          Share 3D and AR models with academic papers, posters, and presentations.
         </p>
         <p class="mt-5 text-base lg:text-lg text-[#64748b] max-w-3xl leading-relaxed">
-          STL dosyasını yükleyin; GLB viewer bağlantısı ve baskıya hazır QR çıktısı üretin. Okuyucu modeli tarayıcıda inceler, destekleyen cihazlarda AR modunda açar.
+          Upload an STL or GLB model, generate a browser-ready viewer link, create a QR code, and let readers inspect your model in 3D or AR from mobile devices.
         </p>
         <div class="mt-8 flex flex-wrap gap-3">
-          <a href="{{ url_for('auth.register') }}" class="btn-primary">Çalışma Alanı Oluştur</a>
-          <a href="#workflow" class="btn-secondary">Akışı Gör</a>
+          <a href="{{ url_for('auth.register') }}" class="btn-primary">Create Workspace</a>
+          <a href="#workflow" class="btn-secondary">See Workflow</a>
         </div>
 
         <div class="clinical-metrics mt-10 max-w-3xl">
           <div>
-            <p>STL</p>
-            <span>Kaynak model</span>
+            <p>STL/GLB</p>
+            <span>Model upload</span>
           </div>
           <div>
-            <p>GLB</p>
-            <span>Web-ready çıktı</span>
+            <p>QR</p>
+            <span>Publication link</span>
           </div>
           <div>
             <p>AR</p>
-            <span>Cihazda deneyim</span>
+            <span>Mobile viewing</span>
           </div>
         </div>
       </div>
@@ -86,19 +86,20 @@
   <div class="max-w-[1760px] mx-auto px-5 sm:px-8 lg:px-14">
     <div class="workflow-layout">
       <div class="reveal-up">
-        <span class="eyebrow">Research pipeline</span>
-        <h2 class="font-sans text-4xl lg:text-6xl 2xl:text-7xl font-semibold text-[#0f172a] mt-4 leading-[0.95] tracking-[-0.055em]">Modelden yayına tek akış.</h2>
-        <p class="text-[#64748b] leading-relaxed text-lg max-w-3xl mt-6">Upload formu, dönüşüm motoru, viewer ve QR çıktısı aynı ürün hissiyle çalışır. Araştırmacı teknik ayrıntıya boğulmaz; sonuç yayınlanabilir hale gelir.</p>
+        <span class="eyebrow">How it works</span>
+        <h2 class="font-sans text-4xl lg:text-6xl 2xl:text-7xl font-semibold text-[#0f172a] mt-4 leading-[0.95]">From segmentation model to publication link.</h2>
+        <p class="text-[#64748b] leading-relaxed text-lg max-w-3xl mt-6">AcademicAR turns technical model files into a shareable academic asset: model upload, GLB viewer, screenshots, QR code, and mobile AR access in one flow.</p>
 
         <div class="clinical-steps mt-12">
           {% for step in [
-            ('01', 'Tezi yapılandır', 'Başlık, yazarlar, kurum, DOI ve özet alanlarını akademik kayıt gibi sakla.'),
-            ('02', 'STL modelini dönüştür', 'Modeli renklendir, GLB formatına çevir ve web viewer için optimize et.'),
-            ('03', 'QR ile yayınla', 'Kalıcı viewer linki ve baskıya hazır QR çıktısını araştırmanın içine yerleştir.')
+            ('01', 'Upload your model', 'Upload an anonymized STL or GLB segmentation model from your account.'),
+            ('02', 'Create a publication page', 'Add title, authors, institution, DOI/PMID, description, and model notes.'),
+            ('03', 'Get QR and link', 'Use the generated viewer URL and QR code in papers, posters, and presentations.'),
+            ('04', 'Show in 3D or AR', 'Readers can rotate, zoom, inspect, and open the model in AR on supported phones and tablets.')
           ] %}
             <div class="reveal-up delay-{{ loop.index }}">
               <div class="text-sm font-bold text-[#2563eb]">{{ step[0] }}</div>
-              <h3 class="font-sans text-2xl font-semibold text-[#0f172a] mt-3 tracking-[-0.035em]">{{ step[1] }}</h3>
+              <h3 class="font-sans text-2xl font-semibold text-[#0f172a] mt-3">{{ step[1] }}</h3>
               <p class="text-sm text-[#64748b] leading-relaxed mt-3">{{ step[2] }}</p>
             </div>
           {% endfor %}
@@ -120,16 +121,18 @@
   <div class="max-w-[1760px] mx-auto px-5 sm:px-8 lg:px-14">
     <div class="workspace-layout">
       <div class="reveal-up max-w-3xl">
-        <span class="eyebrow">Workspace signals</span>
-        <h2 class="font-sans text-4xl lg:text-6xl 2xl:text-7xl font-semibold mt-5 leading-[0.95] tracking-[-0.055em]">Dashboard klinik araştırma masası gibi davranır.</h2>
-        <p class="text-[#64748b] leading-relaxed mt-5 text-lg">Model sayısı, QR durumu, PDF varlığı ve son güncelleme bilgileri daha az görsel gürültüyle okunur. Boş durum bile kullanıcıyı ilk dönüşüme yönlendirir.</p>
+        <span class="eyebrow">Features</span>
+        <h2 class="font-sans text-4xl lg:text-6xl 2xl:text-7xl font-semibold mt-5 leading-[0.95]">A publication-ready workspace for 3D academic models.</h2>
+        <p class="text-[#64748b] leading-relaxed mt-5 text-lg">Manage publication metadata, upload models, generate QR codes, capture standard views, and keep public links active for temporary or paid publication windows.</p>
       </div>
       <div class="clinical-signal-list reveal-up delay-2">
         {% for item in [
-          ('Compact metadata', 'Alan, yıl, DOI ve model sayısı tek bakışta.'),
-          ('QR state', 'Her model için baskıya hazır QR önizlemesi.'),
-          ('Conversion console', 'Upload sırasında STL -> GLB -> QR aşamaları görünür.'),
-          ('Spatial viewer', 'Tam ekran model, bilgi paneli ve premium AR CTA.')
+          ('3D model upload', 'STL and GLB support now, with OBJ planned for the next converter pass.'),
+          ('Web-based viewer', 'A full-screen browser viewer with metadata and mobile AR controls.'),
+          ('Automatic QR code', 'Every model receives a shareable viewer URL and QR image.'),
+          ('Publication archive', 'Project-based model records for papers, posters, and presentations.'),
+          ('Screenshots', 'Front, right, left, top, and perspective captures for publication assets.'),
+          ('Privacy guardrails', 'Uploads require anonymization, rights, and ethics responsibility confirmation.')
         ] %}
           <div>
             <h3 class="font-semibold text-[#0f172a]">{{ item[0] }}</h3>
@@ -142,11 +145,29 @@
 </section>
 
 <section class="py-24 lg:py-28">
-  <div class="max-w-[1760px] mx-auto px-5 sm:px-8 lg:px-14 text-center reveal-up">
-    <h2 class="font-sans text-4xl lg:text-6xl font-semibold text-[#0f172a] tracking-[-0.055em]">Bir sonraki modeliniz yayına hazır mı?</h2>
-    <p class="text-[#64748b] mt-4 text-lg">AcademicAR, teknik 3D dosyayı akademik yayın deneyimine bağlayan ince katmandır.</p>
-    <div class="mt-8">
-      <a href="{{ url_for('auth.register') }}" class="btn-primary">Ücretsiz Başla</a>
+  <div class="max-w-[1760px] mx-auto px-5 sm:px-8 lg:px-14 reveal-up">
+    <div class="grid lg:grid-cols-2 gap-5">
+      <div class="surface rounded-xl p-7">
+        <p class="eyebrow">Temporary Publication</p>
+        <h3 class="font-sans text-4xl font-semibold text-[#0f172a] mt-4">0 TL</h3>
+        <ul class="mt-6 space-y-3 text-[#64748b]">
+          <li>3-day active link</li>
+          <li>QR code</li>
+          <li>3D viewing</li>
+          <li>Screenshot capture</li>
+        </ul>
+      </div>
+      <div class="dark-surface rounded-xl p-7 text-white">
+        <p class="eyebrow bg-white/10 text-white border-white/15">Academic Publication Package</p>
+        <h3 class="font-sans text-4xl font-semibold mt-4">500 TL</h3>
+        <ul class="mt-6 space-y-3 text-white/70">
+          <li>3-year active link</li>
+          <li>Persistent QR code</li>
+          <li>Public sharing</li>
+          <li>Multiple model support</li>
+          <li>Publication metadata fields</li>
+        </ul>
+      </div>
     </div>
   </div>
 </section>

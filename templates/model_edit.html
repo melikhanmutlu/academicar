@@ -1,19 +1,19 @@
 {% extends "base.html" %}
-{% block title %}Model Düzenle — AcademicAR{% endblock %}
+{% block title %}Edit Model - AcademicAR{% endblock %}
 
 {% block content %}
 <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-  <a href="{{ url_for('paper_detail', slug=paper.slug) }}" class="nav-link inline-flex mb-5">&larr; Teze dön</a>
+  <a href="{{ url_for('paper_detail', slug=paper.slug) }}" class="nav-link inline-flex mb-5">&larr; Back to publication</a>
 
   <div class="grid lg:grid-cols-[0.85fr_1.15fr] gap-6 items-stretch">
     <aside class="dark-surface rounded-xl p-7 overflow-hidden relative">
       <div class="absolute inset-0 volumetric-grid opacity-35"></div>
       <div class="relative">
         <span class="eyebrow bg-white/10 text-white border-white/15">Model metadata</span>
-        <h1 class="font-serif text-4xl font-bold text-white mt-5 leading-tight">Viewer kartını düzenleyin.</h1>
-        <p class="text-white/60 mt-4">Model adı ve açıklaması public viewer bilgi panelinde ve çalışma detayında görünür.</p>
+        <h1 class="font-serif text-4xl font-bold text-white mt-5 leading-tight">Edit the viewer card.</h1>
+        <p class="text-white/60 mt-4">The model name and note appear in the public viewer info panel and publication detail page.</p>
         <div class="mt-8 rounded-xl bg-white/[0.06] border border-white/10 p-4">
-          <p class="text-xs text-white/50">Orijinal dosya</p>
+          <p class="text-xs text-white/50">Original file</p>
           <p class="text-white font-semibold mt-1 break-all">{{ model.original_filename }}</p>
         </div>
       </div>
@@ -22,18 +22,18 @@
     <form method="POST" class="surface rounded-xl p-6 sm:p-8 space-y-6">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div>
-        <label class="field-label">Model Adı</label>
-        <input type="text" name="display_name" value="{{ model.display_name or '' }}" class="field-input" placeholder="Örn: Femur rekonstrüksiyonu">
+        <label class="field-label">Model name</label>
+        <input type="text" name="display_name" value="{{ model.display_name or '' }}" class="field-input" placeholder="Example: Femur reconstruction">
       </div>
 
       <div>
-        <label class="field-label">Açıklama</label>
-        <textarea name="description" rows="6" class="field-textarea" placeholder="Modelin çalışma içindeki bağlamı">{{ model.description or '' }}</textarea>
+        <label class="field-label">Model note</label>
+        <textarea name="description" rows="6" class="field-textarea" placeholder="Describe the model context within the publication">{{ model.description or '' }}</textarea>
       </div>
 
       <div class="flex items-center justify-end gap-3 pt-4 border-t border-[#141821]/10">
-        <a href="{{ url_for('paper_detail', slug=paper.slug) }}" class="btn-secondary">İptal</a>
-        <button type="submit" class="btn-primary">Kaydet</button>
+        <a href="{{ url_for('paper_detail', slug=paper.slug) }}" class="btn-secondary">Cancel</a>
+        <button type="submit" class="btn-primary">Save</button>
       </div>
     </form>
   </div>

@@ -38,25 +38,25 @@ def init_oauth(app):
 
 
 class LoginForm(FlaskForm):
-    email = StringField("E-posta", validators=[DataRequired(), Email()])
-    password = PasswordField("Şifre", validators=[DataRequired()])
-    remember = BooleanField("Beni hatırla")
-    submit = SubmitField("Giriş Yap")
+    email = StringField("Email", validators=[DataRequired(), Email()])
+    password = PasswordField("Password", validators=[DataRequired()])
+    remember = BooleanField("Remember me")
+    submit = SubmitField("Log in")
 
 
 class RegistrationForm(FlaskForm):
-    username = StringField("Ad Soyad", validators=[DataRequired(), Length(min=2, max=80)])
-    email = StringField("E-posta", validators=[DataRequired(), Email()])
-    password = PasswordField("Şifre", validators=[DataRequired(), Length(min=6)])
+    username = StringField("Full name", validators=[DataRequired(), Length(min=2, max=80)])
+    email = StringField("Email", validators=[DataRequired(), Email()])
+    password = PasswordField("Password", validators=[DataRequired(), Length(min=6)])
     confirm = PasswordField(
-        "Şifre (tekrar)",
-        validators=[DataRequired(), EqualTo("password", message="Şifreler eşleşmiyor")],
+        "Confirm password",
+        validators=[DataRequired(), EqualTo("password", message="Passwords do not match.")],
     )
-    submit = SubmitField("Kayıt Ol")
+    submit = SubmitField("Sign up")
 
     def validate_email(self, field):
         if User.query.filter_by(email=field.data.lower()).first():
-            raise ValidationError("Bu e-posta zaten kayıtlı.")
+            raise ValidationError("This email is already registered.")
 
 
 @auth_bp.route("/register", methods=["GET", "POST"])
@@ -74,7 +74,7 @@ def register():
         db.session.add(user)
         db.session.commit()
         login_user(user)
-        flash("Kayıt başarılı! Hoş geldiniz.", "success")
+        flash("Registration successful. Welcome.", "success")
         return redirect(url_for("dashboard"))
 
     return render_template("register.html", form=form)
@@ -94,7 +94,7 @@ def login():
             if next_page and is_safe_redirect_url(next_page):
                 return redirect(next_page)
             return redirect(url_for("dashboard"))
-        flash("E-posta veya şifre hatalı.", "danger")
+        flash("Invalid email or password.", "danger")
 
     return render_template("login.html", form=form)
 
@@ -103,14 +103,14 @@ def login():
 @login_required
 def logout():
     logout_user()
-    flash("Çıkış yapıldı.", "info")
+    flash("Logged out.", "info")
     return redirect(url_for("landing"))
 
 
 @auth_bp.route("/google")
 def google_login():
     if not current_app.config.get("GOOGLE_CLIENT_ID"):
-        flash("Google girişi henüz yapılandırılmadı.", "warning")
+        flash("Google login is not configured yet.", "warning")
         return redirect(url_for("auth.login"))
     redirect_uri = public_url("auth.google_callback")
     return oauth.google.authorize_redirect(redirect_uri)
@@ -121,7 +121,7 @@ def google_callback():
     try:
         token = oauth.google.authorize_access_token()
     except Exception as e:
-        flash(f"Google girişi başarısız: {e}", "danger")
+        flash(f"Google login failed: {e}", "danger")
         return redirect(url_for("auth.login"))
 
     userinfo = token.get("userinfo")
@@ -134,10 +134,10 @@ def google_callback():
     picture = userinfo.get("picture")
 
     if not google_id or not email:
-        flash("Google'dan kullanıcı bilgileri alınamadı.", "danger")
+        flash("Could not retrieve user information from Google.", "danger")
         return redirect(url_for("auth.login"))
     if userinfo.get("email_verified") is not True:
-        flash("Google hesabınızın e-posta adresi doğrulanmamış.", "danger")
+        flash("Your Google account email address is not verified.", "danger")
         return redirect(url_for("auth.login"))
 
     user = User.query.filter_by(google_id=google_id).first()
@@ -158,5 +158,5 @@ def google_callback():
     db.session.commit()
 
     login_user(user)
-    flash(f"Hoş geldin, {user.username}!", "success")
+    flash(f"Welcome, {user.username}.", "success")
     return redirect(url_for("dashboard"))

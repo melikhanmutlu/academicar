@@ -1,7 +1,7 @@
 """
 SQLAlchemy database models: User, Paper, Model3D.
 """
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -54,6 +54,14 @@ class Paper(db.Model):
     pdf_path = db.Column(db.String(500), nullable=True)
     slug = db.Column(db.String(250), unique=True, nullable=False, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    package_type = db.Column(db.String(30), nullable=False, default="temporary")
+    status = db.Column(db.String(30), nullable=False, default="active")
+    is_public = db.Column(db.Boolean, nullable=False, default=False)
+    payment_status = db.Column(db.String(30), nullable=False, default="free")
+    payment_provider = db.Column(db.String(50), nullable=True)
+    payment_reference = db.Column(db.String(200), nullable=True)
+    pmid = db.Column(db.String(100), nullable=True)
+    expires_at = db.Column(db.DateTime, nullable=True, default=lambda: utc_now() + timedelta(days=3))
     created_at = db.Column(db.DateTime, default=utc_now)
 
     models = db.relationship(
@@ -76,6 +84,12 @@ class Model3D(db.Model):
     glb_path = db.Column(db.String(500), nullable=False)
     qr_code_path = db.Column(db.String(500), nullable=True)
     file_size = db.Column(db.Integer, nullable=True)
+    source_format = db.Column(db.String(10), nullable=False, default="stl")
+    anonymization_confirmed = db.Column(db.Boolean, nullable=False, default=False)
+    rights_confirmed = db.Column(db.Boolean, nullable=False, default=False)
+    ethics_responsibility_confirmed = db.Column(db.Boolean, nullable=False, default=False)
+    consent_confirmed_at = db.Column(db.DateTime, nullable=True)
+    consent_ip = db.Column(db.String(100), nullable=True)
     created_at = db.Column(db.DateTime, default=utc_now)
 
     def __repr__(self) -> str:

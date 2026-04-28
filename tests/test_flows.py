@@ -116,7 +116,7 @@ def test_invalid_stl_upload_leaves_no_model(client):
 
     response = client.post(
         f"/papers/{slug}/upload-model",
-        data={"file": upload_file_bytes(b"bad", "bad.stl")},
+        data={"file": upload_file_bytes(b"bad", "bad.stl"), "compliance_confirm": "yes"},
         content_type="multipart/form-data",
         follow_redirects=True,
     )
@@ -211,6 +211,7 @@ def test_valid_stl_upload_creates_model_and_qr(client, monkeypatch):
             "display_name": "Test Model",
             "description": "Pilot fixture",
             "file": upload_file_bytes(valid_ascii_stl_bytes(), "model.stl"),
+            "compliance_confirm": "yes",
         },
         content_type="multipart/form-data",
         follow_redirects=True,
@@ -233,7 +234,7 @@ def test_real_stl_upload_creates_glb_qr_and_public_viewer(client):
 
     response = client.post(
         f"/papers/{slug}/upload-model",
-        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "real.stl")},
+        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "real.stl"), "compliance_confirm": "yes"},
         content_type="multipart/form-data",
         follow_redirects=True,
     )
@@ -251,6 +252,50 @@ def test_real_stl_upload_creates_glb_qr_and_public_viewer(client):
     assert client.get(f"/files/{model_id}/model.glb").status_code == 200
 
 
+def test_glb_upload_creates_model_without_conversion(client):
+    from tests.conftest import register, upload_file_bytes
+
+    register(client)
+    client.post("/papers/new", data={"title": "Direct GLB Paper"}, follow_redirects=True)
+    with client.application.app_context():
+        slug = Paper.query.filter_by(title="Direct GLB Paper").one().slug
+
+    glb = b"glTF" + b"\x00" * 24
+    response = client.post(
+        f"/papers/{slug}/upload-model",
+        data={"file": upload_file_bytes(glb, "direct.glb"), "compliance_confirm": "yes"},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+
+    with client.application.app_context():
+        model = Model3D.query.one()
+        assert model.source_format == "glb"
+        assert model.anonymization_confirmed
+        assert Path(model.glb_path).read_bytes() == glb
+
+
+def test_upload_requires_anonymization_confirmation(client):
+    from tests.conftest import register, upload_file_bytes, valid_ascii_stl_bytes
+
+    register(client)
+    client.post("/papers/new", data={"title": "Consent Paper"}, follow_redirects=True)
+    with client.application.app_context():
+        slug = Paper.query.filter_by(title="Consent Paper").one().slug
+
+    response = client.post(
+        f"/papers/{slug}/upload-model",
+        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "model.stl")},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert "must confirm" in response.get_data(as_text=True)
+    with client.application.app_context():
+        assert Model3D.query.count() == 0
+
+
 def test_upload_rate_limit_blocks_repeated_attempts(client):
     from tests.conftest import register, upload_file_bytes, valid_ascii_stl_bytes
 
@@ -263,13 +308,13 @@ def test_upload_rate_limit_blocks_repeated_attempts(client):
 
     first = client.post(
         f"/papers/{slug}/upload-model",
-        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "first.stl")},
+        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "first.stl"), "compliance_confirm": "yes"},
         content_type="multipart/form-data",
         follow_redirects=True,
     )
     second = client.post(
         f"/papers/{slug}/upload-model",
-        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "second.stl")},
+        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "second.stl"), "compliance_confirm": "yes"},
         content_type="multipart/form-data",
         follow_redirects=True,
     )
