@@ -45,6 +45,78 @@ def _numpy2_allclose(a, b, atol=1e-8):
 trimesh.util.allclose = _numpy2_allclose
 
 
+def inject_pbr_material(
+    glb_path: str,
+    base_color_rgba: tuple,
+    roughness: float = 0.85,
+    metallic: float = 0.0,
+    double_sided: bool = True,
+) -> None:
+    """Rewrite a GLB file in place, attaching a PBR material with the given
+    baseColorFactor to every primitive.
+
+    trimesh exports vertex colors via the COLOR_0 vertex attribute, but iOS
+    Quick Look (USDZ conversion) and several Android Scene Viewer paths
+    ignore COLOR_0 when rendering AR — the model appears stark white. By
+    injecting a proper PBR material with baseColorFactor we get consistent
+    color rendering across desktop three.js, iOS Quick Look, and Android
+    Scene Viewer. doubleSided=true also avoids invisible back faces on
+    non-watertight anatomical meshes.
+
+    Operates on the JSON chunk only; binary buffers are left untouched.
+    """
+    import json
+    import struct
+
+    with open(glb_path, "rb") as f:
+        data = f.read()
+
+    if len(data) < 20:
+        raise ValueError("GLB file too small to be valid")
+
+    magic, version, _total = struct.unpack("<4sII", data[:12])
+    if magic != b"glTF" or version != 2:
+        raise ValueError(f"Unexpected GLB header: magic={magic!r}, version={version}")
+
+    json_length, json_type = struct.unpack("<II", data[12:20])
+    if json_type != 0x4E4F534A:  # 'JSON' little-endian
+        raise ValueError(f"First chunk is not JSON (type=0x{json_type:08x})")
+
+    json_bytes = data[20 : 20 + json_length]
+    gltf = json.loads(json_bytes.decode("utf-8").rstrip("\x00"))
+
+    materials = gltf.setdefault("materials", [])
+    new_index = len(materials)
+    materials.append(
+        {
+            "name": "AcademicAR_Default",
+            "pbrMetallicRoughness": {
+                "baseColorFactor": [float(c) for c in base_color_rgba],
+                "metallicFactor": float(metallic),
+                "roughnessFactor": float(roughness),
+            },
+            "doubleSided": bool(double_sided),
+        }
+    )
+
+    for mesh_def in gltf.get("meshes", []):
+        for primitive in mesh_def.get("primitives", []):
+            primitive["material"] = new_index
+
+    new_json = json.dumps(gltf, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    pad = (4 - len(new_json) % 4) % 4
+    new_json += b" " * pad
+
+    rest = data[20 + json_length :]
+    new_total = 12 + 8 + len(new_json) + len(rest)
+
+    with open(glb_path, "wb") as f:
+        f.write(struct.pack("<4sII", b"glTF", 2, new_total))
+        f.write(struct.pack("<II", len(new_json), 0x4E4F534A))
+        f.write(new_json)
+        f.write(rest)
+
+
 def load_stl_mesh_without_normals(file_path: str) -> trimesh.Trimesh:
     """Load ASCII or binary STL without passing face normals to old trimesh."""
     with open(file_path, "rb") as file:
@@ -246,84 +318,38 @@ class STLConverter(BaseConverter):
             else:
                 self.log_operation("No scaling applied - max_dimension not set by user")
 
-            # Apply color using vertex colors (no UV coordinates needed)
-            # STL meshes have no UV data, so TextureVisuals would create phantom TEXCOORD_0
-            # causing purple striped texture in AR (iOS Quick Look, Android Scene Viewer)
-            # Use ColorVisuals with vertex colors instead
+            # Determine target color (hex -> RGBA float in 0..1) for material.
+            # We DO NOT apply vertex colors anymore: iOS Quick Look (USDZ) and many
+            # Android Scene Viewer paths ignore COLOR_0 vertex attributes when they
+            # render AR, so a vertex-colored mesh appears stark white in AR even
+            # though the desktop three.js viewer shows it correctly. Instead we
+            # inject a PBR material with baseColorFactor into the exported GLB
+            # below; this is read by both desktop and AR engines uniformly.
+            target_color = (0.8, 0.8, 0.8, 1.0)  # default light gray
             if color:
                 try:
-                    self.log_operation(f"Applying color: {color}")
-                    # Convert hex color to RGB (0-255 range)
                     hex_color = color.lstrip("#")
                     if len(hex_color) != 6:
                         raise ValueError(f"Invalid hex color: {color}")
-
-                    r = int(hex_color[0:2], 16)
-                    g = int(hex_color[2:4], 16)
-                    b = int(hex_color[4:6], 16)
-
-                    # Apply vertex colors only (no TextureVisuals, no phantom UV data)
-                    if isinstance(mesh, trimesh.Scene):
-                        for geom in mesh.geometry.values():
-                            if isinstance(geom, trimesh.Trimesh):
-                                vertex_colors = np.tile(
-                                    [r, g, b, 255], (len(geom.vertices), 1)
-                                )
-                                geom.visual = trimesh.visual.ColorVisuals(
-                                    vertex_colors=vertex_colors.astype(np.uint8)
-                                )
-                    else:
-                        vertex_colors = np.tile([r, g, b, 255], (len(mesh.vertices), 1))
-                        mesh.visual = trimesh.visual.ColorVisuals(
-                            vertex_colors=vertex_colors.astype(np.uint8)
-                        )
-
+                    target_color = (
+                        int(hex_color[0:2], 16) / 255.0,
+                        int(hex_color[2:4], 16) / 255.0,
+                        int(hex_color[4:6], 16) / 255.0,
+                        1.0,
+                    )
                     self.log_operation(
-                        f"Color applied successfully: RGB({r}, {g}, {b}) using vertex colors (no UV)"
+                        f"Target PBR color parsed from '{color}': {target_color}"
                     )
                 except Exception as e:
                     self.log_operation(
-                        f"Warning: Could not apply color: {str(e)}", "WARNING"
-                    )
-                    import traceback
-
-                    self.log_operation(f"Traceback: {traceback.format_exc()}")
-                    # Continue even if color application fails
-            else:
-                # No color specified - apply default gray using vertex colors
-                self.log_operation(
-                    "No color specified - applying default gray using vertex colors"
-                )
-                try:
-                    # Default light gray in RGB(255 scale): [204, 204, 204] = 0.8*255
-                    default_r, default_g, default_b = 204, 204, 204
-
-                    if isinstance(mesh, trimesh.Scene):
-                        for geom in mesh.geometry.values():
-                            if isinstance(geom, trimesh.Trimesh):
-                                vertex_colors = np.tile(
-                                    [default_r, default_g, default_b, 255],
-                                    (len(geom.vertices), 1),
-                                )
-                                geom.visual = trimesh.visual.ColorVisuals(
-                                    vertex_colors=vertex_colors.astype(np.uint8)
-                                )
-                    else:
-                        vertex_colors = np.tile(
-                            [default_r, default_g, default_b, 255], (len(mesh.vertices), 1)
-                        )
-                        mesh.visual = trimesh.visual.ColorVisuals(
-                            vertex_colors=vertex_colors.astype(np.uint8)
-                        )
-
-                    self.log_operation(
-                        f"Default gray applied using vertex colors (no UV/texture data)"
-                    )
-                except Exception as e:
-                    self.log_operation(
-                        f"Warning: Could not apply default color: {str(e)}",
+                        f"Warning: could not parse color '{color}': {e}; "
+                        f"falling back to default light gray",
                         "WARNING",
                     )
+            else:
+                self.log_operation(
+                    "No color specified; using default light gray for PBR material"
+                )
 
             # Note: Basis correction (Z-up to Y-up) is NOT applied here
             # It will be handled in glb_modifier during normalization
@@ -343,6 +369,22 @@ class STLConverter(BaseConverter):
             if not os.path.exists(output_path):
                 self.handle_error("Output file was not created")
                 return False
+
+            # Post-process: inject a PBR material with baseColorFactor + doubleSided
+            # so AR engines (iOS Quick Look, Android Scene Viewer) render the chosen
+            # color and don't drop back faces on non-watertight anatomical meshes.
+            try:
+                inject_pbr_material(output_path, target_color)
+                self.log_operation(
+                    f"Injected PBR material baseColorFactor={target_color} "
+                    f"(roughness=0.85, metallic=0.0, doubleSided=true)"
+                )
+            except Exception as e:
+                self.log_operation(
+                    f"Warning: PBR material injection failed: {e}; "
+                    f"GLB will render with default white in AR.",
+                    "WARNING",
+                )
 
             file_size = os.path.getsize(output_path)
             self.log_operation(
