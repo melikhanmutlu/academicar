@@ -131,6 +131,7 @@ def ensure_sqlite_schema() -> None:
 
     paper_columns = {row[1] for row in db.session.execute(text("PRAGMA table_info(papers)"))}
     model_columns = {row[1] for row in db.session.execute(text("PRAGMA table_info(models)"))}
+    user_columns = {row[1] for row in db.session.execute(text("PRAGMA table_info(users)"))}
     paper_additions = {
         "package_type": "VARCHAR(30) DEFAULT 'temporary' NOT NULL",
         "status": "VARCHAR(30) DEFAULT 'active' NOT NULL",
@@ -149,6 +150,9 @@ def ensure_sqlite_schema() -> None:
         "consent_confirmed_at": "DATETIME",
         "consent_ip": "VARCHAR(100)",
     }
+    user_additions = {
+        "plan": "VARCHAR(30) DEFAULT 'free' NOT NULL",
+    }
 
     for name, definition in paper_additions.items():
         if name not in paper_columns:
@@ -156,6 +160,9 @@ def ensure_sqlite_schema() -> None:
     for name, definition in model_additions.items():
         if name not in model_columns:
             db.session.execute(text(f"ALTER TABLE models ADD COLUMN {name} {definition}"))
+    for name, definition in user_additions.items():
+        if name not in user_columns:
+            db.session.execute(text(f"ALTER TABLE users ADD COLUMN {name} {definition}"))
     db.session.commit()
 
 
@@ -249,7 +256,6 @@ def validate_paper_form(form) -> tuple[dict, list[str]]:
     doi = (form.get("doi") or "").strip()
     institution = (form.get("institution") or "").strip()
     pmid = (form.get("pmid") or "").strip()
-    package_type = (form.get("package_type") or "temporary").strip()
     visibility = (form.get("visibility") or "public").strip().lower()
     year_raw = (form.get("year") or "").strip()
     errors = []
@@ -261,9 +267,6 @@ def validate_paper_form(form) -> tuple[dict, list[str]]:
         errors.append("Title is required.")
     elif len(title) > 500:
         errors.append("Title can be at most 500 characters.")
-
-    if package_type not in {"temporary", "academic"}:
-        errors.append("Invalid publication package.")
 
     length_limits = {
         "Authors": (authors, 500),
@@ -297,7 +300,6 @@ def validate_paper_form(form) -> tuple[dict, list[str]]:
             "doi": doi or None,
             "institution": institution or None,
             "pmid": pmid or None,
-            "package_type": package_type,
             "is_public": visibility == "public",
         },
         errors,
@@ -631,6 +633,49 @@ def register_routes(app: Flask) -> None:
         papers = Paper.query.filter_by(user_id=current_user.id).order_by(Paper.created_at.desc()).all()
         return render_template("dashboard.html", papers=papers)
 
+    @app.route("/profile", methods=["GET", "POST"])
+    @login_required
+    def profile():
+        if request.method == "POST":
+            new_plan = (request.form.get("plan") or "").strip().lower()
+            if new_plan not in {"free", "academic"}:
+                flash("Invalid plan choice.", "danger")
+                return redirect(url_for("profile"))
+            previous = current_user.plan or "free"
+            if new_plan == previous:
+                flash("You're already on this plan.", "info")
+                return redirect(url_for("profile"))
+
+            current_user.plan = new_plan
+            try:
+                db.session.commit()
+                log_audit(
+                    "plan_changed",
+                    user_id=current_user.id,
+                    details={"from": previous, "to": new_plan},
+                )
+                if new_plan == "academic":
+                    flash(
+                        "You're now on the Academic plan. New publications will be created with persistent (3-year) viewer links and multi-model uploads.",
+                        "success",
+                    )
+                else:
+                    flash(
+                        "Switched to the Free plan. New publications will be created as Temporary (3-day links, single model). Existing publications keep their current settings.",
+                        "info",
+                    )
+            except SQLAlchemyError:
+                db.session.rollback()
+                flash("Could not update plan. Please try again.", "danger")
+            return redirect(url_for("profile"))
+
+        paper_count = Paper.query.filter_by(user_id=current_user.id).count()
+        return render_template(
+            "profile.html",
+            user=current_user,
+            paper_count=paper_count,
+        )
+
     @app.route("/papers/new", methods=["GET", "POST"])
     @login_required
     def paper_new():
@@ -640,6 +685,11 @@ def register_routes(app: Flask) -> None:
                 flash(" ".join(paper_errors), "danger")
                 return render_template("paper_new.html", form=request.form)
 
+            # Plan is now a user-level setting (managed on /profile). New
+            # papers inherit the user's current plan as a snapshot — this is
+            # what determines expiration and multi-model upload limits.
+            user_plan = current_user.plan or "free"
+            inherited_package = "academic" if user_plan == "academic" else "temporary"
             paper = Paper(
                 title=paper_data["title"],
                 authors=paper_data["authors"],
@@ -649,10 +699,10 @@ def register_routes(app: Flask) -> None:
                 doi=paper_data["doi"],
                 institution=paper_data["institution"],
                 pmid=paper_data["pmid"],
-                package_type=paper_data["package_type"],
+                package_type=inherited_package,
                 is_public=paper_data["is_public"],
-                payment_status="pending" if paper_data["package_type"] == "academic" else "free",
-                expires_at=package_expires_at(paper_data["package_type"]),
+                payment_status="pending" if inherited_package == "academic" else "free",
+                expires_at=package_expires_at(inherited_package),
                 slug=make_slug(paper_data["title"]),
                 user_id=current_user.id,
             )
@@ -729,16 +779,11 @@ def register_routes(app: Flask) -> None:
             paper.doi = paper_data["doi"]
             paper.institution = paper_data["institution"]
             paper.pmid = paper_data["pmid"]
-            paper.package_type = paper_data["package_type"]
+            # paper.package_type is locked at creation (snapshot of the user's
+            # plan at that moment). Change the plan via /profile, not here.
             paper.is_public = paper_data["is_public"]
-            if paper.payment_status in {None, "free", "pending"}:
-                paper.payment_status = "pending" if paper_data["package_type"] == "academic" else "free"
-            if paper_data["package_type"] == "academic" and (
-                not paper.expires_at or paper_is_expired(paper)
-            ):
-                paper.expires_at = package_expires_at("academic")
-            elif paper_data["package_type"] == "temporary" and not paper.expires_at:
-                paper.expires_at = package_expires_at("temporary")
+            if not paper.expires_at:
+                paper.expires_at = package_expires_at(paper.package_type or "temporary")
 
             saved_pdf_path = None
             old_pdf_path = None
@@ -782,7 +827,6 @@ def register_routes(app: Flask) -> None:
             "doi": paper.doi or "",
             "pmid": paper.pmid or "",
             "abstract": paper.abstract or "",
-            "package_type": paper.package_type or "temporary",
             "visibility": "public" if paper.is_public else "private",
         }
         return render_template("paper_new.html", form=form, paper=paper, mode="edit")

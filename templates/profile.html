@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Profile - AcademicAR{% endblock %}
+
+{% block content %}
+{% set is_academic = (user.plan == 'academic') %}
+<div class="app-shell py-10 pb-10">
+  <div class="grid lg:grid-cols-[1fr_auto] gap-6 items-end mb-8 reveal-up">
+    <div>
+      <span class="eyebrow">Account</span>
+      <h1 class="font-serif text-4xl sm:text-5xl font-bold text-[#111827] mt-4">Profile</h1>
+      <p class="text-[#5c6473] mt-2">Manage your plan and account-wide settings.</p>
+    </div>
+    <a href="{{ url_for('dashboard') }}" class="btn-secondary">Back to dashboard</a>
+  </div>
+
+  <section class="surface rounded-xl p-6 sm:p-8 mb-6 reveal-up">
+    <div class="flex flex-wrap items-center gap-5">
+      {% if user.avatar_url %}
+        <img src="{{ user.avatar_url }}" class="w-16 h-16 rounded-full" alt="">
+      {% else %}
+        <div class="w-16 h-16 rounded-full bg-[#111827] text-white grid place-items-center text-xl font-semibold">
+          {{ user.username[0]|upper }}
+        </div>
+      {% endif %}
+      <div class="min-w-0 flex-1">
+        <h2 class="font-serif text-2xl font-semibold text-[#111827] truncate">{{ user.username }}</h2>
+        <p class="text-sm text-[#5c6473] truncate">{{ user.email }}</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="text-xs uppercase tracking-[0.12em] text-[#9ca3af] font-bold">Current plan</span>
+        <span class="text-[12px] px-3 py-1 rounded-full font-semibold
+          {% if is_academic %}bg-emerald-100 text-emerald-800{% else %}bg-amber-100 text-amber-800{% endif %}">
+          {{ 'Academic' if is_academic else 'Free' }}
+        </span>
+      </div>
+    </div>
+    <div class="grid sm:grid-cols-3 gap-3 mt-6 text-sm">
+      <div class="rounded-lg bg-white/55 border border-[#141821]/10 p-4">
+        <p class="text-xs uppercase tracking-[0.12em] text-[#9ca3af] font-bold">Publications</p>
+        <p class="font-bold text-[#111827] text-2xl mt-1">{{ paper_count }}</p>
+      </div>
+      <div class="rounded-lg bg-white/55 border border-[#141821]/10 p-4">
+        <p class="text-xs uppercase tracking-[0.12em] text-[#9ca3af] font-bold">Member since</p>
+        <p class="font-bold text-[#111827] mt-1">{{ user.created_at.strftime('%b %Y') if user.created_at else '—' }}</p>
+      </div>
+      <div class="rounded-lg bg-white/55 border border-[#141821]/10 p-4">
+        <p class="text-xs uppercase tracking-[0.12em] text-[#9ca3af] font-bold">New publication default</p>
+        <p class="font-bold text-[#111827] mt-1">{{ 'Academic (3-year)' if is_academic else 'Temporary (3-day)' }}</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal-up">
+    <div class="flex items-end justify-between gap-4 mb-5">
+      <div>
+        <h2 class="font-serif text-3xl font-semibold text-[#111827]">Plan</h2>
+        <p class="text-sm text-[#5c6473] mt-1">Your plan applies to every publication you create from now on. Existing publications keep the plan they were created under.</p>
+      </div>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="surface rounded-xl p-6 relative overflow-hidden {% if not is_academic %}ring-2 ring-[#111827]{% endif %}">
+        {% if not is_academic %}<span class="absolute top-3 right-3 text-[10px] px-2 py-0.5 rounded-full bg-[#111827] text-white font-bold uppercase tracking-wider">Current</span>{% endif %}
+        <h3 class="font-serif text-2xl font-semibold text-[#111827]">Free</h3>
+        <p class="text-3xl font-bold text-[#111827] mt-2">0 ₺</p>
+        <p class="text-xs text-[#5c6473] mt-1">forever</p>
+        <ul class="mt-5 space-y-2 text-sm text-[#374151]">
+          <li>• 3-day active viewer links per publication</li>
+          <li>• 1 model per publication</li>
+          <li>• Public viewer page + AR + paper QR</li>
+          <li>• PDF reader</li>
+        </ul>
+        {% if is_academic %}
+          <form method="POST" class="mt-6">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="plan" value="free">
+            <button type="submit" class="btn-secondary w-full" onclick="return confirm('Switch to Free? Existing Academic publications keep their current expiration; only new publications will use the Free plan.');">Switch to Free</button>
+          </form>
+        {% else %}
+          <button class="btn-secondary w-full mt-6 opacity-50 cursor-not-allowed" disabled>Active plan</button>
+        {% endif %}
+      </div>
+
+      <div class="surface rounded-xl p-6 relative overflow-hidden {% if is_academic %}ring-2 ring-emerald-600{% endif %}">
+        {% if is_academic %}<span class="absolute top-3 right-3 text-[10px] px-2 py-0.5 rounded-full bg-emerald-600 text-white font-bold uppercase tracking-wider">Current</span>{% endif %}
+        <h3 class="font-serif text-2xl font-semibold text-[#111827]">Academic</h3>
+        <p class="text-3xl font-bold text-[#111827] mt-2">500 ₺<span class="text-sm font-normal text-[#5c6473]"> / publication</span></p>
+        <p class="text-xs text-[#5c6473] mt-1">3-year persistent links</p>
+        <ul class="mt-5 space-y-2 text-sm text-[#374151]">
+          <li>• 3-year active viewer links per publication</li>
+          <li>• Multiple models per publication</li>
+          <li>• Public viewer page + AR + paper QR</li>
+          <li>• PDF reader</li>
+          <li>• Persistent QR codes you can print on the paper itself</li>
+        </ul>
+        {% if not is_academic %}
+          <form method="POST" class="mt-6">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="plan" value="academic">
+            <button type="submit" class="btn-primary w-full">Switch to Academic</button>
+          </form>
+          <p class="text-[11px] text-[#9ca3af] mt-3 text-center">Payment integration is not yet wired in — switching is currently free for development. New publications you create will be marked Academic.</p>
+        {% else %}
+          <button class="btn-primary w-full mt-6 opacity-60 cursor-not-allowed" disabled>Active plan</button>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}

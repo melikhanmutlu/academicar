@@ -1,13 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Sign up - AcademicAR{% endblock %}
 
-{% block head %}
-<script type="module" src="https://unpkg.com/@google/model-viewer@4.2.0/dist/model-viewer.min.js"></script>
-{% endblock %}
-
 {% block content %}
 <div class="auth-shell">
-  <div class="max-w-6xl mx-auto w-full grid lg:grid-cols-[0.95fr_1.05fr] gap-6 items-stretch">
+  <div class="max-w-md mx-auto w-full">
     <section class="surface rounded-xl p-6 sm:p-8 lg:p-10">
       <span class="eyebrow">New workspace</span>
       <h1 class="font-serif text-4xl font-bold text-[#111827] mt-5">Create an account</h1>
@@ -52,27 +48,6 @@
       <p class="text-sm text-[#5c6473] text-center mt-7">
         Already have an account? <a href="{{ url_for('auth.login') }}" class="text-[#111827] underline underline-offset-4 font-semibold">Log in</a>
       </p>
-    </section>
-
-    <section class="dark-surface rounded-xl p-8 lg:p-10 overflow-hidden relative min-h-[560px] hidden lg:block">
-      <div class="absolute inset-0 volumetric-grid opacity-40"></div>
-      <model-viewer
-        class="auth-preview-model absolute inset-0 w-full h-full"
-        src="{{ url_for('static', filename='models/demo-model.glb') }}"
-        alt="AcademicAR register model"
-        auto-rotate
-        auto-rotate-delay="0"
-        rotation-per-second="14deg"
-        camera-orbit="35deg 66deg auto"
-        field-of-view="26deg"
-        exposure="1.05"
-        bounds="tight">
-      </model-viewer>
-      <div class="auth-copy-panel">
-        <span class="eyebrow bg-white/10 text-white border-white/15">STL -> GLB -> QR</span>
-        <h2 class="font-serif text-4xl font-bold text-white mt-5 leading-tight">Put your first model into a publication workflow.</h2>
-        <p class="text-white/60 mt-4">After registration, create a publication page and upload an anonymized model.</p>
-      </div>
     </section>
   </div>
 </div>
