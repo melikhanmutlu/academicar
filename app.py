@@ -838,6 +838,9 @@ def register_routes(app: Flask) -> None:
         display_name = (request.form.get("display_name") or "").strip() or None
         description = (request.form.get("description") or "").strip() or None
         color = (request.form.get("color") or "").strip() or None
+        source_unit = (request.form.get("source_unit") or "auto").strip().lower()
+        if source_unit not in {"auto", "mm", "cm", "m"}:
+            source_unit = "auto"
         unique_id = str(uuid.uuid4())
         original_name = secure_filename(file.filename)
         source_format = original_name.rsplit(".", 1)[1].lower()
@@ -869,7 +872,9 @@ def register_routes(app: Flask) -> None:
                     return redirect(url_for("paper_detail", slug=slug))
 
                 converter = STLConverter()
-                success = converter.convert(stl_path, glb_path, color=color)
+                success = converter.convert(
+                    stl_path, glb_path, color=color, source_unit=source_unit
+                )
                 if not success or not os.path.exists(glb_path):
                     flash(
                         "Conversion failed: "

@@ -397,7 +397,13 @@ class STLConverter(BaseConverter):
 
         return True
 
-    def convert(self, input_path: str, output_path: str, color: str = None) -> bool:
+    def convert(
+        self,
+        input_path: str,
+        output_path: str,
+        color: str = None,
+        source_unit: str = "auto",
+    ) -> bool:
         """
         Convert STL file to GLB format using trimesh
         Args:
@@ -463,10 +469,19 @@ class STLConverter(BaseConverter):
             # STL files are unitless. Detect the source unit heuristically from
             # the bounding-box extents BEFORE scaling. GLB standard requires meters.
             #
-            # Typical academic STLs (medical/dental from Slicer/Mimics, CAD parts):
-            #   - millimeters: extents in tens to thousands  (a 7 cm bone -> 70)
-            #   - centimeters: extents in single to hundreds (a 7 cm bone -> 7)
-            #   - meters:      extents already < ~10         (a 7 cm bone -> 0.07)
+            # Bias toward MILLIMETRES because nearly every medical/dental STL
+            # (3D Slicer, Mimics, Materialise, intraoral/CBCT scanners) and
+            # most CAD STLs are exported in mm. cm-unit STLs are rare and m-unit
+            # STLs are exotic. With these thresholds:
+            #
+            #   > 10           -> mm  (typical anatomical 10-500 mm)
+            #   > 0.1 .. <= 10 -> cm  (e.g. a 7 cm cube exported in cm = 7)
+            #   <= 0.1         -> m   (already in meters, tiny object)
+            #
+            # Edge cases (sub-1cm objects in mm, or large objects in cm) remain
+            # ambiguous because the same numeric extent can map to multiple
+            # real sizes; in that case the only correct fix is an explicit
+            # source-unit dropdown on the upload form.
             raw_extents = np.ptp(mesh.bounds, axis=0)
             max_extent_raw = float(raw_extents.max())
             self.log_operation(
@@ -474,16 +489,23 @@ class STLConverter(BaseConverter):
                 f"y={raw_extents[1]:.3f}, z={raw_extents[2]:.3f}"
             )
 
-            if max_extent_raw > 100.0:
-                unit_scale, unit_label = 0.001, "mm"
+            # Explicit user override beats heuristic. The form sends mm/cm/m;
+            # anything else (including "auto") falls back to the heuristic.
+            explicit_units = {"mm": 0.001, "cm": 0.01, "m": 1.0}
+            if source_unit in explicit_units:
+                unit_scale = explicit_units[source_unit]
+                unit_label = f"{source_unit} (user-specified)"
             elif max_extent_raw > 10.0:
-                unit_scale, unit_label = 0.01, "cm"
+                unit_scale, unit_label = 0.001, "mm (auto-detected)"
+            elif max_extent_raw > 0.1:
+                unit_scale, unit_label = 0.01, "cm (auto-detected)"
             else:
-                unit_scale, unit_label = 1.0, "m"
+                unit_scale, unit_label = 1.0, "m (auto-detected)"
             mesh.apply_scale(unit_scale)
+            scaled_max = max_extent_raw * unit_scale
             self.log_operation(
-                f"Detected source unit '{unit_label}' (max extent {max_extent_raw:.2f}); "
-                f"applied scale {unit_scale} -> meters"
+                f"Source unit: {unit_label} (raw max extent {max_extent_raw:.2f}); "
+                f"applied scale {unit_scale} -> {scaled_max * 100:.1f} cm in AR"
             )
 
             # Center the mesh on the origin so model-viewer / AR placement uses a

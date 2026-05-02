@@ -229,6 +229,16 @@
                 <input type="text" name="display_name" placeholder="Model name" class="field-input">
                 <input type="text" name="description" placeholder="Short model note" class="field-input">
               </div>
+              <div>
+                <label class="field-label">Source unit (STL / GLB scale)</label>
+                <select name="source_unit" class="field-select">
+                  <option value="auto" selected>Auto-detect (works for typical 1-50 cm anatomical scans)</option>
+                  <option value="mm">Millimeters — most medical / dental / CAD STLs</option>
+                  <option value="cm">Centimeters — some legacy or photogrammetry exports</option>
+                  <option value="m">Meters — already in real-world units</option>
+                </select>
+                <p class="text-xs text-[#5c6473] mt-2">If your model appears 10× too big or too small in AR, pick the correct unit explicitly. Auto-detect biases toward millimeters because that is the standard in this domain.</p>
+              </div>
               <label class="flex items-start gap-3 rounded-xl border border-[#e2e8f0] bg-white p-4 text-sm text-[#475569]">
                 <input type="checkbox" name="compliance_confirm" value="yes" required class="mt-1">
                 <span>I confirm that this model has been anonymized, that I have the right to share/publish it, and that I am responsible for all required ethical approval and consent processes.</span>
