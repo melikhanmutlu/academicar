@@ -91,6 +91,168 @@ def convert_glb_to_usdz(glb_path: str, usdz_path: str) -> bool:
         return False
 
 
+def enrich_glb_for_ar(
+    glb_path: str,
+    base_color_rgba: tuple,
+    roughness: float = 0.45,
+    metallic: float = 0.05,
+    double_sided: bool = True,
+) -> bool:
+    """Post-process a GLB so that:
+
+    1. Every primitive has a PBR material with linear baseColorFactor +
+       roughness/metallic factors and doubleSided=True. This fixes iOS
+       Quick Look and Android Scene Viewer rendering the model as stark
+       white when only COLOR_0 vertex attributes are present.
+    2. Every primitive has TEXCOORD_0 UV coordinates, generated via
+       triplanar box projection from vertex positions and the dominant
+       axis of each vertex's normal. STL meshes ship without UVs; some
+       AR pipelines (notably the THREE.USDZExporter that model-viewer
+       uses on iOS) handle un-UV'd geometry oddly, contributing to the
+       smoothed/blob look.
+
+    Implemented with pygltflib so the GLB binary is rebuilt by a
+    well-tested library instead of by hand-rolled JSON+struct code.
+    Returns True on success, False if pygltflib isn't installed (in
+    which case the caller falls back to the legacy raw injector).
+    """
+    try:
+        import pygltflib
+        from pygltflib import Accessor, BufferView, Material, PbrMetallicRoughness
+    except ImportError:
+        logger.info(
+            "pygltflib not installed; falling back to raw struct injector "
+            "(no triplanar UVs). Install with `pip install pygltflib`."
+        )
+        return False
+
+    try:
+        gltf = pygltflib.GLTF2.load(glb_path)
+    except Exception as e:
+        logger.warning("pygltflib failed to load GLB %s (%s); falling back", glb_path, e)
+        return False
+
+    # 1) Material: append a fresh AcademicAR_Default material and link
+    #    every primitive to it. Existing materials are kept (could be
+    #    referenced by other primitives in mixed scenes) but every
+    #    primitive ends up pointing at our explicit one for AR consistency.
+    material = Material(
+        name="AcademicAR_Default",
+        pbrMetallicRoughness=PbrMetallicRoughness(
+            baseColorFactor=[float(c) for c in base_color_rgba],
+            metallicFactor=float(metallic),
+            roughnessFactor=float(roughness),
+        ),
+        doubleSided=bool(double_sided),
+    )
+    if gltf.materials is None:
+        gltf.materials = []
+    material_index = len(gltf.materials)
+    gltf.materials.append(material)
+    for mesh_def in gltf.meshes or []:
+        for prim in mesh_def.primitives or []:
+            prim.material = material_index
+
+    # 2) Triplanar UVs for primitives missing TEXCOORD_0
+    blob = gltf.binary_blob() or b""
+    extra = bytearray()
+
+    for mesh_def in gltf.meshes or []:
+        for prim in mesh_def.primitives or []:
+            if getattr(prim.attributes, "TEXCOORD_0", None) is not None:
+                continue
+            pos_idx = getattr(prim.attributes, "POSITION", None)
+            if pos_idx is None:
+                continue
+
+            pos_acc = gltf.accessors[pos_idx]
+            pos_bv = gltf.bufferViews[pos_acc.bufferView]
+            pos_off = (pos_bv.byteOffset or 0) + (pos_acc.byteOffset or 0)
+            pos_stride = pos_bv.byteStride or 12
+
+            positions = []
+            for v in range(pos_acc.count):
+                off = pos_off + v * pos_stride
+                positions.append(struct.unpack_from("<3f", blob, off))
+
+            normals = None
+            norm_idx = getattr(prim.attributes, "NORMAL", None)
+            if norm_idx is not None:
+                n_acc = gltf.accessors[norm_idx]
+                n_bv = gltf.bufferViews[n_acc.bufferView]
+                n_off = (n_bv.byteOffset or 0) + (n_acc.byteOffset or 0)
+                n_stride = n_bv.byteStride or 12
+                normals = []
+                for v in range(n_acc.count):
+                    off = n_off + v * n_stride
+                    normals.append(struct.unpack_from("<3f", blob, off))
+
+            xs = [p[0] for p in positions]
+            ys = [p[1] for p in positions]
+            zs = [p[2] for p in positions]
+            min_v = (min(xs), min(ys), min(zs))
+            max_v = (max(xs), max(ys), max(zs))
+            rng = tuple((max_v[i] - min_v[i]) or 1.0 for i in range(3))
+
+            uv_bytes = bytearray()
+            for i, (x, y, z) in enumerate(positions):
+                ux = (x - min_v[0]) / rng[0]
+                uy = (y - min_v[1]) / rng[1]
+                uz = (z - min_v[2]) / rng[2]
+                if normals and i < len(normals):
+                    anx, any_, anz = abs(normals[i][0]), abs(normals[i][1]), abs(normals[i][2])
+                else:
+                    anx, any_, anz = 0.0, 0.0, 1.0
+                if anx >= any_ and anx >= anz:
+                    u, v = uz, uy
+                elif any_ >= anx and any_ >= anz:
+                    u, v = ux, uz
+                else:
+                    u, v = ux, uy
+                uv_bytes += struct.pack("<2f", u, v)
+
+            new_bv_offset = len(blob) + len(extra)
+            new_bv = BufferView(
+                buffer=0,
+                byteOffset=new_bv_offset,
+                byteLength=len(uv_bytes),
+            )
+            bv_index = len(gltf.bufferViews)
+            gltf.bufferViews.append(new_bv)
+            new_acc = Accessor(
+                bufferView=bv_index,
+                byteOffset=0,
+                componentType=5126,  # FLOAT
+                count=pos_acc.count,
+                type="VEC2",
+                max=[1.0, 1.0],
+                min=[0.0, 0.0],
+            )
+            acc_index = len(gltf.accessors)
+            gltf.accessors.append(new_acc)
+            prim.attributes.TEXCOORD_0 = acc_index
+            extra += uv_bytes
+
+    if extra:
+        new_blob = blob + bytes(extra)
+        gltf.set_binary_blob(new_blob)
+        if gltf.buffers:
+            gltf.buffers[0].byteLength = len(new_blob)
+
+    try:
+        gltf.save(glb_path)
+    except Exception as e:
+        logger.warning("pygltflib failed to save GLB %s (%s)", glb_path, e)
+        return False
+
+    logger.info(
+        "Enriched GLB %s: PBR material + %d primitives received triplanar UVs",
+        os.path.basename(glb_path),
+        sum(1 for m in (gltf.meshes or []) for p in (m.primitives or [])),
+    )
+    return True
+
+
 def inject_pbr_material(
     glb_path: str,
     base_color_rgba: tuple,
@@ -338,35 +500,23 @@ class STLConverter(BaseConverter):
                     f"Warning: could not center mesh on origin: {e}", "WARNING"
                 )
 
-            # Compute FLAT per-face vertex normals and write them to the GLB.
-            #
-            # STL stores triangles with no vertex normals. We deliberately KEEP
-            # the un-welded "one vertex per triangle corner" topology that
-            # load_stl_mesh_without_normals produces, because each vertex then
-            # belongs to exactly one face -> trimesh.vertex_normals returns the
-            # face normal at every corner -> faceted (flat per-face) shading.
-            #
-            # That matches the geometric appearance of the original STL and
-            # reveals anatomical relief (ridges, foramina, mesh resolution).
-            # Welding via merge_vertices() would average normals across shared
-            # edges and produce a smooth blob that hides those details, which
-            # is wrong for medical / dental / archaeological scans.
-            #
-            # An explicit NORMAL accessor is required: iOS Quick Look (USDZ
-            # conversion) and parts of Android Scene Viewer skip auto-deriving
-            # normals at render time, leaving the surface unlit if absent.
+            # Force trimesh to compute vertex_normals so the GLB exporter
+            # writes a NORMAL accessor. We deliberately keep the unwelded
+            # one-vertex-per-triangle-corner topology produced by
+            # load_stl_mesh_without_normals — each vertex then belongs to a
+            # single face, so the lazily computed vertex_normals equal the
+            # face normals (= flat per-face shading, the look anatomical
+            # STLs need). Without this access, the exporter writes the GLB
+            # without normals and AR engines must derive them at runtime
+            # (often inconsistently between desktop three.js and iOS USDZ).
             try:
-                mesh.fix_normals()  # consistent triangle winding only; no merge
-                _ = mesh.vertex_normals  # force lazy computation; written to GLB
+                _ = mesh.vertex_normals
                 self.log_operation(
-                    f"Computed flat per-face vertex normals "
+                    f"Forced vertex_normals computation for export "
                     f"({len(mesh.vertices)} verts, {len(mesh.faces)} faces)"
                 )
             except Exception as e:
-                self.log_operation(
-                    f"Warning: normal computation failed ({e}); AR may render flat",
-                    "WARNING",
-                )
+                self.log_operation(f"Warning: vertex_normals access failed: {e}", "WARNING")
 
             # Get model dimensions (now in meters, consistent with GLB standard)
             extents = np.ptp(mesh.bounds, axis=0)
@@ -454,19 +604,30 @@ class STLConverter(BaseConverter):
                 self.handle_error("Output file was not created")
                 return False
 
-            # Post-process: inject a PBR material with baseColorFactor + doubleSided
-            # so AR engines (iOS Quick Look, Android Scene Viewer) render the chosen
-            # color and don't drop back faces on non-watertight anatomical meshes.
+            # Post-process: enrich the GLB with a PBR material AND triplanar
+            # UVs so AR engines (iOS Quick Look, Android Scene Viewer) get a
+            # complete primitive — explicit baseColorFactor (linear), doubleSided,
+            # roughness/metallic, and TEXCOORD_0 for shaders that need it.
+            # Falls back to the legacy raw-struct injector (material only, no
+            # UVs) if pygltflib isn't installed.
             try:
-                inject_pbr_material(output_path, target_color)
-                self.log_operation(
-                    f"Injected PBR material baseColorFactor={target_color} "
-                    f"(roughness=0.45, metallic=0.05, doubleSided=true)"
-                )
+                enriched = enrich_glb_for_ar(output_path, target_color)
+                if enriched:
+                    self.log_operation(
+                        f"Enriched GLB via pygltflib: PBR material "
+                        f"baseColorFactor={target_color} (roughness=0.45, "
+                        f"metallic=0.05, doubleSided=true) + triplanar UVs"
+                    )
+                else:
+                    inject_pbr_material(output_path, target_color)
+                    self.log_operation(
+                        f"Injected PBR material via raw struct fallback "
+                        f"(no UVs): baseColorFactor={target_color}"
+                    )
             except Exception as e:
                 self.log_operation(
-                    f"Warning: PBR material injection failed: {e}; "
-                    f"GLB will render with default white in AR.",
+                    f"Warning: GLB enrichment failed: {e}; "
+                    f"AR may render flat/white.",
                     "WARNING",
                 )
 
