@@ -20,6 +20,7 @@ from werkzeug.utils import secure_filename
 from auth import auth_bp, init_oauth
 from config import Config
 from converters import STLConverter
+from converters.stl_converter import convert_glb_to_usdz
 from models import AuditLog, Model3D, Paper, User, db
 from url_helpers import public_url
 
@@ -496,11 +497,17 @@ def register_routes(app: Flask) -> None:
             abort(404)
         if paper_is_expired(model.paper):
             abort(404)
-        return render_template("viewer.html", model=model, paper=model.paper)
+        usdz_path = os.path.join(
+            app.config["CONVERTED_FOLDER"], model.id, "model.usdz"
+        )
+        has_usdz = os.path.exists(usdz_path)
+        return render_template(
+            "viewer.html", model=model, paper=model.paper, has_usdz=has_usdz
+        )
 
     @app.route("/files/<unique_id>/<path:filename>")
     def serve_glb(unique_id, filename):
-        if not is_uuid(unique_id) or filename != "model.glb":
+        if not is_uuid(unique_id) or filename not in {"model.glb", "model.usdz"}:
             abort(404)
         model = db.session.get(Model3D, unique_id)
         if not model:
@@ -508,10 +515,15 @@ def register_routes(app: Flask) -> None:
         if paper_is_expired(model.paper):
             abort(404)
         directory = os.path.join(app.config["CONVERTED_FOLDER"], unique_id)
-        response = send_from_directory(directory, "model.glb", mimetype="model/gltf-binary")
+        if not os.path.exists(os.path.join(directory, filename)):
+            abort(404)
+        mimetype = (
+            "model/vnd.usdz+zip" if filename == "model.usdz" else "model/gltf-binary"
+        )
+        response = send_from_directory(directory, filename, mimetype=mimetype)
         # Discourage casual download/caching by browsers and crawlers. The browser
         # still needs the bytes to render, so this is friction, not a hard barrier.
-        response.headers["Content-Disposition"] = 'inline; filename="model.glb"'
+        response.headers["Content-Disposition"] = f'inline; filename="{filename}"'
         response.headers["Cache-Control"] = "private, no-store, max-age=0"
         response.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
         return response
@@ -836,6 +848,7 @@ def register_routes(app: Flask) -> None:
         os.makedirs(converted_dir, exist_ok=True)
         stl_path = os.path.join(upload_dir, original_name)
         glb_path = os.path.join(converted_dir, "model.glb")
+        usdz_path = os.path.join(converted_dir, "model.usdz")
 
         try:
             file.save(stl_path)
@@ -866,6 +879,23 @@ def register_routes(app: Flask) -> None:
                     cleanup_dir(upload_dir)
                     cleanup_dir(converted_dir)
                     return redirect(url_for("paper_detail", slug=slug))
+
+            # Optional iOS USDZ companion. Priority order:
+            #   1. User-uploaded .usdz (most reliable; control over Reality
+            #      Composer / pro tooling output quality)
+            #   2. Server-side auto-conversion via aspose-3d if installed
+            #   3. None (iOS will fall back to model-viewer's online USDZ Maker
+            #      which over-smooths normals — a known iOS Quick Look issue)
+            usdz_file = request.files.get("usdz")
+            if usdz_file and usdz_file.filename and usdz_file.filename.lower().endswith(".usdz"):
+                try:
+                    usdz_file.save(usdz_path)
+                    logger.info("User-provided USDZ stored at %s", usdz_path)
+                except OSError as e:
+                    logger.warning("Failed to save user USDZ: %s", e)
+            elif os.path.exists(glb_path):
+                # Try automatic conversion; silently skip if aspose-3d not installed
+                convert_glb_to_usdz(glb_path, usdz_path)
 
             cleanup_dir(upload_dir)
             view_url = public_url("view_model", model_id=unique_id)

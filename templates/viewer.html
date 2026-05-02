@@ -60,22 +60,29 @@
       id="viewer"
       class="absolute inset-0 z-10"
       src="{{ url_for('serve_glb', unique_id=model.id, filename='model.glb') }}"
+      {% if has_usdz %}ios-src="{{ url_for('serve_glb', unique_id=model.id, filename='model.usdz') }}"{% endif %}
       alt="3D model: {{ model.display_name or model.original_filename }}"
-      shadow-intensity="1.35"
-      shadow-softness="0.75"
-      exposure="1.05"
-      tone-mapping="neutral"
+      shadow-intensity="1.4"
+      shadow-softness="0.6"
+      exposure="1.2"
+      tone-mapping="agx"
+      environment-image="neutral"
       ar
       ar-modes="webxr scene-viewer quick-look"
       ar-scale="auto"
       ar-placement="floor"
+      xr-environment
+      quick-look-browsers="safari chrome"
       camera-controls
       touch-action="pan-y"
       auto-rotate
       auto-rotate-delay="2500"
       camera-orbit="35deg 70deg auto"
       field-of-view="28deg"
+      min-field-of-view="10deg"
+      max-field-of-view="60deg"
       bounds="tight"
+      interaction-prompt="none"
       reveal="auto">
       <button slot="ar-button" class="hidden" aria-hidden="true" tabindex="-1">
         View in AR

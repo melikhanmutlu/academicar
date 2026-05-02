@@ -45,6 +45,36 @@ def _numpy2_allclose(a, b, atol=1e-8):
 trimesh.util.allclose = _numpy2_allclose
 
 
+def convert_glb_to_usdz(glb_path: str, usdz_path: str) -> bool:
+    """Convert a GLB to USDZ so iOS Quick Look can render it without Apple's
+    lossy auto-conversion (which strips normals and produces a smooth blob).
+
+    Tries the optional ``aspose-3d`` package. If it isn't installed (it is
+    proprietary and large), returns False — the caller should treat USDZ as
+    optional and continue with GLB only. Users can also upload a hand-made
+    USDZ via the model upload form as a fallback.
+    """
+    try:
+        import aspose.threed as a3d  # type: ignore
+    except ImportError:
+        logger.info(
+            "aspose-3d not installed; skipping GLB->USDZ. "
+            "Install with `pip install aspose-3d` to enable automatic iOS USDZ generation."
+        )
+        return False
+
+    try:
+        scene = a3d.Scene.from_file(glb_path)
+        scene.save(usdz_path)
+        ok = os.path.exists(usdz_path) and os.path.getsize(usdz_path) > 0
+        if ok:
+            logger.info("Converted GLB -> USDZ: %s", usdz_path)
+        return ok
+    except Exception as e:
+        logger.warning("GLB -> USDZ conversion failed (%s); USDZ will be unavailable", e)
+        return False
+
+
 def inject_pbr_material(
     glb_path: str,
     base_color_rgba: tuple,
