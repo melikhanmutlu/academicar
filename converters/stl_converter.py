@@ -180,11 +180,45 @@ class STLConverter(BaseConverter):
             mesh.apply_transform(basis_correction)
             self.log_operation("Applied basis correction: -90° around X (Z-up to Y-up)")
 
-            # STL files are unitless; most CAD tools export in mm or cm.
-            # GLB standard requires meters. Apply cm→m conversion (÷100) unconditionally
-            # so the model appears at the correct real-world scale in model-viewer and AR.
-            mesh.apply_scale(0.01)
-            self.log_operation("Applied cm→m unit conversion: scale 0.01 (STL assumed cm)")
+            # STL files are unitless. Detect the source unit heuristically from
+            # the bounding-box extents BEFORE scaling. GLB standard requires meters.
+            #
+            # Typical academic STLs (medical/dental from Slicer/Mimics, CAD parts):
+            #   - millimeters: extents in tens to thousands  (a 7 cm bone -> 70)
+            #   - centimeters: extents in single to hundreds (a 7 cm bone -> 7)
+            #   - meters:      extents already < ~10         (a 7 cm bone -> 0.07)
+            raw_extents = np.ptp(mesh.bounds, axis=0)
+            max_extent_raw = float(raw_extents.max())
+            self.log_operation(
+                f"Raw STL extents (unitless): x={raw_extents[0]:.3f}, "
+                f"y={raw_extents[1]:.3f}, z={raw_extents[2]:.3f}"
+            )
+
+            if max_extent_raw > 100.0:
+                unit_scale, unit_label = 0.001, "mm"
+            elif max_extent_raw > 10.0:
+                unit_scale, unit_label = 0.01, "cm"
+            else:
+                unit_scale, unit_label = 1.0, "m"
+            mesh.apply_scale(unit_scale)
+            self.log_operation(
+                f"Detected source unit '{unit_label}' (max extent {max_extent_raw:.2f}); "
+                f"applied scale {unit_scale} -> meters"
+            )
+
+            # Center the mesh on the origin so model-viewer / AR placement uses a
+            # predictable pivot (otherwise an off-origin model can be placed far
+            # from the AR floor reticle and appear missing).
+            try:
+                center = mesh.bounding_box.centroid
+                mesh.apply_translation(-center)
+                self.log_operation(
+                    f"Centered mesh on origin (translated by {-center})"
+                )
+            except Exception as e:
+                self.log_operation(
+                    f"Warning: could not center mesh on origin: {e}", "WARNING"
+                )
 
             # Get model dimensions (now in meters, consistent with GLB standard)
             extents = np.ptp(mesh.bounds, axis=0)
