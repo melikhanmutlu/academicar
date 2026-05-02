@@ -6,7 +6,6 @@ import time
 import uuid
 from datetime import UTC, datetime, timedelta
 
-import qrcode
 from flask import Flask, abort, flash, redirect, render_template, request, send_from_directory, url_for
 from flask_login import LoginManager, current_user, login_required
 from flask_migrate import Migrate
@@ -250,8 +249,12 @@ def validate_paper_form(form) -> tuple[dict, list[str]]:
     institution = (form.get("institution") or "").strip()
     pmid = (form.get("pmid") or "").strip()
     package_type = (form.get("package_type") or "temporary").strip()
+    visibility = (form.get("visibility") or "public").strip().lower()
     year_raw = (form.get("year") or "").strip()
     errors = []
+
+    if visibility not in {"public", "private"}:
+        errors.append("Invalid visibility option.")
 
     if not title:
         errors.append("Title is required.")
@@ -294,6 +297,7 @@ def validate_paper_form(form) -> tuple[dict, list[str]]:
             "institution": institution or None,
             "pmid": pmid or None,
             "package_type": package_type,
+            "is_public": visibility == "public",
         },
         errors,
     )
@@ -315,6 +319,8 @@ def paper_is_expired(paper: Paper) -> bool:
 
 
 def generate_qr(model_id: str, qr_folder: str, view_url: str) -> str:
+    import qrcode
+
     qr = qrcode.QRCode(
         version=1,
         error_correction=qrcode.constants.ERROR_CORRECT_M,
@@ -327,6 +333,41 @@ def generate_qr(model_id: str, qr_folder: str, view_url: str) -> str:
     filename = f"qr_{model_id}.png"
     img.save(os.path.join(qr_folder, filename))
     return filename
+
+
+def paper_qr_filename(paper_id: int) -> str:
+    return f"qr_paper_{paper_id}.png"
+
+
+def ensure_paper_qr(paper: Paper) -> str:
+    """Lazily generate the paper-level QR (encoding the public landing URL)
+    if it doesn't yet exist on disk. Returns the filename."""
+    import qrcode
+
+    qr_folder = current_app_qr_folder()
+    filename = paper_qr_filename(paper.id)
+    full_path = os.path.join(qr_folder, filename)
+    if os.path.exists(full_path):
+        return filename
+
+    target_url = public_url("paper_public", slug=paper.slug)
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(target_url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    img.save(full_path)
+    return filename
+
+
+def current_app_qr_folder() -> str:
+    from flask import current_app
+
+    return current_app.config["QR_FOLDER"]
 
 
 def converter_message(converter: STLConverter, fallback: str) -> str:
@@ -374,6 +415,7 @@ def collect_paper_file_paths(app: Flask, paper: Paper) -> list[tuple[str, str]]:
         paths.extend(collect_model_file_paths(app, model))
     if paper.pdf_path:
         paths.append(("file", os.path.join(app.config["PDF_FOLDER"], paper.pdf_path)))
+    paths.append(("file", os.path.join(app.config["QR_FOLDER"], paper_qr_filename(paper.id))))
     return paths
 
 
@@ -503,6 +545,74 @@ def register_routes(app: Flask) -> None:
             abort(403)
         return send_from_directory(app.config["PDF_FOLDER"], os.path.basename(paper.pdf_path))
 
+    def _paper_visible_to_request(paper: Paper) -> bool:
+        """A paper is visible if it is public, or if the current user is the owner."""
+        if paper.is_public:
+            return True
+        return current_user.is_authenticated and current_user.id == paper.user_id
+
+    @app.route("/qr-image/paper/<int:paper_id>")
+    def qr_image_paper(paper_id):
+        paper = db.session.get(Paper, paper_id)
+        if not paper:
+            abort(404)
+        if paper_is_expired(paper):
+            abort(404)
+        if not _paper_visible_to_request(paper):
+            abort(404)
+        filename = ensure_paper_qr(paper)
+        return send_from_directory(app.config["QR_FOLDER"], filename)
+
+    @app.route("/qr-print/paper/<int:paper_id>")
+    @login_required
+    def qr_print_paper(paper_id):
+        paper = db.session.get(Paper, paper_id)
+        if not paper:
+            abort(404)
+        if paper.user_id != current_user.id:
+            abort(403)
+        ensure_paper_qr(paper)
+        return render_template("qr_page_paper.html", paper=paper)
+
+    @app.route("/p/<slug>")
+    def paper_public(slug):
+        paper = Paper.query.filter_by(slug=slug).first_or_404()
+        if paper_is_expired(paper):
+            abort(404)
+        if not _paper_visible_to_request(paper):
+            abort(404)
+        return render_template("paper_public.html", paper=paper)
+
+    @app.route("/p/<slug>/pdf")
+    def paper_public_pdf(slug):
+        paper = Paper.query.filter_by(slug=slug).first_or_404()
+        if paper_is_expired(paper):
+            abort(404)
+        if not _paper_visible_to_request(paper):
+            abort(404)
+        if not paper.pdf_path:
+            abort(404)
+        return render_template("pdf_reader.html", paper=paper)
+
+    @app.route("/p/<slug>/pdf/file")
+    def paper_public_pdf_file(slug):
+        paper = Paper.query.filter_by(slug=slug).first_or_404()
+        if paper_is_expired(paper):
+            abort(404)
+        if not _paper_visible_to_request(paper):
+            abort(404)
+        if not paper.pdf_path:
+            abort(404)
+        response = send_from_directory(
+            app.config["PDF_FOLDER"],
+            os.path.basename(paper.pdf_path),
+            mimetype="application/pdf",
+        )
+        # Inline so the iframe can render it; discourage indexing.
+        response.headers["Content-Disposition"] = 'inline; filename="paper.pdf"'
+        response.headers["X-Robots-Tag"] = "noindex, nofollow"
+        return response
+
     @app.route("/dashboard")
     @login_required
     def dashboard():
@@ -528,7 +638,7 @@ def register_routes(app: Flask) -> None:
                 institution=paper_data["institution"],
                 pmid=paper_data["pmid"],
                 package_type=paper_data["package_type"],
-                is_public=paper_data["package_type"] == "academic",
+                is_public=paper_data["is_public"],
                 payment_status="pending" if paper_data["package_type"] == "academic" else "free",
                 expires_at=package_expires_at(paper_data["package_type"]),
                 slug=make_slug(paper_data["title"]),
@@ -585,6 +695,85 @@ def register_routes(app: Flask) -> None:
         if paper.user_id != current_user.id:
             abort(403)
         return render_template("paper_detail.html", paper=paper)
+
+    @app.route("/papers/<slug>/edit", methods=["GET", "POST"])
+    @login_required
+    def paper_edit(slug):
+        paper = Paper.query.filter_by(slug=slug).first_or_404()
+        if paper.user_id != current_user.id:
+            abort(403)
+
+        if request.method == "POST":
+            paper_data, paper_errors = validate_paper_form(request.form)
+            if paper_errors:
+                flash(" ".join(paper_errors), "danger")
+                return render_template("paper_new.html", form=request.form, paper=paper, mode="edit")
+
+            paper.title = paper_data["title"]
+            paper.authors = paper_data["authors"]
+            paper.year = paper_data["year"]
+            paper.field = paper_data["field"]
+            paper.abstract = paper_data["abstract"]
+            paper.doi = paper_data["doi"]
+            paper.institution = paper_data["institution"]
+            paper.pmid = paper_data["pmid"]
+            paper.package_type = paper_data["package_type"]
+            paper.is_public = paper_data["is_public"]
+            if paper.payment_status in {None, "free", "pending"}:
+                paper.payment_status = "pending" if paper_data["package_type"] == "academic" else "free"
+            if paper_data["package_type"] == "academic" and (
+                not paper.expires_at or paper_is_expired(paper)
+            ):
+                paper.expires_at = package_expires_at("academic")
+            elif paper_data["package_type"] == "temporary" and not paper.expires_at:
+                paper.expires_at = package_expires_at("temporary")
+
+            saved_pdf_path = None
+            old_pdf_path = None
+            pdf_file = request.files.get("pdf")
+            if pdf_file and pdf_file.filename:
+                if not allowed_pdf(pdf_file.filename):
+                    flash("Only .pdf files are accepted.", "danger")
+                    return render_template("paper_new.html", form=request.form, paper=paper, mode="edit")
+                pdf_filename = f"{uuid.uuid4()}_{secure_filename(pdf_file.filename)}"
+                saved_pdf_path = os.path.join(app.config["PDF_FOLDER"], pdf_filename)
+                pdf_file.save(saved_pdf_path)
+                pdf_errors = validate_pdf_file(saved_pdf_path)
+                if pdf_errors:
+                    cleanup_file(saved_pdf_path)
+                    flash("Invalid PDF file: " + "; ".join(pdf_errors), "danger")
+                    return render_template("paper_new.html", form=request.form, paper=paper, mode="edit")
+                if paper.pdf_path:
+                    old_pdf_path = os.path.join(app.config["PDF_FOLDER"], os.path.basename(paper.pdf_path))
+                paper.pdf_path = pdf_filename
+
+            try:
+                db.session.commit()
+                log_audit("paper_updated", user_id=current_user.id, resource_id=str(paper.id))
+            except SQLAlchemyError:
+                db.session.rollback()
+                cleanup_file(saved_pdf_path)
+                logger.exception("Paper update failed")
+                flash("The publication could not be updated. Please try again.", "danger")
+                return render_template("paper_new.html", form=request.form, paper=paper, mode="edit")
+
+            cleanup_file(old_pdf_path)
+            flash("Publication updated.", "success")
+            return redirect(url_for("paper_detail", slug=paper.slug))
+
+        form = {
+            "title": paper.title or "",
+            "authors": paper.authors or "",
+            "year": paper.year or "",
+            "field": paper.field or "",
+            "institution": paper.institution or "",
+            "doi": paper.doi or "",
+            "pmid": paper.pmid or "",
+            "abstract": paper.abstract or "",
+            "package_type": paper.package_type or "temporary",
+            "visibility": "public" if paper.is_public else "private",
+        }
+        return render_template("paper_new.html", form=form, paper=paper, mode="edit")
 
     @app.route("/papers/<slug>/delete", methods=["POST"])
     @login_required
@@ -667,12 +856,6 @@ def register_routes(app: Flask) -> None:
                     return redirect(url_for("paper_detail", slug=slug))
 
                 converter = STLConverter()
-                if not converter.validate(stl_path):
-                    flash("Invalid STL file: " + converter_message(converter, "The file could not be read."), "danger")
-                    cleanup_dir(upload_dir)
-                    cleanup_dir(converted_dir)
-                    return redirect(url_for("paper_detail", slug=slug))
-
                 success = converter.convert(stl_path, glb_path, color=color)
                 if not success or not os.path.exists(glb_path):
                     flash(

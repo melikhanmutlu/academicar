@@ -4,6 +4,8 @@ STL format to GLB format conversion operations using trimesh.
 
 import os
 import logging
+import re
+import struct
 import trimesh
 import numpy as np
 from .base_converter import BaseConverter
@@ -34,6 +36,49 @@ def is_valid_extension(filename, extensions):
 
 
 logger = logging.getLogger(__name__)
+
+
+def _numpy2_allclose(a, b, atol=1e-8):
+    return float(np.ptp(np.asanyarray(a) - np.asanyarray(b))) < atol
+
+
+trimesh.util.allclose = _numpy2_allclose
+
+
+def load_stl_mesh_without_normals(file_path: str) -> trimesh.Trimesh:
+    """Load ASCII or binary STL without passing face normals to old trimesh."""
+    with open(file_path, "rb") as file:
+        header = file.read(512)
+
+    if header.lower().lstrip().startswith(b"solid") and (
+        b"facet" in header.lower() or b"endsolid" in header.lower()
+    ):
+        text = open(file_path, "r", encoding="utf-8", errors="ignore").read()
+        vertex_lines = re.findall(
+            r"vertex\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)",
+            text,
+        )
+        vertices = np.array(vertex_lines, dtype=np.float64)
+        if len(vertices) < 3 or len(vertices) % 3 != 0:
+            raise ValueError("ASCII STL does not contain complete triangle vertices.")
+        faces = np.arange(len(vertices), dtype=np.int64).reshape((-1, 3))
+        return trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
+
+    with open(file_path, "rb") as file:
+        file.seek(80)
+        triangle_count = struct.unpack("<I", file.read(4))[0]
+        payload = file.read(triangle_count * 50)
+
+    if len(payload) < triangle_count * 50:
+        raise ValueError("Binary STL payload is incomplete.")
+
+    vertices = np.zeros((triangle_count * 3, 3), dtype=np.float64)
+    for index in range(triangle_count):
+        offset = index * 50 + 12
+        triangle = struct.unpack_from("<9f", payload, offset)
+        vertices[index * 3 : index * 3 + 3] = np.array(triangle, dtype=np.float64).reshape((3, 3))
+    faces = np.arange(len(vertices), dtype=np.int64).reshape((-1, 3))
+    return trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
 
 
 class STLConverter(BaseConverter):
@@ -93,7 +138,7 @@ class STLConverter(BaseConverter):
 
             # Load the STL file
             self.log_operation("Loading STL file...")
-            mesh = trimesh.load(input_path)
+            mesh = load_stl_mesh_without_normals(input_path)
 
             if not isinstance(mesh, (trimesh.Trimesh, trimesh.Scene)):
                 self.handle_error(f"Invalid mesh type: {type(mesh)}")
@@ -142,7 +187,7 @@ class STLConverter(BaseConverter):
             self.log_operation("Applied cm→m unit conversion: scale 0.01 (STL assumed cm)")
 
             # Get model dimensions (now in meters, consistent with GLB standard)
-            extents = mesh.extents
+            extents = np.ptp(mesh.bounds, axis=0)
 
             dimensions = {"x": extents[0], "y": extents[1], "z": extents[2]}
 

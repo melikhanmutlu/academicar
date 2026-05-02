@@ -1,7 +1,6 @@
 """Authentication blueprint: email/password login, registration, and Google OAuth."""
 from urllib.parse import urljoin, urlparse
 
-from authlib.integrations.flask_client import OAuth
 from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 from flask_wtf import FlaskForm
@@ -12,7 +11,12 @@ from models import User, db
 from url_helpers import public_url
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
-oauth = OAuth()
+try:
+    from authlib.integrations.flask_client import OAuth
+except ImportError:
+    OAuth = None
+
+oauth = OAuth() if OAuth else None
 
 
 def is_safe_redirect_url(target: str) -> bool:
@@ -26,6 +30,8 @@ def is_safe_redirect_url(target: str) -> bool:
 
 def init_oauth(app):
     """Initialize OAuth client with app config."""
+    if oauth is None:
+        return
     oauth.init_app(app)
     if app.config.get("GOOGLE_CLIENT_ID"):
         oauth.register(
@@ -115,7 +121,7 @@ def logout():
 
 @auth_bp.route("/google")
 def google_login():
-    if not current_app.config.get("GOOGLE_CLIENT_ID"):
+    if oauth is None or not current_app.config.get("GOOGLE_CLIENT_ID"):
         flash("Google login is not configured yet.", "warning")
         return redirect(url_for("auth.login"))
     redirect_uri = public_url("auth.google_callback")

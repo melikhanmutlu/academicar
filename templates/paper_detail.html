@@ -1,125 +1,172 @@
 {% extends "base.html" %}
 {% block title %}{{ paper.title }} - AcademicAR{% endblock %}
+{% block head %}
+<script type="module" src="https://unpkg.com/@google/model-viewer@4.2.0/dist/model-viewer.min.js"></script>
+{% endblock %}
 
 {% block content %}
-<div class="max-w-[1760px] mx-auto px-5 sm:px-8 lg:px-14 py-10">
+{% set first_model = paper.models[0] if paper.models else none %}
+{% set can_upload_more = paper.package_type == 'academic' or not paper.models %}
+<div class="app-shell py-10 pb-10">
   <a href="{{ url_for('dashboard') }}" class="nav-link inline-flex mb-5">&larr; Back to dashboard</a>
 
-  <section class="grid lg:grid-cols-[1fr_340px] gap-6 mb-6">
-    <div class="surface rounded-xl p-6 sm:p-8 reveal-up">
+  <section class="grid lg:grid-cols-[minmax(0,1fr)_420px] gap-5 mb-8">
+    <div class="surface paper-hero rounded-xl p-6 sm:p-7 reveal-up">
       <div class="flex flex-wrap items-start justify-between gap-4 mb-5">
-        <div class="flex flex-wrap gap-2">
-          {% if paper.field %}<span class="text-xs px-2 py-1 bg-[#111827] text-white rounded-full">{{ paper.field }}</span>{% endif %}
-          {% if paper.year %}<span class="text-xs px-2 py-1 bg-white/70 text-[#5c6473] rounded-full">{{ paper.year }}</span>{% endif %}
-          <span class="text-xs px-2 py-1 bg-[#111827]/10 text-[#111827] rounded-full">{{ 'Academic package' if paper.package_type == 'academic' else 'Temporary publication' }}</span>
+          <div class="flex flex-wrap gap-2">
+            {% if paper.field %}<span class="detail-chip dark">{{ paper.field }}</span>{% endif %}
+            {% if paper.year %}<span class="detail-chip">{{ paper.year }}</span>{% endif %}
+          </div>
+        <div class="flex flex-wrap gap-2 paper-actions">
+          <a href="{{ url_for('paper_edit', slug=paper.slug) }}" class="btn-secondary compact">Edit Paper</a>
+          <details class="action-menu">
+            <summary aria-label="More publication actions">...</summary>
+            <div class="action-menu-panel">
+              <form method="POST" action="{{ url_for('paper_delete', slug=paper.slug) }}" onsubmit="return confirm('Delete this publication and all models?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="action-menu-danger">Delete publication</button>
+              </form>
+            </div>
+          </details>
         </div>
-        <form method="POST" action="{{ url_for('paper_delete', slug=paper.slug) }}" onsubmit="return confirm('Delete this publication and all models?');">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="text-sm text-red-600 hover:text-red-800">Delete</button>
-        </form>
       </div>
 
-      <h1 class="font-serif text-3xl sm:text-5xl font-bold leading-tight text-[#111827]">{{ paper.title }}</h1>
-      <div class="mt-5 grid sm:grid-cols-2 gap-3 text-sm text-[#5c6473]">
-        {% if paper.authors %}<p><span class="font-semibold text-[#111827]">Authors:</span> {{ paper.authors }}</p>{% endif %}
-        {% if paper.institution %}<p><span class="font-semibold text-[#111827]">Institution:</span> {{ paper.institution }}</p>{% endif %}
-        {% if paper.doi %}<p><span class="font-semibold text-[#111827]">DOI:</span> <a href="https://doi.org/{{ paper.doi }}" target="_blank" rel="noopener noreferrer" class="text-[#111827] underline underline-offset-4">{{ paper.doi }}</a></p>{% endif %}
-        {% if paper.pmid %}<p><span class="font-semibold text-[#111827]">PMID:</span> {{ paper.pmid }}</p>{% endif %}
-        {% if paper.pdf_path %}<p><a href="{{ url_for('serve_pdf', paper_id=paper.id) }}" target="_blank" rel="noopener noreferrer" class="text-[#111827] underline underline-offset-4">Download PDF</a></p>{% endif %}
+      <h1 class="paper-title font-serif text-3xl lg:text-4xl font-bold leading-tight text-[#111827]">{{ paper.title }}</h1>
+      <div class="paper-meta mt-5">
+        {% if paper.authors %}
+          <div><span>Authors</span><strong>{{ paper.authors }}</strong></div>
+        {% endif %}
+        {% if paper.institution %}
+          <div><span>Institution</span><strong>{{ paper.institution }}</strong></div>
+        {% endif %}
+        {% if paper.doi %}
+          <div><span>DOI</span><strong><a href="https://doi.org/{{ paper.doi }}" target="_blank" rel="noopener noreferrer">{{ paper.doi }}</a></strong></div>
+        {% endif %}
+        {% if paper.pmid %}
+          <div><span>PMID</span><strong>{{ paper.pmid }}</strong></div>
+        {% endif %}
+        {% if paper.pdf_path %}
+          <div><span>PDF</span><strong><a href="{{ url_for('serve_pdf', paper_id=paper.id) }}" target="_blank" rel="noopener noreferrer">Download PDF</a></strong></div>
+        {% endif %}
       </div>
 
       {% if paper.abstract %}
-        <div class="mt-6 pt-6 border-t border-[#141821]/10">
+        <div class="abstract-block mt-5 pt-5 border-t border-[#141821]/10" data-collapsible-abstract>
           <h3 class="font-semibold text-[#111827] mb-2">Description / Abstract</h3>
-          <p class="text-[#5c6473] leading-relaxed text-sm whitespace-pre-line">{{ paper.abstract }}</p>
+          <p class="abstract-copy text-[#5c6473] leading-relaxed text-sm whitespace-pre-line">{{ paper.abstract }}</p>
+          <button type="button" class="abstract-toggle" data-abstract-toggle>Read more</button>
         </div>
       {% endif %}
     </div>
 
-    <aside class="dark-surface rounded-xl p-5 text-white reveal-up delay-1">
-      <p class="text-sm text-white/60">Publication status</p>
-      <div class="mt-4 space-y-3">
-        <div class="flex items-center justify-between rounded-lg bg-white/[0.06] p-3">
-          <span>Models</span><strong>{{ paper.models|length }}</strong>
+    <aside class="share-panel surface rounded-xl p-5 reveal-up delay-1">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <p class="text-xs uppercase tracking-[0.12em] text-[#9ca3af] font-bold">Paper Information</p>
+          <h2 class="font-serif text-2xl font-semibold text-[#111827] mt-2">Public landing page</h2>
         </div>
-        <div class="flex items-center justify-between rounded-lg bg-white/[0.06] p-3">
-          <span>QR code</span><strong>{{ 'Ready' if paper.models else 'Waiting' }}</strong>
+      </div>
+
+      <div class="mt-5 flex gap-4 share-identity">
+        <div class="share-qr">
+          <img src="{{ url_for('qr_image_paper', paper_id=paper.id) }}" class="w-28 h-28" alt="QR code for {{ paper.title }}">
         </div>
-        <div class="flex items-center justify-between rounded-lg bg-white/[0.06] p-3">
-          <span>Active until</span><strong>{{ paper.expires_at.strftime('%Y-%m-%d') if paper.expires_at else 'No expiry' }}</strong>
+        <div class="min-w-0 flex-1">
+          <p class="text-sm font-semibold text-[#111827] truncate">{{ paper.title }}</p>
+          <p class="text-xs text-[#64748b] mt-1">QR opens the public paper page with PDF and every 3D / AR model.</p>
+          <div class="copy-field mt-3" title="{{ public_url('paper_public', slug=paper.slug) }}">
+            <span>{{ public_url('paper_public', slug=paper.slug) }}</span>
+            <button type="button" data-copy-link="{{ public_url('paper_public', slug=paper.slug) }}">Copy</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="share-actions mt-5">
+        {% if paper.pdf_path %}
+          <a href="{{ url_for('paper_public_pdf', slug=paper.slug) }}" target="_blank" rel="noopener noreferrer" class="btn-primary compact">View the paper</a>
+        {% else %}
+          <a href="{{ url_for('paper_edit', slug=paper.slug) }}" class="btn-secondary compact">Add PDF to enable reader</a>
+        {% endif %}
+        <a href="{{ url_for('paper_public', slug=paper.slug) }}" target="_blank" rel="noopener noreferrer" class="btn-secondary compact">Open public page</a>
+        <a href="{{ url_for('qr_print_paper', paper_id=paper.id) }}" target="_blank" rel="noopener noreferrer" class="btn-secondary compact">View Paper QR</a>
+      </div>
+
+      <div class="share-stats mt-5">
+        <div>
+          <span>Visibility</span>
+          <strong>{{ 'Public' if paper.is_public else 'Private' }}</strong>
+        </div>
+        <div>
+          <span>Models</span>
+          <strong>{{ paper.models|length }}</strong>
+        </div>
+        <div>
+          <span>PDF</span>
+          <strong>{{ 'Available' if paper.pdf_path else 'Missing' }}</strong>
+        </div>
+        <div>
+          <span>{{ 'Active until' if paper.expires_at else 'Availability' }}</span>
+          <strong>{{ paper.expires_at.strftime('%b %d') if paper.expires_at else 'No expiry' }}</strong>
         </div>
       </div>
     </aside>
   </section>
 
-  <section class="dark-surface rounded-xl p-6 sm:p-8 mb-8 reveal-up">
-    <div class="grid lg:grid-cols-[0.85fr_1.15fr] gap-8">
-      <div>
-        <span class="eyebrow bg-white/10 text-white border-white/15">Model upload</span>
-        <h2 class="font-serif text-3xl font-semibold text-white mt-4">Prepare a 3D/AR model for publication.</h2>
-        <p class="text-white/60 text-sm leading-relaxed mt-3">Upload an anonymized STL or GLB file. STL files are converted to GLB; GLB files are published directly for the web viewer and AR button.</p>
-        <div class="mt-6 rounded-xl border border-white/10 bg-white/[0.06] p-4 text-sm text-white/75">
-          Uploaded models must be anonymized. Uploading files that contain patient names, protocol numbers, faces, identity data, or any identifiable information is prohibited.
-        </div>
-      </div>
-
-      <form method="POST" action="{{ url_for('upload_model', slug=paper.slug) }}" enctype="multipart/form-data" class="space-y-4" data-upload-form>
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <label class="block rounded-xl border border-dashed border-white/30 bg-white/[0.06] p-6 cursor-pointer hover:bg-white/[0.09] transition">
-          <span class="block text-white font-semibold">Select STL or GLB file</span>
-          <span class="block text-sm text-white/60 mt-1">The model will be prepared for the publication viewer.</span>
-          <input type="file" name="file" accept=".stl,.glb" required class="mt-4 w-full text-sm text-white/70 file:mr-3 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-white file:text-[#111827] file:font-bold">
-        </label>
-        <div class="grid sm:grid-cols-2 gap-4">
-          <input type="text" name="display_name" placeholder="Model name" class="rounded-lg border border-white/10 bg-white/[0.08] px-4 py-3 text-white placeholder:text-white/40 outline-none focus:border-white">
-          <input type="text" name="description" placeholder="Short model note" class="rounded-lg border border-white/10 bg-white/[0.08] px-4 py-3 text-white placeholder:text-white/40 outline-none focus:border-white">
-        </div>
-        <label class="flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.06] p-4 text-sm text-white/75">
-          <input type="checkbox" name="compliance_confirm" value="yes" required class="mt-1">
-          <span>I confirm that this model has been anonymized, that I have the right to share/publish it, and that I am responsible for all required ethical approval and consent processes.</span>
-        </label>
-        <div class="flex flex-wrap items-center gap-4">
-          <label class="flex items-center gap-3 text-sm text-white/70">
-            <span>Model color</span>
-            <input type="color" name="color" value="#cccccc" class="h-10 w-16 rounded border border-white/20 bg-transparent">
-          </label>
-          <button type="submit" class="btn-primary" data-upload-submit>Upload and Generate QR</button>
-          <p class="hidden text-sm text-white rounded-full border border-white/25 bg-white/[0.08] px-4 py-2" data-upload-status>Preparing model, viewer, and QR...</p>
-        </div>
-      </form>
-    </div>
-  </section>
-
-  <section>
+  <section class="mb-8">
     <div class="flex items-end justify-between gap-4 mb-5">
       <div>
-        <span class="eyebrow">Model registry</span>
-        <h2 class="font-serif text-3xl font-semibold text-[#111827] mt-3">Models ({{ paper.models|length }})</h2>
+        <h2 class="font-serif text-3xl font-semibold text-[#111827] mt-3">Model registry</h2>
       </div>
     </div>
 
     {% if paper.models %}
-      <div class="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-5">
+      <div class="space-y-3">
         {% for m in paper.models %}
-          <div class="surface rounded-xl p-4 group reveal-up">
-            <div class="rounded-lg bg-[#111827] aspect-[4/3] mb-4 grid place-items-center overflow-hidden relative">
-              <div class="absolute inset-0 volumetric-grid opacity-35"></div>
-              <img src="{{ url_for('qr_image', model_id=m.id) }}" class="w-32 h-32 rounded-sm transition group-hover:scale-110 relative" alt="QR code">
-            </div>
-            <h3 class="font-serif text-xl font-semibold text-[#111827] truncate" title="{{ m.display_name or m.original_filename }}">{{ m.display_name or m.original_filename }}</h3>
-            <div class="flex items-center justify-between text-xs text-[#5c6473] mt-2">
-              <span>{{ format_file_size(m.file_size) }}</span>
-              <span>{{ (m.source_format or 'stl')|upper }} -> GLB</span>
-            </div>
-            {% if m.description %}<p class="text-xs text-[#5c6473] mt-3 line-clamp-2">{{ m.description }}</p>{% endif %}
-            <div class="flex flex-wrap gap-2 mt-4">
-              <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="btn-primary compact">View 3D / AR</a>
-              <a href="{{ url_for('qr_print', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="btn-secondary compact">Print QR</a>
-              <a href="{{ url_for('model_edit', model_id=m.id) }}" class="btn-secondary compact">Edit</a>
-              <form method="POST" action="{{ url_for('model_delete', model_id=m.id) }}" onsubmit="return confirm('Delete this model?');" class="inline">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="text-xs text-red-600 hover:text-red-800 px-2 py-2">Delete</button>
-              </form>
+          <div class="model-row surface rounded-xl p-4 group reveal-up">
+            <div class="model-row-grid">
+              <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-preview" aria-label="Open 3D viewer for {{ m.display_name or m.original_filename }}">
+                <model-viewer
+                  src="{{ url_for('serve_glb', unique_id=m.id, filename='model.glb') }}"
+                  alt="3D preview: {{ m.display_name or m.original_filename }}"
+                  camera-orbit="35deg 70deg auto"
+                  field-of-view="28deg"
+                  exposure="1"
+                  shadow-intensity="0.6"
+                  bounds="tight"
+                  disable-zoom
+                  auto-rotate
+                  auto-rotate-delay="1800"
+                  interaction-prompt="none">
+                </model-viewer>
+              </a>
+
+              <div class="model-info">
+                <div class="flex flex-wrap items-center gap-2">
+                  <h3 class="font-serif text-2xl font-semibold text-[#111827] truncate" title="{{ m.display_name or m.original_filename }}">{{ m.display_name or m.original_filename }}</h3>
+                  <span class="detail-chip">{{ format_file_size(m.file_size) }}</span>
+                  <span class="detail-chip">{{ (m.source_format or 'stl')|upper }} -> GLB</span>
+                </div>
+                {% if m.description %}<p class="text-sm text-[#64748b] mt-2 line-clamp-2">{{ m.description }}</p>{% endif %}
+                <div class="model-actions mt-4">
+                  <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="btn-primary compact">Open 3D / AR</a>
+                  <button type="button" class="btn-secondary compact" data-copy-link="{{ public_url('view_model', model_id=m.id) }}">Copy link</button>
+                  <a href="{{ url_for('qr_print', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="btn-secondary compact">Print QR</a>
+                  <a href="{{ url_for('model_edit', model_id=m.id) }}" class="btn-secondary compact">Edit Model</a>
+                  <details class="action-menu">
+                    <summary aria-label="More model actions">...</summary>
+                    <div class="action-menu-panel">
+                      <form method="POST" action="{{ url_for('model_delete', model_id=m.id) }}" onsubmit="return confirm('Delete this model?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="action-menu-danger">Delete model</button>
+                      </form>
+                    </div>
+                  </details>
+                </div>
+              </div>
+
+              <a href="{{ url_for('qr_print', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-qr" aria-label="Open large QR code for {{ m.display_name or m.original_filename }}">
+                <img src="{{ url_for('qr_image', model_id=m.id) }}" class="w-24 h-24 rounded-sm transition group-hover:scale-105 relative" alt="QR code">
+              </a>
             </div>
           </div>
         {% endfor %}
@@ -127,7 +174,74 @@
     {% else %}
       <div class="surface rounded-xl border border-dashed border-[#111827]/20 p-12 text-center reveal-up">
         <h3 class="font-serif text-2xl font-semibold text-[#111827]">No models yet.</h3>
-        <p class="text-[#5c6473] mt-2">Upload the first anonymized STL or GLB model from the console above.</p>
+        <p class="text-[#5c6473] mt-2">Upload the first anonymized STL or GLB model to generate the viewer link and QR code.</p>
+      </div>
+    {% endif %}
+  </section>
+
+  <section id="add-model" class="mb-8 reveal-up">
+    {% if paper.models %}
+      <details class="surface rounded-xl p-0 overflow-hidden">
+        <summary class="upload-summary">
+          <span>
+            <strong>{{ 'Add another model' if can_upload_more else 'Additional models require Academic package' }}</strong>
+            <small>{{ 'Upload an additional STL or GLB for this publication.' if can_upload_more else 'Temporary publications support one model. Upgrade the paper to enable multiple models.' }}</small>
+          </span>
+          <span class="upload-chevron" aria-hidden="true">+</span>
+        </summary>
+        <div class="border-t border-[#e2e8f0] p-6 sm:p-8">
+    {% else %}
+      <div class="surface rounded-xl p-6 sm:p-8">
+    {% endif %}
+          {% if not can_upload_more %}
+            <div class="upload-locked">
+              <div>
+                <h3>Multiple models are available in the Academic package.</h3>
+                <p>To add another model to this publication, edit the paper package first. The existing model, QR, and viewer link will remain active.</p>
+              </div>
+              <a href="{{ url_for('paper_edit', slug=paper.slug) }}" class="btn-primary compact">Edit Paper</a>
+            </div>
+          {% else %}
+          <div class="grid lg:grid-cols-[0.78fr_1.22fr] gap-8">
+            <div>
+              <span class="eyebrow">Model upload</span>
+              <h2 class="font-serif text-3xl font-semibold text-[#111827] mt-4">{{ 'Add a model' if paper.models else 'Add the first model' }}</h2>
+              <p class="text-[#64748b] text-sm leading-relaxed mt-3">Upload an anonymized STL or GLB file. The platform prepares the public viewer and QR code after upload.</p>
+              <div class="mt-6 rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4 text-sm text-[#475569] leading-relaxed">
+                Uploaded models must be anonymized. Files containing patient names, protocol numbers, faces, identity data, or identifiable information are prohibited.
+              </div>
+            </div>
+
+            <form method="POST" action="{{ url_for('upload_model', slug=paper.slug) }}" enctype="multipart/form-data" class="space-y-4" data-upload-form>
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <label class="upload-dropzone">
+                <span class="block text-[#111827] font-semibold">Select STL or GLB file</span>
+                <span class="block text-sm text-[#64748b] mt-1">The model will be prepared for the publication viewer.</span>
+                <input type="file" name="file" accept=".stl,.glb" required class="mt-4 w-full text-sm text-[#64748b] file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:bg-[#111827] file:text-white file:font-bold">
+              </label>
+              <div class="grid sm:grid-cols-2 gap-4">
+                <input type="text" name="display_name" placeholder="Model name" class="field-input">
+                <input type="text" name="description" placeholder="Short model note" class="field-input">
+              </div>
+              <label class="flex items-start gap-3 rounded-xl border border-[#e2e8f0] bg-white p-4 text-sm text-[#475569]">
+                <input type="checkbox" name="compliance_confirm" value="yes" required class="mt-1">
+                <span>I confirm that this model has been anonymized, that I have the right to share/publish it, and that I am responsible for all required ethical approval and consent processes.</span>
+              </label>
+              <div class="flex flex-wrap items-center gap-4">
+                <label class="flex items-center gap-3 text-sm text-[#64748b]">
+                  <span>Model color</span>
+                  <input type="color" name="color" value="#cccccc" class="h-10 w-16 rounded border border-[#e2e8f0] bg-transparent">
+                </label>
+                <button type="submit" class="btn-primary" data-upload-submit>Upload and Generate QR</button>
+                <p class="hidden text-sm text-[#475569] rounded border border-[#e2e8f0] bg-[#f8fafc] px-4 py-2" data-upload-status>Preparing model, viewer, and QR...</p>
+              </div>
+            </form>
+          </div>
+          {% endif %}
+    {% if paper.models %}
+        </div>
+      </details>
+    {% else %}
       </div>
     {% endif %}
   </section>
@@ -149,5 +263,35 @@
       if (status) status.classList.remove('hidden');
     });
   }
+
+  document.querySelectorAll('[data-copy-link]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(button.dataset.copyLink);
+        const original = button.textContent;
+        button.textContent = 'Copied';
+        setTimeout(() => { button.textContent = original; }, 1400);
+      } catch (error) {
+        window.prompt('Copy this viewer link:', button.dataset.copyLink);
+      }
+    });
+  });
+
+  document.querySelectorAll('[data-collapsible-abstract]').forEach((block) => {
+    const copy = block.querySelector('.abstract-copy');
+    const toggle = block.querySelector('[data-abstract-toggle]');
+    if (!copy || !toggle) return;
+
+    const isOverflowing = copy.scrollHeight > copy.clientHeight + 4;
+    if (!isOverflowing) {
+      toggle.hidden = true;
+      return;
+    }
+
+    toggle.addEventListener('click', () => {
+      const expanded = block.classList.toggle('is-expanded');
+      toggle.textContent = expanded ? 'Show less' : 'Read more';
+    });
+  });
 </script>
 {% endblock %}

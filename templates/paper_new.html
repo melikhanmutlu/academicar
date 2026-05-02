@@ -1,17 +1,18 @@
 {% extends "base.html" %}
-{% block title %}New Publication - AcademicAR{% endblock %}
+{% set is_edit = mode|default('new') == 'edit' %}
+{% block title %}{{ 'Edit Publication' if is_edit else 'New Publication' }} - AcademicAR{% endblock %}
 
 {% block content %}
-<div class="max-w-[1760px] mx-auto px-5 sm:px-8 lg:px-14 py-10">
-  <a href="{{ url_for('dashboard') }}" class="nav-link inline-flex mb-5">&larr; Back to dashboard</a>
+<div class="app-shell py-10">
+  <a href="{{ url_for('paper_detail', slug=paper.slug) if is_edit else url_for('dashboard') }}" class="nav-link inline-flex mb-5">&larr; {{ 'Back to publication' if is_edit else 'Back to dashboard' }}</a>
 
   <div class="grid lg:grid-cols-[0.78fr_1.22fr] gap-6 items-start">
     <aside class="dark-surface rounded-xl p-7 lg:p-8 sticky top-24 overflow-hidden">
       <div class="absolute inset-0 volumetric-grid opacity-30"></div>
       <div class="relative">
-        <span class="eyebrow bg-white/10 text-white border-white/15">Publication setup</span>
-        <h1 class="font-serif text-4xl lg:text-5xl font-bold text-white mt-5 leading-tight">Create a publication page.</h1>
-        <p class="text-white/60 mt-4 leading-relaxed">Add academic metadata first. Model upload, QR generation, screenshots, and AR viewing are handled on the publication detail screen.</p>
+        <span class="eyebrow bg-white/10 text-white border-white/15">{{ 'Publication settings' if is_edit else 'Publication setup' }}</span>
+        <h1 class="font-serif text-4xl lg:text-5xl font-bold text-white mt-5 leading-tight">{{ 'Edit publication details.' if is_edit else 'Create a publication page.' }}</h1>
+        <p class="text-white/60 mt-4 leading-relaxed">{{ 'Update title, authors, institution, identifiers, package, or attached PDF.' if is_edit else 'Add academic metadata first. Model upload, QR generation, screenshots, and AR viewing are handled on the publication detail screen.' }}</p>
         <div class="mt-8 space-y-3 text-sm">
           {% for item in ['Publication metadata', 'DOI / PMID fields', 'Temporary or 3-year link', 'Model upload after save'] %}
             <div class="flex items-center gap-3 rounded-lg bg-white/[0.06] border border-white/10 p-3">
@@ -89,15 +90,31 @@
         </div>
       </div>
 
+      <div>
+        <label class="field-label">Visibility</label>
+        <div class="grid sm:grid-cols-2 gap-3">
+          <label class="rounded-xl border border-[#111827]/15 bg-white/60 p-4 cursor-pointer">
+            <input type="radio" name="visibility" value="public" {% if form.get('visibility', 'public') == 'public' %}checked{% endif %}>
+            <span class="font-semibold text-[#111827] ml-2">Public</span>
+            <span class="block text-sm text-[#5c6473] mt-2">Anyone with the QR or link can view the paper page, read the PDF, and open 3D / AR models.</span>
+          </label>
+          <label class="rounded-xl border border-[#111827]/15 bg-white/60 p-4 cursor-pointer">
+            <input type="radio" name="visibility" value="private" {% if form.get('visibility') == 'private' %}checked{% endif %}>
+            <span class="font-semibold text-[#111827] ml-2">Private</span>
+            <span class="block text-sm text-[#5c6473] mt-2">Only you (when signed in) can access the paper page. The QR and link will return Not Found for everyone else.</span>
+          </label>
+        </div>
+      </div>
+
       <label class="block rounded-xl border border-dashed border-[#111827]/25 bg-white/55 p-5 cursor-pointer hover:bg-white/75 transition">
-        <span class="block font-semibold text-[#111827]">Attach PDF</span>
-        <span class="block text-sm text-[#5c6473] mt-1">PDF files are only downloadable by the publication owner.</span>
+        <span class="block font-semibold text-[#111827]">{{ 'Replace PDF' if is_edit and paper.pdf_path else 'Attach PDF' }}</span>
+        <span class="block text-sm text-[#5c6473] mt-1">PDF files are only downloadable by the publication owner.{% if is_edit and paper.pdf_path %} Leave empty to keep the current PDF.{% endif %}</span>
         <input type="file" name="pdf" accept=".pdf" class="mt-4 w-full text-sm text-[#5c6473] file:mr-3 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-[#111827] file:text-white file:font-semibold">
       </label>
 
       <div class="flex items-center justify-end gap-3 pt-4 border-t border-[#141821]/10">
-        <a href="{{ url_for('dashboard') }}" class="btn-secondary">Cancel</a>
-        <button type="submit" class="btn-primary">Save and Continue</button>
+        <a href="{{ url_for('paper_detail', slug=paper.slug) if is_edit else url_for('dashboard') }}" class="btn-secondary">Cancel</a>
+        <button type="submit" class="btn-primary">{{ 'Save Changes' if is_edit else 'Save and Continue' }}</button>
       </div>
     </form>
   </div>

@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}{{ paper.title }} - AcademicAR{% endblock %}
+{% block head %}
+<script type="module" src="https://unpkg.com/@google/model-viewer@4.2.0/dist/model-viewer.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="app-shell py-10 pb-10">
+  <section class="grid lg:grid-cols-[minmax(0,1fr)_360px] gap-5 mb-8">
+    <div class="surface paper-hero rounded-xl p-6 sm:p-7 reveal-up">
+      <div class="flex flex-wrap gap-2 mb-4">
+        {% if paper.field %}<span class="detail-chip dark">{{ paper.field }}</span>{% endif %}
+        {% if paper.year %}<span class="detail-chip">{{ paper.year }}</span>{% endif %}
+      </div>
+
+      <h1 class="paper-title font-serif text-3xl lg:text-4xl font-bold leading-tight text-[#111827]">{{ paper.title }}</h1>
+
+      <div class="paper-meta mt-5">
+        {% if paper.authors %}<div><span>Authors</span><strong>{{ paper.authors }}</strong></div>{% endif %}
+        {% if paper.institution %}<div><span>Institution</span><strong>{{ paper.institution }}</strong></div>{% endif %}
+        {% if paper.doi %}<div><span>DOI</span><strong><a href="https://doi.org/{{ paper.doi }}" target="_blank" rel="noopener noreferrer">{{ paper.doi }}</a></strong></div>{% endif %}
+        {% if paper.pmid %}<div><span>PMID</span><strong>{{ paper.pmid }}</strong></div>{% endif %}
+      </div>
+
+      {% if paper.abstract %}
+        <div class="abstract-block mt-5 pt-5 border-t border-[#141821]/10" data-collapsible-abstract>
+          <h3 class="font-semibold text-[#111827] mb-2">Description / Abstract</h3>
+          <p class="abstract-copy text-[#5c6473] leading-relaxed text-sm whitespace-pre-line">{{ paper.abstract }}</p>
+          <button type="button" class="abstract-toggle" data-abstract-toggle>Read more</button>
+        </div>
+      {% endif %}
+    </div>
+
+    <aside class="share-panel surface rounded-xl p-5 reveal-up delay-1">
+      <p class="text-xs uppercase tracking-[0.12em] text-[#9ca3af] font-bold">Paper Information</p>
+      <h2 class="font-serif text-2xl font-semibold text-[#111827] mt-2">{{ paper.models|length }} model{{ '' if paper.models|length == 1 else 's' }} available</h2>
+
+      <div class="mt-5 flex gap-4 share-identity">
+        <div class="share-qr">
+          <img src="{{ url_for('qr_image_paper', paper_id=paper.id) }}" class="w-28 h-28" alt="QR code for {{ paper.title }}">
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-sm font-semibold text-[#111827]">Scan to revisit</p>
+          <p class="text-xs text-[#64748b] mt-1">Opens this paper page on any device.</p>
+        </div>
+      </div>
+
+      <div class="share-actions mt-5">
+        {% if paper.pdf_path %}
+          <a href="{{ url_for('paper_public_pdf', slug=paper.slug) }}" class="btn-primary compact">View the paper</a>
+        {% else %}
+          <span class="btn-secondary compact opacity-60 cursor-not-allowed" aria-disabled="true">PDF not available</span>
+        {% endif %}
+      </div>
+
+      <div class="share-stats mt-5">
+        <div><span>Models</span><strong>{{ paper.models|length }}</strong></div>
+        <div><span>PDF</span><strong>{{ 'Available' if paper.pdf_path else 'None' }}</strong></div>
+        {% if paper.expires_at and paper.package_type != 'academic' %}
+          <div><span>Active until</span><strong>{{ paper.expires_at.strftime('%b %d') }}</strong></div>
+        {% endif %}
+      </div>
+    </aside>
+  </section>
+
+  <section class="mb-8">
+    <div class="flex items-end justify-between gap-4 mb-5">
+      <h2 class="font-serif text-3xl font-semibold text-[#111827]">3D / AR models</h2>
+    </div>
+
+    {% if paper.models %}
+      <div class="space-y-3">
+        {% for m in paper.models %}
+          <div class="model-row surface rounded-xl p-4 group reveal-up">
+            <div class="model-row-grid">
+              <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-preview" aria-label="Open 3D viewer for {{ m.display_name or m.original_filename }}">
+                <model-viewer
+                  src="{{ url_for('serve_glb', unique_id=m.id, filename='model.glb') }}"
+                  alt="3D preview: {{ m.display_name or m.original_filename }}"
+                  camera-orbit="35deg 70deg auto"
+                  field-of-view="28deg"
+                  exposure="1"
+                  shadow-intensity="0.6"
+                  bounds="tight"
+                  disable-zoom
+                  auto-rotate
+                  auto-rotate-delay="1800"
+                  interaction-prompt="none">
+                </model-viewer>
+              </a>
+
+              <div class="model-info">
+                <div class="flex flex-wrap items-center gap-2">
+                  <h3 class="font-serif text-2xl font-semibold text-[#111827] truncate" title="{{ m.display_name or m.original_filename }}">{{ m.display_name or m.original_filename }}</h3>
+                  <span class="detail-chip">{{ format_file_size(m.file_size) }}</span>
+                </div>
+                {% if m.description %}<p class="text-sm text-[#64748b] mt-2 line-clamp-2">{{ m.description }}</p>{% endif %}
+                <div class="model-actions mt-4">
+                  <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="btn-primary compact">Open 3D / AR</a>
+                  <button type="button" class="btn-secondary compact" data-copy-link="{{ public_url('view_model', model_id=m.id) }}">Copy link</button>
+                </div>
+              </div>
+
+              <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-qr" aria-label="Open viewer for {{ m.display_name or m.original_filename }}">
+                <img src="{{ url_for('qr_image', model_id=m.id) }}" class="w-24 h-24 rounded-sm transition group-hover:scale-105 relative" alt="QR code for {{ m.display_name or m.original_filename }}">
+              </a>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="surface rounded-xl border border-dashed border-[#111827]/20 p-12 text-center reveal-up">
+        <h3 class="font-serif text-2xl font-semibold text-[#111827]">No models available yet.</h3>
+        <p class="text-[#5c6473] mt-2">The authors have not published 3D models for this paper.</p>
+      </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.querySelectorAll('[data-copy-link]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(button.dataset.copyLink);
+        const original = button.textContent;
+        button.textContent = 'Copied';
+        setTimeout(() => { button.textContent = original; }, 1400);
+      } catch (error) {
+        window.prompt('Copy this viewer link:', button.dataset.copyLink);
+      }
+    });
+  });
+
+  document.querySelectorAll('[data-collapsible-abstract]').forEach((block) => {
+    const copy = block.querySelector('.abstract-copy');
+    const toggle = block.querySelector('[data-abstract-toggle]');
+    if (!copy || !toggle) return;
+    const isOverflowing = copy.scrollHeight > copy.clientHeight + 4;
+    if (!isOverflowing) { toggle.hidden = true; return; }
+    toggle.addEventListener('click', () => {
+      const expanded = block.classList.toggle('is-expanded');
+      toggle.textContent = expanded ? 'Show less' : 'Read more';
+    });
+  });
+</script>
+{% endblock %}

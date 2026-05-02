@@ -77,7 +77,7 @@
       field-of-view="28deg"
       bounds="tight"
       reveal="auto">
-      <button slot="ar-button" class="absolute bottom-7 right-7 rounded-full bg-white text-[#111111] px-5 py-3 font-bold hover:scale-[1.02] transition">
+      <button slot="ar-button" class="hidden" aria-hidden="true" tabindex="-1">
         View in AR
       </button>
     </model-viewer>
@@ -87,7 +87,12 @@
         <span class="brand-mark !w-7 !h-7">A</span>
         <span class="font-serif font-semibold">AcademicAR</span>
       </a>
-      <button id="infoBtn" class="pointer-events-auto rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white/80 backdrop-blur-xl hover:bg-white/15 transition">Info</button>
+      <div class="pointer-events-auto flex flex-wrap items-center justify-end gap-2">
+        <button id="fullscreenBtn" class="viewer-tool-btn" type="button">Full screen</button>
+        <button id="qrBtn" class="viewer-tool-btn" type="button">QR</button>
+        <button id="arBtn" class="viewer-tool-btn primary" type="button">View in AR</button>
+        <button id="infoBtn" class="viewer-tool-btn" type="button">Info</button>
+      </div>
     </header>
 
     <div id="viewerStatus" class="absolute left-1/2 top-1/2 z-40 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-white/10 bg-[#111111]/85 px-5 py-4 text-sm text-white/80 backdrop-blur-xl">
@@ -157,6 +162,22 @@
         </div>
       {% endif %}
     </aside>
+
+    <div id="qrModal" class="hidden fixed inset-0 z-50 bg-black/72 p-4 backdrop-blur-sm">
+      <div class="mx-auto mt-16 w-full max-w-sm rounded-xl border border-white/12 bg-[#111111] p-5 text-white shadow-2xl">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="text-xs uppercase tracking-[0.18em] text-white/45">Open on mobile</p>
+            <h2 class="mt-1 text-xl font-bold">Scan for AR</h2>
+          </div>
+          <button id="closeQr" class="rounded border border-white/10 px-3 py-2 text-sm text-white/70 hover:bg-white/10" type="button">Close</button>
+        </div>
+        <div class="mt-5 grid place-items-center rounded-lg bg-white p-4">
+          <img src="{{ url_for('qr_image', model_id=model.id) }}" class="h-56 w-56" alt="QR code for mobile AR">
+        </div>
+        <p class="mt-4 text-sm leading-relaxed text-white/60">AR opens best from a phone or tablet. Scan this QR code, then tap View in AR on the mobile viewer.</p>
+      </div>
+    </div>
   </main>
 
   <script>
@@ -166,6 +187,11 @@
     const viewer = document.getElementById('viewer');
     const viewerStatus = document.getElementById('viewerStatus');
     const screenshotTools = document.querySelector('[data-screenshot-tools]');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const qrBtn = document.getElementById('qrBtn');
+    const arBtn = document.getElementById('arBtn');
+    const qrModal = document.getElementById('qrModal');
+    const closeQr = document.getElementById('closeQr');
     const shotOrbits = {
       front: '0deg 90deg auto',
       right: '90deg 90deg auto',
@@ -176,6 +202,52 @@
 
     infoBtn.addEventListener('click', () => infoPanel.classList.add('open'));
     closeInfo.addEventListener('click', () => infoPanel.classList.remove('open'));
+    qrBtn.addEventListener('click', () => qrModal.classList.remove('hidden'));
+    closeQr.addEventListener('click', () => qrModal.classList.add('hidden'));
+    qrModal.addEventListener('click', (event) => {
+      if (event.target === qrModal) qrModal.classList.add('hidden');
+    });
+
+    fullscreenBtn.addEventListener('click', async () => {
+      const target = document.documentElement;
+      try {
+        if (!document.fullscreenElement) {
+          await target.requestFullscreen();
+          fullscreenBtn.textContent = 'Exit full screen';
+        } else {
+          await document.exitFullscreen();
+          fullscreenBtn.textContent = 'Full screen';
+        }
+      } catch (error) {
+        fullscreenBtn.textContent = 'Full screen unavailable';
+        setTimeout(() => { fullscreenBtn.textContent = 'Full screen'; }, 1600);
+      }
+    });
+
+    document.addEventListener('fullscreenchange', () => {
+      fullscreenBtn.textContent = document.fullscreenElement ? 'Exit full screen' : 'Full screen';
+    });
+
+    const isMobileLike = () => (
+      window.matchMedia('(pointer: coarse)').matches
+      || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+    );
+
+    arBtn.addEventListener('click', async () => {
+      if (!isMobileLike()) {
+        qrModal.classList.remove('hidden');
+        return;
+      }
+      try {
+        if (typeof viewer.activateAR === 'function') {
+          await viewer.activateAR();
+        } else {
+          qrModal.classList.remove('hidden');
+        }
+      } catch (error) {
+        qrModal.classList.remove('hidden');
+      }
+    });
 
     viewer.addEventListener('load', () => {
       viewer.classList.add('is-loaded');
