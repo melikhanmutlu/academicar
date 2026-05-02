@@ -48,7 +48,7 @@ trimesh.util.allclose = _numpy2_allclose
 def inject_pbr_material(
     glb_path: str,
     base_color_rgba: tuple,
-    roughness: float = 0.85,
+    roughness: float = 0.55,
     metallic: float = 0.0,
     double_sided: bool = True,
 ) -> None:
@@ -292,23 +292,29 @@ class STLConverter(BaseConverter):
                     f"Warning: could not center mesh on origin: {e}", "WARNING"
                 )
 
-            # Weld coincident vertices and compute smooth vertex normals.
-            # STL stores per-face triangles with no vertex normals; if we export
-            # without normals the GLB has no NORMAL attribute. Desktop three.js
-            # auto-derives flat per-triangle normals on the fly (so it looks OK),
-            # but iOS Quick Look (USDZ conversion) and parts of Android Scene
-            # Viewer skip that step -> AR shows a single flat unlit color with
-            # no surface relief. Merging duplicate vertices first lets trimesh
-            # average normals across shared edges (smooth shading), which is the
-            # right look for anatomical / organic geometry.
+            # Compute FLAT per-face vertex normals and write them to the GLB.
+            #
+            # STL stores triangles with no vertex normals. We deliberately KEEP
+            # the un-welded "one vertex per triangle corner" topology that
+            # load_stl_mesh_without_normals produces, because each vertex then
+            # belongs to exactly one face -> trimesh.vertex_normals returns the
+            # face normal at every corner -> faceted (flat per-face) shading.
+            #
+            # That matches the geometric appearance of the original STL and
+            # reveals anatomical relief (ridges, foramina, mesh resolution).
+            # Welding via merge_vertices() would average normals across shared
+            # edges and produce a smooth blob that hides those details, which
+            # is wrong for medical / dental / archaeological scans.
+            #
+            # An explicit NORMAL accessor is required: iOS Quick Look (USDZ
+            # conversion) and parts of Android Scene Viewer skip auto-deriving
+            # normals at render time, leaving the surface unlit if absent.
             try:
-                vertex_count_before = len(mesh.vertices)
-                mesh.merge_vertices()
-                mesh.fix_normals()  # ensure consistent triangle winding
+                mesh.fix_normals()  # consistent triangle winding only; no merge
                 _ = mesh.vertex_normals  # force lazy computation; written to GLB
                 self.log_operation(
-                    f"Welded vertices ({vertex_count_before} -> {len(mesh.vertices)}) "
-                    f"and computed {len(mesh.vertex_normals)} smooth vertex normals"
+                    f"Computed flat per-face vertex normals "
+                    f"({len(mesh.vertices)} verts, {len(mesh.faces)} faces)"
                 )
             except Exception as e:
                 self.log_operation(
@@ -401,7 +407,7 @@ class STLConverter(BaseConverter):
                 inject_pbr_material(output_path, target_color)
                 self.log_operation(
                     f"Injected PBR material baseColorFactor={target_color} "
-                    f"(roughness=0.85, metallic=0.0, doubleSided=true)"
+                    f"(roughness=0.55, metallic=0.0, doubleSided=true)"
                 )
             except Exception as e:
                 self.log_operation(
