@@ -292,6 +292,30 @@ class STLConverter(BaseConverter):
                     f"Warning: could not center mesh on origin: {e}", "WARNING"
                 )
 
+            # Weld coincident vertices and compute smooth vertex normals.
+            # STL stores per-face triangles with no vertex normals; if we export
+            # without normals the GLB has no NORMAL attribute. Desktop three.js
+            # auto-derives flat per-triangle normals on the fly (so it looks OK),
+            # but iOS Quick Look (USDZ conversion) and parts of Android Scene
+            # Viewer skip that step -> AR shows a single flat unlit color with
+            # no surface relief. Merging duplicate vertices first lets trimesh
+            # average normals across shared edges (smooth shading), which is the
+            # right look for anatomical / organic geometry.
+            try:
+                vertex_count_before = len(mesh.vertices)
+                mesh.merge_vertices()
+                mesh.fix_normals()  # ensure consistent triangle winding
+                _ = mesh.vertex_normals  # force lazy computation; written to GLB
+                self.log_operation(
+                    f"Welded vertices ({vertex_count_before} -> {len(mesh.vertices)}) "
+                    f"and computed {len(mesh.vertex_normals)} smooth vertex normals"
+                )
+            except Exception as e:
+                self.log_operation(
+                    f"Warning: normal computation failed ({e}); AR may render flat",
+                    "WARNING",
+                )
+
             # Get model dimensions (now in meters, consistent with GLB standard)
             extents = np.ptp(mesh.bounds, axis=0)
 
