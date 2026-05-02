@@ -45,6 +45,22 @@ def _numpy2_allclose(a, b, atol=1e-8):
 trimesh.util.allclose = _numpy2_allclose
 
 
+def _srgb_to_linear(c: float) -> float:
+    """Convert a single sRGB channel (0..1) to linear color space.
+
+    glTF 2.0 spec requires baseColorFactor to be in LINEAR color space.
+    Color picker hex values are sRGB. Without this conversion, strict
+    PBR renderers (iOS Quick Look) display the color ~2.2x too bright,
+    which looks washed-out compared to the user's intent. Lenient
+    renderers (three.js with tone-mapping=agx) tone-map the over-bright
+    value back into a similar-looking color, which is why the desktop
+    preview hid this bug while iOS exposed it.
+    """
+    if c <= 0.04045:
+        return c / 12.92
+    return ((c + 0.055) / 1.055) ** 2.4
+
+
 def convert_glb_to_usdz(glb_path: str, usdz_path: str) -> bool:
     """Convert a GLB to USDZ so iOS Quick Look can render it without Apple's
     lossy auto-conversion (which strips normals and produces a smooth blob).
@@ -78,8 +94,8 @@ def convert_glb_to_usdz(glb_path: str, usdz_path: str) -> bool:
 def inject_pbr_material(
     glb_path: str,
     base_color_rgba: tuple,
-    roughness: float = 0.55,
-    metallic: float = 0.0,
+    roughness: float = 0.45,
+    metallic: float = 0.05,
     double_sided: bool = True,
 ) -> None:
     """Rewrite a GLB file in place, attaching a PBR material with the given
@@ -385,20 +401,28 @@ class STLConverter(BaseConverter):
             # though the desktop three.js viewer shows it correctly. Instead we
             # inject a PBR material with baseColorFactor into the exported GLB
             # below; this is read by both desktop and AR engines uniformly.
-            target_color = (0.8, 0.8, 0.8, 1.0)  # default light gray
+            # Default light gray, expressed in LINEAR color space (sRGB #cccccc
+            # -> linear ~0.604). All baseColorFactor values are linear per the
+            # glTF 2.0 spec; renderers gamma-correct on output.
+            target_color = (0.6038, 0.6038, 0.6038, 1.0)
             if color:
                 try:
                     hex_color = color.lstrip("#")
                     if len(hex_color) != 6:
                         raise ValueError(f"Invalid hex color: {color}")
+                    srgb_r = int(hex_color[0:2], 16) / 255.0
+                    srgb_g = int(hex_color[2:4], 16) / 255.0
+                    srgb_b = int(hex_color[4:6], 16) / 255.0
                     target_color = (
-                        int(hex_color[0:2], 16) / 255.0,
-                        int(hex_color[2:4], 16) / 255.0,
-                        int(hex_color[4:6], 16) / 255.0,
+                        _srgb_to_linear(srgb_r),
+                        _srgb_to_linear(srgb_g),
+                        _srgb_to_linear(srgb_b),
                         1.0,
                     )
                     self.log_operation(
-                        f"Target PBR color parsed from '{color}': {target_color}"
+                        f"Target PBR color parsed from '{color}' "
+                        f"(sRGB {srgb_r:.3f},{srgb_g:.3f},{srgb_b:.3f} -> "
+                        f"linear {target_color[0]:.3f},{target_color[1]:.3f},{target_color[2]:.3f})"
                     )
                 except Exception as e:
                     self.log_operation(
@@ -408,7 +432,7 @@ class STLConverter(BaseConverter):
                     )
             else:
                 self.log_operation(
-                    "No color specified; using default light gray for PBR material"
+                    "No color specified; using default light gray (linear 0.604) for PBR material"
                 )
 
             # Note: Basis correction (Z-up to Y-up) is NOT applied here
@@ -437,7 +461,7 @@ class STLConverter(BaseConverter):
                 inject_pbr_material(output_path, target_color)
                 self.log_operation(
                     f"Injected PBR material baseColorFactor={target_color} "
-                    f"(roughness=0.55, metallic=0.0, doubleSided=true)"
+                    f"(roughness=0.45, metallic=0.05, doubleSided=true)"
                 )
             except Exception as e:
                 self.log_operation(
