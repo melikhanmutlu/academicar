@@ -192,25 +192,13 @@
   position: relative;
   width: 100%;
   height: 620px;
-  border-radius: 8px;
-  overflow: hidden;
-  background:
-    linear-gradient(135deg, var(--color-slate-mist) 0%, var(--color-cloud-whisper) 100%);
-}
-.hero-viewer-stage::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(32, 32, 32, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(32, 32, 32, 0.04) 1px, transparent 1px);
-  background-size: 48px 48px;
-  pointer-events: none;
+  background: transparent;
 }
 .hero-viewer-stage model-viewer {
   width: 100%;
   height: 100%;
   --poster-color: transparent;
+  background: transparent;
   position: relative;
   z-index: 1;
 }
@@ -2897,6 +2885,8 @@ input[type="file"]::-webkit-file-upload-button {
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   margin-bottom: 40px;
+  border: 0;
+  background: transparent;
 }
 .metric-card {
   position: relative;
@@ -3048,19 +3038,57 @@ input[type="file"]::-webkit-file-upload-button {
   color: var(--color-silver-ash);
   margin: 0;
 }
-.dashboard-search-form {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-  flex: 1;
-  justify-content: flex-end;
+/* Override the legacy 1024px column-mode rule and force compact row */
+.dashboard-list-header {
+  flex-direction: row !important;
+  align-items: center !important;
 }
-.dashboard-search-form .field-input,
-.dashboard-search-form .field-select { min-width: 140px; }
+.dashboard-search-form {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  width: auto !important;
+  flex: 0 0 auto !important;
+  justify-content: flex-end !important;
+}
+.dashboard-search-form .field-input.dashboard-search {
+  min-width: 0 !important;
+  width: 200px !important;
+  max-width: 200px !important;
+  flex: 0 0 200px !important;
+  font-size: 13px !important;
+  padding: 7px 12px !important;
+}
+.dashboard-search-form .field-select,
+.dashboard-search-form .compact-select {
+  min-width: 0 !important;
+  width: 130px !important;
+  max-width: 130px !important;
+  flex: 0 0 130px !important;
+  font-size: 13px !important;
+  padding: 7px 28px 7px 12px !important;
+}
+.dashboard-search-form .btn-secondary.compact { font-size: 13px !important; padding: 7px 12px !important; }
+
 @media (max-width: 768px) {
-  .dashboard-list-header { flex-wrap: wrap; }
-  .dashboard-search-form { justify-content: flex-start; flex: 1 1 100%; }
+  .dashboard-list-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    flex-wrap: wrap;
+  }
+  .dashboard-search-form {
+    width: 100% !important;
+    flex-wrap: wrap !important;
+    justify-content: flex-start !important;
+  }
+  .dashboard-search-form .field-input.dashboard-search,
+  .dashboard-search-form .field-select,
+  .dashboard-search-form .compact-select {
+    flex: 1 1 100% !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
 }
 
 /* Form fields */
@@ -3501,7 +3529,7 @@ input[type="file"]::-webkit-file-upload-button {
 .model-row:hover { border-color: var(--color-silver-ash) !important; }
 .model-row-grid {
   display: grid;
-  grid-template-columns: 160px 1fr 110px;
+  grid-template-columns: 160px minmax(0, 1fr) 132px;
   gap: 24px;
   align-items: center;
 }
@@ -3550,11 +3578,19 @@ input[type="file"]::-webkit-file-upload-button {
 .model-qr {
   display: block;
   background: var(--color-canvas-white);
-  padding: 6px;
+  padding: 8px;
   border-radius: 8px;
   border: 1px solid var(--color-light-pearl);
+  width: 132px;
+  height: 132px;
+  box-sizing: border-box;
+  justify-self: end;
 }
-.model-qr img { display: block; width: 90px !important; height: 90px !important; }
+.model-qr img {
+  display: block;
+  width: 116px !important;
+  height: 116px !important;
+}
 @media (max-width: 768px) {
   .model-row-grid { grid-template-columns: 1fr; }
   .model-qr { width: fit-content; }
