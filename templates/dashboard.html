@@ -23,21 +23,56 @@
     <a href="{{ url_for('paper_new') }}" class="btn-primary shrink-0">+ New Publication</a>
   </div>
 
+  {% set public_count = (papers or [])|selectattr('is_public')|list|length %}
   <div class="dashboard-metrics reveal-up">
-    <div>
-      <span>Publications</span>
-      <strong>{{ papers|length }}</strong>
-      <small>All time</small>
+    <div class="metric-card metric-card-feature">
+      <div class="metric-card-head">
+        <span class="metric-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h12l4 4v12H4z"/><path d="M16 4v4h4"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
+        </span>
+        <span class="metric-label">Publications</span>
+      </div>
+      <strong class="metric-value">{{ papers|length }}</strong>
+      <div class="metric-foot">
+        <span class="metric-sub">All time</span>
+        {% if papers|length > 0 %}<span class="metric-trend positive">●</span>{% endif %}
+      </div>
     </div>
-    <div>
-      <span>3D Models</span>
-      <strong>{{ stats.total_models }}</strong>
-      <small>Uploaded</small>
+    <div class="metric-card">
+      <div class="metric-card-head">
+        <span class="metric-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 4 6v12l8 4 8-4V6z"/><path d="M4 6l8 4 8-4"/><line x1="12" y1="22" x2="12" y2="10"/></svg>
+        </span>
+        <span class="metric-label">3D Models</span>
+      </div>
+      <strong class="metric-value">{{ stats.total_models }}</strong>
+      <div class="metric-foot">
+        <span class="metric-sub">{{ 'Uploaded' if stats.total_models else 'Upload your first model' }}</span>
+      </div>
     </div>
-    <div>
-      <span>PDF Attachments</span>
-      <strong>{{ papers_with_pdf }}</strong>
-      <small>Linked</small>
+    <div class="metric-card">
+      <div class="metric-card-head">
+        <span class="metric-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="3" width="16" height="18" rx="1"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>
+        </span>
+        <span class="metric-label">PDF Attachments</span>
+      </div>
+      <strong class="metric-value">{{ papers_with_pdf }}</strong>
+      <div class="metric-foot">
+        <span class="metric-sub">{{ papers|length - papers_with_pdf }} without PDF</span>
+      </div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-card-head">
+        <span class="metric-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18"/><path d="M12 3a14 14 0 0 0 0 18"/></svg>
+        </span>
+        <span class="metric-label">Public Links</span>
+      </div>
+      <strong class="metric-value">{{ public_count }}<small class="metric-divider">/{{ papers|length }}</small></strong>
+      <div class="metric-foot">
+        <span class="metric-sub">{{ papers|length - public_count }} private</span>
+      </div>
     </div>
   </div>
 

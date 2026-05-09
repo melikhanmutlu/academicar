@@ -1215,13 +1215,6 @@ def register_routes(app: Flask) -> None:
                     "danger",
                 )
                 return redirect(url_for("paper_detail", slug=slug))
-            usdz_file = request.files.get("usdz")
-            if usdz_file and usdz_file.filename and usdz_file.filename.lower().endswith(".usdz"):
-                try:
-                    usdz_file.save(usdz_path)
-                    logger.info("User-provided USDZ stored at %s", usdz_path)
-                except OSError as e:
-                    logger.warning("Failed to save user USDZ: %s", e)
 
             model = Model3D(
                 id=unique_id,

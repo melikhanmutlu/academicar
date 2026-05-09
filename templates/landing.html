@@ -2,150 +2,304 @@
 {% block title %}AcademicAR - 3D and AR models for academic publications{% endblock %}
 
 {% block content %}
-<section class="hero-stage">
-  <div class="relative max-w-[1760px] mx-auto px-5 sm:px-8 lg:px-14 py-16 lg:py-20">
-    <div class="grid xl:grid-cols-[0.84fr_1.16fr] gap-10 2xl:gap-20 items-center">
-      <div class="reveal-up max-w-4xl">
-        <span class="eyebrow"><span class="w-2 h-2 rounded-full bg-[#2563eb]"></span> Academic spatial publishing</span>
-        <h1 class="font-sans text-[3.15rem] sm:text-[5.8rem] lg:text-[6.8rem] 2xl:text-[7.9rem] leading-[0.86] font-semibold mt-7 text-[#0f172a]">
-          AcademicAR
-        </h1>
-        <p class="mt-7 text-2xl lg:text-3xl 2xl:text-[2rem] text-[#1e293b] max-w-3xl leading-tight">
-          Share 3D and AR models with academic papers, posters, and presentations.
-        </p>
-        <p class="mt-5 text-base lg:text-lg text-[#64748b] max-w-3xl leading-relaxed">
-          Upload an STL or GLB model, generate a browser-ready viewer link, create a QR code, and let readers inspect your model in 3D or AR from mobile devices.
-        </p>
-        <div class="mt-8 flex flex-wrap gap-3">
-          <a href="{{ url_for('auth.register') }}" class="btn-primary">Create Workspace</a>
-          <a href="#workflow" class="btn-secondary">See Workflow</a>
-        </div>
-
-        <div class="clinical-metrics mt-10 max-w-3xl">
-          <div>
-            <p>STL/GLB</p>
-            <span>Model upload</span>
-          </div>
-          <div>
-            <p>QR</p>
-            <span>Publication link</span>
-          </div>
-          <div>
-            <p>AR</p>
-            <span>Mobile viewing</span>
-          </div>
-        </div>
+<!-- HERO -->
+<section class="hero-section">
+  <div class="hero-grid">
+    <div class="reveal-up">
+      <span class="landing-eyebrow">Academic spatial publishing</span>
+      <h1 class="landing-h1">AcademicAR</h1>
+      <p class="landing-lead">
+        Share 3D and AR models with academic papers, posters, and presentations.
+      </p>
+      <p class="landing-body">
+        Upload an STL or GLB model, generate a browser-ready viewer link, create a QR code, and let readers inspect your model in 3D or AR from mobile devices.
+      </p>
+      <div class="hero-actions">
+        <a href="{{ url_for('auth.register') }}" class="btn-primary">Create Workspace</a>
+        <a href="#workflow" class="btn-secondary">See Workflow</a>
       </div>
 
-      <div class="relative min-h-[620px] lg:min-h-[760px] 2xl:min-h-[820px] reveal-up delay-2">
-        <div class="clinical-model-stage absolute inset-0 overflow-hidden" data-parallax="0.13">
-          <div class="absolute inset-0 volumetric-grid opacity-70"></div>
-          <model-viewer
-            src="{{ url_for('static', filename='models/demo-model.glb') }}"
-            alt="AcademicAR demo 3D model"
-            class="hero-live-model absolute inset-0 w-full h-full"
-            camera-controls
-            auto-rotate
-            rotation-per-second="18deg"
-            scale="0.42 0.42 0.42"
-            camera-orbit="35deg 64deg 4.4m"
-            field-of-view="34deg"
-            exposure="0.9"
-            shadow-intensity="0.86"
-            environment-image="neutral">
-          </model-viewer>
+      <div class="hero-metrics">
+        <div>
+          <div class="hero-metric-value">STL/GLB</div>
+          <div class="hero-metric-label">Model upload</div>
+        </div>
+        <div>
+          <div class="hero-metric-value">QR</div>
+          <div class="hero-metric-label">Publication link</div>
+        </div>
+        <div>
+          <div class="hero-metric-value">AR</div>
+          <div class="hero-metric-label">Mobile viewing</div>
         </div>
       </div>
+    </div>
+
+    <div class="hero-viewer-stage reveal-up delay-2">
+      <span class="hero-viewer-tag">Live 3D preview</span>
+      <model-viewer
+        src="{{ url_for('static', filename='models/demo-model.glb') }}"
+        alt="AcademicAR demo 3D model"
+        camera-controls
+        auto-rotate
+        rotation-per-second="18deg"
+        scale="0.42 0.42 0.42"
+        camera-orbit="35deg 64deg 4.4m"
+        field-of-view="34deg"
+        exposure="0.95"
+        shadow-intensity="0.85"
+        environment-image="neutral"
+        loading="lazy">
+      </model-viewer>
     </div>
   </div>
 </section>
 
-<section id="workflow" class="landing-section py-24 lg:py-28">
-  <div class="max-w-[1760px] mx-auto px-5 sm:px-8 lg:px-14">
-    <div class="workflow-layout">
-      <div class="reveal-up">
-        <span class="eyebrow">How it works</span>
-        <h2 class="font-sans text-4xl lg:text-6xl 2xl:text-7xl font-semibold text-[#0f172a] mt-4 leading-[0.95]">From segmentation model to publication link.</h2>
-        <p class="text-[#64748b] leading-relaxed text-lg max-w-3xl mt-6">AcademicAR turns technical model files into a shareable academic asset: model upload, GLB viewer, screenshots, QR code, and mobile AR access in one flow.</p>
-
-        <div class="clinical-steps mt-12">
-          {% for step in [
-            ('01', 'Upload your model', 'Upload an anonymized STL or GLB segmentation model from your account.'),
-            ('02', 'Create a publication page', 'Add title, authors, institution, DOI/PMID, description, and model notes.'),
-            ('03', 'Get QR and link', 'Use the generated viewer URL and QR code in papers, posters, and presentations.'),
-            ('04', 'Show in 3D or AR', 'Readers can rotate, zoom, inspect, and open the model in AR on supported phones and tablets.')
-          ] %}
-            <div class="reveal-up delay-{{ loop.index }}">
-              <div class="text-sm font-bold text-[#2563eb]">{{ step[0] }}</div>
-              <h3 class="font-sans text-2xl font-semibold text-[#0f172a] mt-3">{{ step[1] }}</h3>
-              <p class="text-sm text-[#64748b] leading-relaxed mt-3">{{ step[2] }}</p>
-            </div>
-          {% endfor %}
-        </div>
-      </div>
-
-      <div class="workflow-visual reveal-up delay-2" aria-hidden="true" data-parallax="-0.09">
-        <img src="{{ url_for('static', filename='images/clinical-spatial-hero.png') }}" alt="">
-        <div class="workflow-visual-caption">
-          <span>3D research context</span>
-          <strong>Paper -> model -> AR</strong>
-        </div>
-      </div>
+<!-- TRUST BAR -->
+<section class="trust-bar">
+  <div class="trust-bar-inner">
+    <span class="trust-bar-label">Built for researchers across</span>
+    <div class="trust-bar-items">
+      <span class="trust-bar-item">Medical imaging</span>
+      <span class="trust-bar-item">Anatomy &amp; surgery</span>
+      <span class="trust-bar-item">Archaeology</span>
+      <span class="trust-bar-item">Engineering</span>
+      <span class="trust-bar-item">Earth sciences</span>
     </div>
   </div>
 </section>
 
-<section class="workspace-section py-24 lg:py-32 bg-[#f8fafc] text-[#0f172a] overflow-hidden border-y border-[#e2e8f0]">
-  <div class="max-w-[1760px] mx-auto px-5 sm:px-8 lg:px-14">
-    <div class="workspace-layout">
-      <div class="reveal-up max-w-3xl">
-        <span class="eyebrow">Features</span>
-        <h2 class="font-sans text-4xl lg:text-6xl 2xl:text-7xl font-semibold mt-5 leading-[0.95]">A publication-ready workspace for 3D academic models.</h2>
-        <p class="text-[#64748b] leading-relaxed mt-5 text-lg">Manage publication metadata, upload models, generate QR codes, capture standard views, and keep public links active for temporary or paid publication windows.</p>
-      </div>
-      <div class="clinical-signal-list reveal-up delay-2">
-        {% for item in [
-          ('3D model upload', 'STL and GLB support now, with OBJ planned for the next converter pass.'),
-          ('Web-based viewer', 'A full-screen browser viewer with metadata and mobile AR controls.'),
-          ('Automatic QR code', 'Every model receives a shareable viewer URL and QR image.'),
-          ('Publication archive', 'Project-based model records for papers, posters, and presentations.'),
-          ('Screenshots', 'Front, right, left, top, and perspective captures for publication assets.'),
-          ('Privacy guardrails', 'Uploads require anonymization, rights, and ethics responsibility confirmation.')
+<!-- WORKFLOW -->
+<section id="workflow" class="landing-section">
+  <div class="workflow-grid">
+    <div class="reveal-up">
+      <span class="landing-eyebrow">How it works</span>
+      <h2 class="landing-h2">From segmentation model to publication link.</h2>
+      <p class="landing-body">
+        AcademicAR turns technical model files into a shareable academic asset: model upload, GLB viewer, screenshots, QR code, and mobile AR access in one flow.
+      </p>
+
+      <div class="workflow-timeline">
+        {% for step in [
+          ('01', 'Upload your model', 'Upload an anonymized STL or GLB segmentation model from your account.'),
+          ('02', 'Create a publication page', 'Add title, authors, institution, DOI/PMID, description, and model notes.'),
+          ('03', 'Get QR and link', 'Use the generated viewer URL and QR code in papers, posters, and presentations.'),
+          ('04', 'Show in 3D or AR', 'Readers can rotate, zoom, inspect, and open the model in AR on supported phones and tablets.')
         ] %}
-          <div>
-            <h3 class="font-semibold text-[#0f172a]">{{ item[0] }}</h3>
-            <p class="text-sm text-[#64748b] mt-2">{{ item[1] }}</p>
+          <div class="workflow-step reveal-up delay-{{ loop.index }}">
+            <div class="workflow-step-num">{{ step[0] }}</div>
+            <div>
+              <h3 class="workflow-step-title">{{ step[1] }}</h3>
+              <p class="workflow-step-desc">{{ step[2] }}</p>
+            </div>
           </div>
         {% endfor %}
       </div>
     </div>
+
+    <div class="workflow-visual-card reveal-up delay-2" aria-hidden="true">
+      <img src="{{ url_for('static', filename='images/clinical-spatial-hero.png') }}" alt="">
+    </div>
   </div>
 </section>
 
-<section class="py-24 lg:py-28">
-  <div class="max-w-[1760px] mx-auto px-5 sm:px-8 lg:px-14 reveal-up">
-    <div class="grid lg:grid-cols-2 gap-5">
-      <div class="surface rounded-xl p-7">
-        <p class="eyebrow">Temporary Publication</p>
-        <h3 class="font-sans text-4xl font-semibold text-[#0f172a] mt-4">0 TL</h3>
-        <ul class="mt-6 space-y-3 text-[#64748b]">
+<!-- FEATURES -->
+<section class="landing-section alt-surface">
+  <div class="landing-container" style="margin-bottom: 60px;">
+    <div class="reveal-up">
+      <span class="landing-eyebrow">Features</span>
+      <h2 class="landing-h2">A publication-ready workspace for 3D academic models.</h2>
+      <p class="landing-body">
+        Manage publication metadata, upload models, generate QR codes, capture standard views, and keep public links active for temporary or paid publication windows.
+      </p>
+    </div>
+  </div>
+
+  <div class="features-grid">
+    {% for item in [
+      ('3D model upload', 'STL and GLB support now, with OBJ planned for the next converter pass.', 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.27 6.96 12 12.01l8.73-5.05 M12 22.08V12'),
+      ('Web-based viewer', 'A full-screen browser viewer with metadata and mobile AR controls.', 'M2 3h20v14H2z M8 21h8 M12 17v4'),
+      ('Automatic QR code', 'Every model receives a shareable viewer URL and QR image.', 'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h2v2h-2z M18 14h2v2h-2z M14 18h2v2h-2z M18 18h2v2h-2z'),
+      ('Publication archive', 'Project-based model records for papers, posters, and presentations.', 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8'),
+      ('Screenshots', 'Front, right, left, top, and perspective captures for publication assets.', 'M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'),
+      ('Privacy guardrails', 'Uploads require anonymization, rights, and ethics responsibility confirmation.', 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z')
+    ] %}
+      <div class="feature-card reveal-up delay-{{ loop.index }}">
+        <svg class="feature-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+          {% for d in item[2].split(' M') %}
+            <path d="{% if not loop.first %}M{% endif %}{{ d }}"/>
+          {% endfor %}
+        </svg>
+        <h3 class="feature-title">{{ item[0] }}</h3>
+        <p class="feature-desc">{{ item[1] }}</p>
+      </div>
+    {% endfor %}
+  </div>
+</section>
+
+<!-- USE CASES -->
+<section class="landing-section">
+  <div class="landing-container" style="margin-bottom: 60px;">
+    <div class="reveal-up">
+      <span class="landing-eyebrow">Use cases</span>
+      <h2 class="landing-h2">Spatial context for any research output.</h2>
+      <p class="landing-body">
+        From clinical segmentations to cultural heritage scans, AcademicAR adapts to the way your readers explore evidence.
+      </p>
+    </div>
+  </div>
+
+  <div class="usecases-grid">
+    <div class="usecase-card reveal-up delay-1">
+      <div class="usecase-thumb">
+        <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg" style="width: 60%; height: auto;">
+          <circle cx="100" cy="60" r="40" fill="none" stroke="#202020" stroke-width="1.5"/>
+          <ellipse cx="100" cy="60" rx="40" ry="14" fill="none" stroke="#828282" stroke-width="1"/>
+          <ellipse cx="100" cy="60" rx="14" ry="40" fill="none" stroke="#828282" stroke-width="1"/>
+          <circle cx="100" cy="60" r="3" fill="#ff682c"/>
+          <line x1="40" y1="100" x2="60" y2="80" stroke="#202020" stroke-width="1"/>
+          <line x1="160" y1="100" x2="140" y2="80" stroke="#202020" stroke-width="1"/>
+        </svg>
+      </div>
+      <div class="usecase-body">
+        <span class="usecase-tag">Clinical</span>
+        <h3 class="usecase-title">Patient-specific anatomy</h3>
+        <p class="usecase-desc">Share segmented CT/MRI structures with the supplementary material of your paper.</p>
+      </div>
+    </div>
+
+    <div class="usecase-card reveal-up delay-2">
+      <div class="usecase-thumb">
+        <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg" style="width: 60%; height: auto;">
+          <rect x="40" y="30" width="120" height="70" rx="4" fill="none" stroke="#202020" stroke-width="1.5"/>
+          <line x1="40" y1="50" x2="160" y2="50" stroke="#828282" stroke-width="1"/>
+          <circle cx="55" cy="40" r="2" fill="#ff682c"/>
+          <rect x="55" y="65" width="40" height="3" fill="#828282"/>
+          <rect x="55" y="75" width="60" height="3" fill="#828282"/>
+          <rect x="55" y="85" width="30" height="3" fill="#828282"/>
+          <rect x="120" y="65" width="30" height="25" fill="none" stroke="#ff682c" stroke-width="1"/>
+        </svg>
+      </div>
+      <div class="usecase-body">
+        <span class="usecase-tag">Education</span>
+        <h3 class="usecase-title">Interactive anatomy</h3>
+        <p class="usecase-desc">Embed AR-ready models in lecture slides and open them on student devices.</p>
+      </div>
+    </div>
+
+    <div class="usecase-card reveal-up delay-3">
+      <div class="usecase-thumb">
+        <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg" style="width: 60%; height: auto;">
+          <polygon points="100,20 150,50 150,90 100,100 50,90 50,50" fill="none" stroke="#202020" stroke-width="1.5"/>
+          <line x1="100" y1="20" x2="100" y2="100" stroke="#828282" stroke-width="1"/>
+          <line x1="50" y1="50" x2="150" y2="50" stroke="#828282" stroke-width="1"/>
+          <line x1="50" y1="90" x2="150" y2="90" stroke="#828282" stroke-width="1"/>
+          <circle cx="100" cy="60" r="4" fill="#ff682c"/>
+          <line x1="20" y1="105" x2="180" y2="105" stroke="#202020" stroke-width="1" stroke-dasharray="3,3"/>
+        </svg>
+      </div>
+      <div class="usecase-body">
+        <span class="usecase-tag">Heritage</span>
+        <h3 class="usecase-title">Site &amp; artifact scans</h3>
+        <p class="usecase-desc">Publish photogrammetry results alongside descriptive metadata.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="landing-section alt-surface">
+  <div class="pricing-layout">
+    <!-- Left: context copy -->
+    <div class="pricing-context reveal-up">
+      <span class="landing-eyebrow">Pricing</span>
+      <h2 class="landing-h2">Simple, publication-aligned plans.</h2>
+      <p class="landing-body" style="margin-bottom: 32px;">
+        Start with a free preview link. Upgrade to keep your model live alongside the published paper for the long term.
+      </p>
+      <div class="pricing-context-stats">
+        <div>
+          <div class="pricing-stat-value">3 days</div>
+          <div class="pricing-stat-label">Free link duration</div>
+        </div>
+        <div>
+          <div class="pricing-stat-value">3 years</div>
+          <div class="pricing-stat-label">Paid link duration</div>
+        </div>
+        <div>
+          <div class="pricing-stat-value">One-time</div>
+          <div class="pricing-stat-label">No subscription</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: plan cards -->
+    <div class="pricing-cards-col">
+      <div class="pricing-card reveal-up delay-1">
+        <span class="pricing-eyebrow">Temporary</span>
+        <h3 class="pricing-price">$0</h3>
+        <p class="pricing-period">Free preview link</p>
+        <ul class="pricing-features">
           <li>3-day active link</li>
           <li>QR code</li>
           <li>3D viewing</li>
           <li>Screenshot capture</li>
         </ul>
+        <a href="{{ url_for('auth.register') }}" class="pricing-cta">Start free</a>
+        <p class="pricing-microcopy">No credit card required</p>
       </div>
-      <div class="dark-surface rounded-xl p-7 text-white">
-        <p class="eyebrow bg-white/10 text-white border-white/15">Academic Publication Package</p>
-        <h3 class="font-sans text-4xl font-semibold mt-4">500 TL</h3>
-        <ul class="mt-6 space-y-3 text-white/70">
+
+      <div class="pricing-card featured-pricing reveal-up delay-2">
+        <span class="pricing-badge">Recommended</span>
+        <span class="pricing-eyebrow">Academic Package</span>
+        <h3 class="pricing-price">$10</h3>
+        <p class="pricing-period">One-time, per publication</p>
+        <ul class="pricing-features">
           <li>3-year active link</li>
           <li>Persistent QR code</li>
           <li>Public sharing</li>
           <li>Multiple model support</li>
           <li>Publication metadata fields</li>
         </ul>
+        <a href="{{ url_for('auth.register') }}" class="pricing-cta">Get package</a>
+        <p class="pricing-microcopy">Billed once at activation</p>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="landing-section">
+  <div class="faq-grid">
+    <div class="reveal-up">
+      <span class="landing-eyebrow">FAQ</span>
+      <h2 class="landing-h2">Quick answers.</h2>
+      <p class="landing-body">More in the documentation once you create a workspace.</p>
+    </div>
+    <div class="faq-list reveal-up delay-2">
+      {% for qa in [
+        ('Which file formats can I upload?', 'STL and GLB today. OBJ support is planned for the next converter pass.'),
+        ('Do my readers need an app for AR?', 'No. Modern iOS and Android browsers open AR directly via Quick Look (USDZ) and Scene Viewer.'),
+        ('Are uploads private by default?', 'Yes. You control visibility per publication and can keep models unlisted before paper acceptance.'),
+        ('What happens after the 3-year window?', 'Paid publications stay archived; readers see a notice that the live AR viewer is paused.')
+      ] %}
+        <div class="faq-item">
+          <h3 class="faq-q">{{ qa[0] }}</h3>
+          <p class="faq-a">{{ qa[1] }}</p>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section class="final-cta">
+  <div class="final-cta-inner reveal-up">
+    <h2>Start publishing in 3D.</h2>
+    <p>Create a workspace, upload your first model, and share an AR-ready link with your next paper.</p>
+    <div class="final-cta-actions">
+      <a href="{{ url_for('auth.register') }}" class="btn-primary-light">Create Workspace</a>
+      <a href="#workflow" class="btn-secondary-light">See workflow again</a>
     </div>
   </div>
 </section>
@@ -153,4 +307,22 @@
 
 {% block scripts %}
   <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
+  <script>
+    (function() {
+      const els = document.querySelectorAll('.reveal-up');
+      if (!('IntersectionObserver' in window)) {
+        els.forEach(el => el.classList.add('is-visible'));
+        return;
+      }
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible');
+            io.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.12 });
+      els.forEach(el => io.observe(el));
+    })();
+  </script>
 {% endblock %}

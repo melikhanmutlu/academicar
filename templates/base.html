@@ -5,9 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}AcademicAR{% endblock %}</title>
 
+  <meta name="description" content="Share 3D and AR models with academic papers, posters, and presentations. Upload STL or GLB, get a viewer link and a QR code.">
+  <meta property="og:title" content="AcademicAR - 3D and AR models for academic publications">
+  <meta property="og:description" content="Share 3D and AR models with academic papers, posters, and presentations.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="{{ url_for('static', filename='images/clinical-spatial-hero.png', _external=True) }}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="AcademicAR - 3D and AR models for academic publications">
+  <meta name="twitter:description" content="Share 3D and AR models with academic papers, posters, and presentations.">
+  <meta name="twitter:image" content="{{ url_for('static', filename='images/clinical-spatial-hero.png', _external=True) }}">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -16,17 +26,17 @@
         extend: {
           fontFamily: {
             sans: ['Inter', 'sans-serif'],
-            serif: ['Inter', 'sans-serif'],
+            serif: ['Montserrat', 'sans-serif'],
           },
           colors: {
             academic: {
-              50: '#f7f7f5',
-              100: '#eeeeea',
-              500: '#68686f',
-              600: '#2b2b30',
-              700: '#1c1c1f',
-              800: '#111111',
-              900: '#050505',
+              50: '#f5f5f5',
+              100: '#efefef',
+              500: '#828282',
+              600: '#4d4d4d',
+              700: '#202020',
+              800: '#202020',
+              900: '#202020',
             }
           }
         }
@@ -36,37 +46,35 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   {% block head %}{% endblock %}
 </head>
-<body class="font-sans bg-[#f7f7f5] text-[#141821] min-h-screen flex flex-col selection:bg-[#111111] selection:text-white">
+<body class="font-sans min-h-screen flex flex-col" style="background: var(--color-canvas-white); color: var(--color-midnight-graphite);">
 
-  <header class="bg-white/88 border-b border-[#141821]/10 sticky top-0 z-40 backdrop-blur-xl">
-    <nav class="app-shell h-16 flex items-center justify-between">
-      <a href="{{ url_for('landing') }}" class="flex items-center gap-2">
-        <div class="brand-mark"><span>A</span></div>
-        <span class="font-sans font-semibold text-lg text-[#111827] tracking-[-0.02em]">AcademicAR</span>
+  <header class="site-header">
+    <nav class="site-header-inner">
+      <a href="{{ url_for('landing') }}" class="site-brand">
+        <div class="site-brand-mark">A</div>
+        <span class="site-brand-name">AcademicAR</span>
       </a>
 
-      <div class="flex items-center gap-3">
+      <div class="site-nav-actions">
         {% if current_user.is_authenticated %}
           <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
-          <a href="{{ url_for('paper_new') }}" class="btn-primary compact">+ New Publication</a>
-          <div class="flex items-center gap-2 ml-2 border-l border-[#141821]/10 pl-3">
-            <a href="{{ url_for('profile') }}" class="flex items-center gap-2" title="Profile">
-              {% if current_user.avatar_url %}
-                <img src="{{ current_user.avatar_url }}" class="w-8 h-8 rounded-full" alt="">
-              {% else %}
-                <div class="w-8 h-8 rounded-full bg-[#111827] text-white flex items-center justify-center text-sm font-semibold">
-                  {{ current_user.username[0]|upper }}
-                </div>
-              {% endif %}
-            </a>
-            <form method="POST" action="{{ url_for('auth.logout') }}">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button type="submit" class="text-sm text-[#5c6473] hover:text-red-600">Log out</button>
-            </form>
-          </div>
+          <a href="{{ url_for('paper_new') }}" class="nav-link">+ New Publication</a>
+          <a href="{{ url_for('profile') }}" title="Profile" style="display: inline-flex; align-items: center;">
+            {% if current_user.avatar_url %}
+              <img src="{{ current_user.avatar_url }}" style="width: 28px; height: 28px; border-radius: 200px;" alt="">
+            {% else %}
+              <div style="width: 28px; height: 28px; border-radius: 200px; background: var(--color-midnight-graphite); color: var(--color-canvas-white); display: grid; place-items: center; font-family: var(--font-inter); font-size: 13px; font-weight: 600;">
+                {{ current_user.username[0]|upper }}
+              </div>
+            {% endif %}
+          </a>
+          <form method="POST" action="{{ url_for('auth.logout') }}" style="margin: 0;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="nav-link-muted" style="background: transparent; border: none; cursor: pointer; padding: 0;">Log out</button>
+          </form>
         {% else %}
-          <a href="{{ url_for('auth.login') }}" class="nav-link">Log in</a>
-          <a href="{{ url_for('auth.register') }}" class="btn-primary compact">Sign up</a>
+          <a href="{{ url_for('auth.login') }}" class="nav-link-muted">Log in</a>
+          <a href="{{ url_for('auth.register') }}" class="nav-link">Sign up</a>
         {% endif %}
       </div>
     </nav>
@@ -74,9 +82,9 @@
 
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
-      <div class="app-shell mt-4">
+      <div style="max-width: 1440px; margin: 16px auto 0; padding: 0 40px;">
         {% for cat, msg in messages %}
-          <div class="bg-white border border-[#d8d8d2] text-[#141821] px-4 py-3 rounded mb-2 text-sm">
+          <div style="background: var(--color-slate-mist); border: 1px solid var(--color-light-pearl); color: var(--color-midnight-graphite); padding: 12px 16px; border-radius: 8px; margin-bottom: 8px; font-family: var(--font-inter); font-size: 14px;">
             {{ msg }}
           </div>
         {% endfor %}
@@ -88,8 +96,8 @@
     {% block content %}{% endblock %}
   </main>
 
-  <footer class="bg-[#0f172a] border-t border-white/10 mt-12">
-    <div class="app-shell py-5 text-center text-xs text-white/55">
+  <footer class="site-footer">
+    <div class="site-footer-inner">
       &copy; {{ current_year }} AcademicAR - 3D and AR model sharing for academic publications
     </div>
   </footer>

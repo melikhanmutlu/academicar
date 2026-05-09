@@ -233,14 +233,8 @@
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <label class="upload-dropzone">
                 <span class="block text-[#111827] font-semibold">Select STL or GLB file</span>
-                <span class="block text-sm text-[#64748b] mt-1">The model will be prepared for the publication viewer.</span>
+                <span class="block text-sm text-[#64748b] mt-1">The model will be prepared for the publication viewer. iOS AR uses an automatically generated USDZ companion.</span>
                 <input type="file" name="file" accept=".stl,.glb" required class="mt-4 w-full text-sm text-[#64748b] file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:bg-[#111827] file:text-white file:font-bold">
-              </label>
-
-              <label class="upload-dropzone">
-                <span class="block text-[#111827] font-semibold">USDZ file <span class="text-xs text-[#64748b] font-normal">(optional, recommended for iOS AR quality)</span></span>
-                <span class="block text-sm text-[#64748b] mt-1">Upload a hand-prepared USDZ (e.g. from Reality Composer) to bypass Apple Quick Look's lossy auto-conversion. Without it, iOS still works but mesh detail is smoothed.</span>
-                <input type="file" name="usdz" accept=".usdz" class="mt-4 w-full text-sm text-[#64748b] file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:bg-[#111827] file:text-white file:font-bold">
               </label>
               <div class="grid sm:grid-cols-2 gap-4">
                 <input type="text" name="display_name" placeholder="Model name" class="field-input">
