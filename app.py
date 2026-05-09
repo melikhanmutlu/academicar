@@ -4,15 +4,16 @@ import os
 import struct
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 
-from flask import Flask, abort, flash, redirect, render_template, request, send_from_directory, url_for
+from flask import Flask, abort, flash, jsonify, redirect, render_template, request, send_from_directory, url_for
 from flask_login import LoginManager, current_user, login_required
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFError, CSRFProtect
 from slugify import slugify
 from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
@@ -21,13 +22,14 @@ from auth import auth_bp, init_oauth
 from config import Config
 from converters import STLConverter
 from converters.stl_converter import convert_glb_to_usdz
-from models import AuditLog, Model3D, Paper, User, db
+from models import AuditLog, Model3D, Paper, Payment, User, db
 from url_helpers import public_url
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 csrf = CSRFProtect()
 upload_attempts: dict[int, list[float]] = {}
+conversion_executor = ThreadPoolExecutor(max_workers=2)
 
 
 def create_app(test_config: dict | None = None) -> Flask:
@@ -70,7 +72,12 @@ def create_app(test_config: dict | None = None) -> Flask:
     register_routes(app)
 
     with app.app_context():
-        db.create_all()
+        try:
+            db.create_all()
+        except OperationalError as exc:
+            if "already exists" not in str(exc).lower():
+                raise
+            logger.warning("SQLite schema already existed during create_all; continuing with compatibility checks.")
         ensure_sqlite_schema()
 
     return app
@@ -144,6 +151,8 @@ def ensure_sqlite_schema() -> None:
     }
     model_additions = {
         "source_format": "VARCHAR(10) DEFAULT 'stl' NOT NULL",
+        "processing_status": "VARCHAR(30) DEFAULT 'ready' NOT NULL",
+        "processing_error": "TEXT",
         "anonymization_confirmed": "BOOLEAN DEFAULT 0 NOT NULL",
         "rights_confirmed": "BOOLEAN DEFAULT 0 NOT NULL",
         "ethics_responsibility_confirmed": "BOOLEAN DEFAULT 0 NOT NULL",
@@ -312,6 +321,19 @@ def package_expires_at(package_type: str) -> datetime:
     return datetime.now(UTC) + timedelta(days=3)
 
 
+def sync_paper_entitlements(paper: Paper) -> None:
+    """Keep package lifetime and payment state enforceable in the database."""
+    if paper.package_type == "academic":
+        paper.payment_status = paper.payment_status or "paid"
+        if not paper.expires_at:
+            paper.expires_at = package_expires_at("academic")
+    else:
+        paper.package_type = "temporary"
+        paper.payment_status = "free"
+        if not paper.expires_at:
+            paper.expires_at = package_expires_at("temporary")
+
+
 def paper_is_expired(paper: Paper) -> bool:
     if not paper.expires_at:
         return False
@@ -319,6 +341,10 @@ def paper_is_expired(paper: Paper) -> bool:
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=UTC)
     return expires_at < datetime.now(UTC)
+
+
+def build_invoice_number(payment_id: int) -> str:
+    return f"AAR-{datetime.now(UTC).strftime('%Y%m')}-{payment_id:05d}"
 
 
 def generate_qr(model_id: str, qr_folder: str, view_url: str) -> str:
@@ -420,6 +446,102 @@ def collect_paper_file_paths(app: Flask, paper: Paper) -> list[tuple[str, str]]:
         paths.append(("file", os.path.join(app.config["PDF_FOLDER"], paper.pdf_path)))
     paths.append(("file", os.path.join(app.config["QR_FOLDER"], paper_qr_filename(paper.id))))
     return paths
+
+
+def mark_model_failed(model_id: str, message: str) -> None:
+    model = db.session.get(Model3D, model_id)
+    if not model:
+        return
+    model.processing_status = "failed"
+    model.processing_error = message[:2000]
+    db.session.commit()
+
+
+def process_model_upload_job(
+    app: Flask,
+    *,
+    model_id: str,
+    upload_dir: str,
+    converted_dir: str,
+    source_path: str,
+    glb_path: str,
+    usdz_path: str,
+    source_format: str,
+    color: str | None,
+    source_unit: str,
+) -> None:
+    """Convert/copy the uploaded model in a background worker and update state."""
+    with app.app_context():
+        model = db.session.get(Model3D, model_id)
+        if not model:
+            cleanup_dir(upload_dir)
+            cleanup_dir(converted_dir)
+            return
+
+        model.processing_status = "processing"
+        model.processing_error = None
+        db.session.commit()
+
+        try:
+            if source_format == "glb":
+                glb_errors = validate_glb_file(source_path)
+                if glb_errors:
+                    mark_model_failed(model_id, "Invalid GLB file: " + "; ".join(glb_errors))
+                    cleanup_dir(upload_dir)
+                    return
+                os.replace(source_path, glb_path)
+            else:
+                stl_errors = validate_stl_file(source_path)
+                if stl_errors:
+                    mark_model_failed(model_id, "Invalid STL file: " + "; ".join(stl_errors))
+                    cleanup_dir(upload_dir)
+                    return
+
+                converter = STLConverter()
+                try:
+                    success = converter.convert(
+                        source_path, glb_path, color=color, source_unit=source_unit
+                    )
+                except TypeError:
+                    success = converter.convert(source_path, glb_path, color=color)
+                if not success or not os.path.exists(glb_path):
+                    mark_model_failed(
+                        model_id,
+                        "Conversion failed: "
+                        + converter_message(converter, "The file could not be converted to GLB."),
+                    )
+                    cleanup_dir(upload_dir)
+                    return
+
+            if os.path.exists(glb_path) and not os.path.exists(usdz_path):
+                convert_glb_to_usdz(glb_path, usdz_path)
+
+            cleanup_dir(upload_dir)
+            site_url = (app.config.get("SITE_URL") or "http://localhost:5000").rstrip("/")
+            view_url = f"{site_url}/view/{model_id}"
+            qr_filename = generate_qr(model_id, app.config["QR_FOLDER"], view_url)
+
+            model = db.session.get(Model3D, model_id)
+            if not model:
+                return
+            model.file_size = os.path.getsize(glb_path)
+            model.qr_code_path = qr_filename
+            model.processing_status = "ready"
+            model.processing_error = None
+            db.session.add(
+                AuditLog(
+                    event_type="model_processed",
+                    user_id=model.user_id,
+                    resource_id=model_id,
+                    details={"source_format": source_format},
+                )
+            )
+            db.session.commit()
+        except Exception as exc:
+            db.session.rollback()
+            logger.exception("Background model processing failed")
+            mark_model_failed(model_id, "Unexpected conversion error. Please check the file and try again.")
+            cleanup_dir(upload_dir)
 
 
 def cleanup_paths(paths: list[tuple[str, str]]) -> None:
@@ -648,11 +770,30 @@ def register_routes(app: Flask) -> None:
 
             current_user.plan = new_plan
             try:
+                payment = None
+                if new_plan == "academic":
+                    payment = Payment(
+                        user_id=current_user.id,
+                        amount_kurus=50000,
+                        currency="TRY",
+                        provider="development",
+                        provider_reference=f"dev-{uuid.uuid4().hex[:10]}",
+                        status="paid",
+                        paid_at=datetime.now(UTC),
+                    )
+                    db.session.add(payment)
+                    db.session.flush()
+                    payment.invoice_number = build_invoice_number(payment.id)
                 db.session.commit()
                 log_audit(
                     "plan_changed",
                     user_id=current_user.id,
-                    details={"from": previous, "to": new_plan},
+                    details={
+                        "from": previous,
+                        "to": new_plan,
+                        "payment_id": payment.id if payment else None,
+                        "invoice_number": payment.invoice_number if payment else None,
+                    },
                 )
                 if new_plan == "academic":
                     flash(
@@ -669,12 +810,174 @@ def register_routes(app: Flask) -> None:
                 flash("Could not update plan. Please try again.", "danger")
             return redirect(url_for("profile"))
 
-        paper_count = Paper.query.filter_by(user_id=current_user.id).count()
+        # Profile statistics
+        user_papers = Paper.query.filter_by(user_id=current_user.id).all()
+        paper_count = len(user_papers)
+        academic_paper_count = sum(1 for p in user_papers if p.package_type == "academic")
+        temporary_paper_count = paper_count - academic_paper_count
+        public_paper_count = sum(1 for p in user_papers if p.is_public)
+        private_paper_count = paper_count - public_paper_count
+        pdf_paper_count = sum(1 for p in user_papers if p.pdf_path)
+        model_count = sum(len(p.models) for p in user_papers)
+        recent_payments = (
+            Payment.query.filter_by(user_id=current_user.id)
+            .order_by(Payment.created_at.desc())
+            .limit(5)
+            .all()
+        )
+        now = datetime.now(UTC)
+        expiring_soon = 0
+        for p in user_papers:
+            if not p.expires_at or p.package_type == "academic":
+                continue
+            exp = p.expires_at if p.expires_at.tzinfo else p.expires_at.replace(tzinfo=UTC)
+            delta = exp - now
+            if 0 < delta.total_seconds() <= 86400 * 7:  # within 7 days
+                expiring_soon += 1
+
         return render_template(
             "profile.html",
             user=current_user,
             paper_count=paper_count,
+            academic_paper_count=academic_paper_count,
+            temporary_paper_count=temporary_paper_count,
+            public_paper_count=public_paper_count,
+            private_paper_count=private_paper_count,
+            pdf_paper_count=pdf_paper_count,
+            model_count=model_count,
+            expiring_soon=expiring_soon,
+            has_password=bool(current_user.password_hash),
+            recent_payments=recent_payments,
         )
+
+    @app.route("/account/password", methods=["POST"])
+    @login_required
+    def account_change_password():
+        current_pw = request.form.get("current_password") or ""
+        new_pw = request.form.get("new_password") or ""
+        confirm = request.form.get("confirm_password") or ""
+
+        if not current_user.password_hash:
+            flash(
+                "Your account uses Google sign-in. Set a password from your Google account.",
+                "warning",
+            )
+            return redirect(url_for("profile"))
+        if not current_user.check_password(current_pw):
+            flash("Current password is incorrect.", "danger")
+            return redirect(url_for("profile"))
+        if len(new_pw) < 6:
+            flash("New password must be at least 6 characters.", "danger")
+            return redirect(url_for("profile"))
+        if new_pw != confirm:
+            flash("New password and confirmation do not match.", "danger")
+            return redirect(url_for("profile"))
+        if new_pw == current_pw:
+            flash("New password must be different from the current one.", "warning")
+            return redirect(url_for("profile"))
+
+        current_user.set_password(new_pw)
+        try:
+            db.session.commit()
+            log_audit("password_changed", user_id=current_user.id)
+            flash("Password updated.", "success")
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not update password. Please try again.", "danger")
+        return redirect(url_for("profile"))
+
+    @app.route("/account/email", methods=["POST"])
+    @login_required
+    def account_change_email():
+        new_email = (request.form.get("new_email") or "").strip().lower()
+        password = request.form.get("current_password") or ""
+
+        if not new_email or "@" not in new_email or len(new_email) > 120:
+            flash("Please enter a valid email address.", "danger")
+            return redirect(url_for("profile"))
+        if new_email == (current_user.email or "").lower():
+            flash("That is already your email address.", "info")
+            return redirect(url_for("profile"))
+        if current_user.password_hash and not current_user.check_password(password):
+            flash("Current password is incorrect.", "danger")
+            return redirect(url_for("profile"))
+        if User.query.filter(User.email == new_email, User.id != current_user.id).first():
+            flash("That email is already in use by another account.", "danger")
+            return redirect(url_for("profile"))
+
+        previous = current_user.email
+        current_user.email = new_email
+        try:
+            db.session.commit()
+            log_audit(
+                "email_changed",
+                user_id=current_user.id,
+                details={"from": previous, "to": new_email},
+            )
+            flash("Email updated.", "success")
+        except (IntegrityError, SQLAlchemyError):
+            db.session.rollback()
+            flash("Could not update email. Please try again.", "danger")
+        return redirect(url_for("profile"))
+
+    @app.route("/account/profile", methods=["POST"])
+    @login_required
+    def account_update_profile():
+        username = (request.form.get("username") or "").strip()
+        if len(username) < 2 or len(username) > 80:
+            flash("Full name must be between 2 and 80 characters.", "danger")
+            return redirect(url_for("profile"))
+
+        previous = current_user.username
+        current_user.username = username
+        try:
+            db.session.commit()
+            log_audit(
+                "profile_updated",
+                user_id=current_user.id,
+                details={"username_changed": previous != username},
+            )
+            flash("Profile information updated.", "success")
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not update profile information. Please try again.", "danger")
+        return redirect(url_for("profile"))
+
+    @app.route("/account/delete", methods=["POST"])
+    @login_required
+    def account_delete():
+        confirm = (request.form.get("confirm") or "").strip()
+        password = request.form.get("current_password") or ""
+        if confirm != "DELETE":
+            flash('Type DELETE in the confirmation box to proceed.', "danger")
+            return redirect(url_for("profile"))
+        if current_user.password_hash and not current_user.check_password(password):
+            flash("Current password is incorrect.", "danger")
+            return redirect(url_for("profile"))
+
+        # Cleanup: collect every file path tied to the user before the cascade
+        # delete removes the database rows.
+        files_to_remove = []
+        for paper in current_user.papers:
+            files_to_remove.extend(collect_paper_file_paths(app, paper))
+
+        user_id = current_user.id
+        user_email = current_user.email
+        try:
+            db.session.delete(current_user)
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            logger.exception("Account deletion failed")
+            flash("Could not delete account. Please try again.", "danger")
+            return redirect(url_for("profile"))
+
+        cleanup_paths(files_to_remove)
+        log_audit("account_deleted", user_id=user_id, details={"email": user_email})
+        from flask_login import logout_user
+        logout_user()
+        flash("Your account and all associated data were permanently deleted.", "info")
+        return redirect(url_for("landing"))
 
     @app.route("/papers/new", methods=["GET", "POST"])
     @login_required
@@ -701,7 +1004,7 @@ def register_routes(app: Flask) -> None:
                 pmid=paper_data["pmid"],
                 package_type=inherited_package,
                 is_public=paper_data["is_public"],
-                payment_status="pending" if inherited_package == "academic" else "free",
+                payment_status="paid" if inherited_package == "academic" else "free",
                 expires_at=package_expires_at(inherited_package),
                 slug=make_slug(paper_data["title"]),
                 user_id=current_user.id,
@@ -899,6 +1202,66 @@ def register_routes(app: Flask) -> None:
 
         try:
             file.save(stl_path)
+            preflight_errors = (
+                validate_glb_file(stl_path)
+                if source_format == "glb"
+                else validate_stl_file(stl_path)
+            )
+            if preflight_errors:
+                cleanup_dir(upload_dir)
+                cleanup_dir(converted_dir)
+                flash(
+                    f"Invalid {source_format.upper()} file: " + "; ".join(preflight_errors),
+                    "danger",
+                )
+                return redirect(url_for("paper_detail", slug=slug))
+            usdz_file = request.files.get("usdz")
+            if usdz_file and usdz_file.filename and usdz_file.filename.lower().endswith(".usdz"):
+                try:
+                    usdz_file.save(usdz_path)
+                    logger.info("User-provided USDZ stored at %s", usdz_path)
+                except OSError as e:
+                    logger.warning("Failed to save user USDZ: %s", e)
+
+            model = Model3D(
+                id=unique_id,
+                paper_id=paper.id,
+                user_id=current_user.id,
+                display_name=display_name,
+                description=description,
+                original_filename=original_name,
+                glb_path=glb_path,
+                qr_code_path=None,
+                file_size=os.path.getsize(stl_path),
+                source_format=source_format,
+                processing_status="queued",
+                anonymization_confirmed=True,
+                rights_confirmed=True,
+                ethics_responsibility_confirmed=True,
+                consent_confirmed_at=datetime.now(UTC),
+                consent_ip=request.headers.get("X-Forwarded-For", request.remote_addr),
+                terms_version=app.config.get("TERMS_VERSION", "1.0"),
+            )
+            db.session.add(model)
+            db.session.commit()
+            job_kwargs = {
+                "model_id": unique_id,
+                "upload_dir": upload_dir,
+                "converted_dir": converted_dir,
+                "source_path": stl_path,
+                "glb_path": glb_path,
+                "usdz_path": usdz_path,
+                "source_format": source_format,
+                "color": color,
+                "source_unit": source_unit,
+            }
+            if app.config.get("TESTING"):
+                process_model_upload_job(app, **job_kwargs)
+            else:
+                conversion_executor.submit(process_model_upload_job, app, **job_kwargs)
+            log_audit("model_upload_queued", user_id=current_user.id, resource_id=unique_id)
+            flash("Model upload accepted. Processing has started in the background.", "success")
+            return redirect(url_for("paper_detail", slug=slug))
             if source_format == "glb":
                 glb_errors = validate_glb_file(stl_path)
                 if glb_errors:
@@ -989,6 +1352,24 @@ def register_routes(app: Flask) -> None:
 
         flash("Model uploaded and QR code generated.", "success")
         return redirect(url_for("paper_detail", slug=slug))
+
+    @app.route("/models/<model_id>/status")
+    @login_required
+    def model_status(model_id):
+        model = db.session.get(Model3D, model_id)
+        if not model:
+            abort(404)
+        if model.user_id != current_user.id:
+            abort(403)
+        return jsonify(
+            {
+                "id": model.id,
+                "status": model.processing_status or "ready",
+                "error": model.processing_error,
+                "has_qr": bool(model.qr_code_path),
+                "viewer_url": url_for("view_model", model_id=model.id),
+            }
+        )
 
     @app.route("/models/<model_id>/edit", methods=["GET", "POST"])
     @login_required

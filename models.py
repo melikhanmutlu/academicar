@@ -87,6 +87,8 @@ class Model3D(db.Model):
     qr_code_path = db.Column(db.String(500), nullable=True)
     file_size = db.Column(db.Integer, nullable=True)
     source_format = db.Column(db.String(10), nullable=False, default="stl")
+    processing_status = db.Column(db.String(30), nullable=False, default="ready")
+    processing_error = db.Column(db.Text, nullable=True)
     anonymization_confirmed = db.Column(db.Boolean, nullable=False, default=False)
     rights_confirmed = db.Column(db.Boolean, nullable=False, default=False)
     ethics_responsibility_confirmed = db.Column(db.Boolean, nullable=False, default=False)
@@ -97,6 +99,28 @@ class Model3D(db.Model):
 
     def __repr__(self) -> str:
         return f"<Model3D {self.id}>"
+
+
+class Payment(db.Model):
+    __tablename__ = "payments"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    paper_id = db.Column(db.Integer, db.ForeignKey("papers.id"), nullable=True, index=True)
+    amount_kurus = db.Column(db.Integer, nullable=False)
+    currency = db.Column(db.String(3), nullable=False, default="TRY")
+    provider = db.Column(db.String(50), nullable=False, default="manual")
+    provider_reference = db.Column(db.String(200), nullable=True)
+    status = db.Column(db.String(30), nullable=False, default="pending")
+    invoice_number = db.Column(db.String(80), nullable=True, unique=True)
+    created_at = db.Column(db.DateTime, default=utc_now)
+    paid_at = db.Column(db.DateTime, nullable=True)
+
+    user = db.relationship("User", backref=db.backref("payments", lazy=True))
+    paper = db.relationship("Paper", backref=db.backref("payments", lazy=True))
+
+    def __repr__(self) -> str:
+        return f"<Payment {self.status} {self.amount_kurus} {self.currency}>"
 
 
 class AuditLog(db.Model):

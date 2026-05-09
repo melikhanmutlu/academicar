@@ -40,14 +40,6 @@
       <div class="relative min-h-[620px] lg:min-h-[760px] 2xl:min-h-[820px] reveal-up delay-2">
         <div class="clinical-model-stage absolute inset-0 overflow-hidden" data-parallax="0.13">
           <div class="absolute inset-0 volumetric-grid opacity-70"></div>
-          <div class="absolute left-5 top-5 right-5 z-10 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div class="clinical-chip">live GLB preview</div>
-            <div class="clinical-chip">
-              <span class="w-2 h-2 rounded-full bg-[#2563eb]" style="animation: pulseDot 1.6s ease-in-out infinite;"></span>
-              AR-ready
-            </div>
-          </div>
-
           <model-viewer
             src="{{ url_for('static', filename='models/demo-model.glb') }}"
             alt="AcademicAR demo 3D model"

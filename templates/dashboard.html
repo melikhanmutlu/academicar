@@ -7,6 +7,11 @@
   {% set stats.total_models = stats.total_models + (paper.models|length) %}
 {% endfor %}
 {% set papers_with_pdf = papers|selectattr('pdf_path')|list|length if papers else 0 %}
+{% set step1_done = papers|length > 0 %}
+{% set step2_done = stats.total_models > 0 %}
+{% set step3_done = papers_with_pdf > 0 %}
+{% set step4_done = papers|selectattr('is_public')|list|length > 0 %}
+{% set show_onboarding = not (step1_done and step2_done and step3_done and step4_done) %}
 
 <div class="app-shell dashboard-shell py-8">
   <div class="dashboard-header reveal-up">
@@ -36,19 +41,91 @@
     </div>
   </div>
 
+  {% if show_onboarding %}
+    <section class="onboarding-card surface rounded-xl p-6 sm:p-7 mb-6 reveal-up">
+      <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+        <div>
+          <span class="eyebrow">Getting started</span>
+          <h2 class="font-serif text-2xl font-semibold text-[#111827] mt-2">
+            {% if papers|length == 0 %}Welcome to AcademicAR.{% else %}You're almost there.{% endif %}
+          </h2>
+          <p class="text-sm text-[#5c6473] mt-1">
+            {% if papers|length == 0 %}Four small steps and your first paper is ready to share with a QR.{% else %}Finish these to unlock the public viewer page and AR.{% endif %}
+          </p>
+        </div>
+        <a href="{{ url_for('paper_new') }}" class="btn-primary compact whitespace-nowrap">+ New Publication</a>
+      </div>
+
+      <ol class="onboarding-steps">
+        <li class="onboarding-step{% if step1_done %} is-done{% endif %}">
+          <span class="onboarding-step-mark">{% if step1_done %}✓{% else %}1{% endif %}</span>
+          <div>
+            <p class="font-semibold text-[#111827]">Create your first publication page</p>
+            <p class="text-sm text-[#5c6473]">Add the title, authors, institution, year — minimal metadata is fine to start.</p>
+            {% if not step1_done %}<a href="{{ url_for('paper_new') }}" class="text-sm font-semibold text-[#111827] underline mt-1 inline-block">Create publication →</a>{% endif %}
+          </div>
+        </li>
+        <li class="onboarding-step{% if step2_done %} is-done{% endif %}">
+          <span class="onboarding-step-mark">{% if step2_done %}✓{% else %}2{% endif %}</span>
+          <div>
+            <p class="font-semibold text-[#111827]">Upload an anonymized 3D model</p>
+            <p class="text-sm text-[#5c6473]">STL or GLB. Pick the source unit (mm/cm/m) so the model lands at real-world scale in AR.</p>
+            {% if step1_done and not step2_done and papers %}<a href="{{ url_for('paper_detail', slug=papers[0].slug) }}#add-model" class="text-sm font-semibold text-[#111827] underline mt-1 inline-block">Add model →</a>{% endif %}
+          </div>
+        </li>
+        <li class="onboarding-step{% if step3_done %} is-done{% endif %}">
+          <span class="onboarding-step-mark">{% if step3_done %}✓{% else %}3{% endif %}</span>
+          <div>
+            <p class="font-semibold text-[#111827]">Attach the paper PDF (optional)</p>
+            <p class="text-sm text-[#5c6473]">Lets visitors read the paper directly from the public landing page.</p>
+            {% if step1_done and not step3_done and papers %}<a href="{{ url_for('paper_edit', slug=papers[0].slug) }}" class="text-sm font-semibold text-[#111827] underline mt-1 inline-block">Add PDF →</a>{% endif %}
+          </div>
+        </li>
+        <li class="onboarding-step{% if step4_done %} is-done{% endif %}">
+          <span class="onboarding-step-mark">{% if step4_done %}✓{% else %}4{% endif %}</span>
+          <div>
+            <p class="font-semibold text-[#111827]">Make it public and grab the QR</p>
+            <p class="text-sm text-[#5c6473]">Switch visibility to Public on the publication and download the paper QR for your manuscript or poster.</p>
+            {% if step1_done and not step4_done and papers %}<a href="{{ url_for('paper_detail', slug=papers[0].slug) }}" class="text-sm font-semibold text-[#111827] underline mt-1 inline-block">Open paper →</a>{% endif %}
+          </div>
+        </li>
+      </ol>
+    </section>
+  {% endif %}
+
   {% if papers %}
     <div class="dashboard-list-header reveal-up">
       <div>
         <h2>Publications</h2>
         <p>{{ papers|length }} publication{{ '' if papers|length == 1 else 's' }} in this workspace</p>
       </div>
-      <input
-        id="pubSearch"
-        type="search"
-        placeholder="Search publications..."
-        autocomplete="off"
-        class="field-input dashboard-search"
-      >
+      <form class="dashboard-search-form" role="search" onsubmit="return false;">
+        <input
+          id="pubSearch"
+          type="search"
+          placeholder="Search publications..."
+          autocomplete="off"
+          class="field-input dashboard-search"
+        >
+        <select id="pubStatusFilter" class="field-select compact-select" aria-label="Filter by status">
+          <option value="all">All status</option>
+          <option value="academic">Academic</option>
+          <option value="temporary">Temporary</option>
+          <option value="public">Public</option>
+          <option value="private">Private</option>
+          <option value="with-models">With models</option>
+          <option value="no-models">No models</option>
+          <option value="expiring">Expiring soon</option>
+        </select>
+        <select id="pubSort" class="field-select compact-select" aria-label="Sort publications">
+          <option value="created-desc">Newest</option>
+          <option value="created-asc">Oldest</option>
+          <option value="title-asc">Title A-Z</option>
+          <option value="models-desc">Most models</option>
+          <option value="expires-asc">Expires first</option>
+        </select>
+        <button type="button" class="btn-secondary compact" id="pubSearchClear" hidden>Clear</button>
+      </form>
     </div>
 
     <div class="publication-table reveal-up" id="pubList">
@@ -72,8 +149,13 @@
 
         <div
           class="pub-row publication-row"
-          data-title="{{ p.title|lower }}"
-          data-authors="{{ (p.authors or '')|lower }}"
+          data-search="{{ ((p.title or '') ~ ' ' ~ (p.authors or '') ~ ' ' ~ (p.institution or '') ~ ' ' ~ (p.field or '') ~ ' ' ~ (p.year or '') ~ ' ' ~ (p.doi or '') ~ ' ' ~ (p.pmid or ''))|lower }}"
+          data-title="{{ (p.title or '')|lower }}"
+          data-package="{{ p.package_type or 'temporary' }}"
+          data-visibility="{{ 'public' if p.is_public else 'private' }}"
+          data-models="{{ p.models|length }}"
+          data-created="{{ p.created_at.timestamp() if p.created_at else 0 }}"
+          data-expires="{{ p.expires_at.timestamp() if p.expires_at else 9999999999 }}"
         >
           <div class="publication-main">
             <div class="publication-avatar">{{ init }}</div>
@@ -114,7 +196,7 @@
     </div>
 
     <p id="pubNoResults" class="hidden text-center text-[#9ca3af] py-12 text-sm">
-      No publications match your search.
+      No publications match the current search or filters.
     </p>
   {% else %}
     <div class="dark-surface rounded-xl p-10 sm:p-14 text-center overflow-hidden relative reveal-up">
@@ -132,19 +214,68 @@
 <script>
   (() => {
     const input = document.getElementById('pubSearch');
+    const form = document.querySelector('.dashboard-search-form');
+    const clear = document.getElementById('pubSearchClear');
+    const statusFilter = document.getElementById('pubStatusFilter');
+    const sortSelect = document.getElementById('pubSort');
+    const list = document.getElementById('pubList');
     const rows = [...document.querySelectorAll('.pub-row')];
     const noResults = document.getElementById('pubNoResults');
     if (!input) return;
 
-    input.addEventListener('input', () => {
-      const q = input.value.trim().toLowerCase();
+    const apply = () => {
+      const tokens = input.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
       let visible = 0;
       rows.forEach((row) => {
-        const match = !q || row.dataset.title.includes(q) || row.dataset.authors.includes(q);
+        const haystack = row.dataset.search || '';
+        const qMatch = tokens.every((t) => haystack.includes(t));
+        const filter = statusFilter?.value || 'all';
+        const models = Number(row.dataset.models || 0);
+        const expires = Number(row.dataset.expires || 9999999999);
+        const sevenDays = Date.now() / 1000 + (86400 * 7);
+        const fMatch =
+          filter === 'all'
+          || row.dataset.package === filter
+          || row.dataset.visibility === filter
+          || (filter === 'with-models' && models > 0)
+          || (filter === 'no-models' && models === 0)
+          || (filter === 'expiring' && expires <= sevenDays);
+        const match = qMatch && fMatch;
         row.style.display = match ? 'grid' : 'none';
         if (match) visible++;
       });
       noResults.classList.toggle('hidden', visible > 0);
+      if (clear) clear.hidden = tokens.length === 0 && (statusFilter?.value || 'all') === 'all';
+    };
+
+    const sortRows = () => {
+      const mode = sortSelect?.value || 'created-desc';
+      const sorted = [...rows].sort((a, b) => {
+        if (mode === 'created-asc') return Number(a.dataset.created) - Number(b.dataset.created);
+        if (mode === 'title-asc') return (a.dataset.title || '').localeCompare(b.dataset.title || '');
+        if (mode === 'models-desc') return Number(b.dataset.models) - Number(a.dataset.models);
+        if (mode === 'expires-asc') return Number(a.dataset.expires) - Number(b.dataset.expires);
+        return Number(b.dataset.created) - Number(a.dataset.created);
+      });
+      sorted.forEach((row) => list?.appendChild(row));
+    };
+
+    form?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      apply();
+    });
+    input.addEventListener('input', apply);
+    statusFilter?.addEventListener('change', apply);
+    sortSelect?.addEventListener('change', () => { sortRows(); apply(); });
+    clear?.addEventListener('click', () => {
+      input.value = '';
+      if (statusFilter) statusFilter.value = 'all';
+      apply();
+      input.focus();
+    });
+    // Allow ESC to clear quickly
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { input.value = ''; apply(); input.blur(); }
     });
   })();
 

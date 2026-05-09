@@ -270,6 +270,8 @@
       if (!viewer.loaded || typeof viewer.toDataURL !== 'function') return;
       viewer.pause();
       viewer.cameraOrbit = shotOrbits[viewName] || shotOrbits.perspective;
+      if (typeof viewer.jumpCameraToGoal === 'function') viewer.jumpCameraToGoal();
+      if (viewer.updateComplete) await viewer.updateComplete;
       await waitFrame();
       const link = document.createElement('a');
       link.href = viewer.toDataURL('image/png');

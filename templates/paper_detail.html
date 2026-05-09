@@ -122,35 +122,48 @@
     {% if paper.models %}
       <div class="space-y-3">
         {% for m in paper.models %}
-          <div class="model-row surface rounded-xl p-4 group reveal-up">
+          {% set model_status = m.processing_status or 'ready' %}
+          <div class="model-row surface rounded-xl p-4 group reveal-up" data-model-row data-status-url="{{ url_for('model_status', model_id=m.id) }}" data-status="{{ model_status }}">
             <div class="model-row-grid">
-              <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-preview" aria-label="Open 3D viewer for {{ m.display_name or m.original_filename }}">
-                <model-viewer
-                  src="{{ url_for('serve_glb', unique_id=m.id, filename='model.glb') }}"
-                  alt="3D preview: {{ m.display_name or m.original_filename }}"
-                  camera-orbit="35deg 70deg auto"
-                  field-of-view="28deg"
-                  exposure="1"
-                  shadow-intensity="0.6"
-                  bounds="tight"
-                  disable-zoom
-                  auto-rotate
-                  auto-rotate-delay="1800"
-                  interaction-prompt="none">
-                </model-viewer>
-              </a>
+              {% if model_status == 'ready' %}
+                <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-preview" aria-label="Open 3D viewer for {{ m.display_name or m.original_filename }}">
+                  <model-viewer
+                    src="{{ url_for('serve_glb', unique_id=m.id, filename='model.glb') }}"
+                    alt="3D preview: {{ m.display_name or m.original_filename }}"
+                    camera-orbit="35deg 70deg auto"
+                    field-of-view="28deg"
+                    exposure="1"
+                    shadow-intensity="0.6"
+                    bounds="tight"
+                    disable-zoom
+                    auto-rotate
+                    auto-rotate-delay="1800"
+                    interaction-prompt="none">
+                  </model-viewer>
+                </a>
+              {% else %}
+                <div class="model-preview model-processing">
+                  <span>{{ 'Processing model...' if model_status != 'failed' else 'Processing failed' }}</span>
+                </div>
+              {% endif %}
 
               <div class="model-info">
                 <div class="flex flex-wrap items-center gap-2">
                   <h3 class="font-serif text-2xl font-semibold text-[#111827] truncate" title="{{ m.display_name or m.original_filename }}">{{ m.display_name or m.original_filename }}</h3>
                   <span class="detail-chip">{{ format_file_size(m.file_size) }}</span>
                   <span class="detail-chip">{{ (m.source_format or 'stl')|upper }} -> GLB</span>
+                  {% if model_status != 'ready' %}<span class="detail-chip status">{{ model_status|title }}</span>{% endif %}
                 </div>
                 {% if m.description %}<p class="text-sm text-[#64748b] mt-2 line-clamp-2">{{ m.description }}</p>{% endif %}
+                {% if model_status == 'failed' and m.processing_error %}<p class="text-sm text-red-600 mt-2">{{ m.processing_error }}</p>{% endif %}
                 <div class="model-actions mt-4">
-                  <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="btn-primary compact">Open 3D / AR</a>
-                  <button type="button" class="btn-secondary compact" data-copy-link="{{ public_url('view_model', model_id=m.id) }}">Copy link</button>
-                  <a href="{{ url_for('qr_print', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="btn-secondary compact">Print QR</a>
+                  {% if model_status == 'ready' %}
+                    <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="btn-primary compact">Open 3D / AR</a>
+                    <button type="button" class="btn-secondary compact" data-copy-link="{{ public_url('view_model', model_id=m.id) }}">Copy link</button>
+                    <a href="{{ url_for('qr_print', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="btn-secondary compact">Print QR</a>
+                  {% else %}
+                    <button type="button" class="btn-primary compact opacity-60 cursor-not-allowed" disabled>{{ 'Processing' if model_status != 'failed' else 'Not ready' }}</button>
+                  {% endif %}
                   <a href="{{ url_for('model_edit', model_id=m.id) }}" class="btn-secondary compact">Edit Model</a>
                   <details class="action-menu">
                     <summary aria-label="More model actions">...</summary>
@@ -164,9 +177,13 @@
                 </div>
               </div>
 
-              <a href="{{ url_for('qr_print', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-qr" aria-label="Open large QR code for {{ m.display_name or m.original_filename }}">
-                <img src="{{ url_for('qr_image', model_id=m.id) }}" class="w-24 h-24 rounded-sm transition group-hover:scale-105 relative" alt="QR code">
-              </a>
+              {% if model_status == 'ready' %}
+                <a href="{{ url_for('qr_print', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-qr" aria-label="Open large QR code for {{ m.display_name or m.original_filename }}">
+                  <img src="{{ url_for('qr_image', model_id=m.id) }}" class="w-24 h-24 rounded-sm transition group-hover:scale-105 relative" alt="QR code">
+                </a>
+              {% else %}
+                <div class="model-qr model-processing"><span>QR pending</span></div>
+              {% endif %}
             </div>
           </div>
         {% endfor %}
@@ -309,5 +326,29 @@
       toggle.textContent = expanded ? 'Show less' : 'Read more';
     });
   });
+
+  const pendingRows = [...document.querySelectorAll('[data-model-row]')]
+    .filter((row) => !['ready', 'failed'].includes(row.dataset.status));
+  if (pendingRows.length) {
+    const poll = async () => {
+      let stillPending = false;
+      await Promise.all(pendingRows.map(async (row) => {
+        if (['ready', 'failed'].includes(row.dataset.status)) return;
+        stillPending = true;
+        try {
+          const response = await fetch(row.dataset.statusUrl, { headers: { Accept: 'application/json' } });
+          if (!response.ok) return;
+          const payload = await response.json();
+          if (['ready', 'failed'].includes(payload.status)) {
+            window.location.reload();
+          }
+        } catch (error) {
+          stillPending = true;
+        }
+      }));
+      if (stillPending) setTimeout(poll, 2500);
+    };
+    setTimeout(poll, 1200);
+  }
 </script>
 {% endblock %}
