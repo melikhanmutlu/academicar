@@ -36,18 +36,17 @@
     </div>
 
     <div class="hero-viewer-stage reveal-up delay-2">
-      <span class="hero-viewer-tag">Live 3D preview</span>
       <model-viewer
-        src="{{ url_for('static', filename='models/demo-model.glb') }}"
-        alt="AcademicAR demo 3D model"
+        src="{{ url_for('static', filename='models/calcaneus.glb') }}"
+        alt="Calcaneus 3D model"
         camera-controls
         auto-rotate
         rotation-per-second="18deg"
-        scale="0.42 0.42 0.42"
-        camera-orbit="35deg 64deg 4.4m"
+        camera-orbit="35deg 64deg 10m"
         field-of-view="34deg"
         exposure="0.95"
-        shadow-intensity="0.85"
+        shadow-intensity="0.12"
+        shadow-softness="0.95"
         environment-image="neutral"
         loading="lazy">
       </model-viewer>
