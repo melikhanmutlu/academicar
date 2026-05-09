@@ -80,7 +80,7 @@ def register():
         db.session.add(user)
         db.session.commit()
         login_user(user)
-        # Log registration for KVKK compliance
+        # Log registration for privacy compliance
         try:
             from app import log_audit
             log_audit("user_registered", user_id=user.id)
@@ -173,7 +173,7 @@ def google_callback():
 
     login_user(user)
 
-    # Log registration/login for KVKK compliance
+    # Log registration/login for privacy compliance
     try:
         from app import log_audit
         if is_new_user:
