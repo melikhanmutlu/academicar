@@ -50,7 +50,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     login_manager = LoginManager()
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
-    login_manager.login_message = "Bu sayfaya erişmek için giriş yapın."
+    login_manager.login_message = "Please log in to access this page."
     login_manager.login_message_category = "info"
 
     @login_manager.user_loader
@@ -580,7 +580,7 @@ def register_error_handlers(app: Flask) -> None:
 
 
 def log_audit(event_type: str, user_id: int | None = None, resource_id: str | None = None, details: dict | None = None) -> None:
-    """Log an audit event for compliance tracking (KVKK/GDPR)."""
+    """Log an audit event for privacy and compliance tracking."""
     try:
         ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) if request else None
         audit_log = AuditLog(
@@ -610,9 +610,9 @@ def register_routes(app: Flask) -> None:
     def privacy():
         return render_template("legal/privacy.html")
 
-    @app.route("/kvkk")
-    def kvkk():
-        return render_template("legal/kvkk.html")
+    @app.route("/data-protection")
+    def data_protection():
+        return render_template("legal/data_protection.html")
 
     @app.route("/view/<model_id>")
     def view_model(model_id):

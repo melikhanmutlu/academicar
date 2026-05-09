@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Personal Data Protection Notice - AcademicAR{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+  <h1 class="font-serif text-4xl font-bold text-[#111827] mb-8">Personal Data Protection Notice</h1>
+
+  <div class="prose prose-lg max-w-none space-y-8 text-[#374151]">
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">1. Scope</h2>
+      <p>This notice explains how AcademicAR expects personal data to be handled when researchers upload 3D models, academic metadata, PDFs, and related publication materials. It is intended to support compliance with applicable data protection laws, including GDPR and Turkish Law No. 6698 on the Protection of Personal Data.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">2. Medical Data and Anonymization</h2>
+      <p>If an uploaded model is derived from medical, biological, patient, or human-subject data, the data must be anonymized before upload.</p>
+      <ul class="list-disc pl-6 space-y-2">
+        <li>Names, identity numbers, hospital numbers, and other direct identifiers must be removed.</li>
+        <li>Geographic, demographic, or contextual details that could identify a person must be removed or generalized.</li>
+        <li>The uploader must confirm anonymization during the upload process.</li>
+        <li>AcademicAR does not verify the scientific or legal sufficiency of anonymization for each uploaded file.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">3. Ethics Approval and Consent</h2>
+      <p>When uploading models related to research involving human subjects, the uploader represents that:</p>
+      <ul class="list-disc pl-6 space-y-2">
+        <li>Required ethics committee or institutional approvals have been obtained.</li>
+        <li>Informed consent has been collected where required.</li>
+        <li>The uploader has the right to process and publish the material through AcademicAR.</li>
+        <li>The upload complies with the rules of the relevant institution, journal, funder, and jurisdiction.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">4. Consent and Upload Records</h2>
+      <p>For accountability and audit purposes, AcademicAR may record the following information during upload and account activity:</p>
+      <ul class="list-disc pl-6 space-y-2">
+        <li><strong>IP address:</strong> The network address associated with the request.</li>
+        <li><strong>Timestamp:</strong> The date and time of the relevant action.</li>
+        <li><strong>Consent version:</strong> The terms or notice version accepted by the user.</li>
+        <li><strong>Confirmation checklist:</strong> Required upload confirmations selected by the user.</li>
+      </ul>
+      <p>These records may be retained to demonstrate compliance, investigate misuse, and respond to legal or institutional requests.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">5. Processing Purposes</h2>
+      <p>AcademicAR processes account and publication data to:</p>
+      <ul class="list-disc pl-6 space-y-2">
+        <li>Provide model hosting, conversion, viewer links, QR codes, and publication pages.</li>
+        <li>Manage accounts, authentication, billing records, and support requests.</li>
+        <li>Protect the service against abuse, security threats, and unauthorized access.</li>
+        <li>Comply with legal obligations and enforce platform terms.</li>
+        <li>Improve service reliability and understand aggregate usage patterns.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">6. Controller and Processor Roles</h2>
+      <ul class="list-disc pl-6 space-y-2">
+        <li><strong>Uploader or institution:</strong> Usually acts as the data controller for uploaded research material and is responsible for lawful collection, anonymization, consent, and publication rights.</li>
+        <li><strong>AcademicAR:</strong> Provides the technical platform and may act as a processor or service provider for hosted content, depending on the circumstances.</li>
+      </ul>
+      <p>The uploader remains responsible for ensuring that uploaded content is lawful, anonymized where required, and suitable for public or private sharing through the service.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">7. Security Measures</h2>
+      <p>AcademicAR uses technical and organizational measures designed to protect data, including:</p>
+      <ul class="list-disc pl-6 space-y-2">
+        <li>Encrypted transport through HTTPS/TLS.</li>
+        <li>Access controls for account-owned resources.</li>
+        <li>CSRF protection and secure session practices.</li>
+        <li>Validation of uploaded file formats and size limits.</li>
+        <li>Operational logging for security and audit purposes.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">8. Data Breach Handling</h2>
+      <p>If AcademicAR becomes aware of a security incident affecting personal data, it will assess the scope, take mitigation steps, and notify affected users or authorities where legally required.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">9. International Transfers</h2>
+      <p>AcademicAR may use hosting, storage, analytics, or infrastructure providers that process data in different jurisdictions. Where required, the uploader is responsible for confirming that such transfers are permitted for the relevant research material.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">10. Individual Rights</h2>
+      <p>Depending on applicable law, individuals may have rights to access, correct, delete, restrict, export, or object to certain processing of their personal data. Requests can be sent to <a href="mailto:privacy@academicAR.com" class="text-blue-600 underline">privacy@academicAR.com</a>.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">11. Responsibility Notice</h2>
+      <div class="bg-red-50 border-l-4 border-red-500 p-4 my-4">
+        <p class="text-red-800"><strong>Important:</strong></p>
+        <ul class="list-disc pl-6 space-y-2 text-red-800">
+          <li>Uploading identifiable patient or human-subject data without a lawful basis may create serious legal consequences.</li>
+          <li>False confirmations about anonymization, consent, or publication rights may violate platform terms and applicable law.</li>
+          <li>AcademicAR may remove content or suspend access if it reasonably believes uploaded material creates legal, privacy, or security risk.</li>
+          <li>The uploader is responsible for the legality and ethical suitability of uploaded research content.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">12. Contact</h2>
+      <p>For privacy or data protection questions, contact:</p>
+      <p class="font-semibold text-[#111827]">
+        Email: privacy@academicAR.com
+      </p>
+    </section>
+
+    <section class="mt-12 pt-8 border-t border-[#e5e7eb]">
+      <p class="text-sm text-[#6b7280]">Last updated: April 28, 2026</p>
+      <p class="text-sm text-[#6b7280]">Version: 1.0</p>
+    </section>
+  </div>
+</div>
+{% endblock %}

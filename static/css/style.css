@@ -3711,11 +3711,13 @@ details[open] .upload-chevron { transform: rotate(45deg); }
 /* Login / Register / Auth pages */
 .auth-shell {
   max-width: 440px;
-  margin: 80px auto;
-  padding: 40px;
-  background: var(--color-canvas-white);
-  border: 1px solid var(--color-light-pearl);
-  border-radius: 8px;
+  min-height: auto;
+  display: block;
+  margin: 64px auto 80px;
+  padding: 0 20px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
 }
 .auth-shell h1 {
   font-family: var(--font-polysans);
@@ -3823,9 +3825,10 @@ details[open] .upload-chevron { transform: rotate(45deg); }
 
 /* Auth shell — collapse double padding when .surface is nested */
 .auth-shell .surface {
-  padding: 0 !important;
-  border: none !important;
-  background: transparent !important;
+  padding: 36px !important;
+  border: 1px solid var(--color-light-pearl) !important;
+  background: var(--color-canvas-white) !important;
+  border-radius: 8px !important;
 }
 .auth-shell .surface > .eyebrow,
 .auth-shell .surface > h1,
