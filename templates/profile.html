@@ -13,29 +13,29 @@
     <a href="{{ url_for('dashboard') }}" class="btn-secondary shrink-0">Back to dashboard</a>
   </div>
 
-  <section class="profile-grid reveal-up">
-    <div class="surface rounded-xl p-6">
-      <div class="profile-identity">
+  <section class="profile-account-card reveal-up">
+    <div class="profile-identity">
+      <div class="profile-avatar-wrap">
         {% if user.avatar_url %}
           <img src="{{ user.avatar_url }}" class="profile-avatar" alt="">
         {% else %}
           <div class="profile-avatar fallback">{{ user.username[0]|upper }}</div>
         {% endif %}
-        <div class="min-w-0">
-          <h2>{{ user.username }}</h2>
-          <p>{{ user.email }}</p>
-          <div class="profile-chips">
-            <span>{{ 'Academic plan' if is_academic else 'Free plan' }}</span>
-            {% if not has_password %}<span>Google sign-in</span>{% endif %}
-            <span>Member since {{ user.created_at.strftime('%b %Y') if user.created_at else '-' }}</span>
-          </div>
-        </div>
       </div>
+      <div class="profile-identity-copy">
+        <h2>{{ user.username }}</h2>
+        <p>{{ user.email }}</p>
+        <div class="profile-chips">
+          <span>{{ 'Academic plan' if is_academic else 'Free plan' }}</span>
+          {% if not has_password %}<span>Google sign-in</span>{% endif %}
+          <span>Member since {{ user.created_at.strftime('%b %Y') if user.created_at else '-' }}</span>
+        </div>
+    </div>
     </div>
 
-    <form method="POST" action="{{ url_for('account_update_profile') }}" class="surface rounded-xl p-6 space-y-3">
+    <form method="POST" action="{{ url_for('account_update_profile') }}" class="profile-form-card">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <div>
+      <div class="profile-form-row">
         <label class="field-label">Full name</label>
         <input type="text" name="username" value="{{ user.username }}" required minlength="2" maxlength="80" class="field-input">
       </div>
@@ -48,23 +48,23 @@
       <h2>Statistics</h2>
       <p>Current account activity across all publications.</p>
     </div>
-    <div class="dashboard-metrics profile-metrics">
-      <div>
+    <div class="profile-stat-grid">
+      <div class="profile-stat-card">
         <span>Publications</span>
         <strong>{{ paper_count }}</strong>
         <small>{{ academic_paper_count }} academic / {{ temporary_paper_count }} temporary</small>
       </div>
-      <div>
+      <div class="profile-stat-card">
         <span>3D Models</span>
         <strong>{{ model_count }}</strong>
         <small>Across all publications</small>
       </div>
-      <div>
+      <div class="profile-stat-card">
         <span>PDF Attachments</span>
         <strong>{{ pdf_paper_count }}</strong>
         <small>{{ paper_count - pdf_paper_count }} without PDF</small>
       </div>
-      <div>
+      <div class="profile-stat-card">
         <span>Public Visibility</span>
         <strong>{{ public_paper_count }}/{{ paper_count }}</strong>
         <small>{{ private_paper_count }} private</small>
@@ -82,19 +82,21 @@
   <section class="profile-section reveal-up">
     <div class="section-heading">
       <h2>Plan</h2>
-      <p>New publications inherit your account plan at creation time.</p>
+      <p>Choose how long publication viewer links stay active.</p>
     </div>
     <div class="plan-grid">
-      <div class="surface rounded-xl p-6 plan-card{% if not is_academic %} is-current{% endif %}">
+      <div class="profile-card plan-card{% if not is_academic %} is-current{% endif %}">
         <div class="plan-card-head">
-          <h3>Free</h3>
+          <h3>Temporary</h3>
           {% if not is_academic %}<span>Current</span>{% endif %}
         </div>
-        <p class="plan-price">0 TL</p>
+        <p class="pricing-period">Free preview link</p>
+        <p class="plan-price">$0</p>
         <ul>
-          <li>3-day viewer links</li>
-          <li>1 model per publication</li>
-          <li>Viewer page, AR, QR, and PDF reader</li>
+          <li>3-day active link</li>
+          <li>QR code</li>
+          <li>3D viewing</li>
+          <li>Screenshot capture</li>
         </ul>
         {% if is_academic %}
           <form method="POST" action="{{ url_for('profile') }}" class="mt-5">
@@ -107,24 +109,27 @@
         {% endif %}
       </div>
 
-      <div class="surface rounded-xl p-6 plan-card{% if is_academic %} is-current{% endif %}">
+      <div class="profile-card plan-card{% if is_academic %} is-current{% endif %}">
         <div class="plan-card-head">
-          <h3>Academic</h3>
+          <h3>Academic Package</h3>
           {% if is_academic %}<span>Current</span>{% endif %}
         </div>
-        <p class="plan-price">500 TL <small>/ publication</small></p>
+        <p class="pricing-period">One-time, per publication</p>
+        <p class="plan-price">$10</p>
         <ul>
-          <li>3-year viewer links</li>
-          <li>Multiple models per publication</li>
-          <li>Persistent QR codes for manuscripts and posters</li>
+          <li>3-year active link</li>
+          <li>Persistent QR code</li>
+          <li>Public sharing</li>
+          <li>Multiple model support</li>
+          <li>Publication metadata fields</li>
         </ul>
         {% if not is_academic %}
           <form method="POST" action="{{ url_for('profile') }}" class="mt-5">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="plan" value="academic">
-            <button type="submit" class="btn-primary w-full">Switch to Academic</button>
+            <button type="submit" class="btn-primary w-full">Get package</button>
           </form>
-          <p class="plan-note">Development checkout records a paid upgrade and invoice entry. Replace the provider with iyzico, PayTR, or Stripe before production.</p>
+          <p class="plan-note">Billed once at activation</p>
         {% else %}
           <button class="btn-primary w-full mt-5 opacity-60 cursor-not-allowed" disabled>Active plan</button>
         {% endif %}
@@ -138,7 +143,7 @@
         <h2>Billing records</h2>
         <p>Development payment records created after plan upgrades.</p>
       </div>
-      <div class="surface rounded-xl overflow-hidden">
+      <div class="profile-card profile-billing-list">
         {% for payment in recent_payments %}
           <div class="billing-row">
             <div>
@@ -162,7 +167,7 @@
     </div>
 
     <div class="security-grid">
-      <div class="surface rounded-xl p-6">
+      <div class="profile-card security-card">
         <h3>Change password</h3>
         {% if has_password %}
           <form method="POST" action="{{ url_for('account_change_password') }}" class="space-y-3 mt-4">
@@ -177,7 +182,7 @@
         {% endif %}
       </div>
 
-      <div class="surface rounded-xl p-6">
+      <div class="profile-card security-card">
         <div class="flex items-start justify-between gap-3">
           <h3>Session security</h3>
           <span class="status-chip">Active</span>
@@ -185,7 +190,7 @@
         <p class="text-sm text-[#5c6473] mt-2">Your current browser session is protected with CSRF validation and secure cookie settings. Use Log out on shared devices.</p>
       </div>
 
-      <div class="surface rounded-xl p-6">
+      <div class="profile-card security-card">
         <h3>Change email</h3>
         <form method="POST" action="{{ url_for('account_change_email') }}" class="space-y-3 mt-4">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -198,7 +203,7 @@
       </div>
     </div>
 
-    <div class="surface rounded-xl p-6 mt-4 danger-panel">
+    <div class="profile-card danger-panel">
       <h3>Delete account</h3>
       <p>Permanently removes your account, publications, models, QR codes, and PDFs. This cannot be undone.</p>
       <details>
