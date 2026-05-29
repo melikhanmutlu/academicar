@@ -956,6 +956,15 @@ def enqueue_conversion_job(
     job_kwargs["job_id"] = job.id
     if app.config.get("TESTING") or app.config.get("DEV_INLINE_JOBS"):
         process_model_upload_job(app, **job_kwargs)
+    else:
+        import threading
+        thread = threading.Thread(
+            target=process_model_upload_job,
+            args=(app,),
+            kwargs=job_kwargs,
+            daemon=True
+        )
+        thread.start()
     return job
 
 
