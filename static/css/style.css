@@ -799,7 +799,8 @@
 @media (max-width: 1024px) {
   .hero-grid,
   .workflow-grid,
-  .faq-grid {
+  .faq-grid,
+  .institutional-grid {
     grid-template-columns: 1fr;
     gap: 60px;
   }
@@ -3839,10 +3840,6 @@ input[type="file"]::-webkit-file-upload-button {
   padding: 24px 0;
   border-top: 1px solid var(--color-light-pearl);
 }
-.institutional-list li:first-child {
-  border-top: 0;
-  padding-top: 0;
-}
 .institutional-list li:last-child {
   border-bottom: 1px solid var(--color-light-pearl);
 }
@@ -3861,15 +3858,6 @@ input[type="file"]::-webkit-file-upload-button {
   font-size: 14px;
   color: var(--color-dark-shale);
   line-height: 1.6;
-}
-
-@media (max-width: 1024px) {
-  .institutional-grid {
-    grid-template-columns: 1fr;
-    gap: 40px;
-    padding-left: 20px;
-    padding-right: 20px;
-  }
 }
 
 /* ===== Action menu ===== */
