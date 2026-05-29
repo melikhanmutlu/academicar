@@ -407,8 +407,9 @@
 }
 .pricing-badge {
   position: absolute;
-  top: 20px;
-  right: 20px;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -50%);
   padding: 4px 12px;
   background: var(--color-sunset-orange);
   color: var(--color-canvas-white);
@@ -418,6 +419,7 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   border-radius: 200px;
+  white-space: nowrap;
 }
 .pricing-eyebrow {
   font-family: var(--font-inter);
@@ -586,9 +588,6 @@
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 22px;
-}
-.featured-pricing .pricing-card-top {
-  margin-top: 28px;
 }
 .pricing-meta {
   display: inline-flex;
