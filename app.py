@@ -958,9 +958,11 @@ def enqueue_conversion_job(
         process_model_upload_job(app, **job_kwargs)
     else:
         import threading
+        # Resolve the actual application object from the LocalProxy proxy if needed
+        actual_app = app._get_current_object() if hasattr(app, "_get_current_object") else app
         thread = threading.Thread(
             target=process_model_upload_job,
-            args=(app,),
+            args=(actual_app,),
             kwargs=job_kwargs,
             daemon=True
         )
