@@ -38,3 +38,6 @@ pytest-cache-files-*/
 *.egg-info/
 dist/
 build/
+
+# Node
+node_modules/

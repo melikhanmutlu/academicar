@@ -37,7 +37,10 @@ class ExternalConverter(BaseConverter):
         override = os.environ.get(self.command_env, "").strip()
         if override:
             return shlex.split(override)
-        return list(self.default_command)
+        cmd = list(self.default_command)
+        if os.name == "nt" and cmd and cmd[0] == "npx":
+            cmd[0] = "npx.cmd"
+        return cmd
 
     def _run(self, command: list[str], cwd: str) -> subprocess.CompletedProcess[str]:
         try:
