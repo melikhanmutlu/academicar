@@ -66,10 +66,10 @@ class Config:
 
     # Redis is used in production for shared rate limits. Local development
     # defaults to memory storage so the app runs without a local Redis daemon.
-    REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+    REDIS_URL = os.environ.get("REDIS_URL")
     RATELIMIT_STORAGE_URI = os.environ.get(
         "RATELIMIT_STORAGE_URI",
-        REDIS_URL if APP_ENV in {"production", "prod", "pilot"} else "memory://",
+        REDIS_URL if REDIS_URL else "memory://",
     )
 
     # Runtime folders. Railway filesystem is ephemeral; use external object
