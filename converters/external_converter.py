@@ -103,6 +103,27 @@ class FBXConverter(ExternalConverter):
     command_env = "FBX2GLTF_COMMAND"
     default_command = ("npx", "fbx2gltf")
 
+    def _command(self) -> list[str]:
+        base_dir = Path(__file__).parent.parent
+        import platform
+        system = platform.system()
+        binary_name = "FBX2glTF"
+        if system == "Windows":
+            os_folder = "Windows_NT"
+            binary_name = "FBX2glTF.exe"
+        elif system == "Linux":
+            os_folder = "Linux"
+        elif system == "Darwin":
+            os_folder = "Darwin"
+        else:
+            os_folder = None
+
+        if os_folder:
+            precompiled = base_dir / "node_modules" / "fbx2gltf" / "bin" / os_folder / binary_name
+            if precompiled.exists():
+                return [str(precompiled)]
+        return super()._command()
+
     def convert(self, input_path: str, output_path: str, color: str | None = None, **_: object) -> bool:
         if not self.validate(input_path):
             return False
