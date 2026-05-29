@@ -78,6 +78,13 @@ class OBJConverter(ExternalConverter):
     command_env = "OBJ2GLTF_COMMAND"
     default_command = ("npx", "obj2gltf")
 
+    def _command(self) -> list[str]:
+        base_dir = Path(__file__).parent.parent
+        obj2gltf_js = base_dir / "node_modules" / "obj2gltf" / "bin" / "obj2gltf.js"
+        if obj2gltf_js.exists():
+            return ["node", str(obj2gltf_js)]
+        return super()._command()
+
     def convert(self, input_path: str, output_path: str, color: str | None = None, **_: object) -> bool:
         if not self.validate(input_path):
             return False
