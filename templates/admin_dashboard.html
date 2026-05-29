@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Admin - AcademicAR{% endblock %}
+
+{% block content %}
+<main class="app-shell py-10">
+  <div class="flex flex-wrap items-end justify-between gap-4 mb-8">
+    <div>
+      <span class="eyebrow">Admin</span>
+      <h1 class="page-title mt-4">AcademicAR control panel</h1>
+      <p class="page-subtitle">Monitor users, publications, model licenses, QR resolver records, and billing events.</p>
+    </div>
+    <a href="{{ url_for('dashboard') }}" class="btn-secondary">Back to dashboard</a>
+  </div>
+
+  <section class="stats-grid mb-8">
+    <div class="stat-card">
+      <span>Users</span>
+      <strong>{{ users|length }}</strong>
+    </div>
+    <div class="stat-card">
+      <span>Publications</span>
+      <strong>{{ papers|length }}</strong>
+    </div>
+    <div class="stat-card">
+      <span>Models</span>
+      <strong>{{ models|length }}</strong>
+    </div>
+    <div class="stat-card">
+      <span>QR records</span>
+      <strong>{{ qr_links|length }}</strong>
+    </div>
+  </section>
+
+  <section class="surface rounded-xl p-6 mb-6">
+    <h2 class="font-serif text-2xl font-semibold text-[#111827]">Models and licenses</h2>
+    <div class="table-wrap mt-5">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>User</th>
+            <th>License</th>
+            <th>Status</th>
+            <th>QR public ID</th>
+            <th>Size</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for model in models %}
+            <tr>
+              <td>{{ model.display_name or model.original_filename or model.id }}</td>
+              <td>{{ model.user_id }}</td>
+              <td>{{ get_license_plan(model.license_type).label }}</td>
+              <td>{{ model_access_status(model) }}</td>
+              <td>{{ model.public_id or '-' }}</td>
+              <td>{{ format_file_size(model.file_size) }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6">No models yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="surface rounded-xl p-6 mb-6">
+    <h2 class="font-serif text-2xl font-semibold text-[#111827]">Recent payments</h2>
+    <div class="table-wrap mt-5">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Invoice</th>
+            <th>User</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Provider</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for payment in payments %}
+            <tr>
+              <td>{{ payment.invoice_number or '-' }}</td>
+              <td>{{ payment.user_id }}</td>
+              <td>{{ payment.amount_kurus }} {{ payment.currency }}</td>
+              <td>{{ payment.status }}</td>
+              <td>{{ payment.provider }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5">No payments yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="surface rounded-xl p-6">
+    <h2 class="font-serif text-2xl font-semibold text-[#111827]">QR resolver records</h2>
+    <div class="table-wrap mt-5">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Public ID</th>
+            <th>Model</th>
+            <th>Status</th>
+            <th>Last resolved</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for qr in qr_links %}
+            <tr>
+              <td>{{ qr.public_id }}</td>
+              <td>{{ qr.model_id }}</td>
+              <td>{{ qr.status }}</td>
+              <td>{{ qr.last_resolved_at or '-' }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4">No QR records yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+{% endblock %}

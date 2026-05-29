@@ -5,13 +5,11 @@ from uuid import uuid4
 import pytest
 
 from app import create_app
-import app as app_module
 from models import User, db
 
 
 @pytest.fixture()
 def app():
-    app_module.upload_attempts.clear()
     base_dir = Path("tests_runtime") / uuid4().hex
     instance_dir = base_dir / "instance"
     upload_dir = base_dir / "uploads"

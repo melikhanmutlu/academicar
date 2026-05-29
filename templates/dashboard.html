@@ -76,6 +76,23 @@
     </div>
   </div>
 
+  <section class="dashboard-upload-band surface reveal-up">
+    <div>
+      <span class="eyebrow">Upload workspace</span>
+      <h2>Start with metadata, attach models anytime.</h2>
+      <p>
+        Create a publication with an optional first model, or add more GLB, STL, OBJ, and FBX files to an existing publication.
+        Each model receives its own license, QR resolver, and stable viewer URL.
+      </p>
+    </div>
+    <div class="dashboard-upload-actions">
+      <a href="{{ url_for('paper_new') }}" class="btn-primary">New publication + model</a>
+      {% if papers %}
+        <a href="{{ url_for('paper_detail', slug=papers[0].slug) }}#add-model" class="btn-secondary">Add model to latest</a>
+      {% endif %}
+    </div>
+  </section>
+
   {% if show_onboarding %}
     <section class="onboarding-card surface rounded-xl p-6 sm:p-7 mb-6 reveal-up">
       <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
@@ -144,8 +161,6 @@
         >
         <select id="pubStatusFilter" class="field-select compact-select" aria-label="Filter by status">
           <option value="all">All status</option>
-          <option value="academic">Academic</option>
-          <option value="temporary">Temporary</option>
           <option value="public">Public</option>
           <option value="private">Private</option>
           <option value="with-models">With models</option>
@@ -206,7 +221,7 @@
           </div>
 
           <div class="publication-status">
-            <span class="status-chip">{{ 'Published' if p.package_type == 'academic' else 'Temporary' }}</span>
+            <span class="status-chip">{{ 'Public' if p.is_public else 'Private' }}</span>
           </div>
 
           <div class="publication-count">
@@ -224,6 +239,7 @@
               <span class="btn-secondary compact opacity-50 cursor-not-allowed" aria-disabled="true" title="No PDF uploaded">PDF</span>
             {% endif %}
             <a href="{{ url_for('paper_edit', slug=p.slug) }}" class="btn-secondary compact">Edit</a>
+            <a href="{{ url_for('paper_detail', slug=p.slug) }}#add-model" class="btn-secondary compact">Add model</a>
             <a href="{{ url_for('paper_detail', slug=p.slug) }}" class="btn-secondary compact">Details</a>
           </div>
         </div>
@@ -239,8 +255,20 @@
       <div class="relative">
         <div class="w-20 h-20 mx-auto rounded-2xl bg-white/10 border border-white/10 grid place-items-center text-white font-bold text-xl">3D</div>
         <h2 class="font-serif text-3xl font-semibold text-white mt-6">Create your first publication page.</h2>
-        <p class="text-white/60 mt-3 max-w-xl mx-auto">Add publication metadata, then upload an anonymized STL or GLB model and generate a viewer link.</p>
+        <p class="text-white/60 mt-3 max-w-xl mx-auto">Add publication metadata, optionally attach your first model immediately, then share a stable viewer link and QR.</p>
         <a href="{{ url_for('paper_new') }}" class="btn-primary mt-7">Create Publication</a>
+        <div class="demo-publication-grid">
+          <div>
+            <span>Demo publication</span>
+            <strong>Mitochondrial morphology atlas</strong>
+            <small>1 GLB model · Academic license · QR ready</small>
+          </div>
+          <div>
+            <span>Demo model</span>
+            <strong>Interactive organelle reconstruction</strong>
+            <small>Viewer, AR, screenshots, stable resolver</small>
+          </div>
+        </div>
       </div>
     </div>
   {% endif %}

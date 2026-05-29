@@ -51,7 +51,7 @@
       <span class="eyebrow">AcademicAR QR</span>
       <h1>{{ model.display_name or model.original_filename }}</h1>
       <p class="subtitle">{{ paper.title }}</p>
-      <p class="url">{{ public_url('view_model', model_id=model.id) }}</p>
+      <p class="url">{{ model_resolver_url(model) }}</p>
       <div class="actions">
         <a href="javascript:window.print()" class="btn">Print</a>
         <a href="{{ url_for('qr_image', model_id=model.id) }}" download="qr_{{ model.id }}.png" class="btn btn-outline">Download PNG</a>

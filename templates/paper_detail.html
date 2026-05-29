@@ -6,7 +6,7 @@
 
 {% block content %}
 {% set first_model = paper.models[0] if paper.models else none %}
-{% set can_upload_more = paper.package_type == 'academic' or not paper.models %}
+{% set can_upload_more = true %}
 <div class="app-shell py-10 pb-10">
   <a href="{{ url_for('dashboard') }}" class="nav-link inline-flex mb-5">&larr; Back to dashboard</a>
 
@@ -123,6 +123,7 @@
       <div class="space-y-3">
         {% for m in paper.models %}
           {% set model_status = m.processing_status or 'ready' %}
+          {% set plan = license_plans.get(m.license_type or 'free') or license_plans.get('free') %}
           <div class="model-row surface rounded-xl p-4 group reveal-up" data-model-row data-status-url="{{ url_for('model_status', model_id=m.id) }}" data-status="{{ model_status }}">
             <div class="model-row-grid">
               {% if model_status == 'ready' %}
@@ -152,19 +153,33 @@
                   <h3 class="font-serif text-2xl font-semibold text-[#111827] truncate" title="{{ m.display_name or m.original_filename }}">{{ m.display_name or m.original_filename }}</h3>
                   <span class="detail-chip">{{ format_file_size(m.file_size) }}</span>
                   <span class="detail-chip">{{ (m.source_format or 'stl')|upper }} -> GLB</span>
+                  <span class="detail-chip dark">{{ plan.label }}</span>
                   {% if model_status != 'ready' %}<span class="detail-chip status">{{ model_status|title }}</span>{% endif %}
                 </div>
                 {% if m.description %}<p class="text-sm text-[#64748b] mt-2 line-clamp-2">{{ m.description }}</p>{% endif %}
                 {% if model_status == 'failed' and m.processing_error %}<p class="text-sm text-red-600 mt-2">{{ m.processing_error }}</p>{% endif %}
+                <div class="model-meta-grid mt-4">
+                  <div><span>Access</span><strong>{{ 'Until ' ~ m.access_expires_at.strftime('%b %d, %Y') if m.access_expires_at else 'No expiry' }}</strong></div>
+                  <div><span>File limit</span><strong>{{ format_file_size(m.storage_limit_bytes or plan.storage_limit_bytes) }}</strong></div>
+                  <div><span>Version</span><strong>v{{ m.version or 1 }}</strong></div>
+                  <div><span>Color</span><strong>{{ m.appearance_color or '#cccccc' }}</strong></div>
+                </div>
                 <div class="model-actions mt-4">
                   {% if model_status == 'ready' %}
                     <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="btn-primary compact">Open 3D / AR</a>
-                    <button type="button" class="btn-secondary compact" data-copy-link="{{ public_url('view_model', model_id=m.id) }}">Copy link</button>
-                    <a href="{{ url_for('qr_print', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="btn-secondary compact">Print QR</a>
+                    <button type="button" class="btn-secondary compact" data-copy-link="{{ model_resolver_url(m) }}">Copy link</button>
+                    <a href="{{ url_for('qr_print', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="btn-secondary compact">View QR</a>
                   {% else %}
                     <button type="button" class="btn-primary compact opacity-60 cursor-not-allowed" disabled>{{ 'Processing' if model_status != 'failed' else 'Not ready' }}</button>
                   {% endif %}
                   <a href="{{ url_for('model_edit', model_id=m.id) }}" class="btn-secondary compact">Edit Model</a>
+                  {% if model_status == 'ready' %}
+                    <form method="POST" action="{{ url_for('model_appearance_update', model_id=m.id) }}" class="model-color-form" title="Update model color without changing the viewer link or QR">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <input type="color" name="color" value="{{ m.appearance_color or '#cccccc' }}" aria-label="Model color">
+                      <button type="submit">Apply color</button>
+                    </form>
+                  {% endif %}
                   <details class="action-menu">
                     <summary aria-label="More model actions">...</summary>
                     <div class="action-menu-panel">
@@ -201,8 +216,8 @@
       <details class="surface rounded-xl p-0 overflow-hidden">
         <summary class="upload-summary">
           <span>
-            <strong>{{ 'Add another model' if can_upload_more else 'Additional models require Academic package' }}</strong>
-            <small>{{ 'Upload an additional STL or GLB for this publication.' if can_upload_more else 'Temporary publications support one model. Upgrade the paper to enable multiple models.' }}</small>
+            <strong>Add another model</strong>
+            <small>Upload an additional model for this publication. Each model keeps its own license and QR.</small>
           </span>
           <span class="upload-chevron" aria-hidden="true">+</span>
         </summary>
@@ -210,20 +225,11 @@
     {% else %}
       <div class="surface rounded-xl p-6 sm:p-8">
     {% endif %}
-          {% if not can_upload_more %}
-            <div class="upload-locked">
-              <div>
-                <h3>Multiple models are available in the Academic package.</h3>
-                <p>To add another model to this publication, edit the paper package first. The existing model, QR, and viewer link will remain active.</p>
-              </div>
-              <a href="{{ url_for('paper_edit', slug=paper.slug) }}" class="btn-primary compact">Edit Paper</a>
-            </div>
-          {% else %}
           <div class="grid lg:grid-cols-[0.78fr_1.22fr] gap-8">
             <div>
               <span class="eyebrow">Model upload</span>
               <h2 class="font-serif text-3xl font-semibold text-[#111827] mt-4">{{ 'Add a model' if paper.models else 'Add the first model' }}</h2>
-              <p class="text-[#64748b] text-sm leading-relaxed mt-3">Upload an anonymized STL or GLB file. The platform prepares the public viewer and QR code after upload.</p>
+              <p class="text-[#64748b] text-sm leading-relaxed mt-3">Upload an anonymized model file. The platform prepares a stable public viewer, managed QR code, and AR-ready GLB asset.</p>
               <div class="mt-6 rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4 text-sm text-[#475569] leading-relaxed">
                 Uploaded models must be anonymized. Files containing patient names, protocol numbers, faces, identity data, or identifiable information are prohibited.
               </div>
@@ -232,10 +238,24 @@
             <form method="POST" action="{{ url_for('upload_model', slug=paper.slug) }}" enctype="multipart/form-data" class="space-y-4" data-upload-form>
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <label class="upload-dropzone">
-                <span class="block text-[#111827] font-semibold">Select STL or GLB file</span>
-                <span class="block text-sm text-[#64748b] mt-1">The model will be prepared for the publication viewer. iOS AR uses an automatically generated USDZ companion.</span>
-                <input type="file" name="file" accept=".stl,.glb" required class="mt-4 w-full text-sm text-[#64748b] file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:bg-[#111827] file:text-white file:font-bold">
+                <span class="block text-[#111827] font-semibold">Select GLB, STL, OBJ, or FBX file</span>
+                <span class="block text-sm text-[#64748b] mt-1" data-dropzone-copy>Drag and drop a model here, or choose a file. The model will be prepared for the publication viewer. iOS AR uses an automatically generated USDZ companion.</span>
+                <input type="file" name="file" accept=".glb,.stl,.obj,.fbx" required class="mt-4 w-full text-sm text-[#64748b] file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:bg-[#111827] file:text-white file:font-bold" data-dropzone-input>
               </label>
+              <div class="companion-files-section" data-companion-section style="display: none;">
+                <label class="field-label">MTL and Texture files <span class="text-[#64748b] font-normal">(optional companion files for OBJ)</span></label>
+                <input type="file" name="companion_files" multiple accept=".mtl,.png,.jpg,.jpeg,.webp" class="mt-1 w-full text-sm text-[#64748b] file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:bg-[#efefef] file:text-[#202020] file:font-semibold" data-companion-input>
+                <p class="text-xs text-[#5c6473] mt-2">Upload the material (.mtl) and texture images (.png, .jpg) referenced by the .obj file. The converter preserves textures by default.</p>
+              </div>
+              <div>
+                <label class="field-label">Model license</label>
+                <select name="license_type" class="field-select">
+                  <option value="free">Free Access - $0, 3-day access, up to 100 MB</option>
+                  <option value="academic">Academic - $9.90 / model, 3-year access, up to 200 MB</option>
+                  <option value="extended_archive">Extended Archive - $24.90 / model, 10-year access, up to 200 MB</option>
+                </select>
+                <p class="text-xs text-[#5c6473] mt-2">The same QR and resolver link stay stable if this model is upgraded or replaced later.</p>
+              </div>
               <div class="grid sm:grid-cols-2 gap-4">
                 <input type="text" name="display_name" placeholder="Model name" class="field-input">
                 <input type="text" name="description" placeholder="Short model note" class="field-input">
@@ -264,7 +284,6 @@
               </div>
             </form>
           </div>
-          {% endif %}
     {% if paper.models %}
         </div>
       </details>
@@ -279,7 +298,120 @@
 <script>
   const uploadForm = document.querySelector('[data-upload-form]');
   if (uploadForm) {
-    uploadForm.addEventListener('submit', () => {
+    const dropzone = uploadForm.querySelector('.upload-dropzone');
+    const fileInput = uploadForm.querySelector('[data-dropzone-input]');
+    const dropzoneCopy = uploadForm.querySelector('[data-dropzone-copy]');
+    const companionSection = uploadForm.querySelector('[data-companion-section]');
+    const companionInput = uploadForm.querySelector('[data-companion-input]');
+    const modelExtensions = ['glb', 'stl', 'obj', 'fbx'];
+    const companionExtensions = ['mtl', 'png', 'jpg', 'jpeg', 'webp'];
+
+    const extensionFor = (file) => {
+      const name = file && file.name ? file.name : '';
+      return name.includes('.') ? name.split('.').pop().toLowerCase() : '';
+    };
+
+    const buildFileList = (files) => {
+      try {
+        const transfer = new DataTransfer();
+        files.forEach((file) => transfer.items.add(file));
+        return transfer.files;
+      } catch (error) {
+        return null;
+      }
+    };
+
+    const setFiles = (input, files, fallbackFileList = null) => {
+      if (!input || !files.length) return false;
+      const fileList = buildFileList(files);
+      if (fileList) {
+        input.files = fileList;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+      }
+      if (fallbackFileList && files[0] === fallbackFileList[0]) {
+        input.files = fallbackFileList;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+      }
+      if (dropzoneCopy) dropzoneCopy.textContent = 'Please choose the model file with the file picker.';
+      if (dropzone) dropzone.classList.add('is-invalid');
+      return false;
+    };
+
+    const clearFiles = (input) => {
+      if (!input || !input.files.length) return;
+      const fileList = buildFileList([]);
+      if (!fileList) return;
+      input.files = fileList;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+
+    const updateDropzoneState = () => {
+      const selectedFile = fileInput && fileInput.files.length ? fileInput.files[0] : null;
+      const selectedName = selectedFile ? selectedFile.name : '';
+      if (dropzoneCopy && selectedName) {
+        const companionCount = companionInput && companionInput.files ? companionInput.files.length : 0;
+        dropzoneCopy.textContent = companionCount
+          ? `${selectedName} + ${companionCount} companion file${companionCount > 1 ? 's' : ''}`
+          : selectedName;
+      }
+      if (dropzone) dropzone.classList.toggle('is-invalid', Boolean(fileInput.required && !selectedName));
+      if (companionSection) {
+        companionSection.style.display = selectedName.toLowerCase().endsWith('.obj') ? '' : 'none';
+      }
+    };
+
+    const applyDroppedFiles = (files) => {
+      const originalFileList = files || null;
+      const dropped = Array.from(files || []);
+      const modelFiles = dropped.filter((file) => modelExtensions.includes(extensionFor(file)));
+      const companionFiles = dropped.filter((file) => companionExtensions.includes(extensionFor(file)));
+      if (!modelFiles.length) {
+        if (dropzoneCopy) dropzoneCopy.textContent = 'Please choose a GLB, STL, OBJ, or FBX model file.';
+        if (dropzone) dropzone.classList.add('is-invalid');
+        return;
+      }
+      if (!setFiles(fileInput, [modelFiles[0]], originalFileList)) return;
+      if (companionInput) {
+        if (companionFiles.length) setFiles(companionInput, companionFiles);
+        else clearFiles(companionInput);
+      }
+      updateDropzoneState();
+    };
+
+    if (dropzone && fileInput) {
+      ['dragenter', 'dragover'].forEach((eventName) => {
+        dropzone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          dropzone.classList.add('is-drag-over');
+        });
+      });
+      ['dragleave', 'drop'].forEach((eventName) => {
+        dropzone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          dropzone.classList.remove('is-drag-over');
+        });
+      });
+      dropzone.addEventListener('drop', (event) => {
+        if (!event.dataTransfer || !event.dataTransfer.files.length) return;
+        applyDroppedFiles(event.dataTransfer.files);
+      });
+      fileInput.addEventListener('change', () => {
+        updateDropzoneState();
+      });
+    }
+
+    if (companionInput) companionInput.addEventListener('change', updateDropzoneState);
+
+    uploadForm.addEventListener('submit', (event) => {
+      if (fileInput && fileInput.required && !fileInput.files.length) {
+        event.preventDefault();
+        if (dropzoneCopy) dropzoneCopy.textContent = 'Please choose a model file before uploading.';
+        if (dropzone) dropzone.classList.add('is-invalid');
+        fileInput.focus();
+        return;
+      }
       const submit = uploadForm.querySelector('[data-upload-submit]');
       const status = uploadForm.querySelector('[data-upload-status]');
       if (submit) {

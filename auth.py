@@ -1,7 +1,8 @@
 """Authentication blueprint: email/password login, registration, and Google OAuth."""
+import os
 from urllib.parse import urljoin, urlparse
 
-from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 from flask_wtf import FlaskForm
 from wtforms import BooleanField, PasswordField, StringField, SubmitField
@@ -9,6 +10,10 @@ from wtforms.validators import DataRequired, Email, EqualTo, Length, ValidationE
 
 from models import User, db
 from url_helpers import public_url
+
+# Single source of truth — also exported via Config.PASSWORD_MIN_LENGTH so the
+# frontend, account routes, and registration form agree on the same minimum.
+PASSWORD_MIN_LENGTH = int(os.environ.get("PASSWORD_MIN_LENGTH", 8))
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 try:
@@ -53,7 +58,16 @@ class LoginForm(FlaskForm):
 class RegistrationForm(FlaskForm):
     username = StringField("Full name", validators=[DataRequired(), Length(min=2, max=80)])
     email = StringField("Email", validators=[DataRequired(), Email()])
-    password = PasswordField("Password", validators=[DataRequired(), Length(min=6)])
+    password = PasswordField(
+        "Password",
+        validators=[
+            DataRequired(),
+            Length(
+                min=PASSWORD_MIN_LENGTH,
+                message=f"Password must be at least {PASSWORD_MIN_LENGTH} characters.",
+            ),
+        ],
+    )
     confirm = PasswordField(
         "Confirm password",
         validators=[DataRequired(), EqualTo("password", message="Passwords do not match.")],
@@ -63,6 +77,15 @@ class RegistrationForm(FlaskForm):
     def validate_email(self, field):
         if User.query.filter_by(email=field.data.lower()).first():
             raise ValidationError("This email is already registered.")
+
+
+def _rotate_session():
+    """Drop any pre-login session contents to defeat session fixation.
+
+    Called right before login_user() / logout_user() so an attacker who knows
+    a victim's pre-auth session id cannot ride it into an authenticated state.
+    """
+    session.clear()
 
 
 @auth_bp.route("/register", methods=["GET", "POST"])
@@ -79,6 +102,7 @@ def register():
         user.set_password(form.password.data)
         db.session.add(user)
         db.session.commit()
+        _rotate_session()
         login_user(user)
         # Log registration for privacy compliance
         try:
@@ -89,7 +113,11 @@ def register():
         flash("Registration successful. Welcome.", "success")
         return redirect(url_for("dashboard"))
 
-    return render_template("register.html", form=form)
+    return render_template(
+        "register.html",
+        form=form,
+        google_oauth_enabled=bool(current_app.config.get("GOOGLE_CLIENT_ID") and current_app.config.get("GOOGLE_CLIENT_SECRET")),
+    )
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
@@ -99,16 +127,34 @@ def login():
 
     form = LoginForm()
     if form.validate_on_submit():
-        user = User.query.filter_by(email=form.email.data.lower().strip()).first()
+        email = form.email.data.lower().strip()
+        user = User.query.filter_by(email=email).first()
         if user and user.check_password(form.password.data):
+            _rotate_session()
             login_user(user, remember=form.remember.data)
+            try:
+                from app import log_audit
+                log_audit("user_login", user_id=user.id, details={"provider": "password"})
+            except Exception:
+                pass
             next_page = request.args.get("next")
             if next_page and is_safe_redirect_url(next_page):
                 return redirect(next_page)
             return redirect(url_for("dashboard"))
+        # Failed-login audit (no email enumeration: same flash, audit logs the
+        # attempted email so legitimate password-reset abuse can be tracked).
+        try:
+            from app import log_audit
+            log_audit("user_login_failed", user_id=user.id if user else None, details={"email": email})
+        except Exception:
+            pass
         flash("Invalid email or password.", "danger")
 
-    return render_template("login.html", form=form)
+    return render_template(
+        "login.html",
+        form=form,
+        google_oauth_enabled=bool(current_app.config.get("GOOGLE_CLIENT_ID") and current_app.config.get("GOOGLE_CLIENT_SECRET")),
+    )
 
 
 @auth_bp.route("/logout", methods=["POST"])
@@ -155,11 +201,23 @@ def google_callback():
     user = User.query.filter_by(google_id=google_id).first()
     is_new_user = False
     if not user:
-        user = User.query.filter_by(email=email).first()
-        if user:
-            user.google_id = google_id
-            if not user.avatar_url and picture:
-                user.avatar_url = picture
+        existing = User.query.filter_by(email=email).first()
+        if existing:
+            # Don't auto-link a Google identity into an existing local account
+            # if it already has a password set (i.e. the email belongs to a
+            # different signup path). This prevents takeover of squatted
+            # accounts and forces the user to log in with their password first.
+            if existing.password_hash:
+                flash(
+                    "This email is already registered with a password. "
+                    "Please log in first, then link Google from your profile.",
+                    "warning",
+                )
+                return redirect(url_for("auth.login"))
+            existing.google_id = google_id
+            if not existing.avatar_url and picture:
+                existing.avatar_url = picture
+            user = existing
         else:
             user = User(
                 email=email,
@@ -171,6 +229,7 @@ def google_callback():
             is_new_user = True
     db.session.commit()
 
+    _rotate_session()
     login_user(user)
 
     # Log registration/login for privacy compliance

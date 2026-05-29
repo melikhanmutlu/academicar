@@ -83,9 +83,24 @@ class Model3D(db.Model):
     display_name = db.Column(db.String(255), nullable=True)
     description = db.Column(db.Text, nullable=True)
     original_filename = db.Column(db.String(255), nullable=True)
+    original_source_path = db.Column(db.String(500), nullable=True)
+    current_source_path = db.Column(db.String(500), nullable=True)
     glb_path = db.Column(db.String(500), nullable=False)
+    storage_provider = db.Column(db.String(40), nullable=False, default="railway_volume")
+    storage_key = db.Column(db.String(500), nullable=True)
     qr_code_path = db.Column(db.String(500), nullable=True)
     file_size = db.Column(db.Integer, nullable=True)
+    public_id = db.Column(db.String(40), unique=True, nullable=True, index=True)
+    license_type = db.Column(db.String(30), nullable=False, default="free", index=True)
+    license_status = db.Column(db.String(30), nullable=False, default="active", index=True)
+    access_starts_at = db.Column(db.DateTime, nullable=True, default=utc_now)
+    access_expires_at = db.Column(db.DateTime, nullable=True)
+    storage_limit_bytes = db.Column(db.Integer, nullable=True)
+    appearance_color = db.Column(db.String(20), nullable=True)
+    replaced_at = db.Column(db.DateTime, nullable=True)
+    version = db.Column(db.Integer, nullable=False, default=1)
+    replacement_status = db.Column(db.String(30), nullable=True)
+    replacement_error = db.Column(db.Text, nullable=True)
     source_format = db.Column(db.String(10), nullable=False, default="stl")
     processing_status = db.Column(db.String(30), nullable=False, default="ready")
     processing_error = db.Column(db.Text, nullable=True)
@@ -99,6 +114,69 @@ class Model3D(db.Model):
 
     def __repr__(self) -> str:
         return f"<Model3D {self.id}>"
+
+
+class QRLink(db.Model):
+    __tablename__ = "qr_links"
+
+    id = db.Column(db.Integer, primary_key=True)
+    public_id = db.Column(db.String(40), unique=True, nullable=False, index=True)
+    model_id = db.Column(db.String(36), db.ForeignKey("models.id"), nullable=False, index=True)
+    status = db.Column(db.String(30), nullable=False, default="active", index=True)
+    target_type = db.Column(db.String(30), nullable=False, default="model_viewer")
+    created_at = db.Column(db.DateTime, default=utc_now)
+    last_resolved_at = db.Column(db.DateTime, nullable=True)
+
+    model = db.relationship("Model3D", backref=db.backref("qr_links", lazy=True, cascade="all, delete-orphan"))
+
+    def __repr__(self) -> str:
+        return f"<QRLink {self.public_id} -> {self.model_id}>"
+
+
+class ModelVersion(db.Model):
+    __tablename__ = "model_versions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    model_id = db.Column(db.String(36), db.ForeignKey("models.id"), nullable=False, index=True)
+    version_number = db.Column(db.Integer, nullable=False)
+    source_path = db.Column(db.String(500), nullable=True)
+    glb_path = db.Column(db.String(500), nullable=True)
+    source_format = db.Column(db.String(10), nullable=True)
+    file_size = db.Column(db.Integer, nullable=True)
+    material_color = db.Column(db.String(20), nullable=True)
+    storage_provider = db.Column(db.String(40), nullable=False, default="railway_volume")
+    storage_key = db.Column(db.String(500), nullable=True)
+    status = db.Column(db.String(30), nullable=False, default="queued", index=True)
+    error = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=utc_now)
+
+    model = db.relationship("Model3D", backref=db.backref("versions", lazy=True, cascade="all, delete-orphan"))
+
+    def __repr__(self) -> str:
+        return f"<ModelVersion {self.model_id} v{self.version_number} {self.status}>"
+
+
+class ConversionJob(db.Model):
+    __tablename__ = "conversion_jobs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    job_type = db.Column(db.String(40), nullable=False, default="model_upload", index=True)
+    status = db.Column(db.String(30), nullable=False, default="pending", index=True)
+    model_id = db.Column(db.String(36), db.ForeignKey("models.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    payload = db.Column(db.JSON, nullable=False, default=dict)
+    attempts = db.Column(db.Integer, nullable=False, default=0)
+    max_attempts = db.Column(db.Integer, nullable=False, default=3)
+    error = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=utc_now, index=True)
+    started_at = db.Column(db.DateTime, nullable=True)
+    finished_at = db.Column(db.DateTime, nullable=True)
+
+    model = db.relationship("Model3D", backref=db.backref("conversion_jobs", lazy=True, cascade="all, delete-orphan"))
+    user = db.relationship("User", backref=db.backref("conversion_jobs", lazy=True))
+
+    def __repr__(self) -> str:
+        return f"<ConversionJob {self.job_type} {self.status} model={self.model_id}>"
 
 
 class Payment(db.Model):

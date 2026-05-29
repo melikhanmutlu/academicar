@@ -1,158 +1,130 @@
 # AcademicAR
 
-AcademicAR, akademik araştırmacıların tez/makale çalışmalarına 3D model ekleyebilmesi için geliştirilmiş bir Flask uygulamasıdır. Kullanıcı STL model yükler, sistem modeli GLB formatına dönüştürür, kalıcı bir görüntüleme bağlantısı ve QR kodu üretir. Okuyucu bu bağlantıdan modeli 3D olarak inceleyebilir ve destekleyen cihazlarda AR modunda açabilir.
+AcademicAR is a platform that empowers researchers to publish 3D and AR (Augmented Reality) models alongside their academic papers, posters, and presentations. It turns technical model files (STL, GLB, OBJ, FBX) into shareable academic assets accessible via browser-ready viewer links and QR codes.
 
-## Mevcut Özellikler
+## Core Features
 
-- E-posta/şifre ile kayıt ve giriş
-- Opsiyonel Google OAuth girişi
-- Kullanıcı paneli
-- Tez/makale oluşturma ve silme
-- Opsiyonel PDF yükleme
-- PDF dosyaları için kullanıcıya özel erişim
-- STL doğrulama ve STL → GLB dönüşümü
-- Her model için kalıcı public viewer linki
-- QR kodu üretme, yazdırma ve PNG indirme
-- Model adı/açıklaması düzenleme
-- CSRF koruması, güvenli redirect, hata sayfaları
-- Upload rate limit
-- Pytest test paketi
+- **3D Model Upload & Conversion**: Supports STL, GLB, OBJ, and FBX with automated conversion to AR-ready GLB formats.
+- **Web-Based Viewer**: A full-screen browser viewer with metadata, screenshot capabilities, and mobile AR controls.
+- **QR Code Generation**: Every model receives a persistent, shareable viewer URL and QR code.
+- **Publication Archive**: Project-based model records preserving context, identifiers (DOI/PMID), and supplementary materials (PDFs).
+- **Asynchronous Processing**: Background job queues for non-blocking file conversions.
 
-## Lokal Kurulum
+## Project Structure
 
-Python 3.12 önerilir.
-
-```bash
-cd academic_ar
-python -m venv venv
-
-# Windows
-venv\Scripts\activate
-
-# macOS/Linux
-source venv/bin/activate
-
-pip install -r requirements.txt
+```text
+academic_ar/
+├── app.py                 # Main Flask application and route definitions
+├── worker.py              # Background worker for handling conversion tasks
+├── config.py              # Centralized environment configurations
+├── models.py              # SQLAlchemy database schema definitions
+├── auth.py                # Authentication, OAuth, and user management
+├── converters/            # 3D model processing logic
+│   ├── base_converter.py  # Abstract base class for converters
+│   ├── external_converter.py # Wrappers for external CLI tools (fbx2gltf, obj2gltf)
+│   └── stl_converter.py   # Native STL to GLB conversion logic
+├── templates/             # Jinja2 HTML templates
+├── static/                # Static assets (CSS, JS, images, models)
+├── tests/                 # Pytest integration and unit tests
+├── requirements.txt       # Python dependencies
+└── package.json           # Node.js dependencies for conversion tools
 ```
 
-## Ortam Değişkenleri
+## Setup Instructions
+
+### Prerequisites
+- **Python 3.12+**
+- **Node.js 18+** (Required for `fbx2gltf` and `obj2gltf`)
+- **PostgreSQL** (Recommended for production, SQLite used for local dev)
+
+### 1. Environment Setup
+
+Clone the repository and install dependencies:
+
+```bash
+# Set up Python virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Install Node tools for conversions
+npm install
+```
+
+### 2. Configuration
+
+Create a `.env` file in the root directory based on the `.env.example`:
 
 ```bash
 cp .env.example .env
 ```
 
-Geliştirme ortamında `SECRET_KEY` boş bırakılırsa varsayılan dev anahtarı kullanılır. `APP_ENV=pilot`, `APP_ENV=production` veya `FLASK_ENV=production` kullanıldığında gerçek bir `SECRET_KEY` zorunludur.
+Ensure you set a secure `SECRET_KEY` and provide your database credentials if using PostgreSQL.
 
-Örnek güvenli anahtar:
+### 3. Database Initialization
 
-```bash
-python -c "import secrets; print(secrets.token_hex(32))"
-```
-
-Google OAuth kullanmak için:
-
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
-
-Google Cloud Console tarafında redirect URI:
-
-```text
-http://localhost:5000/auth/google/callback
-```
-
-## Çalıştırma
-
-Tek komut:
+Run the Flask application once to automatically initialize the SQLite database (if no `DATABASE_URL` is provided) or apply migrations:
 
 ```bash
-python app.py
+python run_local_server.py
 ```
 
-Tarayıcıdan:
+### 4. Running the Application Locally
 
-```text
-http://127.0.0.1:5000/
+Local development defaults to `DEV_INLINE_JOBS=1`, so model uploads are converted
+immediately by the local web process. This keeps manual testing simple: upload a
+model and it should appear in the registry as soon as the request finishes.
+
+**Terminal 1 (Web Server):**
+```bash
+python run_local_server.py
 ```
 
-## Test
+**Optional worker parity test:**
+```bash
+# Set DEV_INLINE_JOBS=0 first, then run:
+python worker.py
+```
+
+The application will be available at `http://localhost:5000`.
+
+In production, model conversion is intentionally handled only by `worker.py`.
+The web service writes `ConversionJob` records and returns; it must not run
+CPU/RAM-heavy 3D conversion work inline.
+
+## Testing
+
+This project uses `pytest` for automated testing.
 
 ```bash
-python -m py_compile app.py auth.py models.py config.py converters/base_converter.py converters/stl_converter.py
-python -m pytest tests -p no:cacheprovider
+# Run the complete test suite
+python -m pytest tests/ -v
 ```
 
-Windows üzerinde bazı kilitli pytest geçici klasörleri oluşursa `.gitignore` bunları dışarıda bırakır. Test runtime verileri `tests_runtime/` altında üretilir.
+## Linting & Formatting
 
-## Railway Deploy
-
-Repository Railway'e baglandiginda `railway.json` ve `Procfile` su production komutunu kullanir:
+The codebase uses `Black` for formatting and `Ruff` for linting. Configuration is located in `pyproject.toml`.
 
 ```bash
-gunicorn app:app --bind 0.0.0.0:$PORT
+# Format code
+black .
+
+# Run linter
+ruff check .
 ```
 
-Railway panelinde onerilen kurulum:
+## Deployment
 
-1. New Project -> Deploy from GitHub repo -> `melikhanmutlu/academicar`
-2. Add service -> PostgreSQL
-3. Flask service icin variables ekle:
+The project is configured for Railway (`railway.json`, `nixpacks.toml`, `Procfile`).
+Use two Railway services from the same repo:
 
-```env
-APP_ENV=production
-SECRET_KEY=<python -c "import secrets; print(secrets.token_hex(32))" ciktisi>
-DATABASE_URL=<Railway PostgreSQL tarafindan verilir>
-SITE_URL=https://<railway-domain>
-```
+- **Web service:** `gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --worker-class gthread --threads 8 --timeout 180`
+- **Worker service:** `python worker.py`
 
-Google OAuth kullanilacaksa ekle:
-
-```env
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
-```
-
-Google Cloud Console redirect URI:
-
-```text
-https://<railway-domain>/auth/google/callback
-```
-
-Not: `uploads/`, `converted/`, `qr_codes/` ve `pdfs/` Railway uzerinde ephemeral dosya sistemine yazilir. Demo/pilot icin yeterlidir; kalici production dosyalari icin S3, Cloudflare R2 veya benzeri object storage'a tasinmalidir.
-
-## Kullanıcı Akışı
-
-1. Kullanıcı landing page’den kayıt olur veya giriş yapar.
-2. Panelden yeni tez/makale oluşturur.
-3. Başlık, yazarlar, yıl, alan, kurum, DOI, özet ve opsiyonel PDF girer.
-4. Tez detayında STL model yükler.
-5. Sistem dosyayı doğrular, GLB’ye dönüştürür ve QR kodu üretir.
-6. Kullanıcı public viewer linkini açar veya QR sayfasını yazdırır.
-7. Dış kullanıcı QR/viewer linkiyle modele giriş yapmadan erişir.
-8. PDF dosyası yalnızca tez sahibi tarafından indirilebilir.
-
-## Proje Yapısı
-
-```text
-academic_ar/
-├── app.py              # Flask app ve route'lar
-├── auth.py             # Auth blueprint
-├── models.py           # User, Paper, Model3D modelleri
-├── config.py           # Ortam ve uygulama ayarları
-├── converters/         # STL → GLB dönüştürücü
-├── templates/          # Jinja2 şablonları
-├── static/             # CSS / JS
-├── tests/              # Pytest testleri
-├── uploads/            # Runtime STL geçici dosyaları
-├── converted/          # Runtime GLB dosyaları
-├── qr_codes/           # Runtime QR görselleri
-└── pdfs/               # Runtime PDF dosyaları
-```
-
-## Sonraki Faz
-
-- Async dönüşüm job sistemi
-- Upload progress yüzdesi
-- Model thumbnail/preview
-- Draco mesh compression
-- Docker/Nginx/HTTPS deployment
-- Redis tabanlı production rate limit
+Set `APP_ENV=production`, `DATABASE_URL` to PostgreSQL, and `RATELIMIT_STORAGE_URI`
+to the Redis URL. Attach a Railway Volume and set `STORAGE_ROOT` to the mount
+path so uploaded sources, converted GLBs, PDFs, and QR images persist across
+deploys. Production ignores `DEV_INLINE_JOBS` unless
+`ALLOW_PRODUCTION_INLINE_JOBS=1` is explicitly set for emergency debugging.
