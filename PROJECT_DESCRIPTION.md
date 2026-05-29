@@ -16,6 +16,14 @@ The MVP focuses on making academic 3D model sharing fast, reliable, and publicat
 - Allow external readers to view the model without logging in.
 - Keep the compliance responsibility explicit for patient-derived or sensitive models.
 
+## Active MVP Planning Note
+
+The implementation source of truth for the next MVP phase is `MVP_IMPLEMENTATION_PLAN.md`.
+
+The product is moving toward a model-based licensing system, managed QR resolver URLs, Railway-first deployment, portable storage, background workers, and expanded model conversion support for direct GLB upload plus STL, OBJ, and FBX conversion to AR-ready GLB.
+
+While this work is implemented, preserve the existing AcademicAR / Ventriloc design language from `DESIGN.md` and avoid breaking current working flows: authentication, publication management, optional PDF upload, model upload, compliance consent, public viewer pages, QR pages, screenshots, and existing processing states.
+
 ## 2. Target Users
 
 Primary users are academics, clinicians, researchers, graduate students, and medical visualization teams who want to attach interactive 3D content to scholarly work.
@@ -494,4 +502,3 @@ The MVP can be considered successful when:
 - Paid links remain active for 3 years after payment.
 - Patient-data compliance warnings and upload confirmations are mandatory.
 - Production files are stored durably outside the ephemeral app filesystem.
-

@@ -1,0 +1,13 @@
+{
+  "name": "academicar-converters",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Node-based model conversion helpers for AcademicAR",
+  "dependencies": {
+    "fbx2gltf": "^0.9.7-p1",
+    "obj2gltf": "^3.1.6"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

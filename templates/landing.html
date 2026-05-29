@@ -37,8 +37,8 @@
 
     <div class="hero-viewer-stage reveal-up delay-2">
       <model-viewer
-        src="{{ url_for('static', filename='models/calcaneus.glb') }}"
-        alt="Calcaneus 3D model"
+        src="{{ url_for('static', filename='models/model.compressed.glb') }}"
+        alt="AcademicAR demo 3D model"
         camera-controls
         auto-rotate
         rotation-per-second="18deg"
@@ -207,63 +207,121 @@
 </section>
 
 <!-- PRICING -->
-<section class="landing-section alt-surface">
+<section class="landing-section alt-surface pricing-section" id="pricing">
   <div class="pricing-layout">
-    <!-- Left: context copy -->
-    <div class="pricing-context reveal-up">
-      <span class="landing-eyebrow">Pricing</span>
-      <h2 class="landing-h2">Simple, publication-aligned plans.</h2>
-      <p class="landing-body" style="margin-bottom: 32px;">
-        Start with a free preview link. Upgrade to keep your model live alongside the published paper for the long term.
-      </p>
-      <div class="pricing-context-stats">
+    <div class="pricing-header-block reveal-up">
+      <div>
+        <span class="landing-eyebrow">Pricing</span>
+        <h2 class="landing-h2">Simple, publication-aligned plans.</h2>
+        <p class="landing-body">
+          Start with a free preview link. Upgrade per model when the viewer and QR need to stay active alongside the publication.
+        </p>
+      </div>
+      <div class="pricing-context-stats" aria-label="Plan duration summary">
         <div>
           <div class="pricing-stat-value">3 days</div>
-          <div class="pricing-stat-label">Free link duration</div>
+          <div class="pricing-stat-label">Free preview</div>
         </div>
         <div>
           <div class="pricing-stat-value">3 years</div>
-          <div class="pricing-stat-label">Paid link duration</div>
+          <div class="pricing-stat-label">Academic access</div>
         </div>
         <div>
-          <div class="pricing-stat-value">One-time</div>
-          <div class="pricing-stat-label">No subscription</div>
+          <div class="pricing-stat-value">10 years</div>
+          <div class="pricing-stat-label">Extended archive</div>
         </div>
       </div>
     </div>
 
-    <!-- Right: plan cards -->
     <div class="pricing-cards-col">
       <div class="pricing-card reveal-up delay-1">
-        <span class="pricing-eyebrow">Temporary</span>
+        <div class="pricing-card-top">
+          <span class="pricing-eyebrow">Free Access</span>
+          <span class="pricing-meta">3-day active</span>
+        </div>
         <h3 class="pricing-price">$0</h3>
-        <p class="pricing-period">Free preview link</p>
+        <p class="pricing-period">For quick model previews before committing to long-term access.</p>
         <ul class="pricing-features">
-          <li>3-day active link</li>
-          <li>QR code</li>
-          <li>3D viewing</li>
+          <li>3-day active AR & QR access</li>
+          <li>1 interactive model</li>
+          <li>Up to 100 MB storage</li>
           <li>Screenshot capture</li>
+          <li>Watermarked viewer</li>
         </ul>
         <a href="{{ url_for('auth.register') }}" class="pricing-cta">Start free</a>
         <p class="pricing-microcopy">No credit card required</p>
       </div>
 
-      <div class="pricing-card featured-pricing reveal-up delay-2">
-        <span class="pricing-badge">Recommended</span>
-        <span class="pricing-eyebrow">Academic Package</span>
-        <h3 class="pricing-price">$10</h3>
-        <p class="pricing-period">One-time, per publication</p>
+      <div class="pricing-card reveal-up delay-2">
+        <div class="pricing-card-top">
+          <span class="pricing-eyebrow">Academic</span>
+          <span class="pricing-meta">3-year active</span>
+        </div>
+        <h3 class="pricing-price">$9.90</h3>
+        <p class="pricing-period">One-time, per model. Built for papers, posters, and thesis links.</p>
         <ul class="pricing-features">
-          <li>3-year active link</li>
-          <li>Persistent QR code</li>
-          <li>Public sharing</li>
-          <li>Multiple model support</li>
-          <li>Publication metadata fields</li>
+          <li>3-year active AR & QR access</li>
+          <li>1 interactive model</li>
+          <li>Up to 200 MB storage</li>
+          <li>No watermark</li>
+          <li>Persistent QR & viewer URL</li>
         </ul>
-        <a href="{{ url_for('auth.register') }}" class="pricing-cta">Get package</a>
+        <a href="{{ url_for('auth.register') }}" class="pricing-cta">Get started</a>
         <p class="pricing-microcopy">Billed once at activation</p>
       </div>
+
+      <div class="pricing-card featured-pricing reveal-up delay-3">
+        <span class="pricing-badge">Recommended</span>
+        <div class="pricing-card-top">
+          <span class="pricing-eyebrow">Extended Archive</span>
+          <span class="pricing-meta">10-year active</span>
+        </div>
+        <h3 class="pricing-price">$24.90</h3>
+        <p class="pricing-period">One-time, per model. Longer access for long-lived academic references.</p>
+        <ul class="pricing-features">
+          <li>10-year active AR & QR access</li>
+          <li>Priority archival storage</li>
+          <li>Guided viewing</li>
+          <li>Saved camera views</li>
+          <li>Rich metadata fields</li>
+        </ul>
+        <a href="{{ url_for('auth.register') }}" class="pricing-cta">Get started</a>
+        <p class="pricing-microcopy">Renewable after 10 years</p>
+      </div>
     </div>
+  </div>
+</section>
+
+<!-- INSTITUTIONAL LICENSING -->
+<section class="landing-section" id="institutional">
+  <div class="institutional-grid">
+    <div class="institutional-copy reveal-up">
+      <span class="landing-eyebrow">Institutional licensing</span>
+      <h2 class="landing-h2">For labs, research groups, and universities.</h2>
+      <p class="landing-body">
+        AcademicAR can support multi-user workspaces, shared publication management, higher model limits, and custom deployment requirements through a sales-led institutional package.
+      </p>
+      <a href="mailto:hello@academicar.com?subject=AcademicAR%20Institutional%20Licensing" class="pricing-cta institutional-cta">Contact sales</a>
+      <span class="institutional-note">Custom pricing for shared labs, cohorts, and infrastructure needs.</span>
+    </div>
+    <ul class="institutional-list reveal-up delay-2">
+      <li>
+        <strong>Team workspace</strong>
+        <span>Shared dashboards, role-based publishing, and lab-wide model management.</span>
+      </li>
+      <li>
+        <strong>Bulk model licensing</strong>
+        <span>Pre-purchased model credits for recurring publication and thesis workflows.</span>
+      </li>
+      <li>
+        <strong>Custom infrastructure</strong>
+        <span>Higher upload limits, dedicated support, and domain or storage alignment.</span>
+      </li>
+      <li>
+        <strong>Procurement-ready</strong>
+        <span>Custom invoicing, institutional contracts, and renewal planning.</span>
+      </li>
+    </ul>
   </div>
 </section>
 
@@ -277,10 +335,10 @@
     </div>
     <div class="faq-list reveal-up delay-2">
       {% for qa in [
-        ('Which file formats can I upload?', 'STL and GLB today. OBJ support is planned for the next converter pass.'),
+        ('Which file formats can I upload?', 'GLB, STL, OBJ, and FBX are supported. OBJ/FBX are converted to AR-ready GLB.'),
         ('Do my readers need an app for AR?', 'No. Modern iOS and Android browsers open AR directly via Quick Look (USDZ) and Scene Viewer.'),
         ('Are uploads private by default?', 'Yes. You control visibility per publication and can keep models unlisted before paper acceptance.'),
-        ('What happens after the 3-year window?', 'Paid publications stay archived; readers see a notice that the live AR viewer is paused.')
+        ('What happens after the access window?', 'The QR resolver stays stable. Readers see a controlled renewal notice instead of a dead link.')
       ] %}
         <div class="faq-item">
           <h3 class="faq-q">{{ qa[0] }}</h3>

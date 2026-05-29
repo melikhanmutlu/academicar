@@ -12,9 +12,9 @@
       <div class="relative">
         <span class="eyebrow bg-white/10 text-white border-white/15">{{ 'Publication settings' if is_edit else 'Publication setup' }}</span>
         <h1 class="font-serif text-4xl lg:text-5xl font-bold text-white mt-5 leading-tight">{{ 'Edit publication details.' if is_edit else 'Create a publication page.' }}</h1>
-        <p class="text-white/60 mt-4 leading-relaxed">{{ 'Update title, authors, institution, identifiers, package, or attached PDF.' if is_edit else 'Add academic metadata first. Model upload, QR generation, screenshots, and AR viewing are handled on the publication detail screen.' }}</p>
+        <p class="text-white/60 mt-4 leading-relaxed">{{ 'Update title, authors, institution, identifiers, package, or attached PDF.' if is_edit else 'Add academic metadata and optionally attach the first model in the same step.' }}</p>
         <div class="mt-8 space-y-3 text-sm">
-          {% for item in ['Publication metadata', 'DOI / PMID fields', 'Public / Private visibility', 'Model upload after save'] %}
+          {% for item in ['Publication metadata', 'DOI / PMID fields', 'Public / Private visibility', 'Optional first model upload'] %}
             <div class="flex items-center gap-3 rounded-lg bg-white/[0.06] border border-white/10 p-3">
               <span class="w-2 h-2 rounded-full bg-white"></span>
               <span class="text-white/80">{{ item }}</span>
@@ -24,8 +24,23 @@
       </div>
     </aside>
 
-    <form method="POST" enctype="multipart/form-data" class="surface rounded-xl p-6 sm:p-8 space-y-6">
+    <form method="POST" enctype="multipart/form-data" class="surface rounded-xl p-6 sm:p-8 space-y-6" data-upload-form>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <!-- Metadata Autofill Bar -->
+      <div class="rounded-xl border border-[#e8e8e8] bg-[#f8f8f8] p-5 space-y-3">
+        <label class="block text-xs uppercase tracking-wider font-semibold text-[#64748b]">Autofill via DOI or PMID</label>
+        <div class="flex flex-col sm:flex-row gap-3">
+          <input type="text" id="autofillQuery" placeholder="Enter DOI (e.g. 10.1148/radiol.210408) or PMID" class="field-input !py-2 flex-1 text-sm bg-white" aria-label="DOI or PMID input">
+          <button type="button" id="autofillBtn" class="rounded bg-[#111827] text-white px-5 py-2 hover:bg-[#202020] text-sm font-semibold transition flex items-center justify-center gap-2">
+            <span id="autofillSpinner" class="hidden h-4.5 w-4.5 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
+            <span id="autofillText">Fetch Metadata</span>
+          </button>
+        </div>
+        <p class="text-xs text-[#5c6473]">Instantly populates Title, Authors, Year, Abstract, and identifiers using Crossref and PubMed APIs.</p>
+        <div id="autofillStatus" class="hidden text-xs font-semibold"></div>
+      </div>
+
       <div>
         <label class="field-label">Title <span class="text-red-500">*</span></label>
         <input type="text" name="title" value="{{ form.get('title', '') }}" required class="field-input text-lg" placeholder="Full title of the publication or project">
@@ -92,9 +107,66 @@
 
       <label class="block rounded-xl border border-dashed border-[#111827]/25 bg-white/55 p-5 cursor-pointer hover:bg-white/75 transition">
         <span class="block font-semibold text-[#111827]">{{ 'Replace PDF' if is_edit and paper.pdf_path else 'Attach PDF' }}</span>
-        <span class="block text-sm text-[#5c6473] mt-1">PDF files are only downloadable by the publication owner.{% if is_edit and paper.pdf_path %} Leave empty to keep the current PDF.{% endif %}</span>
+        <span class="block text-sm text-[#5c6473] mt-1">Optional PDF upload. PDF files are only downloadable by the publication owner.{% if is_edit and paper.pdf_path %} Leave empty to keep the current PDF.{% endif %}</span>
         <input type="file" name="pdf" accept=".pdf" class="mt-4 w-full text-sm text-[#5c6473] file:mr-3 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-[#111827] file:text-white file:font-semibold">
       </label>
+
+      {% if not is_edit %}
+        <section class="rounded-xl border border-[#e8e8e8] bg-[#f8f8f8] p-5 space-y-4">
+          <div>
+            <span class="eyebrow">Optional model</span>
+            <h2 class="font-serif text-2xl font-semibold text-[#111827] mt-3">Attach the first model</h2>
+            <p class="text-sm text-[#5c6473] mt-2">You can create the publication first and upload later, or attach the first GLB, STL, OBJ, or FBX file now.</p>
+          </div>
+
+          <label class="upload-dropzone">
+            <span class="block text-[#111827] font-semibold">Select model file</span>
+            <span class="block text-sm text-[#64748b] mt-1" data-dropzone-copy>Drag and drop a model here, or choose a file. The model gets its own license, QR resolver link, and processing job.</span>
+            <input type="file" name="model_file" accept=".glb,.stl,.obj,.fbx" class="mt-4 w-full text-sm text-[#64748b] file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:bg-[#111827] file:text-white file:font-bold" data-dropzone-input>
+          </label>
+
+          <div class="companion-files-section" data-companion-section style="display: none;">
+            <label class="field-label">MTL and Texture files <span class="text-[#64748b] font-normal">(optional companion files for OBJ)</span></label>
+            <input type="file" name="model_companion_files" multiple accept=".mtl,.png,.jpg,.jpeg,.webp" class="mt-1 w-full text-sm text-[#64748b] file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:bg-[#efefef] file:text-[#202020] file:font-semibold" data-companion-input>
+            <p class="text-xs text-[#5c6473] mt-2">Upload the material (.mtl) and texture images (.png, .jpg) referenced by the .obj file.</p>
+          </div>
+
+          <div class="grid sm:grid-cols-2 gap-4">
+            <input type="text" name="model_display_name" placeholder="Model name" class="field-input">
+            <input type="text" name="model_description" placeholder="Short model note" class="field-input">
+          </div>
+
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label class="field-label">Model license</label>
+              <select name="license_type" class="field-select">
+                <option value="free">Free Access - $0, 3-day access, up to 100 MB</option>
+                <option value="academic">Academic - $9.90 / model, 3-year access, up to 200 MB</option>
+                <option value="extended_archive">Extended Archive - $24.90 / model, 10-year access, up to 200 MB</option>
+              </select>
+            </div>
+            <div>
+              <label class="field-label">Source unit</label>
+              <select name="source_unit" class="field-select">
+                <option value="auto" selected>Auto-detect</option>
+                <option value="mm">Millimeters</option>
+                <option value="cm">Centimeters</option>
+                <option value="m">Meters</option>
+              </select>
+            </div>
+          </div>
+
+          <label class="flex items-center gap-3 text-sm text-[#64748b]">
+            <span>Model color</span>
+            <input type="color" name="color" value="#cccccc" class="h-10 w-16 rounded border border-[#e2e8f0] bg-transparent">
+          </label>
+
+          <label class="flex items-start gap-3 rounded-xl border border-[#e2e8f0] bg-white p-4 text-sm text-[#475569]">
+            <input type="checkbox" name="compliance_confirm" value="yes" class="mt-1">
+            <span>I confirm that this model has been anonymized, that I have the right to share/publish it, and that I am responsible for all required ethical approval and consent processes.</span>
+          </label>
+        </section>
+      {% endif %}
 
       <div class="flex items-center justify-end gap-3 pt-4 border-t border-[#141821]/10">
         <a href="{{ url_for('paper_detail', slug=paper.slug) if is_edit else url_for('dashboard') }}" class="btn-secondary">Cancel</a>
@@ -103,4 +175,187 @@
     </form>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const uploadForm = document.querySelector('[data-upload-form]');
+  if (uploadForm) {
+    const dropzone = uploadForm.querySelector('.upload-dropzone');
+    const fileInput = uploadForm.querySelector('[data-dropzone-input]');
+    const dropzoneCopy = uploadForm.querySelector('[data-dropzone-copy]');
+    const companionSection = uploadForm.querySelector('[data-companion-section]');
+    const companionInput = uploadForm.querySelector('[data-companion-input]');
+    const modelExtensions = ['glb', 'stl', 'obj', 'fbx'];
+    const companionExtensions = ['mtl', 'png', 'jpg', 'jpeg', 'webp'];
+
+    const extensionFor = (file) => {
+      const name = file && file.name ? file.name : '';
+      return name.includes('.') ? name.split('.').pop().toLowerCase() : '';
+    };
+
+    const buildFileList = (files) => {
+      try {
+        const transfer = new DataTransfer();
+        files.forEach((file) => transfer.items.add(file));
+        return transfer.files;
+      } catch (error) {
+        return null;
+      }
+    };
+
+    const setFiles = (input, files, fallbackFileList = null) => {
+      if (!input || !files.length) return false;
+      const fileList = buildFileList(files);
+      if (fileList) {
+        input.files = fileList;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+      }
+      if (fallbackFileList && files[0] === fallbackFileList[0]) {
+        input.files = fallbackFileList;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+      }
+      if (dropzoneCopy) dropzoneCopy.textContent = 'Please choose the model file with the file picker.';
+      if (dropzone) dropzone.classList.add('is-invalid');
+      return false;
+    };
+
+    const clearFiles = (input) => {
+      if (!input || !input.files.length) return;
+      const fileList = buildFileList([]);
+      if (!fileList) return;
+      input.files = fileList;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+
+    const updateDropzoneState = () => {
+      const selectedFile = fileInput && fileInput.files.length ? fileInput.files[0] : null;
+      const selectedName = selectedFile ? selectedFile.name : '';
+      if (dropzoneCopy && selectedName) {
+        const companionCount = companionInput && companionInput.files ? companionInput.files.length : 0;
+        dropzoneCopy.textContent = companionCount
+          ? `${selectedName} + ${companionCount} companion file${companionCount > 1 ? 's' : ''}`
+          : selectedName;
+      }
+      if (dropzone) dropzone.classList.remove('is-invalid');
+      if (companionSection) {
+        companionSection.style.display = selectedName.toLowerCase().endsWith('.obj') ? '' : 'none';
+      }
+    };
+
+    const applyDroppedFiles = (files) => {
+      const originalFileList = files || null;
+      const dropped = Array.from(files || []);
+      const modelFiles = dropped.filter((file) => modelExtensions.includes(extensionFor(file)));
+      const companionFiles = dropped.filter((file) => companionExtensions.includes(extensionFor(file)));
+      if (!modelFiles.length) {
+        if (dropzoneCopy) dropzoneCopy.textContent = 'Please choose a GLB, STL, OBJ, or FBX model file.';
+        if (dropzone) dropzone.classList.add('is-invalid');
+        return;
+      }
+      if (!setFiles(fileInput, [modelFiles[0]], originalFileList)) return;
+      if (companionInput) {
+        if (companionFiles.length) setFiles(companionInput, companionFiles);
+        else clearFiles(companionInput);
+      }
+      updateDropzoneState();
+    };
+
+    if (dropzone && fileInput) {
+      ['dragenter', 'dragover'].forEach((eventName) => {
+        dropzone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          dropzone.classList.add('is-drag-over');
+        });
+      });
+      ['dragleave', 'drop'].forEach((eventName) => {
+        dropzone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          dropzone.classList.remove('is-drag-over');
+        });
+      });
+      dropzone.addEventListener('drop', (event) => {
+        if (!event.dataTransfer || !event.dataTransfer.files.length) return;
+        applyDroppedFiles(event.dataTransfer.files);
+      });
+      fileInput.addEventListener('change', () => {
+        updateDropzoneState();
+      });
+    }
+
+    if (companionInput) companionInput.addEventListener('change', updateDropzoneState);
+  }
+
+  // DOI / PMID Autofill Logic
+  (function() {
+    const autofillBtn = document.getElementById('autofillBtn');
+    const autofillQuery = document.getElementById('autofillQuery');
+    const autofillSpinner = document.getElementById('autofillSpinner');
+    const autofillText = document.getElementById('autofillText');
+    const autofillStatus = document.getElementById('autofillStatus');
+
+    if (autofillBtn && autofillQuery) {
+      autofillBtn.addEventListener('click', async () => {
+        const query = autofillQuery.value.trim();
+        if (!query) {
+          showStatus('Please enter a DOI or PMID first.', 'text-red-500');
+          return;
+        }
+
+        setLoading(true);
+        showStatus('Fetching metadata...', 'text-[#64748b]');
+
+        try {
+          const response = await fetch('/papers/fetch-metadata', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': '{{ csrf_token() }}'
+            },
+            body: JSON.stringify({ query })
+          });
+
+          const data = await response.json();
+          if (response.ok && data.success) {
+            if (data.title) document.querySelector('[name="title"]').value = data.title;
+            if (data.authors) document.querySelector('[name="authors"]').value = data.authors;
+            if (data.year) document.querySelector('[name="year"]').value = data.year;
+            if (data.doi) document.querySelector('[name="doi"]').value = data.doi;
+            if (data.pmid) document.querySelector('[name="pmid"]').value = data.pmid;
+            if (data.abstract) document.querySelector('[name="abstract"]').value = data.abstract;
+            if (data.institution) document.querySelector('[name="institution"]').value = data.institution;
+
+            showStatus('Metadata populated successfully!', 'text-green-600');
+          } else {
+            showStatus(data.error || 'Failed to fetch metadata. Please verify the DOI/PMID.', 'text-red-500');
+          }
+        } catch (error) {
+          showStatus('Network error occurred. Please try again.', 'text-red-500');
+        } finally {
+          setLoading(false);
+        }
+      });
+
+      function showStatus(msg, colorClass) {
+        autofillStatus.textContent = msg;
+        autofillStatus.className = `text-xs font-semibold mt-1 ${colorClass}`;
+        autofillStatus.classList.remove('hidden');
+      }
+
+      function setLoading(isLoading) {
+        if (isLoading) {
+          autofillSpinner.classList.remove('hidden');
+          autofillText.textContent = 'Fetching...';
+          autofillBtn.disabled = true;
+        } else {
+          autofillSpinner.classList.add('hidden');
+          autofillText.textContent = 'Fetch Metadata';
+          autofillBtn.disabled = false;
+        }
+      }
+    }
+  })();
+</script>
 {% endblock %}

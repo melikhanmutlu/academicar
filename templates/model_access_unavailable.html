@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Model access - AcademicAR{% endblock %}
+
+{% block content %}
+<main class="page-shell">
+  <section class="stack-lg" style="max-width: 760px; padding: 72px 0;">
+    <div class="eyebrow">Model access</div>
+    <h1 class="page-title">
+      {% if status == "expired" %}
+        This model link has expired.
+      {% elif status == "queued" or status == "processing" %}
+        This model is still processing.
+      {% elif status == "failed" %}
+        This model could not be processed.
+      {% else %}
+        This model is unavailable.
+      {% endif %}
+    </h1>
+    <p class="page-subtitle">
+      The QR and viewer URL are still managed by AcademicAR. The publication owner can renew,
+      upgrade, or replace the model without changing this public link.
+    </p>
+
+    <div class="panel subtle-panel">
+      <div class="meta-grid">
+        <div>
+          <span class="meta-label">Publication</span>
+          <strong>{{ paper.title }}</strong>
+        </div>
+        <div>
+          <span class="meta-label">Model</span>
+          <strong>{{ model.display_name or model.original_filename or "3D model" }}</strong>
+        </div>
+        <div>
+          <span class="meta-label">Current plan</span>
+          <strong>{{ get_license_plan(model.license_type).label }}</strong>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+{% endblock %}
