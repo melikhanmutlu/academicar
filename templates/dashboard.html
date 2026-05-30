@@ -11,16 +11,29 @@
 {% set step2_done = stats.total_models > 0 %}
 {% set step3_done = papers_with_pdf > 0 %}
 {% set step4_done = papers|selectattr('is_public')|list|length > 0 %}
-{% set show_onboarding = not (step1_done and step2_done and step3_done and step4_done) %}
+{% set show_onboarding = false %}
+{% if admin_view is defined and admin_view %}
+  {% set show_onboarding = false %}
+{% endif %}
 
 <div class="app-shell dashboard-shell py-8">
   <div class="dashboard-header reveal-up">
     <div>
-      <span class="eyebrow">Research workspace</span>
-      <h1>Dashboard</h1>
-      <p>Manage publications, model uploads, and public viewer links.</p>
+      <span class="eyebrow">{{ "Admin user workspace" if admin_view is defined and admin_view else "Research workspace" }}</span>
+      <h1>{{ viewed_user.username ~ "'s dashboard" if admin_view is defined and admin_view else "Dashboard" }}</h1>
+      <p>
+        {% if admin_view is defined and admin_view %}
+          Read-only dashboard view for {{ viewed_user.email }}. Use admin controls for logged changes.
+        {% else %}
+          Manage publications, model uploads, and public viewer links.
+        {% endif %}
+      </p>
     </div>
-    <a href="{{ url_for('paper_new') }}" class="btn-primary shrink-0">+ New Publication</a>
+    {% if admin_view is defined and admin_view %}
+      <a href="{{ url_for('admin_user_detail', user_id=viewed_user.id) }}" class="btn-secondary shrink-0">User detail</a>
+    {% else %}
+      <a href="{{ url_for('paper_new') }}" class="btn-primary shrink-0">+ New Publication</a>
+    {% endif %}
   </div>
 
   {% set public_count = (papers or [])|selectattr('is_public')|list|length %}
@@ -86,8 +99,12 @@
       </p>
     </div>
     <div class="dashboard-upload-actions">
-      <a href="{{ url_for('paper_new') }}" class="btn-primary">New publication + model</a>
-      {% if papers %}
+      {% if admin_view is defined and admin_view %}
+        <a href="{{ url_for('admin_dashboard', admin_page='content') }}" class="btn-secondary">Manage publications</a>
+      {% else %}
+        <a href="{{ url_for('paper_new') }}" class="btn-primary">New publication + model</a>
+      {% endif %}
+      {% if papers and not (admin_view is defined and admin_view) %}
         <a href="{{ url_for('paper_detail', slug=papers[0].slug) }}#add-model" class="btn-secondary">Add model to latest</a>
       {% endif %}
     </div>
@@ -188,6 +205,7 @@
       </div>
 
       {% for p in papers %}
+        {% set paper_href = url_for('paper_public', slug=p.slug) if admin_view is defined and admin_view else url_for('paper_detail', slug=p.slug) %}
         {% set first_model = p.models[0] if p.models else none %}
         {% if p.authors %}
           {% set words = p.authors.replace('Dr. ','').replace('Prof. ','').replace('Dr.','').replace('Prof.','').split() %}
@@ -211,7 +229,7 @@
             <div class="publication-avatar">{{ init }}</div>
             <div class="min-w-0">
               <div class="publication-title-line">
-                <a href="{{ url_for('paper_detail', slug=p.slug) }}">{{ p.title }}</a>
+                <a href="{{ paper_href }}">{{ p.title }}</a>
               </div>
               <p>
                 {{ p.authors if p.authors else '-' }}{% if p.institution %}<span> · </span>{{ p.institution }}{% endif %}
@@ -238,9 +256,14 @@
             {% else %}
               <span class="btn-secondary compact opacity-50 cursor-not-allowed" aria-disabled="true" title="No PDF uploaded">PDF</span>
             {% endif %}
-            <a href="{{ url_for('paper_edit', slug=p.slug) }}" class="btn-secondary compact">Edit</a>
-            <a href="{{ url_for('paper_detail', slug=p.slug) }}#add-model" class="btn-secondary compact">Add model</a>
-            <a href="{{ url_for('paper_detail', slug=p.slug) }}" class="btn-secondary compact">Details</a>
+            {% if admin_view is defined and admin_view %}
+              <a href="{{ url_for('paper_public', slug=p.slug) }}" target="_blank" rel="noopener noreferrer" class="btn-secondary compact">Open</a>
+              <a href="{{ url_for('admin_dashboard', admin_page='content') }}" class="btn-secondary compact">Manage</a>
+            {% else %}
+              <a href="{{ url_for('paper_edit', slug=p.slug) }}" class="btn-secondary compact">Edit</a>
+              <a href="{{ url_for('paper_detail', slug=p.slug) }}#add-model" class="btn-secondary compact">Add model</a>
+              <a href="{{ url_for('paper_detail', slug=p.slug) }}" class="btn-secondary compact">Details</a>
+            {% endif %}
           </div>
         </div>
       {% endfor %}

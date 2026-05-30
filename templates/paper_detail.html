@@ -112,7 +112,7 @@
     </aside>
   </section>
 
-  <section class="mb-8">
+  <section class="mb-8" data-model-registry>
     <div class="flex items-end justify-between gap-4 mb-5">
       <div>
         <h2 class="font-serif text-3xl font-semibold text-[#111827] mt-3">Model registry</h2>
@@ -213,14 +213,14 @@
 
   <section id="add-model" class="mb-8 reveal-up">
     {% if paper.models %}
-      <details class="surface rounded-xl p-0 overflow-hidden">
-        <summary class="upload-summary">
+      <div class="surface rounded-xl p-0 overflow-hidden upload-panel-prominent">
+        <div class="upload-summary upload-summary-static">
           <span>
             <strong>Add another model</strong>
             <small>Upload an additional model for this publication. Each model keeps its own license and QR.</small>
           </span>
           <span class="upload-chevron" aria-hidden="true">+</span>
-        </summary>
+        </div>
         <div class="border-t border-[#e2e8f0] p-6 sm:p-8">
     {% else %}
       <div class="surface rounded-xl p-6 sm:p-8">
@@ -286,7 +286,7 @@
           </div>
     {% if paper.models %}
         </div>
-      </details>
+      </div>
     {% else %}
       </div>
     {% endif %}
@@ -296,6 +296,12 @@
 
 {% block scripts %}
 <script>
+  const uploadSection = document.getElementById('add-model');
+  const modelRegistry = document.querySelector('[data-model-registry]');
+  if (uploadSection && modelRegistry) {
+    modelRegistry.parentNode.insertBefore(uploadSection, modelRegistry);
+  }
+
   const uploadForm = document.querySelector('[data-upload-form]');
   if (uploadForm) {
     const dropzone = uploadForm.querySelector('.upload-dropzone');

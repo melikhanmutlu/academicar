@@ -2,71 +2,736 @@
 {% block title %}Admin - AcademicAR{% endblock %}
 
 {% block content %}
-<main class="app-shell py-10">
-  <div class="flex flex-wrap items-end justify-between gap-4 mb-8">
+<div class="app-shell admin-shell">
+  <div class="admin-header">
     <div>
       <span class="eyebrow">Admin</span>
-      <h1 class="page-title mt-4">AcademicAR control panel</h1>
-      <p class="page-subtitle">Monitor users, publications, model licenses, QR resolver records, and billing events.</p>
+      <h1>AcademicAR control panel</h1>
+      <p>Monitor platform health, review records, and run operational fixes from one place.</p>
     </div>
-    <a href="{{ url_for('dashboard') }}" class="btn-secondary">Back to dashboard</a>
+    <div class="admin-header-actions">
+      <a href="{{ url_for('dashboard') }}" class="btn-secondary">Dashboard</a>
+      <a href="{{ url_for('paper_new') }}" class="btn-primary">New publication</a>
+    </div>
   </div>
 
-  <section class="stats-grid mb-8">
-    <div class="stat-card">
+  <section class="admin-metrics">
+    <div class="admin-metric">
       <span>Users</span>
-      <strong>{{ users|length }}</strong>
+      <strong>{{ totals.users }}</strong>
+      <small>{{ totals.admins }} admins</small>
     </div>
-    <div class="stat-card">
+    <div class="admin-metric">
       <span>Publications</span>
-      <strong>{{ papers|length }}</strong>
+      <strong>{{ totals.papers }}</strong>
+      <small>{{ totals.public_papers }} public</small>
     </div>
-    <div class="stat-card">
+    <div class="admin-metric">
       <span>Models</span>
-      <strong>{{ models|length }}</strong>
+      <strong>{{ totals.models }}</strong>
+      <small>{{ totals.active_models }} active</small>
     </div>
-    <div class="stat-card">
+    <div class="admin-metric">
       <span>QR records</span>
-      <strong>{{ qr_links|length }}</strong>
+      <strong>{{ totals.qr_links }}</strong>
+      <small>Resolver inventory</small>
+    </div>
+    <div class="admin-metric">
+      <span>Payments</span>
+      <strong>{{ totals.payments }}</strong>
+      <small>{{ "%.2f"|format(totals.paid_revenue / 100) }} TRY paid</small>
+    </div>
+    <div class="admin-metric">
+      <span>Jobs</span>
+      <strong>{{ totals.pending_jobs }}</strong>
+      <small>{{ totals.failed_jobs }} failed</small>
     </div>
   </section>
 
-  <section class="surface rounded-xl p-6 mb-6">
-    <h2 class="font-serif text-2xl font-semibold text-[#111827]">Models and licenses</h2>
-    <div class="table-wrap mt-5">
-      <table class="data-table">
+  <nav class="admin-tabs" aria-label="Admin sections">
+    <a href="{{ url_for('admin_dashboard') }}" class="{% if active_page == 'overview' %}is-active{% endif %}">Overview</a>
+    <a href="{{ url_for('admin_dashboard', admin_page='users') }}" class="{% if active_page == 'users' %}is-active{% endif %}">Users</a>
+    <a href="{{ url_for('admin_dashboard', admin_page='content') }}" class="{% if active_page == 'content' %}is-active{% endif %}">Content</a>
+    <a href="{{ url_for('admin_dashboard', admin_page='models') }}" class="{% if active_page == 'models' %}is-active{% endif %}">Models</a>
+    <a href="{{ url_for('admin_dashboard', admin_page='access') }}" class="{% if active_page == 'access' %}is-active{% endif %}">QR & Access</a>
+    <a href="{{ url_for('admin_dashboard', admin_page='revenue') }}" class="{% if active_page == 'revenue' %}is-active{% endif %}">Revenue</a>
+    <a href="{{ url_for('admin_dashboard', admin_page='security') }}" class="{% if active_page == 'security' %}is-active{% endif %}">Security</a>
+    <a href="{{ url_for('admin_dashboard', admin_page='storage') }}" class="{% if active_page == 'storage' %}is-active{% endif %}">Storage</a>
+    <a href="{{ url_for('admin_dashboard', admin_page='logs') }}" class="{% if active_page == 'logs' %}is-active{% endif %}">Logs</a>
+    <a href="{{ url_for('admin_dashboard', admin_page='backups') }}" class="{% if active_page == 'backups' %}is-active{% endif %}">Backups</a>
+  </nav>
+
+  {% if active_page == "overview" %}
+  <section id="overview" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Operations overview</h2>
+        <p>Growth, conversion health, storage, billing, and QR activity signals.</p>
+      </div>
+      <span>Live snapshot</span>
+    </div>
+    <div class="admin-insight-grid">
+      <div class="admin-insight-card">
+        <span>Growth</span>
+        <strong>{{ stats.new_users_7d }}</strong>
+        <small>new users in 7 days / {{ stats.new_users_30d }} in 30 days</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Content</span>
+        <strong>{{ stats.new_papers_30d }}</strong>
+        <small>new publications in 30 days / {{ stats.public_ratio }}% public</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Model intake</span>
+        <strong>{{ stats.new_models_30d }}</strong>
+        <small>new models in 30 days</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Storage</span>
+        <strong>{{ format_file_size(stats.total_model_storage) }}</strong>
+        <small>{{ format_file_size(stats.storage_average) }} average per model</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Revenue</span>
+        <strong>{{ "%.2f"|format(stats.revenue_30_days / 100) }}</strong>
+        <small>TRY paid in the last 30 days</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Security</span>
+        <strong>{{ stats.failed_login_24h }}</strong>
+        <small>failed logins in 24 hours</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>QR activity</span>
+        <strong>{{ stats.qr_resolved_30d }}</strong>
+        <small>QR records resolved in 30 days</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>PDF coverage</span>
+        <strong>{{ stats.papers_with_pdf }}</strong>
+        <small>publications with PDFs</small>
+      </div>
+    </div>
+
+    <div class="admin-breakdown-grid">
+      <div class="admin-breakdown">
+        <h3>Conversion health</h3>
+        {% for status in ["ready", "queued", "processing", "failed", "replacement_failed"] %}
+          <div><span>{{ status|replace("_", " ")|title }}</span><strong>{{ processing_counts.get(status, 0) }}</strong></div>
+        {% endfor %}
+      </div>
+      <div class="admin-breakdown">
+        <h3>Licenses</h3>
+        {% for key, plan in license_plans.items() %}
+          <div><span>{{ plan.label }}</span><strong>{{ license_counts.get(key, 0) }}</strong></div>
+        {% endfor %}
+      </div>
+      <div class="admin-breakdown">
+        <h3>Source formats</h3>
+        {% for format, count in source_format_counts.items() %}
+          <div><span>{{ format|upper }}</span><strong>{{ count }}</strong></div>
+        {% else %}
+          <div><span>No formats</span><strong>0</strong></div>
+        {% endfor %}
+      </div>
+      <div class="admin-breakdown">
+        <h3>Payments</h3>
+        {% for status in ["pending", "paid", "failed", "refunded"] %}
+          <div><span>{{ status|title }}</span><strong>{{ payment_counts.get(status, 0) }}</strong></div>
+        {% endfor %}
+      </div>
+      <div class="admin-breakdown">
+        <h3>Job queue</h3>
+        {% for status in ["pending", "processing", "completed", "failed"] %}
+          <div><span>{{ status|title }}</span><strong>{{ job_counts.get(status, 0) }}</strong></div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="admin-watch-grid">
+      <div>
+        <h3>Largest models</h3>
+        <ul class="admin-watch-list">
+          {% for model in largest_models %}
+            <li>
+              <span>{{ model.display_name or model.original_filename or model.id }}</span>
+              <strong>{{ format_file_size(model.file_size) }}</strong>
+            </li>
+          {% else %}
+            <li><span>No model files yet.</span><strong>-</strong></li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div>
+        <h3>Licenses expiring in 30 days</h3>
+        <ul class="admin-watch-list">
+          {% for model in expiring_models %}
+            <li>
+              <span>{{ model.display_name or model.original_filename or model.id }}</span>
+              <strong>{{ model.access_expires_at.strftime("%Y-%m-%d") if model.access_expires_at else "-" }}</strong>
+            </li>
+          {% else %}
+            <li><span>No licenses expiring soon.</span><strong>-</strong></li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if active_page == "content" %}
+  <section id="content-stats" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Content and publication statistics</h2>
+        <p>Publication coverage, identifiers, field distribution, and 7/30 day publishing trend.</p>
+      </div>
+      <span>Editorial analytics</span>
+    </div>
+    <div class="admin-insight-grid">
+      <div class="admin-insight-card">
+        <span>Public / private</span>
+        <strong>{{ totals.public_papers }} / {{ stats.private_papers }}</strong>
+        <small>{{ stats.public_ratio }}% public visibility</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>PDF coverage</span>
+        <strong>{{ stats.papers_with_pdf }} / {{ stats.papers_without_pdf }}</strong>
+        <small>attached / missing publication PDFs</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>DOI / PMID</span>
+        <strong>{{ stats.papers_with_doi }} / {{ stats.papers_with_pmid }}</strong>
+        <small>identifier usage across records</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Publishing trend</span>
+        <strong>{{ stats.new_papers_7d }} / {{ stats.new_papers_30d }}</strong>
+        <small>new publications in 7 / 30 days</small>
+      </div>
+    </div>
+    <div class="admin-two-col">
+      <div class="admin-breakdown">
+        <h3>Fields</h3>
+        {% for field, count in field_counts.items() %}
+          <div><span>{{ field }}</span><strong>{{ count }}</strong></div>
+        {% else %}
+          <div><span>No field data</span><strong>0</strong></div>
+        {% endfor %}
+      </div>
+      <div class="admin-breakdown">
+        <h3>30-day publication trend</h3>
+        <div class="admin-sparkline" aria-label="Publication trend">
+          {% for point in daily_publication_trend %}
+            <span title="{{ point.label }}: {{ point.count }}" style="height: {{ 6 + (point.count * 14) }}px"></span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if active_page == "models" %}
+  <section id="model-health" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Model and conversion health</h2>
+        <p>Processing state, failed formats, conversion timing, error messages, and file-limit warnings.</p>
+      </div>
+      <span>Pipeline health</span>
+    </div>
+    <div class="admin-insight-grid">
+      <div class="admin-insight-card">
+        <span>Ready</span>
+        <strong>{{ processing_counts.get("ready", 0) }}</strong>
+        <small>viewer-ready models</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Queued / processing</span>
+        <strong>{{ processing_counts.get("queued", 0) }} / {{ processing_counts.get("processing", 0) }}</strong>
+        <small>models waiting or converting</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Failed</span>
+        <strong>{{ processing_counts.get("failed", 0) }}</strong>
+        <small>{{ processing_counts.get("replacement_failed", 0) }} replacement failures</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Avg conversion</span>
+        <strong>{{ stats.average_conversion_seconds }}s</strong>
+        <small>completed job average</small>
+      </div>
+    </div>
+    <div class="admin-two-col">
+      <div class="admin-breakdown">
+        <h3>Failed formats</h3>
+        {% for format, count in failed_format_counts.items() %}
+          <div><span>{{ format|upper }}</span><strong>{{ count }}</strong></div>
+        {% else %}
+          <div><span>No failed formats</span><strong>0</strong></div>
+        {% endfor %}
+      </div>
+      <div class="admin-breakdown">
+        <h3>Near file limits</h3>
+        {% for model in near_limit_models %}
+          <div><span>{{ model.display_name or model.original_filename or model.id }}</span><strong>{{ format_file_size(model.file_size) }} / {{ format_file_size(model.storage_limit_bytes) }}</strong></div>
+        {% else %}
+          <div><span>No large-file warnings</span><strong>-</strong></div>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="admin-section-subtable">
+      <h3>Failed job messages</h3>
+      <div class="table-wrap">
+        <table class="data-table admin-table">
+          <thead>
+            <tr>
+              <th>Job</th>
+              <th>Format</th>
+              <th>Model</th>
+              <th>Error</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for job in failed_jobs %}
+              <tr>
+                <td>{{ job.job_type|replace("_", " ")|title }}</td>
+                <td>{{ (job.model.source_format if job.model else "unknown")|upper }}</td>
+                <td>{{ job.model_id }}</td>
+                <td>{{ job.error or "-" }}</td>
+              </tr>
+            {% else %}
+              <tr><td colspan="4">No failed jobs.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if active_page == "access" %}
+  <section id="viewer-analytics" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>QR and viewer analytics</h2>
+        <p>Resolver usage, last scan time, viewed models, disabled links, and public viewer trend.</p>
+      </div>
+      <span>Access analytics</span>
+    </div>
+    <div class="admin-insight-grid">
+      <div class="admin-insight-card">
+        <span>QR resolves</span>
+        <strong>{{ stats.qr_resolved_total }}</strong>
+        <small>{{ stats.qr_resolved_30d }} records resolved in 30 days</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Last scan</span>
+        <strong>{{ stats.last_qr_resolved_at.strftime("%m-%d") if stats.last_qr_resolved_at else "-" }}</strong>
+        <small>{{ stats.last_qr_resolved_at.strftime("%Y-%m-%d %H:%M") if stats.last_qr_resolved_at else "No QR scan yet" }}</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Viewer opens</span>
+        <strong>{{ stats.viewer_access_total }}</strong>
+        <small>tracked from now on via audit events</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>QR issues</span>
+        <strong>{{ stats.disabled_qr_count }} / {{ stats.expired_qr_count }}</strong>
+        <small>disabled / expired resolver records</small>
+      </div>
+    </div>
+    <div class="admin-two-col">
+      <div class="admin-breakdown">
+        <h3>Most viewed models</h3>
+        {% for item in top_viewed_models %}
+          <div><span>{{ item.model.display_name if item.model else item.model_id }}</span><strong>{{ item.count }}</strong></div>
+        {% else %}
+          <div><span>No viewer events yet</span><strong>0</strong></div>
+        {% endfor %}
+      </div>
+      <div class="admin-breakdown">
+        <h3>30-day viewer trend</h3>
+        <div class="admin-sparkline" aria-label="Viewer trend">
+          {% for point in daily_viewer_trend %}
+            <span title="{{ point.label }}: {{ point.count }}" style="height: {{ 6 + (point.count * 14) }}px"></span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if active_page == "revenue" %}
+  <section id="license-revenue" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>License and revenue</h2>
+        <p>License distribution, payment states, total revenue, monthly revenue, and upcoming expirations.</p>
+      </div>
+      <span>Commercial analytics</span>
+    </div>
+    <div class="admin-two-col">
+      <div class="admin-breakdown">
+        <h3>License distribution</h3>
+        {% for key, plan in license_plans.items() %}
+          <div><span>{{ plan.label }}</span><strong>{{ license_counts.get(key, 0) }}</strong></div>
+        {% endfor %}
+      </div>
+      <div class="admin-breakdown">
+        <h3>Payment states</h3>
+        {% for status in ["pending", "paid", "failed", "refunded"] %}
+          <div><span>{{ status|title }}</span><strong>{{ payment_counts.get(status, 0) }}</strong></div>
+        {% endfor %}
+        <div><span>Total paid revenue</span><strong>{{ "%.2f"|format(totals.paid_revenue / 100) }} TRY</strong></div>
+      </div>
+    </div>
+    <div class="admin-section-subtable">
+      <h3>Monthly revenue</h3>
+      <div class="admin-bar-chart">
+        {% for month in monthly_revenue %}
+          <div>
+            <span style="height: {{ 8 + (month.amount / 1000)|int }}px"></span>
+            <small>{{ month.label[5:] }}</small>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="admin-section-subtable">
+      <h3>Licenses expiring soon</h3>
+      <ul class="admin-watch-list">
+        {% for model in expiring_models %}
+          <li><span>{{ model.display_name or model.original_filename or model.id }}</span><strong>{{ model.access_expires_at.strftime("%Y-%m-%d") if model.access_expires_at else "-" }}</strong></li>
+        {% else %}
+          <li><span>No licenses expiring soon.</span><strong>-</strong></li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if active_page == "security" %}
+  <section id="security-ops" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Operations and security</h2>
+        <p>Audit filtering, admin actions, failed logins, account events, and critical system alerts.</p>
+      </div>
+      <span>Risk monitor</span>
+    </div>
+    <div class="admin-insight-grid">
+      <div class="admin-insight-card">
+        <span>Admin actions</span>
+        <strong>{{ security_events.admin_actions }}</strong>
+        <small>role, plan, content, model, QR, and billing changes</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Failed logins</span>
+        <strong>{{ security_events.failed_logins }}</strong>
+        <small>{{ stats.failed_login_24h }} in the last 24 hours</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Account events</span>
+        <strong>{{ security_events.account_deleted }}</strong>
+        <small>{{ security_events.email_changed }} email / {{ security_events.password_changed }} password changes</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Critical alerts</span>
+        <strong>{{ critical_alerts|length }}</strong>
+        <small>{{ "Needs attention" if critical_alerts else "No active alerts" }}</small>
+      </div>
+    </div>
+    <div class="admin-breakdown mt-4">
+      <h3>Critical system alerts</h3>
+      {% for alert in critical_alerts %}
+        <div><span>{{ alert }}</span><strong>Review</strong></div>
+      {% else %}
+        <div><span>No critical alerts detected.</span><strong>OK</strong></div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if active_page == "storage" %}
+  <section id="storage" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Storage</h2>
+        <p>Total file usage, user-level storage, file type breakdown, orphan files, and largest models.</p>
+      </div>
+      <span>File inventory</span>
+    </div>
+    <div class="admin-insight-grid">
+      <div class="admin-insight-card">
+        <span>Total model files</span>
+        <strong>{{ format_file_size(stats.total_model_storage) }}</strong>
+        <small>database-reported model upload sizes</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Converted files</span>
+        <strong>{{ format_file_size(storage_breakdown.models.size) }}</strong>
+        <small>{{ storage_breakdown.models.files }} files on disk</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>PDF / QR</span>
+        <strong>{{ format_file_size(storage_breakdown.pdfs.size) }} / {{ format_file_size(storage_breakdown.qr.size) }}</strong>
+        <small>{{ storage_breakdown.pdfs.files }} PDF files / {{ storage_breakdown.qr.files }} QR files</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Orphans</span>
+        <strong>{{ orphan_counts.converted + orphan_counts.pdf + orphan_counts.qr }}</strong>
+        <small>{{ orphan_counts.converted }} model / {{ orphan_counts.pdf }} PDF / {{ orphan_counts.qr }} QR</small>
+      </div>
+    </div>
+    <div class="admin-two-col">
+      <div class="admin-breakdown">
+        <h3>Storage by user</h3>
+        {% for item in storage_by_user %}
+          <div><span>{{ item.user.email if item.user else "User " ~ item.user_id }}</span><strong>{{ format_file_size(item.size) }} / {{ item.models }} models</strong></div>
+        {% else %}
+          <div><span>No user storage yet</span><strong>0 B</strong></div>
+        {% endfor %}
+      </div>
+      <div class="admin-breakdown">
+        <h3>File type breakdown</h3>
+        <div><span>Uploads</span><strong>{{ format_file_size(storage_breakdown.uploads.size) }} / {{ storage_breakdown.uploads.files }}</strong></div>
+        <div><span>Converted models</span><strong>{{ format_file_size(storage_breakdown.models.size) }} / {{ storage_breakdown.models.files }}</strong></div>
+        <div><span>PDFs</span><strong>{{ format_file_size(storage_breakdown.pdfs.size) }} / {{ storage_breakdown.pdfs.files }}</strong></div>
+        <div><span>QR codes</span><strong>{{ format_file_size(storage_breakdown.qr.size) }} / {{ storage_breakdown.qr.files }}</strong></div>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if active_page == "users" %}
+  <section id="users" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Users</h2>
+        <p>Manage account plans and admin access.</p>
+      </div>
+      <span>{{ users|length }} latest</span>
+    </div>
+    <form method="GET" action="{{ url_for('admin_dashboard', admin_page='users') }}" class="admin-filter-bar">
+      <input name="user_q" class="field-input" value="{{ filters.user_q }}" placeholder="Search name or email">
+      <select name="user_plan" class="field-select compact-select">
+        <option value="all" {% if filters.user_plan == "all" %}selected{% endif %}>All plans</option>
+        <option value="free" {% if filters.user_plan == "free" %}selected{% endif %}>Free</option>
+        <option value="academic" {% if filters.user_plan == "academic" %}selected{% endif %}>Academic</option>
+      </select>
+      <select name="user_role" class="field-select compact-select">
+        <option value="all" {% if filters.user_role == "all" %}selected{% endif %}>All roles</option>
+        <option value="admin" {% if filters.user_role == "admin" %}selected{% endif %}>Admins</option>
+        <option value="member" {% if filters.user_role == "member" %}selected{% endif %}>Members</option>
+      </select>
+      <button type="submit" class="btn-secondary compact">Filter users</button>
+      <a href="{{ url_for('admin_dashboard', admin_page='users') }}" class="btn-secondary compact">Clear</a>
+    </form>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
         <thead>
           <tr>
-            <th>Model</th>
             <th>User</th>
-            <th>License</th>
-            <th>Status</th>
-            <th>QR public ID</th>
-            <th>Size</th>
+            <th>Plan</th>
+            <th>Role</th>
+            <th>Created</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          {% for model in models %}
+          {% for user in users %}
             <tr>
-              <td>{{ model.display_name or model.original_filename or model.id }}</td>
-              <td>{{ model.user_id }}</td>
-              <td>{{ get_license_plan(model.license_type).label }}</td>
-              <td>{{ model_access_status(model) }}</td>
-              <td>{{ model.public_id or '-' }}</td>
-              <td>{{ format_file_size(model.file_size) }}</td>
+              <td>
+                <strong><a href="{{ url_for('admin_user_detail', user_id=user.id) }}">{{ user.username }}</a></strong>
+                <small>{{ user.email }}</small>
+              </td>
+              <td><span class="status-chip">{{ user.plan|title }}</span></td>
+              <td><span class="status-chip">{{ "Admin" if user.is_admin else "Member" }}</span></td>
+              <td>{{ user.created_at.strftime("%Y-%m-%d") if user.created_at else "-" }}</td>
+              <td>
+                <div class="admin-actions">
+                  <form method="POST" action="{{ url_for('admin_user_plan_update', user_id=user.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <select name="plan" class="field-select compact-select">
+                      <option value="free" {% if user.plan == "free" %}selected{% endif %}>Free</option>
+                      <option value="academic" {% if user.plan == "academic" %}selected{% endif %}>Academic</option>
+                    </select>
+                    <button type="submit" class="btn-secondary compact">Save plan</button>
+                  </form>
+                  <form method="POST" action="{{ url_for('admin_user_role_update', user_id=user.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="is_admin" value="{{ '0' if user.is_admin else '1' }}">
+                    <button type="submit" class="btn-secondary compact">{{ "Remove admin" if user.is_admin else "Make admin" }}</button>
+                  </form>
+                  <a href="{{ url_for('admin_user_dashboard', user_id=user.id) }}" class="btn-secondary compact">Dashboard</a>
+                </div>
+              </td>
             </tr>
           {% else %}
-            <tr><td colspan="6">No models yet.</td></tr>
+            <tr><td colspan="5">No users yet.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </section>
+  {% endif %}
 
-  <section class="surface rounded-xl p-6 mb-6">
-    <h2 class="font-serif text-2xl font-semibold text-[#111827]">Recent payments</h2>
-    <div class="table-wrap mt-5">
-      <table class="data-table">
+  {% if active_page == "content" %}
+  <section id="papers" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Publications</h2>
+        <p>Control publication visibility and quickly open detail pages.</p>
+      </div>
+      <span>{{ papers|length }} latest</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
+        <thead>
+          <tr>
+            <th>Publication</th>
+            <th>Owner</th>
+            <th>Visibility</th>
+            <th>Status</th>
+            <th>Models</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for paper in papers %}
+            <tr>
+              <td>
+                <strong><a href="{{ url_for('paper_public', slug=paper.slug) }}" target="_blank" rel="noopener noreferrer">{{ paper.title }}</a></strong>
+                <small><a href="{{ url_for('paper_public', slug=paper.slug) }}" target="_blank" rel="noopener noreferrer">{{ url_for('paper_public', slug=paper.slug, _external=True) }}</a></small>
+              </td>
+              <td>
+                {% if paper.author %}
+                  <a href="{{ url_for('admin_user_detail', user_id=paper.author.id) }}">{{ paper.author.email }}</a>
+                {% else %}
+                  {{ paper.user_id }}
+                {% endif %}
+              </td>
+              <td><span class="status-chip">{{ "Public" if paper.is_public else "Private" }}</span></td>
+              <td>{{ paper.status|title }}</td>
+              <td>{{ paper.models|length }}</td>
+              <td>
+                <div class="admin-actions">
+                  <form method="POST" action="{{ url_for('admin_paper_visibility_update', paper_id=paper.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <select name="is_public" class="field-select compact-select">
+                      <option value="0" {% if not paper.is_public %}selected{% endif %}>Private</option>
+                      <option value="1" {% if paper.is_public %}selected{% endif %}>Public</option>
+                    </select>
+                    <input name="status" class="field-input compact-input" value="{{ paper.status or 'active' }}" aria-label="Publication status">
+                    <button type="submit" class="btn-secondary compact">Update</button>
+                  </form>
+                  <a href="{{ url_for('paper_detail', slug=paper.slug) }}" class="btn-secondary compact">Open</a>
+                </div>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6">No publications yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if active_page == "models" %}
+  <section id="models" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Models and licenses</h2>
+        <p>Inspect model access, license tier, file size, QR id, and processing state.</p>
+      </div>
+      <span>{{ models|length }} latest</span>
+    </div>
+    <form method="GET" action="{{ url_for('admin_dashboard', admin_page='models') }}" class="admin-filter-bar">
+      <select name="model_status" class="field-select compact-select">
+        <option value="all" {% if filters.model_status == "all" %}selected{% endif %}>All model states</option>
+        {% for status in ["queued", "processing", "ready", "failed", "replacement_failed"] %}
+          <option value="{{ status }}" {% if filters.model_status == status %}selected{% endif %}>{{ status|replace("_", " ")|title }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn-secondary compact">Filter models</button>
+      <a href="{{ url_for('admin_dashboard', admin_page='models') }}" class="btn-secondary compact">Clear</a>
+    </form>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>User</th>
+            <th>License</th>
+            <th>Access</th>
+            <th>Processing</th>
+            <th>Size</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for model in models %}
+            <tr>
+              <td>
+                <strong>{{ model.display_name or model.original_filename or model.id }}</strong>
+                <small>{{ model.public_id or "No public id" }}</small>
+              </td>
+              <td>
+                {% if model.paper and model.paper.author %}
+                  <a href="{{ url_for('admin_user_detail', user_id=model.paper.author.id) }}">{{ model.paper.author.email }}</a>
+                {% else %}
+                  {{ model.user_id }}
+                {% endif %}
+              </td>
+              <td>{{ get_license_plan(model.license_type).label }}</td>
+              <td><span class="status-chip">{{ model_access_status(model)|title }}</span></td>
+              <td>{{ (model.processing_status or "ready")|title }}</td>
+              <td>{{ format_file_size(model.file_size) }}</td>
+              <td>
+                <div class="admin-actions">
+                  <a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener noreferrer" class="btn-secondary compact">Viewer</a>
+                  <form method="POST" action="{{ url_for('admin_model_license_update', model_id=model.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <select name="license_type" class="field-select compact-select">
+                      {% for key, plan in license_plans.items() %}
+                        <option value="{{ key }}" {% if model.license_type == key %}selected{% endif %}>{{ plan.label }}</option>
+                      {% endfor %}
+                    </select>
+                    <button type="submit" class="btn-secondary compact">Save license</button>
+                  </form>
+                  <form method="POST" action="{{ url_for('admin_model_processing_update', model_id=model.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <select name="processing_status" class="field-select compact-select">
+                      {% for status in ["queued", "processing", "ready", "failed", "replacement_failed"] %}
+                        <option value="{{ status }}" {% if (model.processing_status or "ready") == status %}selected{% endif %}>{{ status|replace("_", " ")|title }}</option>
+                      {% endfor %}
+                    </select>
+                    <button type="submit" class="btn-secondary compact">Save status</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7">No models yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if active_page == "revenue" %}
+  <section id="payments" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Payments</h2>
+        <p>Review billing events and mark manual payment outcomes.</p>
+      </div>
+      <span>{{ payments|length }} latest</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
         <thead>
           <tr>
             <th>Invoice</th>
@@ -74,51 +739,232 @@
             <th>Amount</th>
             <th>Status</th>
             <th>Provider</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody>
           {% for payment in payments %}
             <tr>
-              <td>{{ payment.invoice_number or '-' }}</td>
-              <td>{{ payment.user_id }}</td>
-              <td>{{ payment.amount_kurus }} {{ payment.currency }}</td>
-              <td>{{ payment.status }}</td>
+              <td>{{ payment.invoice_number or "-" }}</td>
+              <td>
+                {% if payment.user %}
+                  <a href="{{ url_for('admin_user_detail', user_id=payment.user.id) }}">{{ payment.user.email }}</a>
+                {% else %}
+                  {{ payment.user_id }}
+                {% endif %}
+              </td>
+              <td>{{ "%.2f"|format(payment.amount_kurus / 100) }} {{ payment.currency }}</td>
+              <td><span class="status-chip">{{ payment.status|title }}</span></td>
               <td>{{ payment.provider }}</td>
+              <td>
+                <form method="POST" action="{{ url_for('admin_payment_status_update', payment_id=payment.id) }}" class="admin-inline-form">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <select name="status" class="field-select compact-select">
+                    {% for status in ["pending", "paid", "failed", "refunded"] %}
+                      <option value="{{ status }}" {% if payment.status == status %}selected{% endif %}>{{ status|title }}</option>
+                    {% endfor %}
+                  </select>
+                  <button type="submit" class="btn-secondary compact">Save</button>
+                </form>
+              </td>
             </tr>
           {% else %}
-            <tr><td colspan="5">No payments yet.</td></tr>
+            <tr><td colspan="6">No payments yet.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </section>
+  {% endif %}
 
-  <section class="surface rounded-xl p-6">
-    <h2 class="font-serif text-2xl font-semibold text-[#111827]">QR resolver records</h2>
-    <div class="table-wrap mt-5">
-      <table class="data-table">
+  {% if active_page == "access" %}
+  <section id="qr" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>QR resolver records</h2>
+        <p>Enable or disable public resolver entries without changing model URLs.</p>
+      </div>
+      <span>{{ qr_links|length }} latest</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
         <thead>
           <tr>
             <th>Public ID</th>
             <th>Model</th>
             <th>Status</th>
             <th>Last resolved</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody>
           {% for qr in qr_links %}
             <tr>
-              <td>{{ qr.public_id }}</td>
-              <td>{{ qr.model_id }}</td>
-              <td>{{ qr.status }}</td>
-              <td>{{ qr.last_resolved_at or '-' }}</td>
+              <td>
+                <a href="{{ model_resolver_url(qr.model) }}" target="_blank" rel="noopener noreferrer">{{ qr.public_id }}</a>
+                <small>{{ model_resolver_url(qr.model) }}</small>
+              </td>
+              <td><a href="{{ url_for('view_model', model_id=qr.model_id) }}" target="_blank" rel="noopener noreferrer">{{ qr.model_id }}</a></td>
+              <td><span class="status-chip">{{ qr.status|title }}</span></td>
+              <td>{{ qr.last_resolved_at.strftime("%Y-%m-%d %H:%M") if qr.last_resolved_at else "-" }}</td>
+              <td>
+                <form method="POST" action="{{ url_for('admin_qr_status_update', qr_id=qr.id) }}" class="admin-inline-form">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <select name="status" class="field-select compact-select">
+                    <option value="active" {% if qr.status == "active" %}selected{% endif %}>Active</option>
+                    <option value="disabled" {% if qr.status == "disabled" %}selected{% endif %}>Disabled</option>
+                  </select>
+                  <button type="submit" class="btn-secondary compact">Save</button>
+                </form>
+              </td>
             </tr>
           {% else %}
-            <tr><td colspan="4">No QR records yet.</td></tr>
+            <tr><td colspan="5">No QR records yet.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </section>
-</main>
+  {% endif %}
+
+  {% if active_page == "models" %}
+  <section id="jobs" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Conversion jobs</h2>
+        <p>Latest model conversion work queue events.</p>
+      </div>
+      <span>{{ jobs|length }} latest</span>
+    </div>
+    <form method="GET" action="{{ url_for('admin_dashboard', admin_page='models') }}" class="admin-filter-bar">
+      <select name="job_status" class="field-select compact-select">
+        <option value="all" {% if filters.job_status == "all" %}selected{% endif %}>All job states</option>
+        {% for status in ["pending", "processing", "completed", "failed"] %}
+          <option value="{{ status }}" {% if filters.job_status == status %}selected{% endif %}>{{ status|title }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn-secondary compact">Filter jobs</button>
+      <a href="{{ url_for('admin_dashboard', admin_page='models') }}" class="btn-secondary compact">Clear</a>
+    </form>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
+        <thead>
+          <tr>
+            <th>Job</th>
+            <th>Status</th>
+            <th>Model</th>
+            <th>Attempts</th>
+            <th>Error</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for job in jobs %}
+            <tr>
+              <td>
+                <strong>{{ job.job_type|replace("_", " ")|title }}</strong>
+                <small>{{ job.created_at.strftime("%Y-%m-%d %H:%M") if job.created_at else "-" }}</small>
+              </td>
+              <td><span class="status-chip">{{ job.status|title }}</span></td>
+              <td>{{ job.model_id }}</td>
+              <td>{{ job.attempts }} / {{ job.max_attempts }}</td>
+              <td>{{ job.error or "-" }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5">No conversion jobs yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if active_page == "logs" %}
+  <section id="audit" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Audit log</h2>
+        <p>Recent security, privacy, account, and admin operations.</p>
+      </div>
+      <span>{{ audit_logs|length }} latest</span>
+    </div>
+    <form method="GET" action="{{ url_for('admin_dashboard', admin_page='logs') }}" class="admin-filter-bar">
+      <input name="audit_q" class="field-input" value="{{ filters.audit_q }}" placeholder="Search event, resource, or IP">
+      <select name="audit_event" class="field-select compact-select">
+        <option value="all" {% if filters.audit_event == "all" %}selected{% endif %}>All events</option>
+        {% for event_type in ["admin_user_role_changed", "admin_user_plan_changed", "admin_paper_visibility_changed", "admin_model_license_changed", "admin_model_processing_changed", "admin_qr_status_changed", "admin_payment_status_changed", "user_login_failed", "account_deleted", "email_changed", "password_changed", "public_model_viewed", "qr_resolved"] %}
+          <option value="{{ event_type }}" {% if filters.audit_event == event_type %}selected{% endif %}>{{ event_type }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn-secondary compact">Filter audit</button>
+      <a href="{{ url_for('admin_dashboard', admin_page='logs') }}" class="btn-secondary compact">Clear</a>
+    </form>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
+        <thead>
+          <tr>
+            <th>Event</th>
+            <th>User</th>
+            <th>Resource</th>
+            <th>IP</th>
+            <th>Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for event in audit_logs %}
+            <tr>
+              <td>{{ event.event_type }}</td>
+              <td>{{ event.user_id or "-" }}</td>
+              <td>{{ event.resource_id or "-" }}</td>
+              <td>{{ event.ip_address or "-" }}</td>
+              <td>{{ event.timestamp.strftime("%Y-%m-%d %H:%M") if event.timestamp else "-" }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5">No audit events yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if active_page == "backups" %}
+  <section id="backups" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Backups</h2>
+        <p>Daily and manual archives include the SQLite database when available, uploads, converted models, PDFs, QR images, and a QR resolver manifest.</p>
+      </div>
+      <span>{{ backups|length }} archives</span>
+    </div>
+    <form method="POST" action="{{ url_for('admin_backup_create') }}" class="admin-filter-bar">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn-primary compact">Create backup now</button>
+    </form>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
+        <thead>
+          <tr>
+            <th>Archive</th>
+            <th>Created</th>
+            <th>Size</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for backup in backups %}
+            <tr>
+              <td>{{ backup.filename }}</td>
+              <td>{{ backup.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+              <td>{{ format_file_size(backup.size) }}</td>
+              <td><a href="{{ url_for('admin_backup_download', filename=backup.filename) }}" class="btn-secondary compact">Download</a></td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4">No backup archives yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+</div>
 {% endblock %}

@@ -28,6 +28,7 @@ uploads/
 converted/
 qr_codes/
 pdfs/
+storage/
 tests_runtime/
 .pytest_cache/
 .test_tmp*/

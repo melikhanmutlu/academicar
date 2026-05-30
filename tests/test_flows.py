@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
-from models import ConversionJob, Model3D, ModelVersion, Paper, QRLink, User, db
+from models import AuditLog, ConversionJob, Model3D, ModelVersion, Paper, Payment, QRLink, User, db
 from models import utc_now
 
 
@@ -32,6 +32,22 @@ def test_register_login_paper_create_and_delete(client):
     assert response.status_code == 200
     with client.application.app_context():
         assert Paper.query.count() == 0
+
+
+def test_landing_mitochondria_qr_and_ar_page(client):
+    landing = client.get("/")
+    assert landing.status_code == 200
+    assert "/demo/mitochondria/qr.png" in landing.get_data(as_text=True)
+    assert "/demo/mitochondria/ar" in landing.get_data(as_text=True)
+
+    qr = client.get("/demo/mitochondria/qr.png")
+    assert qr.status_code == 200
+    assert qr.mimetype == "image/png"
+
+    ar_page = client.get("/demo/mitochondria/ar")
+    assert ar_page.status_code == 200
+    assert "Mitochondria AR" in ar_page.get_data(as_text=True)
+    assert "activateAR" in ar_page.get_data(as_text=True)
 
 
 def test_paper_create_can_include_first_model(client):
@@ -641,6 +657,216 @@ def test_admin_dashboard_requires_admin_user(client):
     response = client.get("/admin")
     assert response.status_code == 200
     assert "AcademicAR control panel" in response.get_data(as_text=True)
+    assert "Operations overview" in response.get_data(as_text=True)
+
+    expected_pages = {
+        "/admin/content": "Content and publication statistics",
+        "/admin/models": "Model and conversion health",
+        "/admin/access": "QR and viewer analytics",
+        "/admin/revenue": "License and revenue",
+        "/admin/security": "Operations and security",
+        "/admin/storage": "Storage",
+        "/admin/users": "Users",
+        "/admin/logs": "Audit log",
+        "/admin/backups": "Backups",
+    }
+    for path, marker in expected_pages.items():
+        response = client.get(path)
+        assert response.status_code == 200
+        assert marker in response.get_data(as_text=True)
+
+
+def test_configured_admin_email_is_always_admin(client):
+    from tests.conftest import create_user, login
+
+    with client.application.app_context():
+        user = create_user(email="melikhanmutlu@gmail.com", username="Melikhan Mutlu")
+        assert user.is_admin is False
+
+    login(client, email="melikhanmutlu@gmail.com")
+    response = client.get("/admin")
+    assert response.status_code == 200
+    assert "AcademicAR control panel" in response.get_data(as_text=True)
+
+    with client.application.app_context():
+        user = User.query.filter_by(email="melikhanmutlu@gmail.com").one()
+        assert user.is_admin is True
+
+
+def test_admin_can_update_user_plan_and_role(client):
+    from tests.conftest import create_user, login
+
+    with client.application.app_context():
+        admin = create_user(email="admin@example.com", username="Admin User")
+        admin.is_admin = True
+        member = create_user(email="member@example.com", username="Member User")
+        db.session.commit()
+        member_id = member.id
+
+    login(client, email="admin@example.com")
+    response = client.post(
+        f"/admin/users/{member_id}/plan",
+        data={"plan": "academic"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert "Plan updated" in response.get_data(as_text=True)
+
+    response = client.post(
+        f"/admin/users/{member_id}/role",
+        data={"is_admin": "1"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert "Admin access updated" in response.get_data(as_text=True)
+
+    with client.application.app_context():
+        member = db.session.get(User, member_id)
+        assert member.plan == "academic"
+        assert member.is_admin is True
+
+
+def test_admin_user_detail_dashboard_and_backup(client):
+    from tests.conftest import create_user, login
+
+    with client.application.app_context():
+        admin = create_user(email="admin@example.com", username="Admin User")
+        admin.is_admin = True
+        member = create_user(email="member@example.com", username="Member User")
+        paper = Paper(title="Member Paper", slug="member-paper", user_id=member.id, is_public=True)
+        db.session.add(paper)
+        db.session.flush()
+        model = Model3D(
+            id="member-model-1",
+            paper_id=paper.id,
+            user_id=member.id,
+            display_name="Member Model",
+            glb_path="model.glb",
+            public_id="member-public",
+            processing_status="ready",
+        )
+        db.session.add(model)
+        db.session.add(QRLink(public_id="member-public", model_id=model.id))
+        db.session.commit()
+        member_id = member.id
+
+    login(client, email="admin@example.com")
+
+    detail = client.get(f"/admin/users/{member_id}")
+    assert detail.status_code == 200
+    detail_text = detail.get_data(as_text=True)
+    assert "Member User" in detail_text
+    assert "Member Paper" in detail_text
+    assert "Member Model" in detail_text
+
+    dashboard = client.get(f"/admin/users/{member_id}/dashboard")
+    assert dashboard.status_code == 200
+    assert "Member User&#39;s dashboard" in dashboard.get_data(as_text=True) or "Member User's dashboard" in dashboard.get_data(as_text=True)
+
+    backup = client.post("/admin/backups/create", follow_redirects=True)
+    assert backup.status_code == 200
+    assert "Backup created" in backup.get_data(as_text=True)
+    with client.application.app_context():
+        assert AuditLog.query.filter_by(event_type="admin_backup_created").count() >= 1
+
+
+def test_admin_can_operate_publication_model_qr_and_payment(client):
+    from tests.conftest import create_user, login
+
+    with client.application.app_context():
+        admin = create_user(email="admin@example.com", username="Admin User")
+        admin.is_admin = True
+        owner = create_user(email="owner@example.com", username="Owner User")
+        paper = Paper(title="Admin Ops Paper", slug="admin-ops-paper", user_id=owner.id)
+        db.session.add(paper)
+        db.session.flush()
+        model = Model3D(
+            id="admin-model-1",
+            paper_id=paper.id,
+            user_id=owner.id,
+            glb_path="model.glb",
+            file_size=1024,
+            public_id="pub-admin-1",
+            processing_status="ready",
+        )
+        db.session.add(model)
+        qr = QRLink(public_id="pub-admin-1", model_id=model.id)
+        payment = Payment(user_id=owner.id, amount_kurus=99000, status="pending")
+        db.session.add_all([qr, payment])
+        db.session.commit()
+        paper_id = paper.id
+        qr_id = qr.id
+        payment_id = payment.id
+
+    login(client, email="admin@example.com")
+
+    assert client.post(
+        f"/admin/papers/{paper_id}/visibility",
+        data={"is_public": "1", "status": "active"},
+        follow_redirects=True,
+    ).status_code == 200
+    assert client.post(
+        "/admin/models/admin-model-1/license",
+        data={"license_type": "academic"},
+        follow_redirects=True,
+    ).status_code == 200
+    assert client.post(
+        "/admin/models/admin-model-1/processing",
+        data={"processing_status": "failed"},
+        follow_redirects=True,
+    ).status_code == 200
+    assert client.post(
+        f"/admin/qr-links/{qr_id}/status",
+        data={"status": "disabled"},
+        follow_redirects=True,
+    ).status_code == 200
+    assert client.post(
+        f"/admin/payments/{payment_id}/status",
+        data={"status": "paid"},
+        follow_redirects=True,
+    ).status_code == 200
+
+    with client.application.app_context():
+        paper = db.session.get(Paper, paper_id)
+        model = db.session.get(Model3D, "admin-model-1")
+        qr = db.session.get(QRLink, qr_id)
+        payment = db.session.get(Payment, payment_id)
+        assert paper.is_public is True
+        assert model.license_type == "academic"
+        assert model.processing_status == "failed"
+        assert qr.status == "disabled"
+        assert payment.status == "paid"
+        assert payment.paid_at is not None
+
+
+def test_public_viewer_and_qr_resolver_feed_admin_analytics(client):
+    with client.application.app_context():
+        owner = User(email="owner@example.com", username="Owner User")
+        owner.set_password("password123")
+        db.session.add(owner)
+        db.session.flush()
+        paper = Paper(title="Analytics Paper", slug="analytics-paper", user_id=owner.id, is_public=True)
+        db.session.add(paper)
+        db.session.flush()
+        model = Model3D(
+            id="analytics-model-1",
+            paper_id=paper.id,
+            user_id=owner.id,
+            glb_path="model.glb",
+            public_id="analytics-public",
+            processing_status="ready",
+        )
+        db.session.add(model)
+        db.session.add(QRLink(public_id="analytics-public", model_id=model.id))
+        db.session.commit()
+
+    assert client.get("/view/analytics-model-1").status_code == 200
+    assert client.get("/m/analytics-public", follow_redirects=False).status_code == 302
+
+    with client.application.app_context():
+        assert QRLink.query.filter_by(public_id="analytics-public").one().last_resolved_at is not None
+        assert AuditLog.query.filter_by(event_type="public_model_viewed", resource_id="analytics-model-1").count() == 1
+        assert AuditLog.query.filter_by(event_type="qr_resolved", resource_id="analytics-public").count() == 1
 
 
 def test_obj_upload_with_companion_files_archives_mtl_and_textures(client, monkeypatch):

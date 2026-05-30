@@ -88,6 +88,15 @@ def _rotate_session():
     session.clear()
 
 
+def _apply_configured_admin(user: User) -> None:
+    admin_emails = current_app.config.get("ADMIN_EMAILS", [])
+    if isinstance(admin_emails, str):
+        admin_emails = admin_emails.split(",")
+    normalized = {str(email).strip().lower() for email in admin_emails if str(email).strip()}
+    if user.email.strip().lower() in normalized:
+        user.is_admin = True
+
+
 @auth_bp.route("/register", methods=["GET", "POST"])
 def register():
     if current_user.is_authenticated:
@@ -100,6 +109,7 @@ def register():
             email=form.email.data.lower().strip(),
         )
         user.set_password(form.password.data)
+        _apply_configured_admin(user)
         db.session.add(user)
         db.session.commit()
         _rotate_session()
@@ -130,6 +140,10 @@ def login():
         email = form.email.data.lower().strip()
         user = User.query.filter_by(email=email).first()
         if user and user.check_password(form.password.data):
+            if not user.is_admin:
+                _apply_configured_admin(user)
+                if user.is_admin:
+                    db.session.commit()
             _rotate_session()
             login_user(user, remember=form.remember.data)
             try:
@@ -217,6 +231,7 @@ def google_callback():
             existing.google_id = google_id
             if not existing.avatar_url and picture:
                 existing.avatar_url = picture
+            _apply_configured_admin(existing)
             user = existing
         else:
             user = User(
@@ -225,8 +240,11 @@ def google_callback():
                 google_id=google_id,
                 avatar_url=picture,
             )
+            _apply_configured_admin(user)
             db.session.add(user)
             is_new_user = True
+    else:
+        _apply_configured_admin(user)
     db.session.commit()
 
     _rotate_session()

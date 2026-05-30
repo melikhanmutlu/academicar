@@ -24,6 +24,7 @@ DEFAULT_STORAGE_ROOT = (
     or os.environ.get("RAILWAY_VOLUME_MOUNT_PATH")
     or str(BASE_DIR / "storage")
 )
+DEFAULT_ADMIN_EMAILS = {"melikhanmutlu@gmail.com"}
 
 
 def runtime_folder(env_name: str, default_name: str, runtime_base: Path) -> str:
@@ -48,6 +49,14 @@ class Config:
     PERMANENT_SESSION_LIFETIME = timedelta(days=int(os.environ.get("SESSION_LIFETIME_DAYS", 14)))
     # Single source of truth for password length minimum (auth + account flows).
     PASSWORD_MIN_LENGTH = int(os.environ.get("PASSWORD_MIN_LENGTH", 8))
+    ADMIN_EMAILS = sorted(
+        DEFAULT_ADMIN_EMAILS
+        | {
+            email.strip().lower()
+            for email in os.environ.get("ADMIN_EMAILS", "").split(",")
+            if email.strip()
+        }
+    )
 
     # Database: PostgreSQL on Railway/production via DATABASE_URL, else SQLite.
     _db_url = os.environ.get("DATABASE_URL", "").strip()

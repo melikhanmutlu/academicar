@@ -6,6 +6,7 @@ import secrets
 import shutil
 import struct
 import uuid
+import zipfile
 from datetime import UTC, datetime, timedelta
 
 from flask import Flask, abort, current_app, flash, jsonify, redirect, render_template, request, send_from_directory, session, url_for
@@ -16,7 +17,7 @@ from flask_login import LoginManager, current_user, login_required
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFError, CSRFProtect
 from slugify import slugify
-from sqlalchemy import text
+from sqlalchemy import func, or_, text
 from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -137,6 +138,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             if "already exists" not in str(exc).lower():
                 raise
             logger.warning("SQLite schema already existed during create_all; continuing with compatibility checks.")
+        sync_configured_admins(app)
         pass # ensure_sqlite_schema removed
 
     return app
@@ -212,6 +214,155 @@ def format_file_size(size_bytes: int | None) -> str:
             return f"{size:.1f} {unit}" if unit != "B" else f"{int(size)} B"
         size /= 1024
     return f"{size_bytes} B"
+
+
+def configured_admin_emails(app: Flask | None = None) -> set[str]:
+    source = (app or current_app).config.get("ADMIN_EMAILS", [])
+    if isinstance(source, str):
+        source = source.split(",")
+    return {str(email).strip().lower() for email in source if str(email).strip()}
+
+
+def user_is_configured_admin(user: User | None, app: Flask | None = None) -> bool:
+    if not user or not getattr(user, "email", None):
+        return False
+    return user.email.strip().lower() in configured_admin_emails(app)
+
+
+def sync_configured_admins(app: Flask) -> None:
+    emails = configured_admin_emails(app)
+    if not emails:
+        return
+    try:
+        users = User.query.filter(func.lower(User.email).in_(emails), User.is_admin.is_(False)).all()
+        for user in users:
+            user.is_admin = True
+        if users:
+            db.session.commit()
+            logger.info("Promoted %s configured admin user(s).", len(users))
+    except SQLAlchemyError:
+        db.session.rollback()
+        logger.exception("Could not sync configured admin users")
+
+
+def day_label(value: datetime) -> str:
+    return value.strftime("%m-%d")
+
+
+def month_label(value: datetime) -> str:
+    return value.strftime("%Y-%m")
+
+
+def scan_folder_size(path: str) -> tuple[int, int]:
+    total_size = 0
+    total_files = 0
+    if not path or not os.path.exists(path):
+        return total_size, total_files
+    for root, _, files in os.walk(path):
+        for filename in files:
+            file_path = os.path.join(root, filename)
+            try:
+                total_size += os.path.getsize(file_path)
+                total_files += 1
+            except OSError:
+                continue
+    return total_size, total_files
+
+
+def count_orphan_files(folder: str, expected_filenames: set[str]) -> int:
+    if not folder or not os.path.exists(folder):
+        return 0
+    orphan_count = 0
+    for root, _, files in os.walk(folder):
+        for filename in files:
+            file_path = os.path.abspath(os.path.join(root, filename))
+            if file_path not in expected_filenames:
+                orphan_count += 1
+    return orphan_count
+
+
+def backup_folder(app: Flask) -> str:
+    path = os.path.join(app.config["STORAGE_ROOT"], "admin_backups")
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def list_backup_archives(app: Flask) -> list[dict]:
+    folder = backup_folder(app)
+    backups = []
+    for filename in os.listdir(folder):
+        if not filename.endswith(".zip"):
+            continue
+        file_path = os.path.join(folder, filename)
+        try:
+            stat = os.stat(file_path)
+        except OSError:
+            continue
+        backups.append(
+            {
+                "filename": filename,
+                "size": stat.st_size,
+                "created_at": datetime.fromtimestamp(stat.st_mtime, UTC),
+            }
+        )
+    return sorted(backups, key=lambda item: item["created_at"], reverse=True)
+
+
+def add_folder_to_zip(zip_file: zipfile.ZipFile, folder: str, archive_prefix: str) -> int:
+    added = 0
+    if not folder or not os.path.exists(folder):
+        return added
+    for root, _, files in os.walk(folder):
+        for filename in files:
+            file_path = os.path.join(root, filename)
+            arcname = os.path.join(archive_prefix, os.path.relpath(file_path, folder))
+            zip_file.write(file_path, arcname)
+            added += 1
+    return added
+
+
+def create_backup_archive(app: Flask, created_by_user_id: int | None = None, reason: str = "manual") -> str:
+    folder = backup_folder(app)
+    timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+    filename = f"academic_ar_backup_{timestamp}.zip"
+    archive_path = os.path.join(folder, filename)
+    manifest_lines = [
+        f"created_at={datetime.now(UTC).isoformat()}",
+        f"created_by_user_id={created_by_user_id or ''}",
+        f"reason={reason}",
+        f"site_url={app.config.get('SITE_URL', '')}",
+    ]
+    qr_manifest = []
+    for qr in QRLink.query.order_by(QRLink.created_at.asc()).all():
+        qr_manifest.append(
+            f"{qr.public_id}\t{qr.status}\t{model_resolver_url(qr.model)}\t{qr.model_id}\t{qr.target_type}"
+        )
+    with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
+        if db_uri.startswith("sqlite:///"):
+            db_path = db_uri.replace("sqlite:///", "", 1)
+            if os.path.exists(db_path):
+                zip_file.write(db_path, "database/academic_ar.db")
+        manifest_lines.append(f"uploads_files={add_folder_to_zip(zip_file, app.config['UPLOAD_FOLDER'], 'uploads')}")
+        manifest_lines.append(f"converted_files={add_folder_to_zip(zip_file, app.config['CONVERTED_FOLDER'], 'converted')}")
+        manifest_lines.append(f"qr_files={add_folder_to_zip(zip_file, app.config['QR_FOLDER'], 'qr_codes')}")
+        manifest_lines.append(f"pdf_files={add_folder_to_zip(zip_file, app.config['PDF_FOLDER'], 'pdfs')}")
+        zip_file.writestr("manifest.txt", "\n".join(manifest_lines) + "\n")
+        zip_file.writestr("qr_links.tsv", "public_id\tstatus\tresolver_url\tmodel_id\ttarget_type\n" + "\n".join(qr_manifest) + "\n")
+    log_audit(
+        "admin_backup_created",
+        user_id=created_by_user_id,
+        resource_id=filename,
+        details={"reason": reason, "filename": filename},
+    )
+    return filename
+
+
+def ensure_daily_backup(app: Flask, created_by_user_id: int | None = None) -> str | None:
+    today_prefix = f"academic_ar_backup_{datetime.now(UTC).strftime('%Y%m%d')}"
+    if any(item["filename"].startswith(today_prefix) for item in list_backup_archives(app)):
+        return None
+    return create_backup_archive(app, created_by_user_id=created_by_user_id, reason="daily")
 
 
 def validate_secret_key(app: Flask) -> None:
@@ -1230,9 +1381,44 @@ def log_audit(event_type: str, user_id: int | None = None, resource_id: str | No
 
 
 def register_routes(app: Flask) -> None:
+    def require_admin() -> None:
+        if not current_user.is_authenticated:
+            abort(403)
+        if user_is_configured_admin(current_user, app) and not current_user.is_admin:
+            current_user.is_admin = True
+            db.session.commit()
+        if not current_user.is_admin:
+            abort(403)
+
     @app.route("/")
     def landing():
         return render_template("landing.html")
+
+    @app.route("/demo/mitochondria/ar")
+    def demo_mitochondria_ar():
+        log_audit("demo_mitochondria_ar_opened", details={"source": request.args.get("source") or "direct"})
+        return render_template("demo_mitochondria_ar.html")
+
+    @app.route("/demo/mitochondria/qr.png")
+    def demo_mitochondria_qr():
+        import io
+        import qrcode
+
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            box_size=8,
+            border=2,
+        )
+        qr.add_data(public_url("demo_mitochondria_ar", source="hero_qr"))
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG")
+        buffer.seek(0)
+        response = current_app.response_class(buffer.getvalue(), mimetype="image/png")
+        response.headers["Cache-Control"] = "public, max-age=3600"
+        return response
 
     @app.route("/terms")
     def terms():
@@ -1266,6 +1452,12 @@ def register_routes(app: Flask) -> None:
             app.config["CONVERTED_FOLDER"], model.id, "model.usdz"
         )
         has_usdz = os.path.exists(usdz_path)
+        log_audit(
+            "public_model_viewed",
+            user_id=current_user.id if current_user.is_authenticated else None,
+            resource_id=model.id,
+            details={"paper_id": model.paper_id, "public_id": model.public_id},
+        )
         return render_template(
             "viewer.html", model=model, paper=model.paper, has_usdz=has_usdz
         )
@@ -1285,6 +1477,11 @@ def register_routes(app: Flask) -> None:
                 db.session.commit()
             except SQLAlchemyError:
                 db.session.rollback()
+            log_audit(
+                "qr_resolved",
+                resource_id=qr_link.public_id,
+                details={"model_id": model.id, "target_type": qr_link.target_type},
+            )
         status = model_access_status(model)
         if status != "active":
             return (
@@ -1424,16 +1621,349 @@ def register_routes(app: Flask) -> None:
         papers = Paper.query.filter_by(user_id=current_user.id).order_by(Paper.created_at.desc()).all()
         return render_template("dashboard.html", papers=papers)
 
-    @app.route("/admin")
+    @app.route("/admin", defaults={"admin_page": "overview"})
+    @app.route("/admin/<admin_page>")
     @login_required
-    def admin_dashboard():
-        if not current_user.is_admin:
-            abort(403)
-        users = User.query.order_by(User.created_at.desc()).limit(100).all()
+    def admin_dashboard(admin_page):
+        require_admin()
+        admin_pages = {
+            "overview",
+            "users",
+            "content",
+            "models",
+            "access",
+            "revenue",
+            "security",
+            "storage",
+            "logs",
+            "backups",
+        }
+        if admin_page not in admin_pages:
+            abort(404)
+        user_query_text = (request.args.get("user_q") or "").strip()
+        user_plan_filter = (request.args.get("user_plan") or "all").strip().lower()
+        user_role_filter = (request.args.get("user_role") or "all").strip().lower()
+        model_status_filter = (request.args.get("model_status") or "all").strip().lower()
+        job_status_filter = (request.args.get("job_status") or "all").strip().lower()
+        audit_event_filter = (request.args.get("audit_event") or "all").strip().lower()
+        audit_query_text = (request.args.get("audit_q") or "").strip()
+
+        users_query = User.query
+        if user_query_text:
+            pattern = f"%{user_query_text.lower()}%"
+            users_query = users_query.filter(
+                or_(
+                    func.lower(User.email).like(pattern),
+                    func.lower(User.username).like(pattern),
+                )
+            )
+        if user_plan_filter in {"free", "academic"}:
+            users_query = users_query.filter(User.plan == user_plan_filter)
+        if user_role_filter == "admin":
+            users_query = users_query.filter(User.is_admin.is_(True))
+        elif user_role_filter == "member":
+            users_query = users_query.filter(User.is_admin.is_(False))
+
+        models_query = Model3D.query
+        if model_status_filter != "all":
+            models_query = models_query.filter(Model3D.processing_status == model_status_filter)
+
+        jobs_query = ConversionJob.query
+        if job_status_filter != "all":
+            jobs_query = jobs_query.filter(ConversionJob.status == job_status_filter)
+
+        audit_query = AuditLog.query
+        if audit_event_filter != "all":
+            audit_query = audit_query.filter(AuditLog.event_type == audit_event_filter)
+        if audit_query_text:
+            audit_pattern = f"%{audit_query_text.lower()}%"
+            audit_query = audit_query.filter(
+                or_(
+                    func.lower(AuditLog.event_type).like(audit_pattern),
+                    func.lower(AuditLog.resource_id).like(audit_pattern),
+                    func.lower(AuditLog.ip_address).like(audit_pattern),
+                )
+            )
+
+        users = users_query.order_by(User.created_at.desc()).limit(100).all()
         papers = Paper.query.order_by(Paper.created_at.desc()).limit(100).all()
-        models = Model3D.query.order_by(Model3D.created_at.desc()).limit(100).all()
+        models = models_query.order_by(Model3D.created_at.desc()).limit(100).all()
         payments = Payment.query.order_by(Payment.created_at.desc()).limit(50).all()
         qr_links = QRLink.query.order_by(QRLink.created_at.desc()).limit(100).all()
+        audit_logs = audit_query.order_by(AuditLog.timestamp.desc()).limit(50).all()
+        jobs = jobs_query.order_by(ConversionJob.created_at.desc()).limit(50).all()
+        now = datetime.now(UTC)
+        last_7_days = now - timedelta(days=7)
+        last_30_days = now - timedelta(days=30)
+        paid_revenue = (
+            db.session.query(func.coalesce(func.sum(Payment.amount_kurus), 0))
+            .filter(Payment.status == "paid")
+            .scalar()
+            or 0
+        )
+        totals = {
+            "users": User.query.count(),
+            "admins": User.query.filter_by(is_admin=True).count(),
+            "papers": Paper.query.count(),
+            "public_papers": Paper.query.filter_by(is_public=True).count(),
+            "models": Model3D.query.count(),
+            "active_models": sum(1 for model in Model3D.query.all() if model_access_status(model) == "active"),
+            "qr_links": QRLink.query.count(),
+            "payments": Payment.query.count(),
+            "paid_revenue": paid_revenue,
+            "pending_jobs": ConversionJob.query.filter_by(status="pending").count(),
+            "failed_jobs": ConversionJob.query.filter_by(status="failed").count(),
+        }
+        processing_counts = {
+            status or "ready": count
+            for status, count in db.session.query(
+                func.coalesce(Model3D.processing_status, "ready"),
+                func.count(Model3D.id),
+            )
+            .group_by(func.coalesce(Model3D.processing_status, "ready"))
+            .all()
+        }
+        license_counts = {
+            license_type or "free": count
+            for license_type, count in db.session.query(
+                func.coalesce(Model3D.license_type, "free"),
+                func.count(Model3D.id),
+            )
+            .group_by(func.coalesce(Model3D.license_type, "free"))
+            .all()
+        }
+        source_format_counts = {
+            source_format or "unknown": count
+            for source_format, count in db.session.query(
+                func.coalesce(Model3D.source_format, "unknown"),
+                func.count(Model3D.id),
+            )
+            .group_by(func.coalesce(Model3D.source_format, "unknown"))
+            .all()
+        }
+        payment_counts = {
+            status or "pending": count
+            for status, count in db.session.query(
+                func.coalesce(Payment.status, "pending"),
+                func.count(Payment.id),
+            )
+            .group_by(func.coalesce(Payment.status, "pending"))
+            .all()
+        }
+        job_counts = {
+            status or "pending": count
+            for status, count in db.session.query(
+                func.coalesce(ConversionJob.status, "pending"),
+                func.count(ConversionJob.id),
+            )
+            .group_by(func.coalesce(ConversionJob.status, "pending"))
+            .all()
+        }
+        total_model_storage = db.session.query(func.coalesce(func.sum(Model3D.file_size), 0)).scalar() or 0
+        revenue_30_days = (
+            db.session.query(func.coalesce(func.sum(Payment.amount_kurus), 0))
+            .filter(Payment.status == "paid", Payment.paid_at >= last_30_days)
+            .scalar()
+            or 0
+        )
+        papers_with_doi = Paper.query.filter(Paper.doi.isnot(None), Paper.doi != "").count()
+        papers_with_pmid = Paper.query.filter(Paper.pmid.isnot(None), Paper.pmid != "").count()
+        private_papers = max(totals["papers"] - totals["public_papers"], 0)
+        papers_with_pdf = Paper.query.filter(Paper.pdf_path.isnot(None), Paper.pdf_path != "").count()
+        papers_without_pdf = max(totals["papers"] - papers_with_pdf, 0)
+        resolved_qr_total = AuditLog.query.filter(AuditLog.event_type == "qr_resolved").count()
+        viewer_access_total = AuditLog.query.filter(AuditLog.event_type == "public_model_viewed").count()
+        last_qr_resolved = QRLink.query.filter(QRLink.last_resolved_at.isnot(None)).order_by(QRLink.last_resolved_at.desc()).first()
+        disabled_qr_count = QRLink.query.filter(QRLink.status != "active").count()
+        expired_qr_count = sum(1 for link in QRLink.query.all() if model_access_status(link.model) == "expired")
+        expired_public_papers = sum(1 for paper in Paper.query.filter_by(is_public=True).all() if paper_is_expired(paper))
+        near_limit_models = (
+            Model3D.query.filter(
+                Model3D.file_size.isnot(None),
+                Model3D.storage_limit_bytes.isnot(None),
+                Model3D.file_size >= Model3D.storage_limit_bytes * 0.8,
+            )
+            .order_by(Model3D.file_size.desc())
+            .limit(10)
+            .all()
+        )
+        completed_jobs = ConversionJob.query.filter(
+            ConversionJob.started_at.isnot(None),
+            ConversionJob.finished_at.isnot(None),
+        ).all()
+        conversion_durations = [
+            (job.finished_at - job.started_at).total_seconds()
+            for job in completed_jobs
+            if job.finished_at and job.started_at and job.finished_at >= job.started_at
+        ]
+        average_conversion_seconds = int(sum(conversion_durations) / len(conversion_durations)) if conversion_durations else 0
+        failed_jobs = ConversionJob.query.filter_by(status="failed").order_by(ConversionJob.finished_at.desc()).limit(10).all()
+        failed_format_counts: dict[str, int] = {}
+        for failed_job in ConversionJob.query.filter_by(status="failed").all():
+            fmt = (failed_job.model.source_format if failed_job.model else None) or "unknown"
+            failed_format_counts[fmt] = failed_format_counts.get(fmt, 0) + 1
+        field_counts = {
+            field or "Unspecified": count
+            for field, count in db.session.query(
+                func.coalesce(Paper.field, "Unspecified"),
+                func.count(Paper.id),
+            )
+            .group_by(func.coalesce(Paper.field, "Unspecified"))
+            .order_by(func.count(Paper.id).desc())
+            .limit(8)
+            .all()
+        }
+        daily_publication_trend = []
+        daily_viewer_trend = []
+        for offset in range(29, -1, -1):
+            day_start = (now - timedelta(days=offset)).replace(hour=0, minute=0, second=0, microsecond=0)
+            day_end = day_start + timedelta(days=1)
+            daily_publication_trend.append(
+                {
+                    "label": day_label(day_start),
+                    "count": Paper.query.filter(Paper.created_at >= day_start, Paper.created_at < day_end).count(),
+                }
+            )
+            daily_viewer_trend.append(
+                {
+                    "label": day_label(day_start),
+                    "count": AuditLog.query.filter(
+                        AuditLog.event_type == "public_model_viewed",
+                        AuditLog.timestamp >= day_start,
+                        AuditLog.timestamp < day_end,
+                    ).count(),
+                }
+            )
+        monthly_revenue = []
+        for offset in range(11, -1, -1):
+            month_seed = (now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(days=offset * 31)).replace(day=1)
+            next_month = (month_seed.replace(day=28) + timedelta(days=4)).replace(day=1)
+            amount = (
+                db.session.query(func.coalesce(func.sum(Payment.amount_kurus), 0))
+                .filter(Payment.status == "paid", Payment.paid_at >= month_seed, Payment.paid_at < next_month)
+                .scalar()
+                or 0
+            )
+            monthly_revenue.append({"label": month_label(month_seed), "amount": amount})
+        top_viewed_rows = (
+            db.session.query(AuditLog.resource_id, func.count(AuditLog.id))
+            .filter(AuditLog.event_type == "public_model_viewed", AuditLog.resource_id.isnot(None))
+            .group_by(AuditLog.resource_id)
+            .order_by(func.count(AuditLog.id).desc())
+            .limit(10)
+            .all()
+        )
+        top_viewed_models = []
+        for model_id, count in top_viewed_rows:
+            model = db.session.get(Model3D, model_id)
+            top_viewed_models.append({"model": model, "model_id": model_id, "count": count})
+        storage_by_user = []
+        for user_id, total_size, model_count in (
+            db.session.query(
+                Model3D.user_id,
+                func.coalesce(func.sum(Model3D.file_size), 0),
+                func.count(Model3D.id),
+            )
+            .group_by(Model3D.user_id)
+            .order_by(func.coalesce(func.sum(Model3D.file_size), 0).desc())
+            .limit(10)
+            .all()
+        ):
+            user = db.session.get(User, user_id)
+            storage_by_user.append({"user": user, "user_id": user_id, "size": total_size or 0, "models": model_count})
+        upload_size, upload_files = scan_folder_size(app.config["UPLOAD_FOLDER"])
+        converted_size, converted_files = scan_folder_size(app.config["CONVERTED_FOLDER"])
+        qr_size, qr_files = scan_folder_size(app.config["QR_FOLDER"])
+        pdf_size, pdf_files = scan_folder_size(app.config["PDF_FOLDER"])
+        expected_pdf_files = {
+            os.path.abspath(os.path.join(app.config["PDF_FOLDER"], os.path.basename(paper.pdf_path)))
+            for paper in Paper.query.filter(Paper.pdf_path.isnot(None)).all()
+            if paper.pdf_path
+        }
+        expected_qr_files = {
+            os.path.abspath(os.path.join(app.config["QR_FOLDER"], os.path.basename(model.qr_code_path)))
+            for model in Model3D.query.filter(Model3D.qr_code_path.isnot(None)).all()
+            if model.qr_code_path
+        }
+        expected_model_files = set()
+        for model in Model3D.query.all():
+            model_folder = os.path.abspath(os.path.join(app.config["CONVERTED_FOLDER"], model.id))
+            expected_model_files.add(os.path.join(model_folder, "model.glb"))
+            expected_model_files.add(os.path.join(model_folder, "model.usdz"))
+        orphan_counts = {
+            "converted": count_orphan_files(app.config["CONVERTED_FOLDER"], expected_model_files),
+            "pdf": count_orphan_files(app.config["PDF_FOLDER"], expected_pdf_files),
+            "qr": count_orphan_files(app.config["QR_FOLDER"], expected_qr_files),
+        }
+        storage_breakdown = {
+            "uploads": {"size": upload_size, "files": upload_files},
+            "models": {"size": converted_size, "files": converted_files},
+            "pdfs": {"size": pdf_size, "files": pdf_files},
+            "qr": {"size": qr_size, "files": qr_files},
+        }
+        security_events = {
+            "admin_actions": AuditLog.query.filter(AuditLog.event_type.like("admin_%")).count(),
+            "account_deleted": AuditLog.query.filter_by(event_type="account_deleted").count(),
+            "email_changed": AuditLog.query.filter_by(event_type="email_changed").count(),
+            "password_changed": AuditLog.query.filter_by(event_type="password_changed").count(),
+            "failed_logins": AuditLog.query.filter_by(event_type="user_login_failed").count(),
+        }
+        critical_alerts = []
+        if totals["failed_jobs"]:
+            critical_alerts.append(f"{totals['failed_jobs']} failed conversion job(s)")
+        if near_limit_models:
+            critical_alerts.append(f"{len(near_limit_models)} model(s) near storage limit")
+        if expired_public_papers:
+            critical_alerts.append(f"{expired_public_papers} expired public publication(s)")
+        if sum(orphan_counts.values()):
+            critical_alerts.append(f"{sum(orphan_counts.values())} orphan file(s) detected")
+        stats = {
+            "new_users_7d": User.query.filter(User.created_at >= last_7_days).count(),
+            "new_users_30d": User.query.filter(User.created_at >= last_30_days).count(),
+            "new_papers_7d": Paper.query.filter(Paper.created_at >= last_7_days).count(),
+            "new_papers_30d": Paper.query.filter(Paper.created_at >= last_30_days).count(),
+            "new_models_30d": Model3D.query.filter(Model3D.created_at >= last_30_days).count(),
+            "papers_with_pdf": papers_with_pdf,
+            "papers_without_pdf": papers_without_pdf,
+            "papers_with_doi": papers_with_doi,
+            "papers_with_pmid": papers_with_pmid,
+            "private_papers": private_papers,
+            "public_ratio": round((totals["public_papers"] / totals["papers"]) * 100) if totals["papers"] else 0,
+            "total_model_storage": total_model_storage,
+            "storage_average": int(total_model_storage / totals["models"]) if totals["models"] else 0,
+            "revenue_30_days": revenue_30_days,
+            "average_conversion_seconds": average_conversion_seconds,
+            "failed_login_24h": AuditLog.query.filter(
+                AuditLog.event_type == "user_login_failed",
+                AuditLog.timestamp >= now - timedelta(hours=24),
+            ).count(),
+            "qr_resolved_30d": QRLink.query.filter(QRLink.last_resolved_at >= last_30_days).count(),
+            "qr_resolved_total": resolved_qr_total,
+            "viewer_access_total": viewer_access_total,
+            "last_qr_resolved_at": last_qr_resolved.last_resolved_at if last_qr_resolved else None,
+            "disabled_qr_count": disabled_qr_count,
+            "expired_qr_count": expired_qr_count,
+            "expired_public_papers": expired_public_papers,
+        }
+        largest_models = (
+            Model3D.query.filter(Model3D.file_size.isnot(None))
+            .order_by(Model3D.file_size.desc())
+            .limit(5)
+            .all()
+        )
+        expiring_models = (
+            Model3D.query.filter(
+                Model3D.access_expires_at.isnot(None),
+                Model3D.access_expires_at >= now,
+                Model3D.access_expires_at <= now + timedelta(days=30),
+            )
+            .order_by(Model3D.access_expires_at.asc())
+            .limit(10)
+            .all()
+        )
+        if admin_page == "backups":
+            ensure_daily_backup(app, created_by_user_id=current_user.id)
+        backups = list_backup_archives(app) if admin_page == "backups" else []
         return render_template(
             "admin_dashboard.html",
             users=users,
@@ -1441,7 +1971,256 @@ def register_routes(app: Flask) -> None:
             models=models,
             payments=payments,
             qr_links=qr_links,
+            audit_logs=audit_logs,
+            jobs=jobs,
+            totals=totals,
+            stats=stats,
+            processing_counts=processing_counts,
+            license_counts=license_counts,
+            source_format_counts=source_format_counts,
+            payment_counts=payment_counts,
+            job_counts=job_counts,
+            field_counts=field_counts,
+            failed_format_counts=failed_format_counts,
+            failed_jobs=failed_jobs,
+            largest_models=largest_models,
+            expiring_models=expiring_models,
+            near_limit_models=near_limit_models,
+            daily_publication_trend=daily_publication_trend,
+            daily_viewer_trend=daily_viewer_trend,
+            monthly_revenue=monthly_revenue,
+            top_viewed_models=top_viewed_models,
+            storage_by_user=storage_by_user,
+            storage_breakdown=storage_breakdown,
+            orphan_counts=orphan_counts,
+            security_events=security_events,
+            critical_alerts=critical_alerts,
+            backups=backups,
+            active_page=admin_page,
+            filters={
+                "user_q": user_query_text,
+                "user_plan": user_plan_filter,
+                "user_role": user_role_filter,
+                "model_status": model_status_filter,
+                "job_status": job_status_filter,
+                "audit_event": audit_event_filter,
+                "audit_q": audit_query_text,
+            },
         )
+
+    @app.route("/admin/users/<int:user_id>")
+    @login_required
+    def admin_user_detail(user_id):
+        require_admin()
+        user = db.session.get(User, user_id)
+        if not user:
+            abort(404)
+        papers = Paper.query.filter_by(user_id=user.id).order_by(Paper.created_at.desc()).all()
+        models = Model3D.query.filter_by(user_id=user.id).order_by(Model3D.created_at.desc()).all()
+        payments = Payment.query.filter_by(user_id=user.id).order_by(Payment.created_at.desc()).all()
+        audit_events = AuditLog.query.filter_by(user_id=user.id).order_by(AuditLog.timestamp.desc()).limit(50).all()
+        total_spent = sum(payment.amount_kurus for payment in payments if payment.status == "paid")
+        log_audit("admin_user_detail_viewed", user_id=current_user.id, resource_id=str(user.id))
+        return render_template(
+            "admin_user_detail.html",
+            user=user,
+            papers=papers,
+            models=models,
+            payments=payments,
+            audit_events=audit_events,
+            total_spent=total_spent,
+        )
+
+    @app.route("/admin/users/<int:user_id>/dashboard")
+    @login_required
+    def admin_user_dashboard(user_id):
+        require_admin()
+        user = db.session.get(User, user_id)
+        if not user:
+            abort(404)
+        papers = Paper.query.filter_by(user_id=user.id).order_by(Paper.created_at.desc()).all()
+        log_audit("admin_user_dashboard_viewed", user_id=current_user.id, resource_id=str(user.id))
+        return render_template(
+            "dashboard.html",
+            papers=papers,
+            admin_view=True,
+            viewed_user=user,
+        )
+
+    @app.route("/admin/backups/create", methods=["POST"])
+    @login_required
+    def admin_backup_create():
+        require_admin()
+        filename = create_backup_archive(app, created_by_user_id=current_user.id, reason="manual")
+        flash(f"Backup created: {filename}", "success")
+        return redirect(url_for("admin_dashboard", admin_page="backups"))
+
+    @app.route("/admin/backups/<path:filename>")
+    @login_required
+    def admin_backup_download(filename):
+        require_admin()
+        safe_name = os.path.basename(filename)
+        log_audit("admin_backup_downloaded", user_id=current_user.id, resource_id=safe_name)
+        return send_from_directory(backup_folder(app), safe_name, as_attachment=True)
+
+    @app.route("/admin/users/<int:user_id>/role", methods=["POST"])
+    @login_required
+    def admin_user_role_update(user_id):
+        require_admin()
+        user = db.session.get(User, user_id)
+        if not user:
+            abort(404)
+        make_admin = request.form.get("is_admin") == "1"
+        if user.id == current_user.id and not make_admin:
+            flash("You cannot remove your own admin access.", "warning")
+            return redirect(url_for("admin_dashboard", admin_page="users"))
+        previous = user.is_admin
+        user.is_admin = make_admin
+        db.session.commit()
+        log_audit(
+            "admin_user_role_changed",
+            user_id=current_user.id,
+            resource_id=str(user.id),
+            details={"from": previous, "to": make_admin},
+        )
+        flash(f"Admin access updated for {user.email}.", "success")
+        return redirect(url_for("admin_dashboard", admin_page="users"))
+
+    @app.route("/admin/users/<int:user_id>/plan", methods=["POST"])
+    @login_required
+    def admin_user_plan_update(user_id):
+        require_admin()
+        user = db.session.get(User, user_id)
+        if not user:
+            abort(404)
+        new_plan = (request.form.get("plan") or "free").strip().lower()
+        if new_plan not in {"free", "academic"}:
+            flash("Invalid user plan.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="users"))
+        previous = user.plan
+        user.plan = new_plan
+        db.session.commit()
+        log_audit(
+            "admin_user_plan_changed",
+            user_id=current_user.id,
+            resource_id=str(user.id),
+            details={"from": previous, "to": new_plan},
+        )
+        flash(f"Plan updated for {user.email}.", "success")
+        return redirect(url_for("admin_dashboard", admin_page="users"))
+
+    @app.route("/admin/papers/<int:paper_id>/visibility", methods=["POST"])
+    @login_required
+    def admin_paper_visibility_update(paper_id):
+        require_admin()
+        paper = db.session.get(Paper, paper_id)
+        if not paper:
+            abort(404)
+        previous = {"is_public": paper.is_public, "status": paper.status}
+        paper.is_public = request.form.get("is_public") == "1"
+        paper.status = (request.form.get("status") or "active").strip().lower()
+        db.session.commit()
+        log_audit(
+            "admin_paper_visibility_changed",
+            user_id=current_user.id,
+            resource_id=str(paper.id),
+            details={"from": previous, "to": {"is_public": paper.is_public, "status": paper.status}},
+        )
+        flash(f"Publication updated: {paper.title}.", "success")
+        return redirect(url_for("admin_dashboard", admin_page="content"))
+
+    @app.route("/admin/models/<model_id>/license", methods=["POST"])
+    @login_required
+    def admin_model_license_update(model_id):
+        require_admin()
+        model = db.session.get(Model3D, model_id)
+        if not model:
+            abort(404)
+        new_license = normalize_license_type(request.form.get("license_type"))
+        previous = model.license_type
+        apply_model_license_defaults(model, new_license)
+        db.session.commit()
+        log_audit(
+            "admin_model_license_changed",
+            user_id=current_user.id,
+            resource_id=model.id,
+            details={"from": previous, "to": new_license},
+        )
+        flash(f"Model license updated to {get_license_plan(new_license).label}.", "success")
+        return redirect(url_for("admin_dashboard", admin_page="models"))
+
+    @app.route("/admin/models/<model_id>/processing", methods=["POST"])
+    @login_required
+    def admin_model_processing_update(model_id):
+        require_admin()
+        model = db.session.get(Model3D, model_id)
+        if not model:
+            abort(404)
+        new_status = (request.form.get("processing_status") or "ready").strip().lower()
+        if new_status not in {"queued", "processing", "ready", "failed", "replacement_failed"}:
+            flash("Invalid model processing status.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="models"))
+        previous = model.processing_status
+        model.processing_status = new_status
+        if new_status != "failed":
+            model.processing_error = None
+        db.session.commit()
+        log_audit(
+            "admin_model_processing_changed",
+            user_id=current_user.id,
+            resource_id=model.id,
+            details={"from": previous, "to": new_status},
+        )
+        flash("Model processing status updated.", "success")
+        return redirect(url_for("admin_dashboard", admin_page="models"))
+
+    @app.route("/admin/qr-links/<int:qr_id>/status", methods=["POST"])
+    @login_required
+    def admin_qr_status_update(qr_id):
+        require_admin()
+        qr_link = db.session.get(QRLink, qr_id)
+        if not qr_link:
+            abort(404)
+        new_status = (request.form.get("status") or "active").strip().lower()
+        if new_status not in {"active", "disabled"}:
+            flash("Invalid QR status.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="access"))
+        previous = qr_link.status
+        qr_link.status = new_status
+        db.session.commit()
+        log_audit(
+            "admin_qr_status_changed",
+            user_id=current_user.id,
+            resource_id=qr_link.public_id,
+            details={"from": previous, "to": new_status},
+        )
+        flash(f"QR record {qr_link.public_id} updated.", "success")
+        return redirect(url_for("admin_dashboard", admin_page="access"))
+
+    @app.route("/admin/payments/<int:payment_id>/status", methods=["POST"])
+    @login_required
+    def admin_payment_status_update(payment_id):
+        require_admin()
+        payment = db.session.get(Payment, payment_id)
+        if not payment:
+            abort(404)
+        new_status = (request.form.get("status") or "pending").strip().lower()
+        if new_status not in {"pending", "paid", "failed", "refunded"}:
+            flash("Invalid payment status.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="revenue"))
+        previous = payment.status
+        payment.status = new_status
+        if new_status == "paid" and not payment.paid_at:
+            payment.paid_at = datetime.now(UTC)
+        db.session.commit()
+        log_audit(
+            "admin_payment_status_changed",
+            user_id=current_user.id,
+            resource_id=str(payment.id),
+            details={"from": previous, "to": new_status},
+        )
+        flash("Payment status updated.", "success")
+        return redirect(url_for("admin_dashboard", admin_page="revenue"))
 
     @app.route("/profile", methods=["GET", "POST"])
     @login_required

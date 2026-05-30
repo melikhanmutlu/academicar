@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}Admin user - AcademicAR{% endblock %}
+
+{% block content %}
+<div class="app-shell admin-shell">
+  <div class="admin-header">
+    <div>
+      <span class="eyebrow">Admin user detail</span>
+      <h1>{{ user.username }}</h1>
+      <p>{{ user.email }} · joined {{ user.created_at.strftime("%Y-%m-%d") if user.created_at else "-" }}</p>
+    </div>
+    <div class="admin-header-actions">
+      <a href="{{ url_for('admin_user_dashboard', user_id=user.id) }}" class="btn-primary">View dashboard</a>
+      <a href="{{ url_for('admin_dashboard', admin_page='users') }}" class="btn-secondary">Users</a>
+    </div>
+  </div>
+
+  <section class="admin-metrics">
+    <div class="admin-metric">
+      <span>Role</span>
+      <strong>{{ "Admin" if user.is_admin else "Member" }}</strong>
+      <small>{{ user.plan|title }} plan</small>
+    </div>
+    <div class="admin-metric">
+      <span>Publications</span>
+      <strong>{{ papers|length }}</strong>
+      <small>{{ papers|selectattr("is_public")|list|length }} public</small>
+    </div>
+    <div class="admin-metric">
+      <span>Models</span>
+      <strong>{{ models|length }}</strong>
+      <small>{{ models|selectattr("processing_status", "equalto", "ready")|list|length }} ready</small>
+    </div>
+    <div class="admin-metric">
+      <span>Spent</span>
+      <strong>{{ "%.2f"|format(total_spent / 100) }}</strong>
+      <small>TRY paid</small>
+    </div>
+  </section>
+
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Account controls</h2>
+        <p>Role and plan changes are logged as admin actions.</p>
+      </div>
+    </div>
+    <div class="admin-actions">
+      <form method="POST" action="{{ url_for('admin_user_plan_update', user_id=user.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <select name="plan" class="field-select compact-select">
+          <option value="free" {% if user.plan == "free" %}selected{% endif %}>Free</option>
+          <option value="academic" {% if user.plan == "academic" %}selected{% endif %}>Academic</option>
+        </select>
+        <button type="submit" class="btn-secondary compact">Save plan</button>
+      </form>
+      <form method="POST" action="{{ url_for('admin_user_role_update', user_id=user.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="is_admin" value="{{ '0' if user.is_admin else '1' }}">
+        <button type="submit" class="btn-secondary compact">{{ "Remove admin" if user.is_admin else "Make admin" }}</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Publications</h2>
+        <p>Clickable public links for this user's publication records.</p>
+      </div>
+      <span>{{ papers|length }} records</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
+        <thead>
+          <tr>
+            <th>Publication</th>
+            <th>Status</th>
+            <th>Models</th>
+            <th>Created</th>
+            <th>Link</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for paper in papers %}
+            <tr>
+              <td>
+                <strong><a href="{{ url_for('paper_public', slug=paper.slug) }}" target="_blank" rel="noopener noreferrer">{{ paper.title }}</a></strong>
+                <small>{{ paper.slug }}</small>
+              </td>
+              <td><span class="status-chip">{{ "Public" if paper.is_public else "Private" }}</span></td>
+              <td>{{ paper.models|length }}</td>
+              <td>{{ paper.created_at.strftime("%Y-%m-%d") if paper.created_at else "-" }}</td>
+              <td><a href="{{ url_for('paper_public', slug=paper.slug, _external=True) }}" target="_blank" rel="noopener noreferrer">{{ url_for('paper_public', slug=paper.slug, _external=True) }}</a></td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5">No publications.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Models</h2>
+        <p>Open model viewers directly from the model name.</p>
+      </div>
+      <span>{{ models|length }} records</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>Publication</th>
+            <th>License</th>
+            <th>Status</th>
+            <th>QR</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for model in models %}
+            <tr>
+              <td><a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener noreferrer">{{ model.display_name or model.original_filename or model.id }}</a></td>
+              <td>{{ model.paper.title if model.paper else "-" }}</td>
+              <td>{{ get_license_plan(model.license_type).label }}</td>
+              <td>{{ model_access_status(model)|title }}</td>
+              <td>{{ model_resolver_url(model) if model.public_id else "-" }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5">No models.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Payments and activity</h2>
+        <p>Recent payments and user audit trail.</p>
+      </div>
+    </div>
+    <div class="admin-two-col">
+      <div class="admin-breakdown">
+        <h3>Payments</h3>
+        {% for payment in payments %}
+          <div><span>{{ payment.invoice_number or payment.provider }}</span><strong>{{ "%.2f"|format(payment.amount_kurus / 100) }} {{ payment.currency }} / {{ payment.status }}</strong></div>
+        {% else %}
+          <div><span>No payments</span><strong>-</strong></div>
+        {% endfor %}
+      </div>
+      <div class="admin-breakdown">
+        <h3>Recent audit events</h3>
+        {% for event in audit_events %}
+          <div><span>{{ event.event_type }}</span><strong>{{ event.timestamp.strftime("%m-%d %H:%M") if event.timestamp else "-" }}</strong></div>
+        {% else %}
+          <div><span>No audit events</span><strong>-</strong></div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mitochondria AR - AcademicAR</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
+</head>
+<body class="demo-ar-body">
+  <main class="demo-ar-shell">
+    <model-viewer
+      id="mitochondriaDemoViewer"
+      src="{{ url_for('static', filename='models/model.compressed.glb') }}"
+      alt="Mitochondria 3D model"
+      ar
+      ar-modes="scene-viewer webxr quick-look"
+      camera-controls
+      auto-rotate
+      rotation-per-second="18deg"
+      camera-orbit="35deg 64deg 10m"
+      field-of-view="34deg"
+      exposure="0.95"
+      shadow-intensity="0.12"
+      shadow-softness="0.95"
+      environment-image="neutral">
+      <button slot="ar-button" id="demoArButton" class="demo-ar-button">Open in AR</button>
+    </model-viewer>
+    <div class="demo-ar-panel">
+      <span>AcademicAR demo</span>
+      <h1>Mitochondria AR</h1>
+      <p>The QR opens this AR-ready model. If your browser blocks automatic AR launch, tap the button once.</p>
+      <button type="button" class="btn-primary" id="manualArLaunch">Open in AR</button>
+    </div>
+  </main>
+  <script>
+    (() => {
+      const viewer = document.getElementById('mitochondriaDemoViewer');
+      const manual = document.getElementById('manualArLaunch');
+      const launch = async () => {
+        if (!viewer || typeof viewer.activateAR !== 'function') return;
+        try { await viewer.activateAR(); } catch (error) {}
+      };
+      manual?.addEventListener('click', launch);
+      viewer?.addEventListener('load', () => {
+        window.setTimeout(launch, 350);
+      }, { once: true });
+    })();
+  </script>
+</body>
+</html>
