@@ -115,7 +115,6 @@
           <h3>Academic</h3>
           {% if is_academic %}<span>Current</span>{% endif %}
         </div>
-        <p class="pricing-period">Billed once at activation</p>
         <p class="plan-price">$9.90</p>
         <ul>
           <li>3-year active AR & QR access</li>
@@ -130,7 +129,6 @@
             <input type="hidden" name="plan" value="academic">
             <button type="submit" class="btn-primary w-full">Get package</button>
           </form>
-          <p class="plan-note">Billed once at activation</p>
         {% else %}
           <button class="btn-primary w-full mt-5 opacity-60 cursor-not-allowed" disabled>Active plan</button>
         {% endif %}
@@ -141,7 +139,6 @@
           <h3>Extended Archive</h3>
           {% if is_extended %}<span>Current</span>{% endif %}
         </div>
-        <p class="pricing-period">Billed once at activation</p>
         <p class="plan-price">$24.90</p>
         <ul>
           <li>10-year active AR & QR access</li>
