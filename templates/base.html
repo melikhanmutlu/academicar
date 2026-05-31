@@ -55,6 +55,15 @@
         <span class="site-brand-name">AcademicAR</span>
       </a>
 
+      <!-- Mobile hamburger toggle button -->
+      <button class="mobile-nav-toggle" aria-label="Toggle Menu" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="12" x2="21" y2="12" class="hamburger-line-middle"></line>
+          <line x1="3" y1="6" x2="21" y2="6" class="hamburger-line-top"></line>
+          <line x1="3" y1="18" x2="21" y2="18" class="hamburger-line-bottom"></line>
+        </svg>
+      </button>
+
       <div class="site-nav-actions">
         {% if current_user.is_authenticated %}
           <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
@@ -148,6 +157,18 @@
         updateParallax();
         window.addEventListener("scroll", requestTick, { passive: true });
         window.addEventListener("resize", requestTick);
+      }
+
+      // Mobile Nav Drawer Toggle Logic
+      const mobileToggle = document.querySelector('.mobile-nav-toggle');
+      const navActions = document.querySelector('.site-nav-actions');
+      if (mobileToggle && navActions) {
+        mobileToggle.addEventListener('click', () => {
+          const active = navActions.classList.toggle('is-active');
+          mobileToggle.classList.toggle('is-open', active);
+          mobileToggle.setAttribute('aria-expanded', active);
+          document.body.classList.toggle('nav-menu-open', active);
+        });
       }
     })();
   </script>

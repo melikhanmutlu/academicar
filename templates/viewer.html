@@ -94,22 +94,31 @@
     <header class="absolute left-0 right-0 top-0 z-30 p-4 flex items-center justify-between pointer-events-none">
       <div class="pointer-events-auto flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-2 py-1 backdrop-blur-xl text-xs">
         <span class="brand-mark !w-5 !h-5 !text-[10px] flex items-center justify-center bg-[#ff682c] rounded-full text-white font-bold font-serif">A</span>
-        <span class="font-serif font-semibold text-white/90">AcademicAR</span>
+        <span class="font-serif font-semibold text-white/90 hidden sm:inline">AcademicAR</span>
       </div>
       <div class="pointer-events-auto flex items-center gap-2">
-        <button id="arBtn" class="viewer-tool-btn primary !py-1.5 !px-4 !text-xs" type="button">View in AR</button>
+        <button id="arBtn" class="viewer-tool-btn primary !py-1.5 !px-4 !text-xs" type="button">
+          <span class="hidden sm:inline">View in AR</span>
+          <span class="sm:hidden">AR</span>
+        </button>
       </div>
     </header>
     {% else %}
     <header class="absolute left-0 right-0 top-0 z-30 p-4 sm:p-6 flex items-center justify-between pointer-events-none">
       <a href="/" class="pointer-events-auto flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-2 backdrop-blur-xl">
         <span class="brand-mark !w-7 !h-7">A</span>
-        <span class="font-serif font-semibold">AcademicAR</span>
+        <span class="font-serif font-semibold hidden sm:inline">AcademicAR</span>
       </a>
       <div class="pointer-events-auto flex flex-wrap items-center justify-end gap-2">
-        <button id="fullscreenBtn" class="viewer-tool-btn" type="button">Full screen</button>
+        <button id="fullscreenBtn" class="viewer-tool-btn" type="button">
+          <span class="hidden sm:inline">Full screen</span>
+          <span class="sm:hidden">Full</span>
+        </button>
         <button id="qrBtn" class="viewer-tool-btn" type="button">QR</button>
-        <button id="arBtn" class="viewer-tool-btn primary" type="button">View in AR</button>
+        <button id="arBtn" class="viewer-tool-btn primary" type="button">
+          <span class="hidden sm:inline">View in AR</span>
+          <span class="sm:hidden">AR</span>
+        </button>
         <button id="infoBtn" class="viewer-tool-btn" type="button">Info</button>
       </div>
     </header>
@@ -167,7 +176,7 @@
     </aside>
     {% endif %}
 
-    <aside id="infoPanel" class="info-drawer absolute top-0 right-0 bottom-0 z-40 w-full sm:w-[420px] bg-[#111111]/94 border-l border-white/10 overflow-y-auto p-6 backdrop-blur-2xl">
+    <aside id="infoPanel" class="info-drawer absolute top-0 right-0 bottom-0 z-40 w-full sm:w-[420px] max-w-full bg-[#111111]/94 border-l border-white/10 overflow-y-auto p-6 backdrop-blur-2xl">
       <div class="flex items-center justify-between mb-6">
         <div>
           <p class="text-xs uppercase tracking-[0.18em] text-white/55">Publication metadata</p>

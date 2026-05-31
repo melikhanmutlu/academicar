@@ -3700,9 +3700,11 @@ input[type="file"]::-webkit-file-upload-button {
   }
   .publication-share {
     border-top: 1px solid var(--color-light-pearl);
-    grid-template-columns: repeat(4, minmax(76px, max-content));
+    grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+    gap: 8px;
     justify-content: flex-start;
     padding-top: 12px;
+    width: 100%;
   }
 }
 
@@ -6255,5 +6257,188 @@ details[open] > .upload-summary .upload-inline-action svg {
   }
   .demo-publication-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ==========================================================================
+   Responsive Navigation Drawer & Hamburger Styles
+   ========================================================================== */
+
+/* Body scroll lock when mobile drawer is open */
+body.nav-menu-open {
+  overflow: hidden !important;
+}
+
+/* Base Hamburger Styles */
+.mobile-nav-toggle {
+  display: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-midnight-graphite);
+  outline: none;
+  z-index: 100;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mobile-nav-toggle svg {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hamburger-line-middle,
+.hamburger-line-top,
+.hamburger-line-bottom {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 0.2s ease,
+              stroke-dashoffset 0.3s ease;
+  transform-origin: center;
+}
+
+/* Open states for Morphing Hamburger Icon to X */
+.mobile-nav-toggle.is-open svg {
+  transform: rotate(90deg);
+}
+
+.mobile-nav-toggle.is-open .hamburger-line-middle {
+  opacity: 0;
+  transform: scale(0.2);
+}
+
+.mobile-nav-toggle.is-open .hamburger-line-top {
+  transform: rotate(45deg) translate(0, 0);
+}
+
+.mobile-nav-toggle.is-open .hamburger-line-bottom {
+  transform: rotate(-45deg) translate(0, 0);
+}
+
+@media (max-width: 768px) {
+  /* Show Hamburger toggle on mobile/tablet */
+  .mobile-nav-toggle {
+    display: flex;
+  }
+
+  /* Reduce inner site header padding */
+  .site-header-inner {
+    padding: 0 20px !important;
+  }
+
+  /* Reposition actions wrapper as full-screen sliding menu drawer */
+  .site-nav-actions {
+    position: fixed !important;
+    top: 64px; /* Align below sticky site header */
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--color-canvas-white);
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    padding: 32px 24px !important;
+    gap: 16px !important;
+    z-index: 99 !important;
+    
+    /* Smooth transform slide-in & opacity transition */
+    transform: translateY(-100%);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+                opacity 0.35s ease;
+    border-top: 1px solid var(--color-light-pearl);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Active Drawer state */
+  .site-nav-actions.is-active {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Drawer individual link styling for premium look & touch target */
+  .site-nav-actions .nav-link,
+  .site-nav-actions .nav-link-muted,
+  .site-nav-actions form button {
+    font-size: 17px !important;
+    font-weight: 500 !important;
+    padding: 14px 12px !important;
+    border-bottom: 1px solid var(--color-light-pearl) !important;
+    width: 100% !important;
+    display: block !important;
+    border-radius: 8px !important;
+    transition: background 0.2s ease, padding-left 0.25s ease !important;
+    box-sizing: border-box;
+  }
+
+  .site-nav-actions .nav-link:hover,
+  .site-nav-actions .nav-link-muted:hover,
+  .site-nav-actions form button:hover {
+    background: var(--color-cloud-whisper) !important;
+    padding-left: 18px !important;
+    color: var(--color-sunset-orange) !important;
+  }
+
+  .site-nav-actions form {
+    width: 100% !important;
+    margin: 0 !important;
+    display: block !important;
+  }
+
+  .site-nav-actions form button {
+    border: none !important;
+    background: transparent !important;
+    text-align: left !important;
+    cursor: pointer !important;
+  }
+  
+  /* Profile avatar alignment inside mobile drawer */
+  .site-nav-actions a[title="Profile"] {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    padding: 14px 12px !important;
+    border-bottom: 1px solid var(--color-light-pearl) !important;
+    text-decoration: none !important;
+    border-radius: 8px !important;
+    transition: background 0.2s ease !important;
+  }
+
+  .site-nav-actions a[title="Profile"]::after {
+    content: "Profile Settings";
+    font-family: var(--font-inter);
+    font-size: 17px;
+    font-weight: 500;
+    color: var(--color-midnight-graphite);
+  }
+  
+  .site-nav-actions a[title="Profile"]:hover {
+    background: var(--color-cloud-whisper) !important;
+  }
+
+  /* Admin tabs responsive horizontal scrolling */
+  .admin-tabs {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    white-space: nowrap !important;
+    padding-bottom: 12px !important;
+  }
+  
+  .admin-tabs a {
+    display: inline-block !important;
+    flex-shrink: 0 !important;
+  }
+  
+  .admin-tabs::-webkit-scrollbar {
+    height: 4px;
+  }
+  
+  .admin-tabs::-webkit-scrollbar-thumb {
+    background: var(--color-light-pearl);
+    border-radius: 4px;
   }
 }
