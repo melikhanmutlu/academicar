@@ -19,7 +19,6 @@
 <div class="app-shell dashboard-shell py-8">
   <div class="dashboard-header reveal-up">
     <div>
-      <span class="eyebrow">{{ "Admin user workspace" if admin_view is defined and admin_view else "Research workspace" }}</span>
       <h1>{{ viewed_user.username ~ "'s dashboard" if admin_view is defined and admin_view else "Dashboard" }}</h1>
       <p>
         {% if admin_view is defined and admin_view %}
@@ -89,7 +88,6 @@
 
   <section class="dashboard-upload-band surface reveal-up">
     <div>
-      <span class="eyebrow">Upload workspace</span>
       <h2>Create a publication or add a model.</h2>
       <p>
         Keep publication metadata, PDF files, models, QR resolvers, and viewer links in one workflow.
@@ -243,7 +241,12 @@
             {% if p.pdf_path %}
               <a href="{{ url_for('paper_public_pdf', slug=p.slug) }}" target="_blank" rel="noopener noreferrer" class="dash-action dash-action-primary">PDF</a>
             {% else %}
-              <button type="button" class="dash-action dash-action-muted" disabled title="No PDF uploaded">PDF missing</button>
+              {% if not (admin_view is defined and admin_view) %}
+                <input type="file" id="pdf-input-{{ p.slug }}" accept=".pdf" style="display: none;" onchange="uploadDashboardPdf('{{ p.slug }}')">
+                <button type="button" class="dash-action" id="pdf-btn-{{ p.slug }}" onclick="document.getElementById('pdf-input-{{ p.slug }}').click()">Add PDF</button>
+              {% else %}
+                <button type="button" class="dash-action dash-action-muted" disabled title="No PDF uploaded">PDF missing</button>
+              {% endif %}
             {% endif %}
             {% if admin_view is defined and admin_view %}
               <a href="{{ url_for('paper_public', slug=p.slug) }}" target="_blank" rel="noopener noreferrer" class="dash-action">Open</a>
@@ -362,5 +365,54 @@
       }
     });
   });
+
+  window.uploadDashboardPdf = function(slug) {
+    const fileInput = document.getElementById(`pdf-input-${slug}`);
+    const btn = document.getElementById(`pdf-btn-${slug}`);
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) return;
+    
+    const file = fileInput.files[0];
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      alert("Only .pdf files are accepted.");
+      return;
+    }
+    
+    const originalText = btn.textContent;
+    btn.textContent = "Uploading...";
+    btn.disabled = true;
+    btn.style.opacity = "0.6";
+    
+    const formData = new FormData();
+    formData.append("pdf", file);
+    
+    fetch(`/papers/${slug}/upload-pdf`, {
+      method: "POST",
+      body: formData,
+      headers: {
+        'X-CSRFToken': '{{ csrf_token() }}'
+      }
+    })
+    .then(response => response.json().then(data => ({ status: response.status, data })))
+    .then(({ status, data }) => {
+      if (status === 200 && data.success) {
+        btn.textContent = "PDF";
+        btn.disabled = false;
+        btn.style.opacity = "1";
+        window.location.reload();
+      } else {
+        alert("Error: " + (data.error || "Could not upload PDF file."));
+        btn.textContent = originalText;
+        btn.disabled = false;
+        btn.style.opacity = "1";
+      }
+    })
+    .catch(error => {
+      console.error("PDF upload failed:", error);
+      alert("An error occurred during upload. Please try again.");
+      btn.textContent = originalText;
+      btn.disabled = false;
+      btn.style.opacity = "1";
+    });
+  };
 </script>
 {% endblock %}

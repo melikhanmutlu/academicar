@@ -6,7 +6,6 @@
 <div class="app-shell profile-shell py-8 pb-12">
   <div class="dashboard-header reveal-up">
     <div>
-      <span class="eyebrow">Account</span>
       <h1>Profile</h1>
       <p>Manage your identity, plan, security, and workspace statistics.</p>
     </div>
@@ -93,10 +92,11 @@
         <p class="pricing-period">Free preview link</p>
         <p class="plan-price">$0</p>
         <ul>
-          <li>3-day active link</li>
-          <li>QR code</li>
-          <li>3D viewing</li>
+          <li>3-day active AR & QR access</li>
+          <li>1 interactive model</li>
+          <li>Up to 100 MB storage</li>
           <li>Screenshot capture</li>
+          <li>Watermarked viewer</li>
         </ul>
         {% if is_academic %}
           <form method="POST" action="{{ url_for('profile') }}" class="mt-5">
@@ -111,17 +111,17 @@
 
       <div class="profile-card plan-card{% if is_academic %} is-current{% endif %}">
         <div class="plan-card-head">
-          <h3>Academic Package</h3>
+          <h3>Academic</h3>
           {% if is_academic %}<span>Current</span>{% endif %}
         </div>
-        <p class="pricing-period">One-time, per publication</p>
-        <p class="plan-price">$10</p>
+        <p class="pricing-period">Billed once at activation</p>
+        <p class="plan-price">$9.90</p>
         <ul>
-          <li>3-year active link</li>
-          <li>Persistent QR code</li>
-          <li>Public sharing</li>
-          <li>Multiple model support</li>
-          <li>Publication metadata fields</li>
+          <li>3-year active AR & QR access</li>
+          <li>1 interactive model</li>
+          <li>Up to 200 MB storage</li>
+          <li>No watermark</li>
+          <li>Persistent QR & viewer URL</li>
         </ul>
         {% if not is_academic %}
           <form method="POST" action="{{ url_for('profile') }}" class="mt-5">

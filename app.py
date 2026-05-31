@@ -2855,6 +2855,51 @@ def register_routes(app: Flask) -> None:
         }
         return render_template("paper_new.html", form=form, paper=paper, mode="edit")
 
+    @app.route("/papers/<slug>/upload-pdf", methods=["POST"])
+    @login_required
+    @require_paper_ownership
+    def paper_upload_pdf(slug):
+        paper = active_paper_query().filter_by(slug=slug).first()
+        if not paper:
+            return jsonify({"success": False, "error": "Publication not found"}), 404
+            
+        pdf_file = request.files.get("pdf")
+        if not pdf_file or not pdf_file.filename:
+            return jsonify({"success": False, "error": "No file uploaded"}), 400
+            
+        if not allowed_pdf(pdf_file.filename):
+            return jsonify({"success": False, "error": "Only .pdf files are accepted"}), 400
+            
+        pdf_filename = f"{uuid.uuid4()}_{secure_filename(pdf_file.filename)}"
+        saved_pdf_path = os.path.join(app.config["PDF_FOLDER"], pdf_filename)
+        
+        try:
+            safe_save_file(pdf_file, saved_pdf_path)
+        except StorageError as e:
+            return jsonify({"success": False, "error": str(e)}), 500
+            
+        pdf_errors = validate_pdf_file(saved_pdf_path)
+        if pdf_errors:
+            cleanup_file(saved_pdf_path)
+            return jsonify({"success": False, "error": "Invalid PDF file: " + "; ".join(pdf_errors)}), 400
+            
+        old_pdf_path = None
+        if paper.pdf_path:
+            old_pdf_path = os.path.join(app.config["PDF_FOLDER"], os.path.basename(paper.pdf_path))
+            
+        try:
+            paper.pdf_path = pdf_filename
+            db.session.commit()
+            log_audit("paper_pdf_uploaded", user_id=current_user.id, resource_id=str(paper.id))
+        except SQLAlchemyError:
+            db.session.rollback()
+            cleanup_file(saved_pdf_path)
+            logger.exception("Ajax PDF upload failed")
+            return jsonify({"success": False, "error": "Database error while updating publication"}), 500
+            
+        cleanup_file(old_pdf_path)
+        return jsonify({"success": True, "pdf_url": url_for("paper_public_pdf", slug=paper.slug)})
+
     @app.route("/papers/<slug>/delete", methods=["POST"])
     @login_required
     @require_paper_ownership

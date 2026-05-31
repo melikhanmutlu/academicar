@@ -3820,7 +3820,7 @@ input[type="file"]::-webkit-file-upload-button {
 .paper-meta > div {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 9px;
   min-height: 76px;
   padding: 16px 20px 16px 0;
