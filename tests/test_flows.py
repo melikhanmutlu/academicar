@@ -1447,19 +1447,13 @@ def test_paper_edit_pdf_deletion(client):
         pdf_path = os.path.join(client.application.config["PDF_FOLDER"], paper.pdf_path)
         assert os.path.exists(pdf_path)
 
-    # 2. Edit the paper and request PDF deletion
+    # 2. Call immediate PDF deletion AJAX route
     response = client.post(
-        f"/papers/{slug}/edit",
-        data={
-            "title": "Paper with PDF to Delete",
-            "authors": "Jane Doe",
-            "year": "2026",
-            "field": "Medicine",
-            "delete_pdf": "1",
-        },
+        f"/papers/{slug}/delete-pdf",
         follow_redirects=True,
     )
     assert response.status_code == 200
+    assert response.get_json()["success"] is True
 
     with client.application.app_context():
         paper = Paper.query.filter_by(title="Paper with PDF to Delete").one()

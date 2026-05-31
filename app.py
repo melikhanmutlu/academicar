@@ -2919,6 +2919,29 @@ def register_routes(app: Flask) -> None:
         cleanup_file(old_pdf_path)
         return jsonify({"success": True, "pdf_url": url_for("paper_public_pdf", slug=paper.slug)})
 
+    @app.route("/papers/<slug>/delete-pdf", methods=["POST"])
+    @login_required
+    @require_paper_ownership
+    def paper_delete_pdf_ajax(slug):
+        paper = active_paper_query().filter_by(slug=slug).first()
+        if not paper:
+            return jsonify({"success": False, "error": "Publication not found"}), 404
+
+        if not paper.pdf_path:
+            return jsonify({"success": False, "error": "No PDF attached to this publication"}), 400
+
+        old_pdf_path = os.path.join(app.config["PDF_FOLDER"], os.path.basename(paper.pdf_path))
+        try:
+            paper.pdf_path = None
+            db.session.commit()
+            cleanup_file(old_pdf_path)
+            log_audit("paper_pdf_deleted", user_id=current_user.id, resource_id=str(paper.id))
+            return jsonify({"success": True})
+        except Exception as e:
+            db.session.rollback()
+            logger.exception("Paper PDF deletion failed")
+            return jsonify({"success": False, "error": "Could not delete PDF"}), 500
+
     @app.route("/papers/<slug>/delete", methods=["POST"])
     @login_required
     @require_paper_ownership

@@ -106,7 +106,7 @@
       </div>
 
       {% if is_edit and paper.pdf_path %}
-        <div class="rounded-xl border border-[#e8e8e8] bg-[#fdfdfd] p-5 mb-4" style="border: 1px solid var(--color-light-pearl); background: rgba(255, 255, 255, 0.7); border-radius: 12px; margin-bottom: 16px;">
+        <div id="current-pdf-container" class="rounded-xl border border-[#e8e8e8] bg-[#fdfdfd] p-5 mb-4" style="border: 1px solid var(--color-light-pearl); background: rgba(255, 255, 255, 0.7); border-radius: 12px; margin-bottom: 16px;">
           <span class="text-xs font-semibold uppercase tracking-wider text-[#d94e14] block" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #d94e14; display: block;">Current PDF File</span>
           <div class="flex items-center justify-between mt-2 gap-4" style="display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 8px;">
             <div class="flex items-center gap-2" style="display: flex; align-items: center; gap: 8px; min-width: 0;">
@@ -117,15 +117,17 @@
                 {{ paper.pdf_path.split('_', 1)[1] if '_' in paper.pdf_path else paper.pdf_path }}
               </span>
             </div>
-            <label class="inline-flex items-center text-sm font-semibold text-[#ef4444] cursor-pointer hover:text-red-700 transition" style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: #ef4444; font-size: 14px; font-weight: 600; transition: color 0.2s;">
-              <input type="checkbox" name="delete_pdf" value="1" style="width: 16px; height: 16px; accent-color: #ef4444; cursor: pointer; margin: 0;">
+            <button type="button" onclick="deletePaperPdfAJAX('{{ paper.slug }}')" class="inline-flex items-center text-sm font-semibold text-[#ef4444] cursor-pointer hover:text-red-700 transition" style="background: none; border: none; padding: 0; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: #ef4444; font-size: 14px; font-weight: 600; transition: color 0.2s; outline: none; font-family: inherit;">
+              <svg class="w-4 h-4 shrink-0" style="width: 16px; height: 16px; color: #ef4444; flex-shrink: 0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+              </svg>
               Remove PDF
-            </label>
+            </button>
           </div>
         </div>
       {% endif %}
 
-      <label class="block rounded-xl border border-dashed border-[#111827]/25 bg-white/55 p-5 cursor-pointer hover:bg-white/75 transition">
+      <label data-pdf-upload-card class="block rounded-xl border border-dashed border-[#111827]/25 bg-white/55 p-5 cursor-pointer hover:bg-white/75 transition">
         <span class="block font-semibold text-[#111827]">{{ 'Replace PDF' if is_edit and paper.pdf_path else 'Attach PDF' }}</span>
         <span class="block text-sm text-[#5c6473] mt-1">Optional PDF upload. PDF files are only downloadable by the publication owner.{% if is_edit and paper.pdf_path %} Leave empty to keep the current PDF.{% endif %}</span>
         <span class="file-picker-control mt-4"><span>Choose PDF</span><small data-file-name>No file selected</small></span>
@@ -470,5 +472,48 @@
       }
     }
   })();
+
+  async function deletePaperPdfAJAX(slug) {
+    if (!confirm("Are you sure you want to delete this PDF? This action cannot be undone.")) {
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/papers/${slug}/delete-pdf`, {
+        method: "POST",
+        headers: {
+          "X-CSRFToken": "{{ csrf_token() }}",
+          "Content-Type": "application/json"
+        }
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        // 1. Remove the PDF container with a smooth fade-out transition
+        const container = document.getElementById("current-pdf-container");
+        if (container) {
+          container.style.transition = "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)";
+          container.style.opacity = "0";
+          container.style.transform = "scale(0.95)";
+          setTimeout(() => container.remove(), 300);
+        }
+        
+        // 2. Update the "Replace PDF" text and description inside the upload card
+        const replaceTitle = document.querySelector('label[data-pdf-upload-card] span.font-semibold');
+        if (replaceTitle) {
+          replaceTitle.textContent = "Attach PDF";
+        }
+        const replaceNote = document.querySelector('label[data-pdf-upload-card] span.text-sm');
+        if (replaceNote) {
+          replaceNote.textContent = "Optional PDF upload. PDF files are only downloadable by the publication owner.";
+        }
+      } else {
+        alert(data.error || "Could not delete PDF. Please try again.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("An error occurred while deleting the PDF.");
+    }
+  }
 </script>
 {% endblock %}
