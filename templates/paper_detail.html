@@ -472,20 +472,22 @@
     });
   });
 
-  document.querySelectorAll('[data-collapsible-abstract]').forEach((block) => {
-    const copy = block.querySelector('.abstract-copy');
-    const toggle = block.querySelector('[data-abstract-toggle]');
-    if (!copy || !toggle) return;
-
-    const isOverflowing = copy.scrollHeight > copy.clientHeight + 4;
-    if (!isOverflowing) {
-      toggle.hidden = true;
-      return;
-    }
-
-    toggle.addEventListener('click', () => {
-      const expanded = block.classList.toggle('is-expanded');
-      toggle.textContent = expanded ? 'Show less' : 'Read more';
+  requestAnimationFrame(() => {
+    document.querySelectorAll('[data-collapsible-abstract]').forEach((block) => {
+      const copy = block.querySelector('.abstract-copy');
+      const toggle = block.querySelector('[data-abstract-toggle]');
+      if (!copy || !toggle) return;
+      const isOverflowing = copy.scrollHeight > copy.clientHeight + 4;
+      if (!isOverflowing) {
+        toggle.hidden = true;
+        copy.style.maskImage = 'none';
+        copy.style.webkitMaskImage = 'none';
+        return;
+      }
+      toggle.addEventListener('click', () => {
+        const expanded = block.classList.toggle('is-expanded');
+        toggle.textContent = expanded ? 'Show less' : 'Read more';
+      });
     });
   });
 

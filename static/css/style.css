@@ -4017,27 +4017,31 @@ input[type="file"]::-webkit-file-upload-button {
   border-top: 1px solid var(--color-light-pearl) !important;
   margin-top: 18px !important;
   padding-top: 18px !important;
+  grid-column: 1 / -1;
+  display: block;
+  width: 100%;
 }
 .abstract-block h3 {
   font-family: var(--font-inter);
-  font-size: 15px;
+  font-size: 11px;
   font-weight: 700;
-  text-transform: none;
-  letter-spacing: 0;
-  color: var(--color-midnight-graphite);
-  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-silver-ash);
+  margin-bottom: 12px;
 }
 .abstract-copy {
   font-family: var(--font-inter);
   font-size: 14px !important;
   color: var(--color-dark-shale) !important;
-  line-height: 1.6 !important;
-  max-height: 7.2em;
+  line-height: 1.65 !important;
+  max-height: 6.6em;
   max-width: none;
   overflow: hidden;
   position: relative;
-  mask-image: linear-gradient(180deg, black 60%, transparent);
-  -webkit-mask-image: linear-gradient(180deg, black 60%, transparent);
+  column-count: 1;
+  mask-image: linear-gradient(180deg, black 55%, transparent);
+  -webkit-mask-image: linear-gradient(180deg, black 55%, transparent);
 }
 .abstract-block.is-expanded .abstract-copy {
   max-height: none;
