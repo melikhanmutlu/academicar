@@ -3728,13 +3728,13 @@ input[type="file"]::-webkit-file-upload-button {
 }
 
 /* ===== Paper Detail ===== */
-.paper-detail-shell { padding-top: 38px; }
+.paper-detail-shell { padding-top: 32px; padding-bottom: 32px; }
 .detail-back-button {
   display: inline-flex;
   min-height: 36px;
   align-items: center;
   justify-content: center;
-  margin-bottom: 26px;
+  margin-bottom: 20px;
   border: 1px solid var(--color-light-pearl);
   border-radius: 999px;
   background: var(--color-canvas-white);
@@ -5991,24 +5991,46 @@ details[open] > .upload-summary .upload-inline-action::before { content: "Hide";
 .upload-workflow-form {
   display: grid;
   grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.1fr);
-  gap: 26px;
+  gap: 20px;
   align-items: start;
+}
+
+.upload-form-header {
+  grid-column: 1 / -1;
+  margin-bottom: 4px;
+}
+.upload-form-title {
+  font-family: var(--font-polysans);
+  font-size: clamp(24px, 2.4vw, 32px);
+  font-weight: 400;
+  letter-spacing: -0.48px;
+  color: var(--color-midnight-graphite);
+  margin-top: 12px;
+  line-height: 1.15;
 }
 
 .upload-workflow-left,
 .upload-workflow-right {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
+}
+
+.upload-description {
+  font-family: var(--font-inter);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--color-silver-ash);
+  margin: 0;
 }
 
 .upload-compliance-note {
   border-top: 1px solid var(--color-light-pearl);
-  padding-top: 14px;
+  padding-top: 12px;
   font-family: var(--font-inter);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.5;
-  color: var(--color-dark-shale);
+  color: var(--color-silver-ash);
 }
 
 .upload-action-row {

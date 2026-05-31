@@ -7,10 +7,10 @@
 {% block content %}
 {% set first_model = paper.models[0] if paper.models else none %}
 {% set can_upload_more = true %}
-<div class="app-shell paper-detail-shell py-10 pb-10">
+<div class="app-shell paper-detail-shell">
   <a href="{{ url_for('dashboard') }}" class="detail-back-button">&larr; Dashboard</a>
 
-  <section class="paper-detail-layout mb-8">
+  <section class="paper-detail-layout mb-5">
     <div class="surface paper-hero rounded-xl p-6 sm:p-7 reveal-up">
       <div class="paper-hero-toolbar">
           <div class="paper-chip-row">
@@ -112,7 +112,7 @@
     </aside>
   </section>
 
-  <section class="mb-8" data-model-registry>
+  <section class="mb-5" data-model-registry>
     <div class="section-heading-row">
       <div>
         <span class="eyebrow">3D / AR assets</span>
@@ -212,7 +212,7 @@
     {% endif %}
   </section>
 
-  <section id="add-model" class="mb-8 reveal-up">
+  <section id="add-model" class="mb-6 reveal-up">
     {% if paper.models %}
       <details class="surface rounded-xl p-0 overflow-hidden upload-panel-prominent" data-upload-panel open>
         <summary class="upload-summary upload-summary-static">
@@ -228,12 +228,15 @@
     {% endif %}
           <form method="POST" action="{{ url_for('upload_model', slug=paper.slug) }}" enctype="multipart/form-data" class="upload-workflow-form" data-upload-form>
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <div class="upload-workflow-left">
+
+              <div class="upload-form-header">
                 <div>
                   <span class="eyebrow">Model upload</span>
-                  <h2 class="font-serif text-3xl font-semibold text-[#111827] mt-4">{{ 'Add a model' if paper.models else 'Add the first model' }}</h2>
-                  <p class="text-[#64748b] text-sm leading-relaxed mt-3">Upload an anonymized model file. The platform prepares a stable public viewer, managed QR code, and AR-ready GLB asset.</p>
+                  <h2 class="upload-form-title">{{ 'Add a model' if paper.models else 'Add the first model' }}</h2>
                 </div>
+              </div>
+
+              <div class="upload-workflow-left">
                 <label class="upload-dropzone">
                   <span class="block text-[#111827] font-semibold">Select GLB, STL, OBJ, or FBX file</span>
                   <span class="block text-sm text-[#64748b] mt-1" data-dropzone-copy>Drag and drop a model here, or choose a file. iOS AR uses an automatically generated USDZ companion.</span>
@@ -249,12 +252,10 @@
                   </label>
                   <p class="text-xs text-[#5c6473] mt-2">Upload the material (.mtl) and texture images (.png, .jpg) referenced by the .obj file. The converter preserves textures by default.</p>
                 </div>
-                <div class="upload-compliance-note">
-                  Uploaded models must be anonymized. Files containing patient names, protocol numbers, faces, identity data, or identifiable information are prohibited.
-                </div>
               </div>
 
               <div class="upload-workflow-right">
+                <p class="upload-description">Upload an anonymized model file. The platform prepares a stable public viewer, managed QR code, and AR-ready GLB asset.</p>
                 <div>
                   <label class="field-label">Model license</label>
                   <select name="license_type" class="field-select">
@@ -272,6 +273,9 @@
                   <input type="checkbox" name="compliance_confirm" value="yes" required class="mt-1">
                   <span>I confirm that this model has been anonymized, that I have the right to share/publish it, and that I am responsible for all required ethical approval and consent processes.</span>
                 </label>
+                <div class="upload-compliance-note">
+                  Uploaded models must be anonymized. Files containing patient names, protocol numbers, faces, identity data, or identifiable information are prohibited.
+                </div>
                 <div class="upload-action-row">
                   <label class="color-optional-control" data-color-control>
                     <input type="checkbox" name="color_enabled" value="yes" data-color-toggle>
