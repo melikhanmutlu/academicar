@@ -4008,13 +4008,13 @@ input[type="file"]::-webkit-file-upload-button {
   font-size: 14px !important;
   color: var(--color-dark-shale) !important;
   line-height: 1.65 !important;
-  max-height: 6.6em;
+  max-height: 8.25em;
   max-width: none;
   overflow: hidden;
   position: relative;
   column-count: 1;
-  mask-image: linear-gradient(180deg, black 55%, transparent);
-  -webkit-mask-image: linear-gradient(180deg, black 55%, transparent);
+  mask-image: linear-gradient(180deg, black 85%, transparent 100%);
+  -webkit-mask-image: linear-gradient(180deg, black 85%, transparent 100%);
 }
 .abstract-block.is-expanded .abstract-copy {
   max-height: none;
