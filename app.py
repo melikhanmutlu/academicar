@@ -2328,7 +2328,7 @@ def register_routes(app: Flask) -> None:
     def profile():
         if request.method == "POST":
             new_plan = (request.form.get("plan") or "").strip().lower()
-            if new_plan not in {"free", "academic"}:
+            if new_plan not in {"free", "academic", "extended_archive"}:
                 flash("Invalid plan choice.", "danger")
                 return redirect(url_for("profile"))
             previous = current_user.plan or "free"
@@ -2339,10 +2339,11 @@ def register_routes(app: Flask) -> None:
             current_user.plan = new_plan
             try:
                 payment = None
-                if new_plan == "academic":
+                if new_plan in {"academic", "extended_archive"}:
+                    amount_kurus = 50000 if new_plan == "academic" else 125000
                     payment = Payment(
                         user_id=current_user.id,
-                        amount_kurus=50000,
+                        amount_kurus=amount_kurus,
                         currency="TRY",
                         provider="development",
                         provider_reference=f"dev-{uuid.uuid4().hex[:10]}",
@@ -2368,6 +2369,11 @@ def register_routes(app: Flask) -> None:
                         "You're now on the Academic plan. New publications will be created with persistent (3-year) viewer links and multi-model uploads.",
                         "success",
                     )
+                elif new_plan == "extended_archive":
+                    flash(
+                        "You're now on the Extended Archive plan. New publications will be created with persistent (10-year) viewer links, priority archival storage, and rich metadata fields.",
+                        "success",
+                    )
                 else:
                     flash(
                         "Switched to the Free plan. New publications will be created as Temporary (3-day links, single model). Existing publications keep their current settings.",
@@ -2382,7 +2388,8 @@ def register_routes(app: Flask) -> None:
         user_papers = Paper.query.filter_by(user_id=current_user.id).all()
         paper_count = len(user_papers)
         academic_paper_count = sum(1 for p in user_papers if p.package_type == "academic")
-        temporary_paper_count = paper_count - academic_paper_count
+        extended_paper_count = sum(1 for p in user_papers if p.package_type == "extended_archive")
+        temporary_paper_count = paper_count - academic_paper_count - extended_paper_count
         public_paper_count = sum(1 for p in user_papers if p.is_public)
         private_paper_count = paper_count - public_paper_count
         pdf_paper_count = sum(1 for p in user_papers if p.pdf_path)
@@ -2400,6 +2407,7 @@ def register_routes(app: Flask) -> None:
             user=current_user,
             paper_count=paper_count,
             academic_paper_count=academic_paper_count,
+            extended_paper_count=extended_paper_count,
             temporary_paper_count=temporary_paper_count,
             public_paper_count=public_paper_count,
             private_paper_count=private_paper_count,

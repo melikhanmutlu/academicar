@@ -3,6 +3,7 @@
 
 {% block content %}
 {% set is_academic = (user.plan == 'academic') %}
+{% set is_extended = (user.plan == 'extended_archive') %}
 <div class="app-shell profile-shell py-8 pb-12">
   <div class="dashboard-header reveal-up">
     <div>
@@ -25,7 +26,7 @@
         <h2>{{ user.username }}</h2>
         <p>{{ user.email }}</p>
         <div class="profile-chips">
-          <span>{{ 'Academic plan' if is_academic else 'Free plan' }}</span>
+          <span>{{ 'Extended Archive plan' if is_extended else ('Academic plan' if is_academic else 'Free plan') }}</span>
           {% if not has_password %}<span>Google sign-in</span>{% endif %}
           <span>Member since {{ user.created_at.strftime('%b %Y') if user.created_at else '-' }}</span>
         </div>
@@ -51,7 +52,7 @@
       <div class="profile-stat-card">
         <span>Publications</span>
         <strong>{{ paper_count }}</strong>
-        <small>{{ academic_paper_count }} academic / {{ temporary_paper_count }} temporary</small>
+        <small>{{ academic_paper_count }} academic / {{ extended_paper_count }} archive / {{ temporary_paper_count }} temporary</small>
       </div>
       <div class="profile-stat-card">
         <span>3D Models</span>
@@ -84,10 +85,10 @@
       <p>Choose how long publication viewer links stay active.</p>
     </div>
     <div class="plan-grid">
-      <div class="profile-card plan-card{% if not is_academic %} is-current{% endif %}">
+      <div class="profile-card plan-card{% if not is_academic and not is_extended %} is-current{% endif %}">
         <div class="plan-card-head">
           <h3>Temporary</h3>
-          {% if not is_academic %}<span>Current</span>{% endif %}
+          {% if not is_academic and not is_extended %}<span>Current</span>{% endif %}
         </div>
         <p class="pricing-period">Free preview link</p>
         <p class="plan-price">$0</p>
@@ -98,7 +99,7 @@
           <li>Screenshot capture</li>
           <li>Watermarked viewer</li>
         </ul>
-        {% if is_academic %}
+        {% if is_academic or is_extended %}
           <form method="POST" action="{{ url_for('profile') }}" class="mt-5">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="plan" value="free">
@@ -130,6 +131,32 @@
             <button type="submit" class="btn-primary w-full">Get package</button>
           </form>
           <p class="plan-note">Billed once at activation</p>
+        {% else %}
+          <button class="btn-primary w-full mt-5 opacity-60 cursor-not-allowed" disabled>Active plan</button>
+        {% endif %}
+      </div>
+
+      <div class="profile-card plan-card{% if is_extended %} is-current{% endif %}">
+        <div class="plan-card-head">
+          <h3>Extended Archive</h3>
+          {% if is_extended %}<span>Current</span>{% endif %}
+        </div>
+        <p class="pricing-period">Billed once at activation</p>
+        <p class="plan-price">$24.90</p>
+        <ul>
+          <li>10-year active AR & QR access</li>
+          <li>Priority archival storage</li>
+          <li>Guided viewing</li>
+          <li>Saved camera views</li>
+          <li>Rich metadata fields</li>
+          <li>Persistent QR & viewer URL</li>
+        </ul>
+        {% if not is_extended %}
+          <form method="POST" action="{{ url_for('profile') }}" class="mt-5">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="plan" value="extended_archive">
+            <button type="submit" class="btn-primary w-full">Get package</button>
+          </form>
         {% else %}
           <button class="btn-primary w-full mt-5 opacity-60 cursor-not-allowed" disabled>Active plan</button>
         {% endif %}
