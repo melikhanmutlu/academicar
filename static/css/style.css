@@ -3544,7 +3544,7 @@ input[type="file"]::-webkit-file-upload-button {
 }
 .publication-table-head,
 .pub-row {
-  grid-template-columns: minmax(360px, 1fr) 112px 82px minmax(350px, 0.82fr);
+  grid-template-columns: minmax(360px, 1fr) 112px 82px 340px;
   gap: 18px;
 }
 .publication-table-head {
@@ -3580,7 +3580,7 @@ input[type="file"]::-webkit-file-upload-button {
   gap: 8px;
   display: grid;
   grid-template-columns: repeat(4, minmax(76px, auto));
-  justify-content: end;
+  justify-content: start;
   justify-items: stretch;
 }
 .publication-share .dash-action {
@@ -3632,7 +3632,7 @@ input[type="file"]::-webkit-file-upload-button {
 @media (max-width: 1180px) {
   .publication-table-head,
   .pub-row {
-    grid-template-columns: minmax(280px, 1fr) 96px 70px minmax(310px, 0.85fr);
+    grid-template-columns: minmax(280px, 1fr) 96px 70px 200px;
   }
   .publication-share {
     grid-template-columns: repeat(2, minmax(92px, 1fr));
