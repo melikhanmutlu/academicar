@@ -3088,11 +3088,11 @@ input[type="file"]::-webkit-file-upload-button {
   background: var(--color-canvas-white);
   border: 1px solid var(--color-light-pearl);
   border-radius: 12px;
-  padding: 24px 24px 20px;
+  padding: 16px 20px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  min-height: 160px;
+  gap: 0;
+  min-height: auto;
   transition: border-color 200ms ease, transform 200ms ease, box-shadow 200ms ease;
   overflow: hidden;
 }
@@ -3153,6 +3153,21 @@ input[type="file"]::-webkit-file-upload-button {
   font-weight: 400;
   color: var(--color-silver-ash);
   letter-spacing: -0.4px;
+}
+.metric-value-compact {
+  font-family: var(--font-polysans) !important;
+  font-size: 26px !important;
+  font-weight: 400 !important;
+  color: var(--color-midnight-graphite) !important;
+  margin-left: auto !important;
+  line-height: 1 !important;
+  display: flex !important;
+  align-items: baseline !important;
+  gap: 2px !important;
+}
+.metric-value-compact .metric-divider {
+  font-size: 14px !important;
+  color: var(--color-silver-ash) !important;
 }
 .metric-foot {
   display: flex;
