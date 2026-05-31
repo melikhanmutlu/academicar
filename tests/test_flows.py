@@ -1,4 +1,4 @@
-from datetime import UTC, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -31,7 +31,10 @@ def test_register_login_paper_create_and_delete(client):
     response = client.post(f"/papers/{slug}/delete", follow_redirects=True)
     assert response.status_code == 200
     with client.application.app_context():
-        assert Paper.query.count() == 0
+        paper = Paper.query.one()
+        assert paper.status == "deleted"
+        assert paper.deleted_at is not None
+    assert client.get(f"/papers/{slug}").status_code == 404
 
 
 def test_landing_mitochondria_qr_and_ar_page(client):
@@ -48,6 +51,43 @@ def test_landing_mitochondria_qr_and_ar_page(client):
     assert ar_page.status_code == 200
     assert "Mitochondria AR" in ar_page.get_data(as_text=True)
     assert "activateAR" in ar_page.get_data(as_text=True)
+
+
+def test_paper_detail_uses_clear_actions_without_publication_expiry(client):
+    from tests.conftest import login, register
+
+    register(client)
+    login(client)
+    response = client.post(
+        "/papers/new",
+        data={
+            "title": "Detail UX Paper",
+            "year": "2026",
+            "field": "Medicine",
+            "doi": "10.1000/detail-ux",
+            "abstract": "This detail page has an abstract for visual hierarchy checks.",
+            "is_public": "public",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+
+    with client.application.app_context():
+        paper = Paper.query.filter_by(title="Detail UX Paper").one()
+        slug = paper.slug
+
+    detail = client.get(f"/papers/{slug}")
+    assert detail.status_code == 200
+    html = detail.get_data(as_text=True)
+    assert "detail-action detail-action-primary" in html
+    assert "meta-link-button" in html
+    assert "Abstract" in html
+    assert "Description / Abstract" not in html
+    assert "Open Public Page" in html
+    assert "View Paper QR" in html
+    assert "Availability" not in html
+    assert "Active until" not in html
+    assert "Source unit" not in html
 
 
 def test_paper_create_can_include_first_model(client):
@@ -81,6 +121,52 @@ def test_paper_create_can_include_first_model(client):
         assert ModelVersion.query.filter_by(model_id=model.id, version_number=1, status="ready").one()
 
 
+def test_model_edit_page_uses_wide_settings_layout(client):
+    from tests.conftest import create_user, login
+    from licensing import apply_model_license_defaults
+
+    with client.application.app_context():
+        user = create_user()
+        paper = Paper(
+            title="Model Edit Layout Paper",
+            year=2026,
+            field="Engineering",
+            slug="model-edit-layout-paper",
+            user_id=user.id,
+            is_public=True,
+        )
+        db.session.add(paper)
+        db.session.flush()
+        model = Model3D(
+            id="layout-model-id",
+            paper_id=paper.id,
+            user_id=user.id,
+            display_name="Layout model",
+            original_filename="layout.stl",
+            glb_path="converted/layout-model-id/model.glb",
+            storage_key="layout-model-id/model.glb",
+            file_size=1234,
+            source_format="stl",
+            processing_status="ready",
+            appearance_color="#cccccc",
+            anonymization_confirmed=True,
+            rights_confirmed=True,
+            ethics_responsibility_confirmed=True,
+        )
+        apply_model_license_defaults(model, "academic")
+        db.session.add(model)
+        db.session.commit()
+
+    login(client)
+    edit = client.get("/models/layout-model-id/edit")
+    assert edit.status_code == 200
+    html = edit.get_data(as_text=True)
+    assert "model-edit-shell" in html
+    assert "model-edit-layout" in html
+    assert "model-edit-secondary-grid" in html
+    assert "Current model" in html
+
+
 def test_authenticated_user_can_view_landing_page(client):
     from tests.conftest import login, register
 
@@ -102,11 +188,12 @@ def test_google_auth_buttons_explain_when_unconfigured(client):
     assert "Google sign-up will be available" in register_response.get_data(as_text=True)
 
 
-def test_paper_delete_cleans_files_after_commit(client):
+def test_paper_delete_soft_deletes_and_keeps_files_for_restore(client):
     from tests.conftest import create_user
 
     with client.application.app_context():
         user = create_user()
+        user_id = user.id
         paper = Paper(title="Cleanup Paper", slug="cleanup-paper", user_id=user.id, pdf_path="paper.pdf")
         db.session.add(paper)
         db.session.commit()
@@ -136,9 +223,15 @@ def test_paper_delete_cleans_files_after_commit(client):
     login(client)
     response = client.post("/papers/cleanup-paper/delete", follow_redirects=True)
     assert response.status_code == 200
-    assert not glb_path.exists()
-    assert not qr_path.exists()
-    assert not pdf_path.exists()
+    assert glb_path.exists()
+    assert qr_path.exists()
+    assert pdf_path.exists()
+    assert client.get("/papers/cleanup-paper").status_code == 404
+    with client.application.app_context():
+        paper = Paper.query.filter_by(slug="cleanup-paper").one()
+        assert paper.status == "deleted"
+        assert paper.deleted_at is not None
+        assert paper.deleted_by_user_id == user_id
 
 
 def test_paper_delete_commit_failure_keeps_files(client, monkeypatch):
@@ -163,6 +256,39 @@ def test_paper_delete_commit_failure_keeps_files(client, monkeypatch):
     response = client.post("/papers/fail-paper/delete", follow_redirects=True)
     assert response.status_code == 200
     assert pdf_path.exists()
+    with client.application.app_context():
+        assert Paper.query.filter_by(slug="fail-paper").one().status == "active"
+
+
+def test_admin_can_restore_soft_deleted_publication(client):
+    from tests.conftest import create_user, login
+
+    with client.application.app_context():
+        owner = create_user()
+        admin = create_user("admin@example.com", username="Admin")
+        admin.is_admin = True
+        paper = Paper(
+            title="Restore Paper",
+            slug="restore-paper",
+            user_id=owner.id,
+            status="deleted",
+            deleted_at=datetime.now(UTC),
+            deleted_by_user_id=owner.id,
+            is_public=False,
+        )
+        db.session.add(paper)
+        db.session.commit()
+        paper_id = paper.id
+
+    login(client, email="admin@example.com")
+    response = client.post(f"/admin/papers/{paper_id}/restore", follow_redirects=True)
+    assert response.status_code == 200
+    assert "Publication restored" in response.get_data(as_text=True)
+    with client.application.app_context():
+        restored = db.session.get(Paper, paper_id)
+        assert restored.status == "active"
+        assert restored.deleted_at is None
+        assert restored.deleted_by_user_id is None
 
 
 def test_invalid_stl_upload_leaves_no_model(client):
@@ -276,10 +402,18 @@ def test_valid_stl_upload_creates_model_and_qr(client, monkeypatch):
         follow_redirects=True,
     )
     assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "Conversion" in html
+    assert "STL -&gt; GLB" in html
+    assert "Size" in html
+    assert "Dimensions" in html
+    assert "File limit" not in html
+    assert "Version" not in html
 
     with client.application.app_context():
         model = Model3D.query.one()
         assert model.display_name == "Test Model"
+        assert model.appearance_color is None
         assert model.qr_code_path
         assert model.public_id
         assert QRLink.query.filter_by(model_id=model.id, public_id=model.public_id).one()
@@ -1021,6 +1155,7 @@ def test_obj_without_textures_can_receive_color(client, monkeypatch):
         f"/papers/{slug}/upload-model",
         data={
             "file": upload_file_bytes(obj_content, "mesh.obj"),
+            "color_enabled": "yes",
             "color": "#ff0000",
             "compliance_confirm": "yes",
         },

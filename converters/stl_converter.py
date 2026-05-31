@@ -402,7 +402,7 @@ class STLConverter(BaseConverter):
         input_path: str,
         output_path: str,
         color: str = None,
-        source_unit: str = "auto",
+        source_unit: str = "m",
     ) -> bool:
         """
         Convert STL file to GLB format using trimesh
@@ -466,22 +466,9 @@ class STLConverter(BaseConverter):
             mesh.apply_transform(basis_correction)
             self.log_operation("Applied basis correction: -90° around X (Z-up to Y-up)")
 
-            # STL files are unitless. Detect the source unit heuristically from
-            # the bounding-box extents BEFORE scaling. GLB standard requires meters.
-            #
-            # Bias toward MILLIMETRES because nearly every medical/dental STL
-            # (3D Slicer, Mimics, Materialise, intraoral/CBCT scanners) and
-            # most CAD STLs are exported in mm. cm-unit STLs are rare and m-unit
-            # STLs are exotic. With these thresholds:
-            #
-            #   > 10           -> mm  (typical anatomical 10-500 mm)
-            #   > 0.1 .. <= 10 -> cm  (e.g. a 7 cm cube exported in cm = 7)
-            #   <= 0.1         -> m   (already in meters, tiny object)
-            #
-            # Edge cases (sub-1cm objects in mm, or large objects in cm) remain
-            # ambiguous because the same numeric extent can map to multiple
-            # real sizes; in that case the only correct fix is an explicit
-            # source-unit dropdown on the upload form.
+            # STL files are unitless. We no longer expose source-unit controls
+            # in the UI, so the default preserves the uploaded model scale.
+            # Legacy job payloads that explicitly pass auto/mm/cm still work.
             raw_extents = np.ptp(mesh.bounds, axis=0)
             max_extent_raw = float(raw_extents.max())
             self.log_operation(

@@ -1,7 +1,7 @@
 """
 SQLAlchemy database models: User, Paper, Model3D.
 """
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -27,7 +27,11 @@ class User(UserMixin, db.Model):
     created_at = db.Column(db.DateTime, default=utc_now)
 
     papers = db.relationship(
-        "Paper", backref="author", lazy=True, cascade="all, delete-orphan"
+        "Paper",
+        backref="author",
+        lazy=True,
+        cascade="all, delete-orphan",
+        foreign_keys="Paper.user_id",
     )
 
     def set_password(self, password: str) -> None:
@@ -63,8 +67,11 @@ class Paper(db.Model):
     payment_provider = db.Column(db.String(50), nullable=True)
     payment_reference = db.Column(db.String(200), nullable=True)
     pmid = db.Column(db.String(100), nullable=True)
-    expires_at = db.Column(db.DateTime, nullable=True, default=lambda: utc_now() + timedelta(days=3))
+    expires_at = db.Column(db.DateTime, nullable=True, default=None)
+    deleted_at = db.Column(db.DateTime, nullable=True)
+    deleted_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=utc_now)
+    deleted_by = db.relationship("User", foreign_keys=[deleted_by_user_id])
 
     models = db.relationship(
         "Model3D", backref="paper", lazy=True, cascade="all, delete-orphan"

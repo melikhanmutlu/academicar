@@ -31,8 +31,6 @@
     </div>
     {% if admin_view is defined and admin_view %}
       <a href="{{ url_for('admin_user_detail', user_id=viewed_user.id) }}" class="btn-secondary shrink-0">User detail</a>
-    {% else %}
-      <a href="{{ url_for('paper_new') }}" class="btn-primary shrink-0">+ New Publication</a>
     {% endif %}
   </div>
 
@@ -48,7 +46,7 @@
       <strong class="metric-value">{{ papers|length }}</strong>
       <div class="metric-foot">
         <span class="metric-sub">All time</span>
-        {% if papers|length > 0 %}<span class="metric-trend positive">●</span>{% endif %}
+        {% if papers|length > 0 %}<span class="metric-trend positive" aria-hidden="true"></span>{% endif %}
       </div>
     </div>
     <div class="metric-card">
@@ -92,10 +90,9 @@
   <section class="dashboard-upload-band surface reveal-up">
     <div>
       <span class="eyebrow">Upload workspace</span>
-      <h2>Start with metadata, attach models anytime.</h2>
+      <h2>Create a publication or add a model.</h2>
       <p>
-        Create a publication with an optional first model, or add more GLB, STL, OBJ, and FBX files to an existing publication.
-        Each model receives its own license, QR resolver, and stable viewer URL.
+        Keep publication metadata, PDF files, models, QR resolvers, and viewer links in one workflow.
       </p>
     </div>
     <div class="dashboard-upload-actions">
@@ -182,14 +179,12 @@
           <option value="private">Private</option>
           <option value="with-models">With models</option>
           <option value="no-models">No models</option>
-          <option value="expiring">Expiring soon</option>
         </select>
         <select id="pubSort" class="field-select compact-select" aria-label="Sort publications">
           <option value="created-desc">Newest</option>
           <option value="created-asc">Oldest</option>
           <option value="title-asc">Title A-Z</option>
           <option value="models-desc">Most models</option>
-          <option value="expires-asc">Expires first</option>
         </select>
         <button type="button" class="btn-secondary compact" id="pubSearchClear" hidden>Clear</button>
       </form>
@@ -200,7 +195,6 @@
         <span>Publication</span>
         <span>Status</span>
         <span>Models</span>
-        <span>Expires</span>
         <span>Actions</span>
       </div>
 
@@ -223,7 +217,6 @@
           data-visibility="{{ 'public' if p.is_public else 'private' }}"
           data-models="{{ p.models|length }}"
           data-created="{{ p.created_at.timestamp() if p.created_at else 0 }}"
-          data-expires="{{ p.expires_at.timestamp() if p.expires_at else 9999999999 }}"
         >
           <div class="publication-main">
             <div class="publication-avatar">{{ init }}</div>
@@ -232,7 +225,7 @@
                 <a href="{{ paper_href }}">{{ p.title }}</a>
               </div>
               <p>
-                {{ p.authors if p.authors else '-' }}{% if p.institution %}<span> · </span>{{ p.institution }}{% endif %}
+                {{ p.authors if p.authors else '-' }}{% if p.institution %}<span> &middot; </span>{{ p.institution }}{% endif %}
                 {% if p.year %}<span class="publication-year">{{ p.year }}</span>{% endif %}
               </p>
             </div>
@@ -246,23 +239,19 @@
             <strong>{{ p.models|length }}</strong>
           </div>
 
-          <div class="publication-expiry">
-            <strong>{{ p.expires_at.strftime('%b %d') if p.expires_at else 'No expiry' }}</strong>
-          </div>
-
           <div class="publication-share">
             {% if p.pdf_path %}
-              <a href="{{ url_for('paper_public_pdf', slug=p.slug) }}" target="_blank" rel="noopener noreferrer" class="btn-primary compact">PDF</a>
+              <a href="{{ url_for('paper_public_pdf', slug=p.slug) }}" target="_blank" rel="noopener noreferrer" class="dash-action dash-action-primary">PDF</a>
             {% else %}
-              <span class="btn-secondary compact opacity-50 cursor-not-allowed" aria-disabled="true" title="No PDF uploaded">PDF</span>
+              <button type="button" class="dash-action dash-action-muted" disabled title="No PDF uploaded">PDF missing</button>
             {% endif %}
             {% if admin_view is defined and admin_view %}
-              <a href="{{ url_for('paper_public', slug=p.slug) }}" target="_blank" rel="noopener noreferrer" class="btn-secondary compact">Open</a>
-              <a href="{{ url_for('admin_dashboard', admin_page='content') }}" class="btn-secondary compact">Manage</a>
+              <a href="{{ url_for('paper_public', slug=p.slug) }}" target="_blank" rel="noopener noreferrer" class="dash-action">Open</a>
+              <a href="{{ url_for('admin_dashboard', admin_page='content') }}" class="dash-action">Manage</a>
             {% else %}
-              <a href="{{ url_for('paper_edit', slug=p.slug) }}" class="btn-secondary compact">Edit</a>
-              <a href="{{ url_for('paper_detail', slug=p.slug) }}#add-model" class="btn-secondary compact">Add model</a>
-              <a href="{{ url_for('paper_detail', slug=p.slug) }}" class="btn-secondary compact">Details</a>
+              <a href="{{ url_for('paper_edit', slug=p.slug) }}" class="dash-action">Edit</a>
+              <a href="{{ url_for('paper_detail', slug=p.slug) }}#add-model" class="dash-action">Add model</a>
+              <a href="{{ url_for('paper_detail', slug=p.slug) }}" class="dash-action">Details</a>
             {% endif %}
           </div>
         </div>
@@ -317,15 +306,12 @@
         const qMatch = tokens.every((t) => haystack.includes(t));
         const filter = statusFilter?.value || 'all';
         const models = Number(row.dataset.models || 0);
-        const expires = Number(row.dataset.expires || 9999999999);
-        const sevenDays = Date.now() / 1000 + (86400 * 7);
         const fMatch =
           filter === 'all'
           || row.dataset.package === filter
           || row.dataset.visibility === filter
           || (filter === 'with-models' && models > 0)
-          || (filter === 'no-models' && models === 0)
-          || (filter === 'expiring' && expires <= sevenDays);
+          || (filter === 'no-models' && models === 0);
         const match = qMatch && fMatch;
         row.style.display = match ? 'grid' : 'none';
         if (match) visible++;
@@ -340,7 +326,6 @@
         if (mode === 'created-asc') return Number(a.dataset.created) - Number(b.dataset.created);
         if (mode === 'title-asc') return (a.dataset.title || '').localeCompare(b.dataset.title || '');
         if (mode === 'models-desc') return Number(b.dataset.models) - Number(a.dataset.models);
-        if (mode === 'expires-asc') return Number(a.dataset.expires) - Number(b.dataset.expires);
         return Number(b.dataset.created) - Number(a.dataset.created);
       });
       sorted.forEach((row) => list?.appendChild(row));

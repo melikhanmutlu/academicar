@@ -112,6 +112,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             "get_license_plan": get_license_plan,
             "model_resolver_url": model_resolver_url,
             "model_access_status": model_access_status,
+            "format_model_dimensions_cm": format_model_dimensions_cm,
         }
 
     @app.after_request
@@ -139,7 +140,7 @@ def create_app(test_config: dict | None = None) -> Flask:
                 raise
             logger.warning("SQLite schema already existed during create_all; continuing with compatibility checks.")
         sync_configured_admins(app)
-        pass # ensure_sqlite_schema removed
+        ensure_sqlite_schema(app)
 
     return app
 
@@ -214,6 +215,39 @@ def format_file_size(size_bytes: int | None) -> str:
             return f"{size:.1f} {unit}" if unit != "B" else f"{int(size)} B"
         size /= 1024
     return f"{size_bytes} B"
+
+
+def _model_glb_candidate_paths(model: Model3D) -> list[str]:
+    paths: list[str] = []
+    if model.glb_path:
+        paths.append(model.glb_path)
+        if not os.path.isabs(model.glb_path):
+            paths.append(os.path.join(current_app.config["CONVERTED_FOLDER"], model.glb_path))
+    if model.storage_key:
+        paths.append(os.path.join(current_app.config["CONVERTED_FOLDER"], model.storage_key))
+    return paths
+
+
+def format_model_dimensions_cm(model: Model3D | None) -> str:
+    if not model:
+        return "Not measured"
+    glb_path = next((path for path in _model_glb_candidate_paths(model) if path and os.path.exists(path)), None)
+    if not glb_path:
+        return "Not measured"
+    try:
+        import trimesh
+
+        loaded = trimesh.load(glb_path, force="scene")
+        bounds = getattr(loaded, "bounds", None)
+        if bounds is None:
+            return "Not measured"
+        extents_cm = [(float(axis) * 100) for axis in (bounds[1] - bounds[0])]
+        if not extents_cm or max(extents_cm) <= 0:
+            return "Not measured"
+        return " x ".join(f"{axis:.1f}" for axis in extents_cm) + " cm"
+    except Exception:
+        logger.debug("Could not read model dimensions for %s", getattr(model, "id", None), exc_info=True)
+        return "Not measured"
 
 
 def configured_admin_emails(app: Flask | None = None) -> set[str]:
@@ -374,7 +408,15 @@ def validate_secret_key(app: Flask) -> None:
         raise RuntimeError("SECRET_KEY must be set for pilot/production environments.")
 
 
-# ensure_sqlite_schema removed
+def ensure_sqlite_schema(app: Flask) -> None:
+    if not str(app.config.get("SQLALCHEMY_DATABASE_URI", "")).startswith("sqlite"):
+        return
+    with db.engine.begin() as connection:
+        columns = {row[1] for row in connection.execute(text("PRAGMA table_info(papers)")).fetchall()}
+        if "deleted_at" not in columns:
+            connection.execute(text("ALTER TABLE papers ADD COLUMN deleted_at DATETIME"))
+        if "deleted_by_user_id" not in columns:
+            connection.execute(text("ALTER TABLE papers ADD COLUMN deleted_by_user_id INTEGER"))
 
 
 def rate_limit_key() -> str:
@@ -528,23 +570,27 @@ def package_expires_at(package_type: str) -> datetime | None:
 
 
 def sync_paper_entitlements(paper: Paper) -> None:
-    """Keep package lifetime and payment state enforceable in the database."""
+    """Keep paper payment state enforceable without expiring publications."""
     if paper.package_type == "model_based":
         paper.payment_status = paper.payment_status or "model_based"
-        paper.expires_at = None
     elif paper.package_type == "academic":
         paper.payment_status = paper.payment_status or "paid"
-        if not paper.expires_at:
-            paper.expires_at = package_expires_at("academic")
     else:
         paper.package_type = "temporary"
         paper.payment_status = "free"
-        if not paper.expires_at:
-            paper.expires_at = package_expires_at("temporary")
+    paper.expires_at = None
 
 
 def paper_is_expired(paper: Paper) -> bool:
     return licensing_paper_is_expired(paper)
+
+
+def paper_is_deleted(paper: Paper | None) -> bool:
+    return not paper or (paper.status or "active").lower() == "deleted"
+
+
+def active_paper_query():
+    return Paper.query.filter(or_(Paper.status.is_(None), Paper.status != "deleted"))
 
 
 def new_public_id() -> str:
@@ -1187,9 +1233,9 @@ def _create_model_for_paper(
     color = (color or "").strip() or None
     if color and HEX_COLOR_PATTERN.fullmatch(color) is None:
         color = None
-    source_unit_norm = (source_unit or "auto").strip().lower()
-    if source_unit_norm not in {"auto", "mm", "cm", "m"}:
-        source_unit_norm = "auto"
+    # Source-unit controls are intentionally disabled in the UI. Keep the
+    # uploaded model's native scale instead of applying the previous heuristic.
+    source_unit_norm = "m"
 
     unique_id = str(uuid.uuid4())
     original_name = secure_filename(file.filename)
@@ -1549,6 +1595,8 @@ def register_routes(app: Flask) -> None:
 
     def _paper_visible_to_request(paper: Paper) -> bool:
         """A paper is visible if it is public, or if the current user is the owner."""
+        if paper_is_deleted(paper):
+            return False
         if paper.is_public:
             return True
         return current_user.is_authenticated and current_user.id == paper.user_id
@@ -1569,7 +1617,7 @@ def register_routes(app: Flask) -> None:
     @login_required
     def qr_print_paper(paper_id):
         paper = db.session.get(Paper, paper_id)
-        if not paper:
+        if not paper or paper_is_deleted(paper):
             abort(404)
         if paper.user_id != current_user.id:
             abort(403)
@@ -1578,7 +1626,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/p/<slug>")
     def paper_public(slug):
-        paper = Paper.query.filter_by(slug=slug).first_or_404()
+        paper = active_paper_query().filter_by(slug=slug).first_or_404()
         if paper_is_expired(paper):
             abort(404)
         if not _paper_visible_to_request(paper):
@@ -1587,7 +1635,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/p/<slug>/pdf")
     def paper_public_pdf(slug):
-        paper = Paper.query.filter_by(slug=slug).first_or_404()
+        paper = active_paper_query().filter_by(slug=slug).first_or_404()
         if paper_is_expired(paper):
             abort(404)
         if not _paper_visible_to_request(paper):
@@ -1598,7 +1646,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/p/<slug>/pdf/file")
     def paper_public_pdf_file(slug):
-        paper = Paper.query.filter_by(slug=slug).first_or_404()
+        paper = active_paper_query().filter_by(slug=slug).first_or_404()
         if paper_is_expired(paper):
             abort(404)
         if not _paper_visible_to_request(paper):
@@ -1618,7 +1666,7 @@ def register_routes(app: Flask) -> None:
     @app.route("/dashboard")
     @login_required
     def dashboard():
-        papers = Paper.query.filter_by(user_id=current_user.id).order_by(Paper.created_at.desc()).all()
+        papers = active_paper_query().filter_by(user_id=current_user.id).order_by(Paper.created_at.desc()).all()
         return render_template("dashboard.html", papers=papers)
 
     @app.route("/admin", defaults={"admin_page": "overview"})
@@ -2015,7 +2063,7 @@ def register_routes(app: Flask) -> None:
         user = db.session.get(User, user_id)
         if not user:
             abort(404)
-        papers = Paper.query.filter_by(user_id=user.id).order_by(Paper.created_at.desc()).all()
+        papers = active_paper_query().filter_by(user_id=user.id).order_by(Paper.created_at.desc()).all()
         models = Model3D.query.filter_by(user_id=user.id).order_by(Model3D.created_at.desc()).all()
         payments = Payment.query.filter_by(user_id=user.id).order_by(Payment.created_at.desc()).all()
         audit_events = AuditLog.query.filter_by(user_id=user.id).order_by(AuditLog.timestamp.desc()).limit(50).all()
@@ -2038,7 +2086,7 @@ def register_routes(app: Flask) -> None:
         user = db.session.get(User, user_id)
         if not user:
             abort(404)
-        papers = Paper.query.filter_by(user_id=user.id).order_by(Paper.created_at.desc()).all()
+        papers = active_paper_query().filter_by(user_id=user.id).order_by(Paper.created_at.desc()).all()
         log_audit("admin_user_dashboard_viewed", user_id=current_user.id, resource_id=str(user.id))
         return render_template(
             "dashboard.html",
@@ -2119,6 +2167,8 @@ def register_routes(app: Flask) -> None:
         previous = {"is_public": paper.is_public, "status": paper.status}
         paper.is_public = request.form.get("is_public") == "1"
         paper.status = (request.form.get("status") or "active").strip().lower()
+        if paper.status == "deleted":
+            paper.is_public = False
         db.session.commit()
         log_audit(
             "admin_paper_visibility_changed",
@@ -2127,6 +2177,27 @@ def register_routes(app: Flask) -> None:
             details={"from": previous, "to": {"is_public": paper.is_public, "status": paper.status}},
         )
         flash(f"Publication updated: {paper.title}.", "success")
+        return redirect(url_for("admin_dashboard", admin_page="content"))
+
+    @app.route("/admin/papers/<int:paper_id>/restore", methods=["POST"])
+    @login_required
+    def admin_paper_restore(paper_id):
+        require_admin()
+        paper = db.session.get(Paper, paper_id)
+        if not paper:
+            abort(404)
+        previous = {"status": paper.status, "deleted_at": paper.deleted_at.isoformat() if paper.deleted_at else None}
+        paper.status = "active"
+        paper.deleted_at = None
+        paper.deleted_by_user_id = None
+        db.session.commit()
+        log_audit(
+            "admin_paper_restored",
+            user_id=current_user.id,
+            resource_id=str(paper.id),
+            details={"from": previous, "to": {"status": paper.status}},
+        )
+        flash(f"Publication restored: {paper.title}.", "success")
         return redirect(url_for("admin_dashboard", admin_page="content"))
 
     @app.route("/admin/models/<model_id>/license", methods=["POST"])
@@ -2292,15 +2363,7 @@ def register_routes(app: Flask) -> None:
             .limit(5)
             .all()
         )
-        now = datetime.now(UTC)
         expiring_soon = 0
-        for p in user_papers:
-            if not p.expires_at or p.package_type == "academic":
-                continue
-            exp = p.expires_at if p.expires_at.tzinfo else p.expires_at.replace(tzinfo=UTC)
-            delta = exp - now
-            if 0 < delta.total_seconds() <= 86400 * 7:  # within 7 days
-                expiring_soon += 1
 
         return render_template(
             "profile.html",
@@ -2667,7 +2730,7 @@ def register_routes(app: Flask) -> None:
                     license_type=request.form.get("license_type"),
                     display_name=request.form.get("model_display_name"),
                     description=request.form.get("model_description"),
-                    color=request.form.get("color"),
+                    color=request.form.get("color") if request.form.get("color_enabled") == "yes" else None,
                     source_unit=request.form.get("source_unit"),
                     compliance_confirm=request.form.get("compliance_confirm"),
                 )
@@ -2682,7 +2745,7 @@ def register_routes(app: Flask) -> None:
     @app.route("/papers/<slug>")
     @login_required
     def paper_detail(slug):
-        paper = Paper.query.filter_by(slug=slug).first_or_404()
+        paper = active_paper_query().filter_by(slug=slug).first_or_404()
         if paper.user_id != current_user.id:
             abort(403)
         return render_template("paper_detail.html", paper=paper)
@@ -2691,7 +2754,7 @@ def register_routes(app: Flask) -> None:
     @login_required
     @require_paper_ownership
     def paper_edit(slug):
-        paper = Paper.query.filter_by(slug=slug).first_or_404()
+        paper = active_paper_query().filter_by(slug=slug).first_or_404()
 
         if request.method == "POST":
             paper_data, paper_errors = validate_paper_form(request.form)
@@ -2710,8 +2773,7 @@ def register_routes(app: Flask) -> None:
             # paper.package_type is locked at creation (snapshot of the user's
             # plan at that moment). Change the plan via /profile, not here.
             paper.is_public = paper_data["is_public"]
-            if not paper.expires_at:
-                paper.expires_at = package_expires_at(paper.package_type or "temporary")
+            paper.expires_at = None
 
             saved_pdf_path = None
             old_pdf_path = None
@@ -2767,19 +2829,25 @@ def register_routes(app: Flask) -> None:
     @login_required
     @require_paper_ownership
     def paper_delete(slug):
-        paper = Paper.query.filter_by(slug=slug).first_or_404()
-        file_paths = collect_paper_file_paths(app, paper)
+        paper = active_paper_query().filter_by(slug=slug).first_or_404()
         paper_id = paper.id
         try:
-            db.session.delete(paper)
+            paper.status = "deleted"
+            paper.is_public = False
+            paper.deleted_at = datetime.now(UTC)
+            paper.deleted_by_user_id = current_user.id
             db.session.commit()
-            log_audit("paper_deleted", user_id=current_user.id, resource_id=str(paper_id))
+            log_audit(
+                "paper_deleted",
+                user_id=current_user.id,
+                resource_id=str(paper_id),
+                details={"soft_deleted": True, "title": paper.title},
+            )
         except SQLAlchemyError:
             db.session.rollback()
             logger.exception("Paper delete failed")
             flash("The publication could not be deleted. Please try again.", "danger")
             return redirect(url_for("paper_detail", slug=slug))
-        cleanup_paths(file_paths)
         flash("Publication deleted.", "info")
         return redirect(url_for("dashboard"))
 
@@ -2788,7 +2856,7 @@ def register_routes(app: Flask) -> None:
     @limiter.limit(upload_rate_limit_value, methods=["POST"], exempt_when=upload_rate_limit_disabled)
     @require_paper_ownership
     def upload_model(slug):
-        paper = Paper.query.filter_by(slug=slug).first_or_404()
+        paper = active_paper_query().filter_by(slug=slug).first_or_404()
         file = request.files.get("file") or request.files.get("model_file")
         if not file or not file.filename:
             flash("No file selected.", "danger")
@@ -2801,7 +2869,7 @@ def register_routes(app: Flask) -> None:
             license_type=request.form.get("license_type"),
             display_name=request.form.get("display_name"),
             description=request.form.get("description"),
-            color=request.form.get("color"),
+            color=request.form.get("color") if request.form.get("color_enabled") == "yes" else None,
             source_unit=request.form.get("source_unit"),
             compliance_confirm=request.form.get("compliance_confirm"),
         )
@@ -2938,7 +3006,7 @@ def register_routes(app: Flask) -> None:
             "usdz_path": usdz_path,
             "source_format": source_format,
             "color": model.appearance_color,
-            "source_unit": "auto",
+            "source_unit": "m",
             "is_replacement": True,
             "version_id": version_row.id,
         }

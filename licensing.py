@@ -149,12 +149,7 @@ def model_is_accessible(model) -> bool:
 
 
 def paper_is_expired(paper) -> bool:
-    if not paper or not paper.expires_at:
-        return False
-    expires_at = paper.expires_at
-    if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=UTC)
-    return expires_at < datetime.now(UTC)
+    return False
 
 
 def model_file_limit_error(file_size: int, license_type: str | None) -> str | None:

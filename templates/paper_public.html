@@ -25,7 +25,7 @@
       {% if paper.abstract %}
         <div class="abstract-block mt-5 pt-5 border-t border-[#141821]/10" data-collapsible-abstract>
           <h3 class="font-semibold text-[#111827] mb-2">Description / Abstract</h3>
-          <p class="abstract-copy text-[#5c6473] leading-relaxed text-sm whitespace-pre-line">{{ paper.abstract }}</p>
+          <p class="abstract-copy text-[#5c6473] leading-relaxed text-sm">{{ paper.abstract }}</p>
           <button type="button" class="abstract-toggle" data-abstract-toggle>Read more</button>
         </div>
       {% endif %}
@@ -56,9 +56,6 @@
       <div class="share-stats mt-5">
         <div><span>Models</span><strong>{{ paper.models|length }}</strong></div>
         <div><span>PDF</span><strong>{{ 'Available' if paper.pdf_path else 'None' }}</strong></div>
-        {% if paper.expires_at and paper.package_type != 'academic' %}
-          <div><span>Active until</span><strong>{{ paper.expires_at.strftime('%b %d') }}</strong></div>
-        {% endif %}
       </div>
     </aside>
   </section>

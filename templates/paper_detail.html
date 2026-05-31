@@ -7,29 +7,23 @@
 {% block content %}
 {% set first_model = paper.models[0] if paper.models else none %}
 {% set can_upload_more = true %}
-<div class="app-shell py-10 pb-10">
-  <a href="{{ url_for('dashboard') }}" class="nav-link inline-flex mb-5">&larr; Back to dashboard</a>
+<div class="app-shell paper-detail-shell py-10 pb-10">
+  <a href="{{ url_for('dashboard') }}" class="detail-back-button">&larr; Dashboard</a>
 
-  <section class="grid lg:grid-cols-[minmax(0,1fr)_420px] gap-5 mb-8">
+  <section class="paper-detail-layout mb-8">
     <div class="surface paper-hero rounded-xl p-6 sm:p-7 reveal-up">
-      <div class="flex flex-wrap items-start justify-between gap-4 mb-5">
-          <div class="flex flex-wrap gap-2">
+      <div class="paper-hero-toolbar">
+          <div class="paper-chip-row">
             {% if paper.field %}<span class="detail-chip dark">{{ paper.field }}</span>{% endif %}
             {% if paper.year %}<span class="detail-chip">{{ paper.year }}</span>{% endif %}
-          </div>
-        <div class="flex flex-wrap gap-2 paper-actions">
-          <a href="{{ url_for('paper_edit', slug=paper.slug) }}" class="btn-secondary compact">Edit Paper</a>
-          <details class="action-menu">
-            <summary aria-label="More publication actions">...</summary>
-            <div class="action-menu-panel">
-              <form method="POST" action="{{ url_for('paper_delete', slug=paper.slug) }}" onsubmit="return confirm('Delete this publication and all models?');">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="action-menu-danger">Delete publication</button>
-              </form>
-            </div>
-          </details>
+            <span class="detail-chip">{{ 'Public' if paper.is_public else 'Private' }}</span>
+        </div>
+        <div class="paper-actions">
+          <a href="{{ url_for('paper_edit', slug=paper.slug) }}" class="detail-action detail-action-primary">Edit Paper</a>
         </div>
       </div>
+
+
 
       <h1 class="paper-title font-serif text-3xl lg:text-4xl font-bold leading-tight text-[#111827]">{{ paper.title }}</h1>
       <div class="paper-meta mt-5">
@@ -40,20 +34,30 @@
           <div><span>Institution</span><strong>{{ paper.institution }}</strong></div>
         {% endif %}
         {% if paper.doi %}
-          <div><span>DOI</span><strong><a href="https://doi.org/{{ paper.doi }}" target="_blank" rel="noopener noreferrer">{{ paper.doi }}</a></strong></div>
+          <div>
+            <span>DOI</span>
+            <strong>
+              <a href="https://doi.org/{{ paper.doi }}" target="_blank" rel="noopener noreferrer" class="meta-link-button">{{ paper.doi }}</a>
+            </strong>
+          </div>
         {% endif %}
         {% if paper.pmid %}
           <div><span>PMID</span><strong>{{ paper.pmid }}</strong></div>
         {% endif %}
         {% if paper.pdf_path %}
-          <div><span>PDF</span><strong><a href="{{ url_for('serve_pdf', paper_id=paper.id) }}" target="_blank" rel="noopener noreferrer">Download PDF</a></strong></div>
+          <div>
+            <span>PDF</span>
+            <strong>
+              <a href="{{ url_for('serve_pdf', paper_id=paper.id) }}" target="_blank" rel="noopener noreferrer" class="meta-link-button">Download PDF</a>
+            </strong>
+          </div>
         {% endif %}
       </div>
 
       {% if paper.abstract %}
         <div class="abstract-block mt-5 pt-5 border-t border-[#141821]/10" data-collapsible-abstract>
-          <h3 class="font-semibold text-[#111827] mb-2">Description / Abstract</h3>
-          <p class="abstract-copy text-[#5c6473] leading-relaxed text-sm whitespace-pre-line">{{ paper.abstract }}</p>
+          <h3 class="font-semibold text-[#111827] mb-2">Abstract</h3>
+          <p class="abstract-copy text-[#5c6473] leading-relaxed text-sm">{{ paper.abstract }}</p>
           <button type="button" class="abstract-toggle" data-abstract-toggle>Read more</button>
         </div>
       {% endif %}
@@ -62,8 +66,8 @@
     <aside class="share-panel surface rounded-xl p-5 reveal-up delay-1">
       <div class="flex items-start justify-between gap-4">
         <div>
-          <p class="text-xs uppercase tracking-[0.12em] text-[#9ca3af] font-bold">Paper Information</p>
-          <h2 class="font-serif text-2xl font-semibold text-[#111827] mt-2">Public landing page</h2>
+          <p class="text-xs uppercase tracking-[0.12em] text-[#9ca3af] font-bold">Share</p>
+          <h2 class="font-serif text-2xl font-semibold text-[#111827] mt-2">Share this publication</h2>
         </div>
       </div>
 
@@ -83,12 +87,12 @@
 
       <div class="share-actions mt-5">
         {% if paper.pdf_path %}
-          <a href="{{ url_for('paper_public_pdf', slug=paper.slug) }}" target="_blank" rel="noopener noreferrer" class="btn-primary compact">View the paper</a>
+          <a href="{{ url_for('paper_public_pdf', slug=paper.slug) }}" target="_blank" rel="noopener noreferrer" class="detail-action detail-action-primary">View Paper PDF</a>
         {% else %}
-          <a href="{{ url_for('paper_edit', slug=paper.slug) }}" class="btn-secondary compact">Add PDF to enable reader</a>
+          <a href="{{ url_for('paper_edit', slug=paper.slug) }}" class="detail-action detail-action-primary">Add PDF</a>
         {% endif %}
-        <a href="{{ url_for('paper_public', slug=paper.slug) }}" target="_blank" rel="noopener noreferrer" class="btn-secondary compact">Open public page</a>
-        <a href="{{ url_for('qr_print_paper', paper_id=paper.id) }}" target="_blank" rel="noopener noreferrer" class="btn-secondary compact">View Paper QR</a>
+        <a href="{{ url_for('paper_public', slug=paper.slug) }}" target="_blank" rel="noopener noreferrer" class="detail-action">Open Public Page</a>
+        <a href="{{ url_for('qr_print_paper', paper_id=paper.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action">View Paper QR</a>
       </div>
 
       <div class="share-stats mt-5">
@@ -104,18 +108,15 @@
           <span>PDF</span>
           <strong>{{ 'Available' if paper.pdf_path else 'Missing' }}</strong>
         </div>
-        <div>
-          <span>{{ 'Active until' if paper.expires_at else 'Availability' }}</span>
-          <strong>{{ paper.expires_at.strftime('%b %d') if paper.expires_at else 'No expiry' }}</strong>
-        </div>
       </div>
     </aside>
   </section>
 
   <section class="mb-8" data-model-registry>
-    <div class="flex items-end justify-between gap-4 mb-5">
+    <div class="section-heading-row">
       <div>
-        <h2 class="font-serif text-3xl font-semibold text-[#111827] mt-3">Model registry</h2>
+        <span class="eyebrow">3D / AR assets</span>
+        <h2>Model registry</h2>
       </div>
     </div>
 
@@ -124,6 +125,8 @@
         {% for m in paper.models %}
           {% set model_status = m.processing_status or 'ready' %}
           {% set plan = license_plans.get(m.license_type or 'free') or license_plans.get('free') %}
+          {% set conversion_label = (m.source_format or 'stl')|upper ~ ' -> GLB' %}
+          {% set dimensions_label = format_model_dimensions_cm(m) %}
           <div class="model-row surface rounded-xl p-4 group reveal-up" data-model-row data-status-url="{{ url_for('model_status', model_id=m.id) }}" data-status="{{ model_status }}">
             <div class="model-row-grid">
               {% if model_status == 'ready' %}
@@ -151,8 +154,6 @@
               <div class="model-info">
                 <div class="flex flex-wrap items-center gap-2">
                   <h3 class="font-serif text-2xl font-semibold text-[#111827] truncate" title="{{ m.display_name or m.original_filename }}">{{ m.display_name or m.original_filename }}</h3>
-                  <span class="detail-chip">{{ format_file_size(m.file_size) }}</span>
-                  <span class="detail-chip">{{ (m.source_format or 'stl')|upper }} -> GLB</span>
                   <span class="detail-chip dark">{{ plan.label }}</span>
                   {% if model_status != 'ready' %}<span class="detail-chip status">{{ model_status|title }}</span>{% endif %}
                 </div>
@@ -160,24 +161,24 @@
                 {% if model_status == 'failed' and m.processing_error %}<p class="text-sm text-red-600 mt-2">{{ m.processing_error }}</p>{% endif %}
                 <div class="model-meta-grid mt-4">
                   <div><span>Access</span><strong>{{ 'Until ' ~ m.access_expires_at.strftime('%b %d, %Y') if m.access_expires_at else 'No expiry' }}</strong></div>
-                  <div><span>File limit</span><strong>{{ format_file_size(m.storage_limit_bytes or plan.storage_limit_bytes) }}</strong></div>
-                  <div><span>Version</span><strong>v{{ m.version or 1 }}</strong></div>
-                  <div><span>Color</span><strong>{{ m.appearance_color or '#cccccc' }}</strong></div>
+                  <div><span>Conversion</span><strong>{{ conversion_label }}</strong></div>
+                  <div><span>Size</span><strong>{{ format_file_size(m.file_size) }}</strong></div>
+                  <div><span>Dimensions</span><strong title="{{ dimensions_label }}">{{ dimensions_label }}</strong></div>
                 </div>
                 <div class="model-actions mt-4">
                   {% if model_status == 'ready' %}
-                    <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="btn-primary compact">Open 3D / AR</a>
-                    <button type="button" class="btn-secondary compact" data-copy-link="{{ model_resolver_url(m) }}">Copy link</button>
-                    <a href="{{ url_for('qr_print', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="btn-secondary compact">View QR</a>
+                    <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action detail-action-primary">Open 3D / AR</a>
+                    <button type="button" class="detail-action" data-copy-link="{{ model_resolver_url(m) }}">Copy Link</button>
+                    <a href="{{ url_for('qr_print', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action">View QR</a>
                   {% else %}
-                    <button type="button" class="btn-primary compact opacity-60 cursor-not-allowed" disabled>{{ 'Processing' if model_status != 'failed' else 'Not ready' }}</button>
+                    <button type="button" class="detail-action detail-action-muted" disabled>{{ 'Processing' if model_status != 'failed' else 'Not ready' }}</button>
                   {% endif %}
-                  <a href="{{ url_for('model_edit', model_id=m.id) }}" class="btn-secondary compact">Edit Model</a>
+                  <a href="{{ url_for('model_edit', model_id=m.id) }}" class="detail-action">Edit Model</a>
                   {% if model_status == 'ready' %}
-                    <form method="POST" action="{{ url_for('model_appearance_update', model_id=m.id) }}" class="model-color-form" title="Update model color without changing the viewer link or QR">
+                    <form method="POST" action="{{ url_for('model_appearance_update', model_id=m.id) }}" class="model-color-form" title="Save viewer color without changing the viewer link or QR">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                       <input type="color" name="color" value="{{ m.appearance_color or '#cccccc' }}" aria-label="Model color">
-                      <button type="submit">Apply color</button>
+                      <button type="submit">Save color</button>
                     </form>
                   {% endif %}
                   <details class="action-menu">
@@ -213,80 +214,79 @@
 
   <section id="add-model" class="mb-8 reveal-up">
     {% if paper.models %}
-      <div class="surface rounded-xl p-0 overflow-hidden upload-panel-prominent">
-        <div class="upload-summary upload-summary-static">
+      <details class="surface rounded-xl p-0 overflow-hidden upload-panel-prominent" data-upload-panel open>
+        <summary class="upload-summary upload-summary-static">
           <span>
             <strong>Add another model</strong>
-            <small>Upload an additional model for this publication. Each model keeps its own license and QR.</small>
+            <small>Attach another 3D / AR asset. Each model keeps its own stable viewer link and QR.</small>
           </span>
-          <span class="upload-chevron" aria-hidden="true">+</span>
-        </div>
-        <div class="border-t border-[#e2e8f0] p-6 sm:p-8">
+          <span class="upload-inline-action" aria-hidden="true"></span>
+        </summary>
+        <div id="model-upload-panel" class="border-t border-[#e2e8f0] p-6 sm:p-8" data-upload-panel-body>
     {% else %}
-      <div class="surface rounded-xl p-6 sm:p-8">
+      <div class="surface rounded-xl p-6 sm:p-8" data-upload-panel>
     {% endif %}
-          <div class="grid lg:grid-cols-[0.78fr_1.22fr] gap-8">
-            <div>
-              <span class="eyebrow">Model upload</span>
-              <h2 class="font-serif text-3xl font-semibold text-[#111827] mt-4">{{ 'Add a model' if paper.models else 'Add the first model' }}</h2>
-              <p class="text-[#64748b] text-sm leading-relaxed mt-3">Upload an anonymized model file. The platform prepares a stable public viewer, managed QR code, and AR-ready GLB asset.</p>
-              <div class="mt-6 rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4 text-sm text-[#475569] leading-relaxed">
-                Uploaded models must be anonymized. Files containing patient names, protocol numbers, faces, identity data, or identifiable information are prohibited.
-              </div>
-            </div>
-
-            <form method="POST" action="{{ url_for('upload_model', slug=paper.slug) }}" enctype="multipart/form-data" class="space-y-4" data-upload-form>
+          <form method="POST" action="{{ url_for('upload_model', slug=paper.slug) }}" enctype="multipart/form-data" class="upload-workflow-form" data-upload-form>
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <label class="upload-dropzone">
-                <span class="block text-[#111827] font-semibold">Select GLB, STL, OBJ, or FBX file</span>
-                <span class="block text-sm text-[#64748b] mt-1" data-dropzone-copy>Drag and drop a model here, or choose a file. The model will be prepared for the publication viewer. iOS AR uses an automatically generated USDZ companion.</span>
-                <input type="file" name="file" accept=".glb,.stl,.obj,.fbx" required class="mt-4 w-full text-sm text-[#64748b] file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:bg-[#111827] file:text-white file:font-bold" data-dropzone-input>
-              </label>
-              <div class="companion-files-section" data-companion-section style="display: none;">
-                <label class="field-label">MTL and Texture files <span class="text-[#64748b] font-normal">(optional companion files for OBJ)</span></label>
-                <input type="file" name="companion_files" multiple accept=".mtl,.png,.jpg,.jpeg,.webp" class="mt-1 w-full text-sm text-[#64748b] file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:bg-[#efefef] file:text-[#202020] file:font-semibold" data-companion-input>
-                <p class="text-xs text-[#5c6473] mt-2">Upload the material (.mtl) and texture images (.png, .jpg) referenced by the .obj file. The converter preserves textures by default.</p>
-              </div>
-              <div>
-                <label class="field-label">Model license</label>
-                <select name="license_type" class="field-select">
-                  <option value="free">Free Access - $0, 3-day access, up to 100 MB</option>
-                  <option value="academic">Academic - $9.90 / model, 3-year access, up to 200 MB</option>
-                  <option value="extended_archive">Extended Archive - $24.90 / model, 10-year access, up to 200 MB</option>
-                </select>
-                <p class="text-xs text-[#5c6473] mt-2">The same QR and resolver link stay stable if this model is upgraded or replaced later.</p>
-              </div>
-              <div class="grid sm:grid-cols-2 gap-4">
-                <input type="text" name="display_name" placeholder="Model name" class="field-input">
-                <input type="text" name="description" placeholder="Short model note" class="field-input">
-              </div>
-              <div>
-                <label class="field-label">Source unit (STL / GLB scale)</label>
-                <select name="source_unit" class="field-select">
-                  <option value="auto" selected>Auto-detect (works for typical 1-50 cm anatomical scans)</option>
-                  <option value="mm">Millimeters — most medical / dental / CAD STLs</option>
-                  <option value="cm">Centimeters — some legacy or photogrammetry exports</option>
-                  <option value="m">Meters — already in real-world units</option>
-                </select>
-                <p class="text-xs text-[#5c6473] mt-2">If your model appears 10× too big or too small in AR, pick the correct unit explicitly. Auto-detect biases toward millimeters because that is the standard in this domain.</p>
-              </div>
-              <label class="flex items-start gap-3 rounded-xl border border-[#e2e8f0] bg-white p-4 text-sm text-[#475569]">
-                <input type="checkbox" name="compliance_confirm" value="yes" required class="mt-1">
-                <span>I confirm that this model has been anonymized, that I have the right to share/publish it, and that I am responsible for all required ethical approval and consent processes.</span>
-              </label>
-              <div class="flex flex-wrap items-center gap-4">
-                <label class="flex items-center gap-3 text-sm text-[#64748b]">
-                  <span>Model color</span>
-                  <input type="color" name="color" value="#cccccc" class="h-10 w-16 rounded border border-[#e2e8f0] bg-transparent">
+              <div class="upload-workflow-left">
+                <div>
+                  <span class="eyebrow">Model upload</span>
+                  <h2 class="font-serif text-3xl font-semibold text-[#111827] mt-4">{{ 'Add a model' if paper.models else 'Add the first model' }}</h2>
+                  <p class="text-[#64748b] text-sm leading-relaxed mt-3">Upload an anonymized model file. The platform prepares a stable public viewer, managed QR code, and AR-ready GLB asset.</p>
+                </div>
+                <label class="upload-dropzone">
+                  <span class="block text-[#111827] font-semibold">Select GLB, STL, OBJ, or FBX file</span>
+                  <span class="block text-sm text-[#64748b] mt-1" data-dropzone-copy>Drag and drop a model here, or choose a file. iOS AR uses an automatically generated USDZ companion.</span>
+                  <span class="file-picker-control mt-4"><span>Choose file</span><small data-file-name>No file selected</small></span>
+                  <input type="file" name="file" accept=".glb,.stl,.obj,.fbx" required class="native-file-input" data-dropzone-input>
                 </label>
-                <button type="submit" class="btn-primary" data-upload-submit>Upload and Generate QR</button>
+                <div class="companion-files-section" data-companion-section style="display: none;">
+                  <label class="field-label">MTL and Texture files <span class="text-[#64748b] font-normal">(optional companion files for OBJ)</span></label>
+                  <label class="file-picker-control file-picker-control-muted mt-1">
+                    <span>Choose companion files</span>
+                    <small data-file-name>No files selected</small>
+                    <input type="file" name="companion_files" multiple accept=".mtl,.png,.jpg,.jpeg,.webp" class="native-file-input" data-companion-input>
+                  </label>
+                  <p class="text-xs text-[#5c6473] mt-2">Upload the material (.mtl) and texture images (.png, .jpg) referenced by the .obj file. The converter preserves textures by default.</p>
+                </div>
+                <div class="upload-compliance-note">
+                  Uploaded models must be anonymized. Files containing patient names, protocol numbers, faces, identity data, or identifiable information are prohibited.
+                </div>
+              </div>
+
+              <div class="upload-workflow-right">
+                <div>
+                  <label class="field-label">Model license</label>
+                  <select name="license_type" class="field-select">
+                    <option value="free">Free Access - $0, 3-day access, up to 100 MB</option>
+                    <option value="academic">Academic - $9.90 / model, 3-year access, up to 200 MB</option>
+                    <option value="extended_archive">Extended Archive - $24.90 / model, 10-year access, up to 200 MB</option>
+                  </select>
+                  <p class="text-xs text-[#5c6473] mt-2">The same QR and resolver link stay stable if this model is upgraded or replaced later.</p>
+                </div>
+                <div class="grid sm:grid-cols-2 gap-4">
+                  <input type="text" name="display_name" placeholder="Model name" class="field-input">
+                  <input type="text" name="description" placeholder="Short model note" class="field-input">
+                </div>
+                <label class="flex items-start gap-3 rounded-xl border border-[#e2e8f0] bg-white p-4 text-sm text-[#475569]">
+                  <input type="checkbox" name="compliance_confirm" value="yes" required class="mt-1">
+                  <span>I confirm that this model has been anonymized, that I have the right to share/publish it, and that I am responsible for all required ethical approval and consent processes.</span>
+                </label>
+                <div class="upload-action-row">
+                  <label class="color-optional-control" data-color-control>
+                    <input type="checkbox" name="color_enabled" value="yes" data-color-toggle>
+                    <span class="color-optional-swatch" aria-hidden="true"></span>
+                    <span class="color-optional-label">Color</span>
+                    <input type="color" name="color" value="#cccccc" disabled aria-label="Model color" data-color-input>
+                  </label>
+                  <button type="submit" class="detail-action detail-action-primary" data-upload-submit>Upload and Generate QR</button>
+                </div>
                 <p class="hidden text-sm text-[#475569] rounded border border-[#e2e8f0] bg-[#f8fafc] px-4 py-2" data-upload-status>Preparing model, viewer, and QR...</p>
               </div>
             </form>
-          </div>
     {% if paper.models %}
         </div>
-      </div>
+      </details>
     {% else %}
       </div>
     {% endif %}
@@ -302,6 +302,7 @@
     modelRegistry.parentNode.insertBefore(uploadSection, modelRegistry);
   }
 
+
   const uploadForm = document.querySelector('[data-upload-form]');
   if (uploadForm) {
     const dropzone = uploadForm.querySelector('.upload-dropzone');
@@ -309,8 +310,17 @@
     const dropzoneCopy = uploadForm.querySelector('[data-dropzone-copy]');
     const companionSection = uploadForm.querySelector('[data-companion-section]');
     const companionInput = uploadForm.querySelector('[data-companion-input]');
+    const colorToggle = uploadForm.querySelector('[data-color-toggle]');
+    const colorInput = uploadForm.querySelector('[data-color-input]');
+    const colorControl = uploadForm.querySelector('[data-color-control]');
     const modelExtensions = ['glb', 'stl', 'obj', 'fbx'];
     const companionExtensions = ['mtl', 'png', 'jpg', 'jpeg', 'webp'];
+    const updateFileName = (input, emptyLabel = 'No file selected') => {
+      const label = input && input.closest('label') ? input.closest('label').querySelector('[data-file-name]') : null;
+      if (!label) return;
+      const files = Array.from(input.files || []);
+      label.textContent = files.length ? files.map((file) => file.name).join(', ') : emptyLabel;
+    };
 
     const extensionFor = (file) => {
       const name = file && file.name ? file.name : '';
@@ -356,6 +366,8 @@
     const updateDropzoneState = () => {
       const selectedFile = fileInput && fileInput.files.length ? fileInput.files[0] : null;
       const selectedName = selectedFile ? selectedFile.name : '';
+      if (fileInput) updateFileName(fileInput);
+      if (companionInput) updateFileName(companionInput, 'No files selected');
       if (dropzoneCopy && selectedName) {
         const companionCount = companionInput && companionInput.files ? companionInput.files.length : 0;
         dropzoneCopy.textContent = companionCount
@@ -409,6 +421,24 @@
     }
 
     if (companionInput) companionInput.addEventListener('change', updateDropzoneState);
+
+    const updateColorState = () => {
+      const enabled = Boolean(colorToggle && colorToggle.checked);
+      if (colorInput) colorInput.disabled = !enabled;
+      if (colorControl) colorControl.classList.toggle('is-enabled', enabled);
+      const swatch = colorControl && colorControl.querySelector('.color-optional-swatch');
+      if (swatch) swatch.style.background = enabled && colorInput ? colorInput.value : '';
+    };
+    if (colorToggle) {
+      colorToggle.addEventListener('change', updateColorState);
+      updateColorState();
+    }
+    if (colorInput) {
+      colorInput.addEventListener('input', () => {
+        const swatch = colorControl && colorControl.querySelector('.color-optional-swatch');
+        if (swatch && colorControl.classList.contains('is-enabled')) swatch.style.background = colorInput.value;
+      });
+    }
 
     uploadForm.addEventListener('submit', (event) => {
       if (fileInput && fileInput.required && !fileInput.files.length) {

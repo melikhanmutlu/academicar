@@ -108,7 +108,8 @@
       <label class="block rounded-xl border border-dashed border-[#111827]/25 bg-white/55 p-5 cursor-pointer hover:bg-white/75 transition">
         <span class="block font-semibold text-[#111827]">{{ 'Replace PDF' if is_edit and paper.pdf_path else 'Attach PDF' }}</span>
         <span class="block text-sm text-[#5c6473] mt-1">Optional PDF upload. PDF files are only downloadable by the publication owner.{% if is_edit and paper.pdf_path %} Leave empty to keep the current PDF.{% endif %}</span>
-        <input type="file" name="pdf" accept=".pdf" class="mt-4 w-full text-sm text-[#5c6473] file:mr-3 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-[#111827] file:text-white file:font-semibold">
+        <span class="file-picker-control mt-4"><span>Choose PDF</span><small data-file-name>No file selected</small></span>
+        <input type="file" name="pdf" accept=".pdf" class="native-file-input" data-named-file-input>
       </label>
 
       {% if not is_edit %}
@@ -122,12 +123,17 @@
           <label class="upload-dropzone">
             <span class="block text-[#111827] font-semibold">Select model file</span>
             <span class="block text-sm text-[#64748b] mt-1" data-dropzone-copy>Drag and drop a model here, or choose a file. The model gets its own license, QR resolver link, and processing job.</span>
-            <input type="file" name="model_file" accept=".glb,.stl,.obj,.fbx" class="mt-4 w-full text-sm text-[#64748b] file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:bg-[#111827] file:text-white file:font-bold" data-dropzone-input>
+            <span class="file-picker-control mt-4"><span>Choose file</span><small data-file-name>No file selected</small></span>
+            <input type="file" name="model_file" accept=".glb,.stl,.obj,.fbx" class="native-file-input" data-dropzone-input>
           </label>
 
           <div class="companion-files-section" data-companion-section style="display: none;">
             <label class="field-label">MTL and Texture files <span class="text-[#64748b] font-normal">(optional companion files for OBJ)</span></label>
-            <input type="file" name="model_companion_files" multiple accept=".mtl,.png,.jpg,.jpeg,.webp" class="mt-1 w-full text-sm text-[#64748b] file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:bg-[#efefef] file:text-[#202020] file:font-semibold" data-companion-input>
+            <label class="file-picker-control file-picker-control-muted mt-1">
+              <span>Choose companion files</span>
+              <small data-file-name>No files selected</small>
+              <input type="file" name="model_companion_files" multiple accept=".mtl,.png,.jpg,.jpeg,.webp" class="native-file-input" data-companion-input>
+            </label>
             <p class="text-xs text-[#5c6473] mt-2">Upload the material (.mtl) and texture images (.png, .jpg) referenced by the .obj file.</p>
           </div>
 
@@ -136,29 +142,20 @@
             <input type="text" name="model_description" placeholder="Short model note" class="field-input">
           </div>
 
-          <div class="grid sm:grid-cols-2 gap-4">
-            <div>
-              <label class="field-label">Model license</label>
-              <select name="license_type" class="field-select">
-                <option value="free">Free Access - $0, 3-day access, up to 100 MB</option>
-                <option value="academic">Academic - $9.90 / model, 3-year access, up to 200 MB</option>
-                <option value="extended_archive">Extended Archive - $24.90 / model, 10-year access, up to 200 MB</option>
-              </select>
-            </div>
-            <div>
-              <label class="field-label">Source unit</label>
-              <select name="source_unit" class="field-select">
-                <option value="auto" selected>Auto-detect</option>
-                <option value="mm">Millimeters</option>
-                <option value="cm">Centimeters</option>
-                <option value="m">Meters</option>
-              </select>
-            </div>
+          <div>
+            <label class="field-label">Model license</label>
+            <select name="license_type" class="field-select">
+              <option value="free">Free Access - $0, 3-day access, up to 100 MB</option>
+              <option value="academic">Academic - $9.90 / model, 3-year access, up to 200 MB</option>
+              <option value="extended_archive">Extended Archive - $24.90 / model, 10-year access, up to 200 MB</option>
+            </select>
           </div>
 
-          <label class="flex items-center gap-3 text-sm text-[#64748b]">
-            <span>Model color</span>
-            <input type="color" name="color" value="#cccccc" class="h-10 w-16 rounded border border-[#e2e8f0] bg-transparent">
+          <label class="color-optional-control" data-color-control>
+            <input type="checkbox" name="color_enabled" value="yes" data-color-toggle>
+            <span class="color-optional-swatch" aria-hidden="true"></span>
+            <span class="color-optional-label">Color</span>
+            <input type="color" name="color" value="#cccccc" disabled aria-label="Model color" data-color-input>
           </label>
 
           <label class="flex items-start gap-3 rounded-xl border border-[#e2e8f0] bg-white p-4 text-sm text-[#475569]">
@@ -168,17 +165,55 @@
         </section>
       {% endif %}
 
-      <div class="flex items-center justify-end gap-3 pt-4 border-t border-[#141821]/10">
-        <a href="{{ url_for('paper_detail', slug=paper.slug) if is_edit else url_for('dashboard') }}" class="btn-secondary">Cancel</a>
-        <button type="submit" class="btn-primary">{{ 'Save Changes' if is_edit else 'Save and Continue' }}</button>
+      <div class="flex items-center justify-between gap-3 pt-4 border-t border-[#141821]/10">
+        {% if is_edit %}
+          <button type="button" class="detail-action detail-action-danger" data-delete-paper-open>Delete Publication</button>
+        {% else %}
+          <span></span>
+        {% endif %}
+        <div class="flex items-center gap-3">
+          <a href="{{ url_for('paper_detail', slug=paper.slug) if is_edit else url_for('dashboard') }}" class="btn-secondary">Cancel</a>
+          <button type="submit" class="btn-primary">{{ 'Save Changes' if is_edit else 'Save and Continue' }}</button>
+        </div>
       </div>
     </form>
+
+    {% if is_edit %}
+      <dialog class="confirm-dialog" data-delete-paper-dialog>
+        <form method="dialog" class="confirm-dialog-card">
+          <div>
+            <span class="eyebrow">Confirm delete</span>
+            <h2>Delete this publication?</h2>
+            <p>The publication will be hidden from your dashboard and public links. Admins can restore it later.</p>
+          </div>
+          <div class="confirm-dialog-actions">
+            <button type="submit" class="detail-action">Cancel</button>
+            <button type="submit" class="detail-action detail-action-danger" form="delete-paper-form">Delete Publication</button>
+          </div>
+        </form>
+      </dialog>
+      <form id="delete-paper-form" method="POST" action="{{ url_for('paper_delete', slug=paper.slug) }}" hidden>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      </form>
+    {% endif %}
   </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+  // Delete dialog
+  const deleteDialog = document.querySelector('[data-delete-paper-dialog]');
+  const deleteDialogOpen = document.querySelector('[data-delete-paper-open]');
+  if (deleteDialog && deleteDialogOpen) {
+    deleteDialogOpen.addEventListener('click', () => {
+      if (typeof deleteDialog.showModal === 'function') deleteDialog.showModal();
+      else if (window.confirm('Delete this publication? Admins can restore it later.')) {
+        document.getElementById('delete-paper-form')?.requestSubmit();
+      }
+    });
+  }
+
   const uploadForm = document.querySelector('[data-upload-form]');
   if (uploadForm) {
     const dropzone = uploadForm.querySelector('.upload-dropzone');
@@ -186,8 +221,17 @@
     const dropzoneCopy = uploadForm.querySelector('[data-dropzone-copy]');
     const companionSection = uploadForm.querySelector('[data-companion-section]');
     const companionInput = uploadForm.querySelector('[data-companion-input]');
+    const colorToggle = uploadForm.querySelector('[data-color-toggle]');
+    const colorInput = uploadForm.querySelector('[data-color-input]');
+    const colorControl = uploadForm.querySelector('[data-color-control]');
     const modelExtensions = ['glb', 'stl', 'obj', 'fbx'];
     const companionExtensions = ['mtl', 'png', 'jpg', 'jpeg', 'webp'];
+    const updateFileName = (input, emptyLabel = 'No file selected') => {
+      const label = input && input.closest('label') ? input.closest('label').querySelector('[data-file-name]') : null;
+      if (!label) return;
+      const files = Array.from(input.files || []);
+      label.textContent = files.length ? files.map((file) => file.name).join(', ') : emptyLabel;
+    };
 
     const extensionFor = (file) => {
       const name = file && file.name ? file.name : '';
@@ -233,6 +277,8 @@
     const updateDropzoneState = () => {
       const selectedFile = fileInput && fileInput.files.length ? fileInput.files[0] : null;
       const selectedName = selectedFile ? selectedFile.name : '';
+      if (fileInput) updateFileName(fileInput);
+      if (companionInput) updateFileName(companionInput, 'No files selected');
       if (dropzoneCopy && selectedName) {
         const companionCount = companionInput && companionInput.files ? companionInput.files.length : 0;
         dropzoneCopy.textContent = companionCount
@@ -286,7 +332,36 @@
     }
 
     if (companionInput) companionInput.addEventListener('change', updateDropzoneState);
+
+    const updateColorState = () => {
+      const enabled = Boolean(colorToggle && colorToggle.checked);
+      if (colorInput) colorInput.disabled = !enabled;
+      if (colorControl) colorControl.classList.toggle('is-enabled', enabled);
+      const swatch = colorControl && colorControl.querySelector('.color-optional-swatch');
+      if (swatch) swatch.style.background = enabled && colorInput ? colorInput.value : '';
+    };
+    if (colorToggle) {
+      colorToggle.addEventListener('change', updateColorState);
+      updateColorState();
+    }
+    if (colorInput) {
+      colorInput.addEventListener('input', () => {
+        const swatch = colorControl && colorControl.querySelector('.color-optional-swatch');
+        if (swatch && colorControl.classList.contains('is-enabled')) swatch.style.background = colorInput.value;
+      });
+    }
   }
+
+  document.querySelectorAll('[data-named-file-input]').forEach((input) => {
+    const updateFileName = () => {
+      const label = input.closest('label')?.querySelector('[data-file-name]');
+      if (!label) return;
+      const files = Array.from(input.files || []);
+      label.textContent = files.length ? files.map((file) => file.name).join(', ') : 'No file selected';
+    };
+    input.addEventListener('change', updateFileName);
+    updateFileName();
+  });
 
   // DOI / PMID Autofill Logic
   (function() {

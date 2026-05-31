@@ -601,8 +601,13 @@
           {% for paper in papers %}
             <tr>
               <td>
-                <strong><a href="{{ url_for('paper_public', slug=paper.slug) }}" target="_blank" rel="noopener noreferrer">{{ paper.title }}</a></strong>
-                <small><a href="{{ url_for('paper_public', slug=paper.slug) }}" target="_blank" rel="noopener noreferrer">{{ url_for('paper_public', slug=paper.slug, _external=True) }}</a></small>
+                {% if paper.status == "deleted" %}
+                  <strong>{{ paper.title }}</strong>
+                  <small>Deleted{% if paper.deleted_at %} on {{ paper.deleted_at.strftime("%b %d, %Y") }}{% endif %}</small>
+                {% else %}
+                  <strong><a href="{{ url_for('paper_public', slug=paper.slug) }}" target="_blank" rel="noopener noreferrer">{{ paper.title }}</a></strong>
+                  <small><a href="{{ url_for('paper_public', slug=paper.slug) }}" target="_blank" rel="noopener noreferrer">{{ url_for('paper_public', slug=paper.slug, _external=True) }}</a></small>
+                {% endif %}
               </td>
               <td>
                 {% if paper.author %}
@@ -625,7 +630,14 @@
                     <input name="status" class="field-input compact-input" value="{{ paper.status or 'active' }}" aria-label="Publication status">
                     <button type="submit" class="btn-secondary compact">Update</button>
                   </form>
-                  <a href="{{ url_for('paper_detail', slug=paper.slug) }}" class="btn-secondary compact">Open</a>
+                  {% if paper.status == "deleted" %}
+                    <form method="POST" action="{{ url_for('admin_paper_restore', paper_id=paper.id) }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="submit" class="btn-secondary compact">Restore</button>
+                    </form>
+                  {% else %}
+                    <a href="{{ url_for('paper_detail', slug=paper.slug) }}" class="btn-secondary compact">Open</a>
+                  {% endif %}
                 </div>
               </td>
             </tr>
