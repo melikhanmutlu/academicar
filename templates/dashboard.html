@@ -201,13 +201,13 @@
       {% for p in papers %}
         {% set paper_href = url_for('paper_public', slug=p.slug) if admin_view is defined and admin_view else url_for('paper_detail', slug=p.slug) %}
         {% set first_model = p.models[0] if p.models else none %}
-        {% if p.authors %}
-          {% set words = p.authors.replace('Dr. ','').replace('Prof. ','').replace('Dr.','').replace('Prof.','').split() %}
-          {% set init = (words[0][0] ~ (words[1][0] if words|length > 1 else ''))|upper %}
+        {% set clean_authors = (p.authors or '').replace('Dr. ','').replace('Prof. ','').replace('Dr.','').replace('Prof.','').strip() %}
+        {% if clean_authors %}
+          {% set words = clean_authors.split() %}
         {% else %}
-          {% set words = p.title.split() %}
-          {% set init = (words[0][0] ~ (words[1][0] if words|length > 1 else ''))|upper %}
+          {% set words = (p.title or '').split() %}
         {% endif %}
+        {% set init = ((words[0][0] if words else 'P') ~ (words[1][0] if words|length > 1 else ''))|upper %}
 
         <div
           class="pub-row publication-row"
