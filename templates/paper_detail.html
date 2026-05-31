@@ -220,7 +220,11 @@
             <strong>Add another model</strong>
             <small>Attach another 3D / AR asset. Each model keeps its own stable viewer link and QR.</small>
           </span>
-          <span class="upload-inline-action" aria-hidden="true"></span>
+          <span class="upload-inline-action" aria-hidden="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 9l6 6 6-6"/>
+            </svg>
+          </span>
         </summary>
         <div id="model-upload-panel" class="border-t border-[#e2e8f0] p-6 sm:p-8" data-upload-panel-body>
     {% else %}
@@ -304,6 +308,79 @@
   const modelRegistry = document.querySelector('[data-model-registry]');
   if (uploadSection && modelRegistry) {
     modelRegistry.parentNode.insertBefore(uploadSection, modelRegistry);
+  }
+
+  // Smooth Details Toggle Animation
+  const detailsElement = document.querySelector('details[data-upload-panel]');
+  if (detailsElement) {
+    const summaryElement = detailsElement.querySelector('summary');
+    const contentElement = detailsElement.querySelector('[data-upload-panel-body]');
+    let animation = null;
+    let isClosing = false;
+    let isExpanding = false;
+
+    if (summaryElement && contentElement) {
+      summaryElement.addEventListener('click', (e) => {
+        e.preventDefault();
+        detailsElement.style.overflow = 'hidden';
+        if (isClosing || !detailsElement.open) {
+          open();
+        } else if (isExpanding || detailsElement.open) {
+          shrink();
+        }
+      });
+    }
+
+    function shrink() {
+      isClosing = true;
+      const startHeight = `${detailsElement.offsetHeight}px`;
+      const endHeight = `${summaryElement.offsetHeight}px`;
+
+      if (animation) animation.cancel();
+
+      animation = detailsElement.animate({
+        height: [startHeight, endHeight]
+      }, {
+        duration: 300,
+        easing: 'cubic-bezier(0.4, 0, 0.2, 1)'
+      });
+
+      animation.onfinish = () => onAnimationFinish(false);
+      animation.oncancel = () => isClosing = false;
+    }
+
+    function open() {
+      detailsElement.style.height = `${detailsElement.offsetHeight}px`;
+      detailsElement.open = true;
+      window.requestAnimationFrame(() => expand());
+    }
+
+    function expand() {
+      isExpanding = true;
+      const startHeight = `${detailsElement.offsetHeight}px`;
+      const endHeight = `${summaryElement.offsetHeight + contentElement.offsetHeight}px`;
+
+      if (animation) animation.cancel();
+
+      animation = detailsElement.animate({
+        height: [startHeight, endHeight]
+      }, {
+        duration: 300,
+        easing: 'cubic-bezier(0.4, 0, 0.2, 1)'
+      });
+
+      animation.onfinish = () => onAnimationFinish(true);
+      animation.oncancel = () => isExpanding = false;
+    }
+
+    function onAnimationFinish(openState) {
+      detailsElement.open = openState;
+      animation = null;
+      isClosing = false;
+      isExpanding = false;
+      detailsElement.style.height = '';
+      detailsElement.style.overflow = '';
+    }
   }
 
 
@@ -433,14 +510,32 @@
       const swatch = colorControl && colorControl.querySelector('.color-optional-swatch');
       if (swatch) swatch.style.background = enabled && colorInput ? colorInput.value : '';
     };
-    if (colorToggle) {
+    if (colorControl && colorToggle && colorInput) {
       colorToggle.addEventListener('change', updateColorState);
       updateColorState();
-    }
-    if (colorInput) {
+
+      colorControl.addEventListener('click', (e) => {
+        if (e.target === colorInput || e.target === colorToggle) return;
+        const enabled = colorToggle.checked;
+        if (!enabled) {
+          e.preventDefault();
+          colorToggle.checked = true;
+          updateColorState();
+          colorInput.click();
+        } else {
+          // If already enabled, clicking the swatch opens the color picker instead of turning it off
+          if (e.target.closest('.color-optional-swatch')) {
+            e.preventDefault();
+            colorInput.click();
+          }
+        }
+      });
+
       colorInput.addEventListener('input', () => {
-        const swatch = colorControl && colorControl.querySelector('.color-optional-swatch');
-        if (swatch && colorControl.classList.contains('is-enabled')) swatch.style.background = colorInput.value;
+        const swatch = colorControl.querySelector('.color-optional-swatch');
+        if (swatch && colorControl.classList.contains('is-enabled')) {
+          swatch.style.background = colorInput.value;
+        }
       });
     }
 

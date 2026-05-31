@@ -5970,22 +5970,25 @@ label.rounded-xl input[type="checkbox"] {
 }
 .upload-inline-action {
   display: inline-flex;
-  min-height: 32px;
+  width: 32px;
+  height: 32px;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--color-light-pearl);
-  border-radius: 999px;
+  border-radius: 50%;
   background: var(--color-canvas-white);
   color: var(--color-midnight-graphite);
-  font-family: var(--font-inter);
-  font-size: 12px;
-  font-weight: 700;
-  padding: 7px 12px;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s ease, background-color 0.2s ease;
 }
-.upload-inline-action::before { content: "Upload"; }
-details[open] > .upload-summary .upload-inline-action::before { content: "Hide"; }
+.upload-inline-action svg {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
 .upload-inline-action:hover {
   border-color: var(--color-midnight-graphite);
+  background: var(--color-cloud-whisper);
+}
+details[open] > .upload-summary .upload-inline-action svg {
+  transform: rotate(180deg);
 }
 
 .upload-workflow-form {
