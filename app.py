@@ -1494,7 +1494,7 @@ def register_routes(app: Flask) -> None:
         img = qr.make_image(
             image_factory=StyledPilImage,
             module_drawer=RoundedModuleDrawer(),
-            color_mask=SolidFillColorMask(back_color=(255, 255, 255), front_color=(255, 104, 44))
+            color_mask=SolidFillColorMask(back_color=(255, 255, 255), front_color=(0, 0, 0))
         )
         buffer = io.BytesIO()
         img.save(buffer, format="PNG")
