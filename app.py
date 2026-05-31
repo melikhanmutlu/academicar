@@ -141,6 +141,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             logger.warning("SQLite schema already existed during create_all; continuing with compatibility checks.")
         sync_configured_admins(app)
         ensure_sqlite_schema(app)
+        stamp_alembic_version_if_needed(app)
 
     return app
 
@@ -417,6 +418,35 @@ def ensure_sqlite_schema(app: Flask) -> None:
             connection.execute(text("ALTER TABLE papers ADD COLUMN deleted_at DATETIME"))
         if "deleted_by_user_id" not in columns:
             connection.execute(text("ALTER TABLE papers ADD COLUMN deleted_by_user_id INTEGER"))
+
+
+def stamp_alembic_version_if_needed(app: Flask) -> None:
+    """
+    Ensure the production database (e.g. PostgreSQL) is stamped with the initial
+    migration version '669b2de1fcd7' if tables already exist but alembic_version is missing.
+    This prevents Alembic from trying to run the initial schema creation,
+    which fails due to duplicate tables/indexes.
+    """
+    import sqlalchemy as sa
+    from sqlalchemy import text
+    try:
+        with app.app_context():
+            # Only apply this workaround on non-SQLite databases (like PostgreSQL on Railway)
+            if db.engine.dialect.name == "sqlite":
+                return
+                
+            inspector = sa.inspect(db.engine)
+            tables = inspector.get_table_names()
+            
+            # If the schema is already populated but alembic_version hasn't been created yet:
+            if "models" in tables and "alembic_version" not in tables:
+                logger.info("Production database tables found but no alembic_version table. Stamping to '669b2de1fcd7'...")
+                with db.engine.begin() as connection:
+                    connection.execute(text("CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL PRIMARY KEY)"))
+                    connection.execute(text("INSERT INTO alembic_version (version_num) VALUES ('669b2de1fcd7')"))
+                logger.info("Successfully stamped alembic_version to '669b2de1fcd7'.")
+    except Exception as e:
+        logger.error(f"Error checking or stamping alembic version: {e}")
 
 
 def rate_limit_key() -> str:
