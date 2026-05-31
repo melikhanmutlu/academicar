@@ -1799,51 +1799,30 @@ def register_routes(app: Flask) -> None:
             "pending_jobs": ConversionJob.query.filter_by(status="pending").count(),
             "failed_jobs": ConversionJob.query.filter_by(status="failed").count(),
         }
-        processing_counts = {
-            status or "ready": count
-            for status, count in db.session.query(
-                func.coalesce(Model3D.processing_status, "ready"),
-                func.count(Model3D.id),
-            )
-            .group_by(func.coalesce(Model3D.processing_status, "ready"))
-            .all()
-        }
-        license_counts = {
-            license_type or "free": count
-            for license_type, count in db.session.query(
-                func.coalesce(Model3D.license_type, "free"),
-                func.count(Model3D.id),
-            )
-            .group_by(func.coalesce(Model3D.license_type, "free"))
-            .all()
-        }
-        source_format_counts = {
-            source_format or "unknown": count
-            for source_format, count in db.session.query(
-                func.coalesce(Model3D.source_format, "unknown"),
-                func.count(Model3D.id),
-            )
-            .group_by(func.coalesce(Model3D.source_format, "unknown"))
-            .all()
-        }
-        payment_counts = {
-            status or "pending": count
-            for status, count in db.session.query(
-                func.coalesce(Payment.status, "pending"),
-                func.count(Payment.id),
-            )
-            .group_by(func.coalesce(Payment.status, "pending"))
-            .all()
-        }
-        job_counts = {
-            status or "pending": count
-            for status, count in db.session.query(
-                func.coalesce(ConversionJob.status, "pending"),
-                func.count(ConversionJob.id),
-            )
-            .group_by(func.coalesce(ConversionJob.status, "pending"))
-            .all()
-        }
+        processing_counts = {}
+        for status, count in db.session.query(Model3D.processing_status, func.count(Model3D.id)).group_by(Model3D.processing_status).all():
+            key = status or "ready"
+            processing_counts[key] = processing_counts.get(key, 0) + count
+
+        license_counts = {}
+        for license_type, count in db.session.query(Model3D.license_type, func.count(Model3D.id)).group_by(Model3D.license_type).all():
+            key = license_type or "free"
+            license_counts[key] = license_counts.get(key, 0) + count
+
+        source_format_counts = {}
+        for source_format, count in db.session.query(Model3D.source_format, func.count(Model3D.id)).group_by(Model3D.source_format).all():
+            key = source_format or "unknown"
+            source_format_counts[key] = source_format_counts.get(key, 0) + count
+
+        payment_counts = {}
+        for status, count in db.session.query(Payment.status, func.count(Payment.id)).group_by(Payment.status).all():
+            key = status or "pending"
+            payment_counts[key] = payment_counts.get(key, 0) + count
+
+        job_counts = {}
+        for status, count in db.session.query(ConversionJob.status, func.count(ConversionJob.id)).group_by(ConversionJob.status).all():
+            key = status or "pending"
+            job_counts[key] = job_counts.get(key, 0) + count
         total_model_storage = db.session.query(func.coalesce(func.sum(Model3D.file_size), 0)).scalar() or 0
         revenue_30_days = (
             db.session.query(func.coalesce(func.sum(Payment.amount_kurus), 0))
@@ -1887,17 +1866,10 @@ def register_routes(app: Flask) -> None:
         for failed_job in ConversionJob.query.filter_by(status="failed").all():
             fmt = (failed_job.model.source_format if failed_job.model else None) or "unknown"
             failed_format_counts[fmt] = failed_format_counts.get(fmt, 0) + 1
-        field_counts = {
-            field or "Unspecified": count
-            for field, count in db.session.query(
-                func.coalesce(Paper.field, "Unspecified"),
-                func.count(Paper.id),
-            )
-            .group_by(func.coalesce(Paper.field, "Unspecified"))
-            .order_by(func.count(Paper.id).desc())
-            .limit(8)
-            .all()
-        }
+        field_counts = {}
+        for field, count in db.session.query(Paper.field, func.count(Paper.id)).group_by(Paper.field).order_by(func.count(Paper.id).desc()).limit(8).all():
+            key = field or "Unspecified"
+            field_counts[key] = field_counts.get(key, 0) + count
         daily_publication_trend = []
         daily_viewer_trend = []
         for offset in range(29, -1, -1):
