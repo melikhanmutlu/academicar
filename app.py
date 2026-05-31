@@ -1479,6 +1479,9 @@ def register_routes(app: Flask) -> None:
     def demo_mitochondria_qr():
         import io
         import qrcode
+        from qrcode.image.styledpil import StyledPilImage
+        from qrcode.image.styles.moduledrawers import RoundedModuleDrawer
+        from qrcode.image.styles.colormasks import SolidFillColorMask
 
         qr = qrcode.QRCode(
             version=1,
@@ -1488,7 +1491,11 @@ def register_routes(app: Flask) -> None:
         )
         qr.add_data(public_url("demo_mitochondria_ar", source="hero_qr"))
         qr.make(fit=True)
-        img = qr.make_image(fill_color="black", back_color="white")
+        img = qr.make_image(
+            image_factory=StyledPilImage,
+            module_drawer=RoundedModuleDrawer(),
+            color_mask=SolidFillColorMask(back_color=(255, 255, 255), front_color=(255, 104, 44))
+        )
         buffer = io.BytesIO()
         img.save(buffer, format="PNG")
         buffer.seek(0)
@@ -2835,6 +2842,10 @@ def register_routes(app: Flask) -> None:
                 if paper.pdf_path:
                     old_pdf_path = os.path.join(app.config["PDF_FOLDER"], os.path.basename(paper.pdf_path))
                 paper.pdf_path = pdf_filename
+            elif request.form.get("delete_pdf") == "1":
+                if paper.pdf_path:
+                    old_pdf_path = os.path.join(app.config["PDF_FOLDER"], os.path.basename(paper.pdf_path))
+                    paper.pdf_path = None
 
             try:
                 db.session.commit()

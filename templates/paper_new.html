@@ -105,6 +105,26 @@
         </div>
       </div>
 
+      {% if is_edit and paper.pdf_path %}
+        <div class="rounded-xl border border-[#e8e8e8] bg-[#fdfdfd] p-5 mb-4" style="border: 1px solid var(--color-light-pearl); background: rgba(255, 255, 255, 0.7); border-radius: 12px; margin-bottom: 16px;">
+          <span class="text-xs font-semibold uppercase tracking-wider text-[#d94e14] block" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #d94e14; display: block;">Current PDF File</span>
+          <div class="flex items-center justify-between mt-2 gap-4" style="display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 8px;">
+            <div class="flex items-center gap-2" style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+              <svg class="w-5 h-5 text-red-500 shrink-0" style="width: 20px; height: 20px; color: #ef4444; flex-shrink: 0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+              </svg>
+              <span class="text-sm font-medium text-[#111827] truncate" style="font-size: 14px; font-weight: 500; color: #111827; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                {{ paper.pdf_path.split('_', 1)[1] if '_' in paper.pdf_path else paper.pdf_path }}
+              </span>
+            </div>
+            <label class="inline-flex items-center text-sm font-semibold text-[#ef4444] cursor-pointer hover:text-red-700 transition" style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: #ef4444; font-size: 14px; font-weight: 600; transition: color 0.2s;">
+              <input type="checkbox" name="delete_pdf" value="1" style="width: 16px; height: 16px; accent-color: #ef4444; cursor: pointer; margin: 0;">
+              Remove PDF
+            </label>
+          </div>
+        </div>
+      {% endif %}
+
       <label class="block rounded-xl border border-dashed border-[#111827]/25 bg-white/55 p-5 cursor-pointer hover:bg-white/75 transition">
         <span class="block font-semibold text-[#111827]">{{ 'Replace PDF' if is_edit and paper.pdf_path else 'Attach PDF' }}</span>
         <span class="block text-sm text-[#5c6473] mt-1">Optional PDF upload. PDF files are only downloadable by the publication owner.{% if is_edit and paper.pdf_path %} Leave empty to keep the current PDF.{% endif %}</span>

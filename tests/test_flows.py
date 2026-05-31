@@ -1416,3 +1416,52 @@ def test_papers_fetch_metadata_endpoint(client, monkeypatch):
     assert res_json["institution"] == "Nature Medicine"
     assert res_json["doi"] == "10.1038/nm.3456"
     assert res_json["pmid"] == "34567890"
+
+
+def test_paper_edit_pdf_deletion(client):
+    import os
+    from tests.conftest import register, upload_file_bytes
+
+    register(client)
+
+    # 1. Create a paper with an attached PDF
+    pdf_content = b"%PDF-1.4 test data"
+    response = client.post(
+        "/papers/new",
+        data={
+            "title": "Paper with PDF to Delete",
+            "authors": "Jane Doe",
+            "year": "2026",
+            "field": "Medicine",
+            "pdf": upload_file_bytes(pdf_content, "test.pdf"),
+        },
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+
+    with client.application.app_context():
+        paper = Paper.query.filter_by(title="Paper with PDF to Delete").one()
+        slug = paper.slug
+        assert paper.pdf_path is not None
+        pdf_path = os.path.join(client.application.config["PDF_FOLDER"], paper.pdf_path)
+        assert os.path.exists(pdf_path)
+
+    # 2. Edit the paper and request PDF deletion
+    response = client.post(
+        f"/papers/{slug}/edit",
+        data={
+            "title": "Paper with PDF to Delete",
+            "authors": "Jane Doe",
+            "year": "2026",
+            "field": "Medicine",
+            "delete_pdf": "1",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+
+    with client.application.app_context():
+        paper = Paper.query.filter_by(title="Paper with PDF to Delete").one()
+        assert paper.pdf_path is None
+        assert not os.path.exists(pdf_path)
