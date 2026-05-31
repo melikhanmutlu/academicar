@@ -21,7 +21,6 @@ ENV/
 
 # Database & migrations
 instance/
-migrations/versions/
 
 # Runtime klasörleri (kullanıcı yüklemeleri)
 uploads/
