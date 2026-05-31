@@ -4063,6 +4063,14 @@ input[type="file"]::-webkit-file-upload-button {
   letter-spacing: 0.5px !important;
   color: var(--color-silver-ash) !important;
 }
+.share-description {
+  font-family: var(--font-inter) !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+  color: var(--color-dark-shale) !important;
+  margin: 0 !important;
+  text-transform: none !important;
+}
 .share-identity {
   display: grid !important;
   grid-template-columns: 132px minmax(0, 1fr);

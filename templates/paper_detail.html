@@ -76,8 +76,7 @@
           <img src="{{ url_for('qr_image_paper', paper_id=paper.id) }}" class="w-28 h-28" alt="QR code for {{ paper.title }}">
         </div>
         <div class="min-w-0 flex-1">
-          <p class="text-sm font-semibold text-[#111827] truncate">{{ paper.title }}</p>
-          <p class="text-xs text-[#64748b] mt-1">QR opens the public paper page with PDF and every 3D / AR model.</p>
+          <p class="share-description">Scan this QR code with a smartphone to view the interactive 3D models and publication details.</p>
           <div class="copy-field mt-3" title="{{ public_url('paper_public', slug=paper.slug) }}">
             <span>{{ public_url('paper_public', slug=paper.slug) }}</span>
             <button type="button" data-copy-link="{{ public_url('paper_public', slug=paper.slug) }}">Copy</button>
