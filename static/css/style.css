@@ -1879,33 +1879,6 @@ body {
   gap: 0.45rem;
 }
 
-.abstract-block {
-  max-width: 68rem;
-}
-
-.abstract-copy {
-  max-height: 5.35rem;
-  overflow: hidden;
-  position: relative;
-}
-
-.abstract-block:not(.is-expanded) .abstract-copy {
-  mask-image: linear-gradient(180deg, black 68%, transparent);
-}
-
-.abstract-block.is-expanded .abstract-copy {
-  max-height: none;
-  mask-image: none;
-}
-
-.abstract-toggle {
-  margin-top: 0.7rem;
-  color: var(--ink);
-  font-size: 0.85rem;
-  font-weight: 800;
-  text-decoration: underline;
-  text-underline-offset: 4px;
-}
 
 .status-line {
   display: flex;
@@ -4066,12 +4039,7 @@ input[type="file"]::-webkit-file-upload-button {
   background: transparent;
 }
 
-@media (min-width: 980px) {
-  .paper-hero .abstract-copy {
-    columns: 2;
-    column-gap: 36px;
-  }
-}
+
 
 /* Share panel */
 .share-panel {
