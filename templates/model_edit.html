@@ -129,6 +129,10 @@
       <div class="model-edit-side-actions">
         <a href="{{ url_for('qr_print', model_id=model.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action">View QR</a>
         <a href="{{ url_for('paper_detail', slug=paper.slug) }}" class="detail-action">Back to Publication</a>
+        <form method="POST" action="{{ url_for('model_delete', model_id=model.id) }}" onsubmit="return confirm('Delete this 3D model? This cannot be undone.');" class="w-full mt-4 pt-4 border-t border-[#e2e8f0]">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="detail-action detail-action-danger w-full text-center">Delete Model</button>
+        </form>
       </div>
     </aside>
   </div>
