@@ -187,7 +187,7 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 32px;
-  max-width: 480px;
+  max-width: 560px;
   padding-top: 32px;
   border-top: 1px solid var(--color-light-pearl);
 }
@@ -199,6 +199,7 @@
   letter-spacing: -0.64px;
   line-height: 1;
   margin-bottom: 8px;
+  white-space: nowrap;
 }
 .hero-metric-label {
   font-family: var(--font-inter);
@@ -1250,7 +1251,7 @@
   .hero-section,
   .final-cta { padding: 60px 20px; }
   .hero-metrics { grid-template-columns: repeat(3, 1fr); gap: 16px; }
-  .hero-metric-value { font-size: 24px; }
+  .hero-metric-value { font-size: 24px; white-space: normal; }
   .features-grid,
   .usecases-grid { grid-template-columns: 1fr; }
   .feature-card,

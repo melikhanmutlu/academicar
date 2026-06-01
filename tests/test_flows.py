@@ -63,6 +63,7 @@ def test_landing_pricing_and_viewer_tools_are_present(client):
     assert viewer.status_code == 200
     viewer_html = viewer.get_data(as_text=True)
     assert "Preview rotation" in viewer_html
+    assert "Reset view" in viewer_html
     assert "Generate 8 views" in viewer_html
     assert "Current view" in viewer_html
     assert "Download ZIP" in viewer_html
