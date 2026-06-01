@@ -37,6 +37,12 @@ def is_valid_extension(filename, extensions):
 
 logger = logging.getLogger(__name__)
 
+# SEC-6/PERF-3/CONVERT-1: hard caps on mesh complexity. A structurally valid
+# but enormous mesh can OOM the conversion worker; these limits reject it early
+# with a clear error instead. Overridable via env (0 disables a given check).
+MAX_MESH_FACES = int(os.environ.get("MAX_MESH_FACES", 2_000_000))
+MAX_MESH_VERTICES = int(os.environ.get("MAX_MESH_VERTICES", 2_000_000))
+
 
 def _numpy2_allclose(a, b, atol=1e-8):
     return float(np.ptp(np.asanyarray(a) - np.asanyarray(b))) < atol
@@ -458,6 +464,20 @@ class STLConverter(BaseConverter):
             self.log_operation(
                 f"Flattened scene: {len(flattened_meshes)} geometries merged into single mesh"
             )
+
+            # SEC-6/PERF-3: reject meshes too large to process safely.
+            n_faces = len(mesh.faces)
+            n_verts = len(mesh.vertices)
+            if (MAX_MESH_FACES and n_faces > MAX_MESH_FACES) or (
+                MAX_MESH_VERTICES and n_verts > MAX_MESH_VERTICES
+            ):
+                self.handle_error(
+                    f"Model is too complex to process ({n_faces:,} triangles, "
+                    f"{n_verts:,} vertices). The limit is {MAX_MESH_FACES:,} triangles "
+                    f"and {MAX_MESH_VERTICES:,} vertices. Please simplify/decimate the "
+                    f"mesh and upload again."
+                )
+                return False
 
             # Apply basis correction once (Z-up -> Y-up) directly to vertices
             basis_correction = trimesh.transformations.rotation_matrix(

@@ -11,9 +11,10 @@
 {% set step2_done = stats.total_models > 0 %}
 {% set step3_done = papers_with_pdf > 0 %}
 {% set step4_done = papers|selectattr('is_public')|list|length > 0 %}
-{% set show_onboarding = false %}
+{# BUG-4: show the getting-started guide until every step is complete. #}
+{% set show_onboarding = not (step1_done and step2_done and step3_done and step4_done) %}
 {% if admin_view is defined and admin_view %}
-  {% set show_onboarding = false %}
+  {% set show_onboarding = (false) %}
 {% endif %}
 
 <div class="app-shell dashboard-shell py-8">
@@ -361,7 +362,7 @@
     
     const file = fileInput.files[0];
     if (!file.name.toLowerCase().endsWith('.pdf')) {
-      alert("Only .pdf files are accepted.");
+      window.showToast("Only .pdf files are accepted.", "danger");
       return;
     }
     
@@ -383,12 +384,15 @@
     .then(response => response.json().then(data => ({ status: response.status, data })))
     .then(({ status, data }) => {
       if (status === 200 && data.success) {
-        btn.textContent = "PDF";
+        // UX-2: update the row inline instead of reloading the whole page.
+        btn.textContent = "PDF ✓";
         btn.disabled = false;
         btn.style.opacity = "1";
-        window.location.reload();
+        btn.title = "PDF attached";
+        fileInput.value = "";
+        window.showToast("PDF uploaded successfully.", "success");
       } else {
-        alert("Error: " + (data.error || "Could not upload PDF file."));
+        window.showToast("Error: " + (data.error || "Could not upload PDF file."), "danger");
         btn.textContent = originalText;
         btn.disabled = false;
         btn.style.opacity = "1";
@@ -396,7 +400,7 @@
     })
     .catch(error => {
       console.error("PDF upload failed:", error);
-      alert("An error occurred during upload. Please try again.");
+      window.showToast("An error occurred during upload. Please try again.", "danger");
       btn.textContent = originalText;
       btn.disabled = false;
       btn.style.opacity = "1";

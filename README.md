@@ -128,3 +128,26 @@ to the Redis URL. Attach a Railway Volume and set `STORAGE_ROOT` to the mount
 path so uploaded sources, converted GLBs, PDFs, and QR images persist across
 deploys. Production ignores `DEV_INLINE_JOBS` unless
 `ALLOW_PRODUCTION_INLINE_JOBS=1` is explicitly set for emergency debugging.
+
+### Conversion runtime dependencies
+
+- **OBJ / FBX (CONVERT-3):** Conversion shells out to the Node CLIs `obj2gltf`
+  and `fbx2gltf` (see `converters/external_converter.py`). These come from
+  `package.json`, so **the deployment image must run `npm install`** and keep
+  `node_modules/.bin` on `PATH`. If the binaries are missing the converter falls
+  back to `npx`, which fetches them from the network at runtime — slow and
+  fragile. On Railway, `nixpacks.toml` installs Node and runs `npm install`;
+  verify this for any other host. STL/GLB conversion is pure-Python and needs no
+  Node.
+- **iOS USDZ (CONVERT-2):** Native USDZ export uses the optional, proprietary
+  `aspose-3d` package, which is **not installed by default**. Without it the
+  viewer falls back to model-viewer's lossy on-device USDZ generation (lower
+  quality). If you target iOS Quick Look in production, either `pip install
+  aspose-3d` (license required) or let users upload a hand-made `.usdz`.
+- **Mesh complexity caps (SEC-6/PERF-3):** Uploads above `MAX_MESH_FACES` /
+  `MAX_MESH_VERTICES` (default 2,000,000 each) are rejected with a clear error
+  to protect the worker from out-of-memory crashes. Tune via env.
+
+> **Large binaries:** the repository tracks several large PDFs (e.g.
+> `AcademicAR_Sunumu.pdf`, ~71 MB). Move these to Git LFS or out of the repo to
+> keep clones fast (`git lfs track "*.pdf"`).

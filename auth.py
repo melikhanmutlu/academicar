@@ -3,11 +3,13 @@ import os
 from urllib.parse import urljoin, urlparse
 
 from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
+from flask_limiter.util import get_remote_address
 from flask_login import current_user, login_required, login_user, logout_user
 from flask_wtf import FlaskForm
 from wtforms import BooleanField, PasswordField, StringField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, ValidationError
 
+from extensions import limiter
 from models import User, db
 from url_helpers import public_url
 
@@ -22,6 +24,19 @@ except ImportError:
     OAuth = None
 
 oauth = OAuth() if OAuth else None
+
+
+def _auth_ip_email_key() -> str:
+    """Rate-limit bucket keyed by client IP + submitted email so brute-force
+    against one account (or from one IP) is throttled without locking everyone."""
+    email = (request.form.get("email") or "").lower().strip()
+    return f"auth:{get_remote_address()}:{email}"
+
+
+def _login_failed(response) -> bool:
+    """Count an attempt against the lockout limit only when login did NOT
+    succeed. A successful login redirects (302); failures re-render (200)."""
+    return getattr(response, "status_code", 200) != 302
 
 
 def is_safe_redirect_url(target: str) -> bool:
@@ -98,6 +113,8 @@ def _apply_configured_admin(user: User) -> None:
 
 
 @auth_bp.route("/register", methods=["GET", "POST"])
+@limiter.limit("10 per hour", methods=["POST"], key_func=get_remote_address)
+@limiter.limit("3 per minute", methods=["POST"], key_func=get_remote_address)
 def register():
     if current_user.is_authenticated:
         return redirect(url_for("dashboard"))
@@ -131,6 +148,13 @@ def register():
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
+@limiter.limit("30 per hour", methods=["POST"], key_func=get_remote_address)
+@limiter.limit(
+    "5 per minute",
+    methods=["POST"],
+    key_func=_auth_ip_email_key,
+    deduct_when=_login_failed,
+)
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("dashboard"))
@@ -189,6 +213,7 @@ def google_login():
 
 
 @auth_bp.route("/google/callback")
+@limiter.limit("20 per hour", key_func=get_remote_address)
 def google_callback():
     try:
         token = oauth.google.authorize_access_token()

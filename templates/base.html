@@ -172,6 +172,30 @@
       }
     })();
   </script>
+  <script>
+    // UX-3: lightweight toast that reuses the server flash styling so client-side
+    // notifications match the look of category-styled flash messages.
+    window.showToast = function (message, category) {
+      category = category || "info";
+      let stack = document.querySelector(".flash-stack");
+      if (!stack) {
+        stack = document.createElement("div");
+        stack.className = "flash-stack";
+        const main = document.querySelector("main");
+        document.body.insertBefore(stack, main || document.body.firstChild);
+      }
+      const item = document.createElement("div");
+      item.setAttribute("role", "alert");
+      item.className = "flash-msg flash-" + category;
+      item.textContent = message;
+      stack.appendChild(item);
+      setTimeout(() => {
+        item.style.transition = "opacity .4s ease";
+        item.style.opacity = "0";
+        setTimeout(() => item.remove(), 400);
+      }, 4200);
+    };
+  </script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

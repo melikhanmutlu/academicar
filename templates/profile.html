@@ -52,12 +52,12 @@
       <div class="profile-stat-card">
         <span>Publications</span>
         <strong>{{ paper_count }}</strong>
-        <small>{{ academic_paper_count }} academic / {{ extended_paper_count }} archive / {{ temporary_paper_count }} temporary</small>
+        <small>{{ model_count }} 3D model{{ '' if model_count == 1 else 's' }} total</small>
       </div>
       <div class="profile-stat-card">
         <span>3D Models</span>
         <strong>{{ model_count }}</strong>
-        <small>Across all publications</small>
+        <small>{{ free_model_count }} free / {{ academic_model_count }} academic / {{ extended_model_count }} archive</small>
       </div>
       <div class="profile-stat-card">
         <span>PDF Attachments</span>
@@ -73,7 +73,7 @@
 
     {% if expiring_soon > 0 %}
       <div class="profile-alert">
-        <span><strong>{{ expiring_soon }}</strong> temporary publication{{ '' if expiring_soon == 1 else 's' }} expire within 7 days.</span>
+        <span><strong>{{ expiring_soon }}</strong> model{{ '' if expiring_soon == 1 else 's' }} lose AR &amp; QR access within 7 days.</span>
         <a href="{{ url_for('dashboard') }}">Review</a>
       </div>
     {% endif %}

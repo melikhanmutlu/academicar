@@ -10,21 +10,21 @@ import zipfile
 from datetime import UTC, datetime, timedelta
 
 from flask import Flask, abort, current_app, flash, jsonify, redirect, render_template, request, send_from_directory, session, url_for
-from flask_limiter import Limiter
 from flask_limiter.errors import RateLimitExceeded
-from flask_limiter.util import get_remote_address
 from flask_login import LoginManager, current_user, login_required
 from flask_migrate import Migrate
-from flask_wtf.csrf import CSRFError, CSRFProtect
+from flask_wtf.csrf import CSRFError
 from slugify import slugify
 from sqlalchemy import func, or_, text
 from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
+from sqlalchemy.orm import selectinload
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
 
 from auth import auth_bp, init_oauth
 from config import Config
+from extensions import csrf, limiter, rate_limit_key
 from converters import FBXConverter, OBJConverter, STLConverter
 from converters.glb_quality import GLBQualityError, embed_external_textures, ensure_pbr_materials, validate_glb_quality
 from converters.stl_converter import convert_glb_to_usdz, enrich_glb_for_ar
@@ -69,11 +69,14 @@ CONTENT_SECURITY_POLICY = "; ".join(
         "object-src 'none'",
         "base-uri 'self'",
         "form-action 'self'",
+        # SEC-4: modern equivalent of X-Frame-Options: DENY for all pages. The
+        # embeddable viewer relaxes this per-response (see set_security_headers).
+        "frame-ancestors 'none'",
     ]
 )
 
-csrf = CSRFProtect()
-limiter = Limiter(key_func=lambda: rate_limit_key(), default_limits=[])
+# csrf, limiter and rate_limit_key are defined in extensions.py (imported above)
+# so blueprints can attach rate limits without importing app.py.
 
 
 def create_app(test_config: dict | None = None) -> Flask:
@@ -144,7 +147,13 @@ def create_app(test_config: dict | None = None) -> Flask:
     def set_security_headers(response):
         # Lightweight set of always-on hardening headers.
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        response.headers.setdefault("X-Frame-Options", "DENY")
+        # SEC-4/AR-1: the public viewer in embed mode (?embed=1) is meant to be
+        # framed by third-party sites, so it must NOT carry X-Frame-Options:DENY.
+        # Instead we relax CSP frame-ancestors to a configurable allowlist for
+        # those responses only; every other page stays frame-denied.
+        embed_viewer = request.endpoint == "view_model" and request.args.get("embed")
+        if not embed_viewer:
+            response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         if app.config.get("APP_ENV") in {"production", "prod", "pilot"}:
             response.headers.setdefault(
@@ -157,7 +166,11 @@ def create_app(test_config: dict | None = None) -> Flask:
                 if app.config.get("CSP_REPORT_ONLY")
                 else "Content-Security-Policy"
             )
-            response.headers.setdefault(header_name, CONTENT_SECURITY_POLICY)
+            policy = CONTENT_SECURITY_POLICY
+            if embed_viewer:
+                ancestors = (app.config.get("EMBED_FRAME_ANCESTORS") or "*").strip()
+                policy = policy.replace("frame-ancestors 'none'", f"frame-ancestors {ancestors}")
+            response.headers.setdefault(header_name, policy)
         return response
 
     register_error_handlers(app)
@@ -543,10 +556,7 @@ def stamp_alembic_version_if_needed(app: Flask) -> None:
         logger.error(f"Error checking or stamping alembic version: {e}")
 
 
-def rate_limit_key() -> str:
-    if current_user.is_authenticated:
-        return f"user:{current_user.id}"
-    return f"ip:{get_remote_address()}"
+# rate_limit_key() is imported from extensions.py.
 
 
 def upload_rate_limit_value() -> str:
@@ -1499,7 +1509,7 @@ def register_error_handlers(app: Flask) -> None:
 
     @app.errorhandler(RateLimitExceeded)
     def rate_limit_exceeded(error):
-        flash("Too many upload attempts in a short time. Please try again in a few minutes.", "warning")
+        flash("Too many attempts in a short time. Please wait a few minutes and try again.", "warning")
         referrer = request.referrer or url_for("dashboard")
         return redirect(referrer)
 
@@ -1604,6 +1614,8 @@ def register_routes(app: Flask) -> None:
         model = db.session.get(Model3D, model_id)
         if not model:
             abort(404)
+        if not _paper_visible_to_request(model.paper):
+            abort(404)
         status = model_access_status(model)
         if status != "active":
             return (
@@ -1649,6 +1661,8 @@ def register_routes(app: Flask) -> None:
                 resource_id=qr_link.public_id,
                 details={"model_id": model.id, "target_type": qr_link.target_type},
             )
+        if not _paper_visible_to_request(model.paper):
+            abort(404)
         status = model_access_status(model)
         if status != "active":
             return (
@@ -1669,7 +1683,7 @@ def register_routes(app: Flask) -> None:
         model = db.session.get(Model3D, unique_id)
         if not model:
             abort(404)
-        if not model_is_accessible(model):
+        if not _paper_visible_to_request(model.paper) or not model_is_accessible(model):
             abort(404)
         directory = os.path.join(app.config["CONVERTED_FOLDER"], unique_id)
         if not os.path.exists(os.path.join(directory, filename)):
@@ -1787,12 +1801,30 @@ def register_routes(app: Flask) -> None:
         # Inline so the iframe can render it; discourage indexing.
         response.headers["Content-Disposition"] = 'inline; filename="paper.pdf"'
         response.headers["X-Robots-Tag"] = "noindex, nofollow"
+        # SEC-8: PDFs can embed JavaScript. Serve them under a locked-down CSP
+        # (no scripts/plugins, only same-origin framing) set explicitly so the
+        # permissive app-wide CSP/X-Frame-Options is not applied via setdefault.
+        # SAMEORIGIN still allows our own pdf_reader.html iframe to render it.
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'none'; img-src 'self' blob: data:; "
+            "style-src 'unsafe-inline'; object-src 'none'; script-src 'none'; "
+            "frame-ancestors 'self'"
+        )
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
         return response
 
     @app.route("/dashboard")
     @login_required
     def dashboard():
-        papers = active_paper_query().filter_by(user_id=current_user.id).order_by(Paper.created_at.desc()).all()
+        # PERF-2: eager-load models so the template's per-row p.models access
+        # does not trigger an N+1 query storm.
+        papers = (
+            active_paper_query()
+            .options(selectinload(Paper.models))
+            .filter_by(user_id=current_user.id)
+            .order_by(Paper.created_at.desc())
+            .all()
+        )
         return render_template("dashboard.html", papers=papers)
 
     @app.route("/admin", defaults={"admin_page": "overview"})
@@ -2483,17 +2515,17 @@ def register_routes(app: Flask) -> None:
                 )
                 if new_plan == "academic":
                     flash(
-                        "You're now on the Academic plan. New publications will be created with persistent (3-year) viewer links and multi-model uploads.",
+                        "You're now on the Academic plan. New models you upload get 3-year AR & QR access, no watermark, and a persistent viewer URL. Existing models keep their current license until you upgrade them.",
                         "success",
                     )
                 elif new_plan == "extended_archive":
                     flash(
-                        "You're now on the Extended Archive plan. New publications will be created with persistent (10-year) viewer links, priority archival storage, and rich metadata fields.",
+                        "You're now on the Extended Archive plan. New models you upload get 10-year AR & QR access, priority archival storage, and rich metadata fields. Existing models keep their current license until you upgrade them.",
                         "success",
                     )
                 else:
                     flash(
-                        "Switched to the Free plan. New publications will be created as Temporary (3-day links, single model). Existing publications keep their current settings.",
+                        "Switched to the Free plan. New models you upload get 3-day AR & QR access (watermarked). Existing models keep their current license.",
                         "info",
                     )
             except SQLAlchemyError:
@@ -2501,31 +2533,50 @@ def register_routes(app: Flask) -> None:
                 flash("Could not update plan. Please try again.", "danger")
             return redirect(url_for("profile"))
 
-        # Profile statistics
-        user_papers = Paper.query.filter_by(user_id=current_user.id).all()
+        # Profile statistics. PERF-2: eager-load models to avoid N+1 in the
+        # Python aggregation loops below.
+        user_papers = (
+            Paper.query.options(selectinload(Paper.models))
+            .filter_by(user_id=current_user.id)
+            .all()
+        )
         paper_count = len(user_papers)
-        academic_paper_count = sum(1 for p in user_papers if p.package_type == "academic")
-        extended_paper_count = sum(1 for p in user_papers if p.package_type == "extended_archive")
-        temporary_paper_count = paper_count - academic_paper_count - extended_paper_count
+        # BUG-1: plans live at the model level (license_type drives real AR/QR
+        # access), so report the model license distribution rather than the
+        # legacy paper.package_type which is always "model_based".
+        user_models = [m for p in user_papers for m in p.models]
+        free_model_count = sum(1 for m in user_models if (m.license_type or "free") == "free")
+        academic_model_count = sum(1 for m in user_models if m.license_type == "academic")
+        extended_model_count = sum(1 for m in user_models if m.license_type == "extended_archive")
         public_paper_count = sum(1 for p in user_papers if p.is_public)
         private_paper_count = paper_count - public_paper_count
         pdf_paper_count = sum(1 for p in user_papers if p.pdf_path)
-        model_count = sum(len(p.models) for p in user_papers)
+        model_count = len(user_models)
         recent_payments = (
             Payment.query.filter_by(user_id=current_user.id)
             .order_by(Payment.created_at.desc())
             .limit(5)
             .all()
         )
+        # BUG-3: real count of models whose AR/QR access expires within 7 days.
+        soon = datetime.now(UTC) + timedelta(days=7)
         expiring_soon = 0
+        for m in user_models:
+            exp = m.access_expires_at
+            if not exp or is_access_expired(exp):
+                continue
+            if exp.tzinfo is None:
+                exp = exp.replace(tzinfo=UTC)
+            if exp <= soon:
+                expiring_soon += 1
 
         return render_template(
             "profile.html",
             user=current_user,
             paper_count=paper_count,
-            academic_paper_count=academic_paper_count,
-            extended_paper_count=extended_paper_count,
-            temporary_paper_count=temporary_paper_count,
+            free_model_count=free_model_count,
+            academic_model_count=academic_model_count,
+            extended_model_count=extended_model_count,
             public_paper_count=public_paper_count,
             private_paper_count=private_paper_count,
             pdf_paper_count=pdf_paper_count,
@@ -2591,6 +2642,63 @@ def register_routes(app: Flask) -> None:
             flash("That email is already in use by another account.", "danger")
             return redirect(url_for("profile"))
 
+        # SEC-5: never switch the email until the new address is verified. Send
+        # a signed, time-limited confirmation link to the NEW address; the email
+        # only changes when that link is opened (see account_confirm_email).
+        from itsdangerous import URLSafeTimedSerializer
+
+        serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"], salt="email-change")
+        token = serializer.dumps({"uid": current_user.id, "new_email": new_email})
+        confirm_url = url_for("account_confirm_email", token=token, _external=True)
+        from utils.email import send_email
+
+        send_email(
+            new_email,
+            "Confirm your new AcademicAR email address",
+            (
+                "We received a request to change the email address on your "
+                "AcademicAR account.\n\n"
+                f"To confirm {new_email}, open this link within 1 hour:\n"
+                f"{confirm_url}\n\n"
+                "If you did not request this change, you can ignore this email; "
+                "your current address stays active."
+            ),
+        )
+        log_audit(
+            "email_change_requested",
+            user_id=current_user.id,
+            details={"from": current_user.email, "to": new_email},
+        )
+        flash(
+            f"We sent a confirmation link to {new_email}. Open it to finish "
+            "changing your email. Your current address stays active until then.",
+            "info",
+        )
+        return redirect(url_for("profile"))
+
+    @app.route("/account/email/confirm/<token>")
+    @login_required
+    def account_confirm_email(token):
+        from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
+
+        serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"], salt="email-change")
+        try:
+            data = serializer.loads(token, max_age=3600)
+        except SignatureExpired:
+            flash("This confirmation link has expired. Please request the change again.", "warning")
+            return redirect(url_for("profile"))
+        except BadSignature:
+            abort(404)
+
+        if data.get("uid") != current_user.id:
+            abort(403)
+        new_email = (data.get("new_email") or "").strip().lower()
+        if not new_email or "@" not in new_email:
+            abort(400)
+        if User.query.filter(User.email == new_email, User.id != current_user.id).first():
+            flash("That email is already in use by another account.", "danger")
+            return redirect(url_for("profile"))
+
         previous = current_user.email
         current_user.email = new_email
         try:
@@ -2600,7 +2708,7 @@ def register_routes(app: Flask) -> None:
                 user_id=current_user.id,
                 details={"from": previous, "to": new_email},
             )
-            flash("Email updated.", "success")
+            flash("Email address confirmed and updated.", "success")
         except (IntegrityError, SQLAlchemyError):
             db.session.rollback()
             flash("Could not update email. Please try again.", "danger")
@@ -2667,6 +2775,8 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/papers/fetch-metadata", methods=["POST"])
     @login_required
+    @limiter.limit("30 per hour", methods=["POST"])
+    @limiter.limit("6 per minute", methods=["POST"])
     def papers_fetch_metadata():
         """API endpoint to fetch paper metadata by DOI or PMID using public APIs."""
         import urllib.request
@@ -2693,7 +2803,7 @@ def register_routes(app: Flask) -> None:
             doi = query
             doi = re.sub(r'^(https?://)?(dx\.)?doi\.org/', '', doi, flags=re.IGNORECASE)
             url = f"https://api.crossref.org/works/{urllib.parse.quote(doi)}"
-            headers = {"User-Agent": "AcademicAR/1.0 (mailto:admin@academicar.com)"}
+            headers = {"User-Agent": f"AcademicAR/1.0 (mailto:{current_app.config['CONTACT_EMAIL']})"}
             req = urllib.request.Request(url, headers=headers)
             try:
                 with urllib.request.urlopen(req, timeout=5) as response:
@@ -2745,7 +2855,7 @@ def register_routes(app: Flask) -> None:
 
         elif is_pmid:
             url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id={query}&retmode=json"
-            req = urllib.request.Request(url, headers={"User-Agent": "AcademicAR/1.0"})
+            req = urllib.request.Request(url, headers={"User-Agent": f"AcademicAR/1.0 (mailto:{current_app.config['CONTACT_EMAIL']})"})
             try:
                 with urllib.request.urlopen(req, timeout=5) as response:
                     if response.status == 200:

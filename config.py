@@ -54,6 +54,13 @@ class Config:
     SESSION_COOKIE_SAMESITE = "Lax"
     SESSION_COOKIE_SECURE = APP_ENV in {"production", "prod", "pilot"}
     PERMANENT_SESSION_LIFETIME = timedelta(days=int(os.environ.get("SESSION_LIFETIME_DAYS", 14)))
+    # SEC-9: pin the Flask-Login "remember me" cookie so it does not default to
+    # a 365-day lifetime and inherits the same security flags as the session
+    # cookie. Kept in sync with the session lifetime unless overridden.
+    REMEMBER_COOKIE_DURATION = timedelta(days=int(os.environ.get("REMEMBER_COOKIE_DAYS", os.environ.get("SESSION_LIFETIME_DAYS", 14))))
+    REMEMBER_COOKIE_SECURE = APP_ENV in {"production", "prod", "pilot"}
+    REMEMBER_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_SAMESITE = "Lax"
     # Single source of truth for password length minimum (auth + account flows).
     PASSWORD_MIN_LENGTH = int(os.environ.get("PASSWORD_MIN_LENGTH", 8))
     ADMIN_EMAILS = sorted(
@@ -143,8 +150,28 @@ class Config:
     CSP_ENABLED = os.environ.get("CSP_ENABLED", "1").lower() in {"1", "true", "yes", "on"}
     CSP_REPORT_ONLY = os.environ.get("CSP_REPORT_ONLY", "0").lower() in {"1", "true", "yes", "on"}
 
+    # SEC-4: CSP frame-ancestors value used ONLY for the embeddable viewer
+    # (?embed=1). Defaults to "*" so the read-only 3D widget can be embedded on
+    # any researcher/institution page; set to a space-separated origin allowlist
+    # (e.g. "'self' https://uni.edu") to restrict who may iframe the viewer.
+    EMBED_FRAME_ANCESTORS = os.environ.get("EMBED_FRAME_ANCESTORS", "*")
+
     # Compliance & Legal
     TERMS_VERSION = os.environ.get("TERMS_VERSION", "1.0")
+
+    # Contact email advertised to external scholarly APIs (Crossref "polite
+    # pool" etiquette) via the outbound User-Agent header. Override in prod.
+    CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "info@academicar.com")
+
+    # SEC-5: transactional email (e.g. email-change confirmation). If
+    # MAIL_SERVER is unset the sender logs the message instead of delivering it
+    # so local development still works without an SMTP provider.
+    MAIL_SERVER = os.environ.get("MAIL_SERVER")
+    MAIL_PORT = int(os.environ.get("MAIL_PORT", 587))
+    MAIL_USE_TLS = os.environ.get("MAIL_USE_TLS", "1").lower() in {"1", "true", "yes", "on"}
+    MAIL_USERNAME = os.environ.get("MAIL_USERNAME")
+    MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD")
+    MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER")
 
     # Google OAuth.
     GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")

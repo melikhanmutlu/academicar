@@ -39,7 +39,7 @@ def test_landing_pricing_and_viewer_tools_are_present(client):
         user.set_password("password")
         db.session.add(user)
         db.session.commit()
-        paper = Paper(title="Viewer Paper", slug="viewer-paper", user_id=user.id)
+        paper = Paper(title="Viewer Paper", slug="viewer-paper", user_id=user.id, is_public=True)
         db.session.add(paper)
         db.session.commit()
         model_id = "33333333-3333-4333-8333-333333333333"
@@ -400,7 +400,7 @@ def test_public_viewer_and_glb_route(client):
 
     with client.application.app_context():
         user = create_user()
-        paper = Paper(title="Public Paper", slug="public-paper", user_id=user.id)
+        paper = Paper(title="Public Paper", slug="public-paper", user_id=user.id, is_public=True)
         db.session.add(paper)
         db.session.commit()
 
@@ -426,6 +426,80 @@ def test_public_viewer_and_glb_route(client):
     assert glb_response.status_code == 200
     assert glb_response.content_type.startswith("model/gltf-binary")
     assert client.get(f"/files/{model_id}/../secret.txt").status_code == 404
+
+    # SEC-4: normal viewer is frame-denied; embed mode is framable via CSP.
+    normal = client.get(f"/view/{model_id}")
+    assert normal.headers.get("X-Frame-Options") == "DENY"
+    embed = client.get(f"/view/{model_id}?embed=1")
+    assert "X-Frame-Options" not in embed.headers
+    assert "frame-ancestors *" in embed.headers.get("Content-Security-Policy", "")
+
+
+def test_private_paper_model_hidden_from_anonymous_but_visible_to_owner(client):
+    """SEC-2: a model belonging to a non-public paper must 404 for visitors
+    who merely know the UUID, while the owner can still view it."""
+    from tests.conftest import create_user, login
+    from pathlib import Path
+
+    with client.application.app_context():
+        user = create_user()
+        paper = Paper(title="Private Paper", slug="private-paper", user_id=user.id, is_public=False)
+        db.session.add(paper)
+        db.session.commit()
+
+        model_id = "44444444-4444-4444-8444-444444444444"
+        model_dir = Path(client.application.config["CONVERTED_FOLDER"]) / model_id
+        model_dir.mkdir(parents=True)
+        (model_dir / "model.glb").write_bytes(valid_glb_bytes())
+        model = Model3D(
+            id=model_id,
+            paper_id=paper.id,
+            user_id=user.id,
+            original_filename="private.glb",
+            glb_path=str(model_dir / "model.glb"),
+            qr_code_path="qr.png",
+            file_size=28,
+        )
+        db.session.add(model)
+        db.session.commit()
+
+    # Anonymous visitor: everything 404s.
+    assert client.get(f"/view/{model_id}").status_code == 404
+    assert client.get(f"/files/{model_id}/model.glb").status_code == 404
+
+    # Owner: viewer and GLB are accessible.
+    login(client)
+    assert client.get(f"/view/{model_id}").status_code == 200
+    assert client.get(f"/files/{model_id}/model.glb").status_code == 200
+
+
+def test_email_change_requires_confirmation(client):
+    """SEC-5: requesting an email change must NOT switch the address until the
+    signed confirmation link sent to the new address is opened."""
+    from tests.conftest import register
+    from itsdangerous import URLSafeTimedSerializer
+
+    register(client)  # logs in as user@example.com / password123
+
+    resp = client.post(
+        "/account/email",
+        data={"new_email": "new@example.com", "current_password": "password123"},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    with client.application.app_context():
+        original = User.query.filter_by(email="user@example.com").first()
+        assert original is not None  # unchanged until confirmed
+        assert User.query.filter_by(email="new@example.com").first() is None
+        uid = original.id
+
+    serializer = URLSafeTimedSerializer(client.application.config["SECRET_KEY"], salt="email-change")
+    token = serializer.dumps({"uid": uid, "new_email": "new@example.com"})
+    confirm = client.get(f"/account/email/confirm/{token}", follow_redirects=True)
+    assert confirm.status_code == 200
+    with client.application.app_context():
+        assert User.query.filter_by(email="new@example.com").first() is not None
+        assert User.query.filter_by(email="user@example.com").first() is None
 
 
 def test_valid_stl_upload_creates_model_and_qr(client, monkeypatch):
@@ -818,7 +892,7 @@ def test_upload_rate_limit_blocks_repeated_attempts(client):
     )
     assert first.status_code == 200
     assert second.status_code == 200
-    assert "Too many upload attempts" in second.get_data(as_text=True)
+    assert "Too many attempts" in second.get_data(as_text=True)
 
 
 def test_pilot_requires_real_secret_key():
@@ -1374,7 +1448,7 @@ def test_upload_rate_limit_is_enforced_across_requests(client):
         follow_redirects=True,
     )
     assert second.status_code == 200
-    assert "Too many upload attempts" in second.get_data(as_text=True)
+    assert "Too many attempts" in second.get_data(as_text=True)
 
     with client.application.app_context():
         assert Model3D.query.count() == 1
