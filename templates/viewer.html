@@ -564,11 +564,17 @@
       autoRotateToggle.textContent = enabled ? 'Auto rotate on' : 'Auto rotate off';
     };
     const applyModelOrientation = async (values) => {
-      const orientation = `${values.x || 0}deg ${values.y || 0}deg ${values.z || 0}deg`;
+      const x = Number(values.x || 0);
+      const y = Number(values.y || 0);
+      const z = Number(values.z || 0);
+      // model-viewer orientation is roll/pitch/yaw, so map UI X/Y/Z to
+      // pitch/yaw/roll instead of writing the sliders in display order.
+      const orientation = `${z}deg ${x}deg ${y}deg`;
       viewer.setAttribute('orientation', orientation);
       viewer.orientation = orientation;
       if (typeof viewer.requestUpdate === 'function') viewer.requestUpdate('orientation', orientation);
       if (viewer.updateComplete) await viewer.updateComplete;
+      if (typeof viewer.updateFraming === 'function') await viewer.updateFraming();
       if (typeof viewer.play === 'function') viewer.play();
     };
     const cameraState = () => ({
