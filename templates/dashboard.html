@@ -254,26 +254,96 @@
       No publications match the current search or filters.
     </p>
   {% else %}
-    <div class="dark-surface rounded-xl p-10 sm:p-14 text-center overflow-hidden relative reveal-up">
-      <div class="absolute inset-0 volumetric-grid opacity-30"></div>
-      <div class="relative">
-        <div class="w-20 h-20 mx-auto rounded-2xl bg-white/10 border border-white/10 grid place-items-center text-white font-bold text-xl">3D</div>
-        <h2 class="font-serif text-3xl font-semibold text-white mt-6">Create your first publication page.</h2>
-        <p class="text-white/60 mt-3 max-w-xl mx-auto">Add publication metadata, optionally attach your first model immediately, then share a stable viewer link and QR.</p>
-        <a href="{{ url_for('paper_new') }}" class="btn-primary mt-7">Create Publication</a>
-        <div class="demo-publication-grid">
+    <div class="dashboard-empty-state reveal-up">
+      <div class="dashboard-empty-grid-bg"></div>
+
+      <!-- Hero -->
+      <div class="dashboard-empty-hero">
+        <div class="dashboard-empty-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 4 6v12l8 4 8-4V6z"/><path d="M4 6l8 4 8-4"/><line x1="12" y1="22" x2="12" y2="10"/></svg>
+        </div>
+        <h2 class="dashboard-empty-title">Publish your first 3D model.</h2>
+        <p class="dashboard-empty-subtitle">Upload STL, GLB, OBJ or FBX — AcademicAR converts it to an AR-ready viewer, generates a stable QR code, and lets you attach your paper PDF. Everything in one link, ready to embed in any manuscript or poster.</p>
+        <a href="{{ url_for('paper_new') }}" class="btn-primary dashboard-empty-cta">+ New Publication</a>
+      </div>
+
+      <!-- Workflow steps -->
+      <div class="dashboard-empty-steps">
+        <div class="dashboard-empty-step">
+          <div class="dashboard-empty-step-num">1</div>
           <div>
-            <span>Demo publication</span>
-            <strong>Mitochondrial morphology atlas</strong>
-            <small>1 GLB model · Academic license · QR ready</small>
+            <p class="dashboard-empty-step-title">Add publication metadata</p>
+            <p class="dashboard-empty-step-body">Title, authors, institution, DOI or PMID — auto-fetch from Crossref or PubMed with one click.</p>
           </div>
+        </div>
+        <div class="dashboard-empty-step-divider"></div>
+        <div class="dashboard-empty-step">
+          <div class="dashboard-empty-step-num">2</div>
           <div>
-            <span>Demo model</span>
-            <strong>Interactive organelle reconstruction</strong>
-            <small>Viewer, AR, screenshots, stable resolver</small>
+            <p class="dashboard-empty-step-title">Upload your 3D model</p>
+            <p class="dashboard-empty-step-body">STL, GLB, OBJ or FBX. Choose the source unit so the model lands at real-world scale in AR.</p>
+          </div>
+        </div>
+        <div class="dashboard-empty-step-divider"></div>
+        <div class="dashboard-empty-step">
+          <div class="dashboard-empty-step-num">3</div>
+          <div>
+            <p class="dashboard-empty-step-title">Share the link & QR</p>
+            <p class="dashboard-empty-step-body">Make the publication public — a persistent viewer URL and downloadable QR are instantly ready.</p>
           </div>
         </div>
       </div>
+
+      <!-- Demo cards -->
+      <div class="dashboard-empty-demo-grid">
+        <!-- Demo publication card -->
+        <div class="dashboard-empty-demo-card">
+          <div class="demo-card-eyebrow">
+            <span class="demo-card-badge">Demo publication</span>
+          </div>
+          <h3 class="demo-card-title">Mitochondrial morphology atlas</h3>
+          <p class="demo-card-authors">Nakamura K. et al. · University of Tokyo · 2024</p>
+          <p class="demo-card-doi">DOI: 10.1234/mitochondria.2024.0091</p>
+          <div class="demo-card-tags">
+            <span class="demo-tag">Cell Biology</span>
+            <span class="demo-tag">Academic license</span>
+            <span class="demo-tag">QR ready</span>
+          </div>
+          <div class="demo-card-model-row">
+            <div class="demo-card-model-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 4 6v12l8 4 8-4V6z"/><path d="M4 6l8 4 8-4"/><line x1="12" y1="22" x2="12" y2="10"/></svg>
+            </div>
+            <span>1 GLB model attached</span>
+            <span class="demo-card-model-sep">·</span>
+            <span class="demo-card-model-status">AR ready</span>
+          </div>
+        </div>
+
+        <!-- Demo model card -->
+        <div class="dashboard-empty-demo-card">
+          <div class="demo-card-eyebrow">
+            <span class="demo-card-badge demo-card-badge-model">Demo model</span>
+          </div>
+          <h3 class="demo-card-title">Interactive organelle reconstruction</h3>
+          <p class="demo-card-authors">3D model · GLB format · Academic license</p>
+          <p class="demo-card-doi">Viewer link: academicar.com/view/mito-atlas-2024</p>
+          <div class="demo-card-tags">
+            <span class="demo-tag">Browser viewer</span>
+            <span class="demo-tag">WebXR AR</span>
+            <span class="demo-tag">iOS Quick Look</span>
+            <span class="demo-tag">Screenshots</span>
+          </div>
+          <div class="demo-card-model-row">
+            <div class="demo-card-model-icon" style="color: var(--color-sunset-orange);">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18"/><path d="M12 3a14 14 0 0 0 0 18"/></svg>
+            </div>
+            <span>Stable resolver &amp; QR code</span>
+            <span class="demo-card-model-sep">·</span>
+            <span class="demo-card-model-status" style="color: var(--color-sunset-orange);">3-year access</span>
+          </div>
+        </div>
+      </div>
+
     </div>
   {% endif %}
 </div>
