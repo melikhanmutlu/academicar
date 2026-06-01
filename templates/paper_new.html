@@ -6,7 +6,7 @@
 <div class="app-shell py-10">
   <a href="{{ url_for('paper_detail', slug=paper.slug) if is_edit else url_for('dashboard') }}" class="nav-link inline-flex mb-5">&larr; {{ 'Back to publication' if is_edit else 'Back to dashboard' }}</a>
 
-  <div class="grid lg:grid-cols-[0.78fr_1.22fr] gap-6 items-start">
+  <div class="paper-form-grid grid lg:grid-cols-[0.78fr_1.22fr] gap-6 items-start">
     <aside class="dark-surface rounded-xl p-7 lg:p-8 sticky top-24 overflow-hidden">
       <div class="absolute inset-0 volumetric-grid opacity-30"></div>
       <div class="relative">
@@ -177,8 +177,8 @@
             <input type="checkbox" name="color_enabled" value="yes" data-color-toggle>
             <span class="color-optional-swatch" aria-hidden="true"></span>
             <span class="color-optional-label">Color</span>
-            <input type="color" name="color" value="#cccccc" disabled aria-label="Model color" data-color-input>
           </label>
+          <input type="color" name="color" value="#cccccc" disabled aria-label="Model color" class="color-optional-picker" data-color-input>
 
           <label class="flex items-start gap-3 rounded-xl border border-[#e2e8f0] bg-white p-4 text-sm text-[#475569]">
             <input type="checkbox" name="compliance_confirm" value="yes" class="mt-1">
@@ -187,7 +187,7 @@
         </section>
       {% endif %}
 
-      <div class="flex items-center justify-between gap-3 pt-4 border-t border-[#141821]/10">
+      <div class="paper-form-actions flex items-center justify-between gap-3 pt-4 border-t border-[#141821]/10">
         {% if is_edit %}
           <button type="button" class="detail-action detail-action-danger" data-delete-paper-open>Delete Publication</button>
         {% else %}
@@ -365,23 +365,6 @@
     if (colorControl && colorToggle && colorInput) {
       colorToggle.addEventListener('change', updateColorState);
       updateColorState();
-
-      colorControl.addEventListener('click', (e) => {
-        if (e.target === colorInput || e.target === colorToggle) return;
-        const enabled = colorToggle.checked;
-        if (!enabled) {
-          e.preventDefault();
-          colorToggle.checked = true;
-          updateColorState();
-          colorInput.click();
-        } else {
-          // If already enabled, clicking the swatch opens the color picker instead of turning it off
-          if (e.target.closest('.color-optional-swatch')) {
-            e.preventDefault();
-            colorInput.click();
-          }
-        }
-      });
 
       colorInput.addEventListener('input', () => {
         const swatch = colorControl.querySelector('.color-optional-swatch');

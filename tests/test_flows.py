@@ -813,17 +813,21 @@ def test_admin_dashboard_requires_admin_user(client):
 def test_configured_admin_email_is_always_admin(client):
     from tests.conftest import create_user, login
 
+    # Admin bootstrap emails are configuration-driven (no hardcoded address in
+    # source). A user whose email is in ADMIN_EMAILS is auto-promoted to admin.
+    client.application.config["ADMIN_EMAILS"] = ["configured-admin@example.com"]
+
     with client.application.app_context():
-        user = create_user(email="melikhanmutlu@gmail.com", username="Melikhan Mutlu")
+        user = create_user(email="configured-admin@example.com", username="Configured Admin")
         assert user.is_admin is False
 
-    login(client, email="melikhanmutlu@gmail.com")
+    login(client, email="configured-admin@example.com")
     response = client.get("/admin")
     assert response.status_code == 200
     assert "AcademicAR control panel" in response.get_data(as_text=True)
 
     with client.application.app_context():
-        user = User.query.filter_by(email="melikhanmutlu@gmail.com").one()
+        user = User.query.filter_by(email="configured-admin@example.com").one()
         assert user.is_admin is True
 
 

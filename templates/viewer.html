@@ -31,25 +31,31 @@
         radial-gradient(circle at 50% 48%, #2a2a2d 0, #111111 54%, #050505 100%);
       background-size: 42px 42px, 42px 42px, auto;
       opacity: 0;
-      transform: scale(1.015);
-      transition: opacity 700ms ease, transform 700ms ease;
+      transform: none;
+      transition: opacity 700ms ease;
     }
     model-viewer.is-loaded {
       opacity: 1;
-      transform: scale(1);
+      transform: none;
     }
     .info-drawer {
       opacity: 0;
       pointer-events: none;
-      transform: translateX(1rem);
+      transform: none;
       visibility: hidden;
       transition: opacity 220ms ease, transform 260ms ease, visibility 220ms ease;
+      box-sizing: border-box;
     }
     .info-drawer.open {
       opacity: 1;
       pointer-events: auto;
-      transform: translateX(0);
+      transform: none;
       visibility: visible;
+    }
+    @media (max-width: 640px) {
+      .viewer-tool-btn { min-height: 36px; padding: 0.5rem 0.7rem; }
+      model-viewer { left: 0 !important; right: 0 !important; width: 100vw !important; transform: none !important; }
+      .info-drawer { left: 0 !important; right: 0 !important; width: 100vw !important; max-width: 100vw !important; }
     }
   </style>
 </head>

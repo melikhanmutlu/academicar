@@ -24,7 +24,14 @@ DEFAULT_STORAGE_ROOT = (
     or os.environ.get("RAILWAY_VOLUME_MOUNT_PATH")
     or str(BASE_DIR / "storage")
 )
-DEFAULT_ADMIN_EMAILS = {"melikhanmutlu@gmail.com"}
+# Bootstrap admin emails come from the environment only — no addresses are
+# hardcoded in source. Set ADMIN_EMAILS (or DEFAULT_ADMIN_EMAILS) to a
+# comma-separated list to auto-promote those accounts to admin on startup.
+DEFAULT_ADMIN_EMAILS = {
+    email.strip().lower()
+    for email in os.environ.get("DEFAULT_ADMIN_EMAILS", "").split(",")
+    if email.strip()
+}
 
 
 def runtime_folder(env_name: str, default_name: str, runtime_base: Path) -> str:
@@ -106,6 +113,35 @@ class Config:
         }
     else:
         DEV_INLINE_JOBS = os.environ.get("DEV_INLINE_JOBS", "1").lower() in {"1", "true", "yes", "on"}
+
+    # Development-only "instant upgrade": marks a Payment as paid without any
+    # real payment gateway. Enabled by default outside production so local
+    # testing works, but DISABLED by default in production/pilot so paid plans
+    # are never granted for free. Set ALLOW_DEV_PAYMENTS=1 to force-enable until
+    # a real payment provider (Iyzico/Stripe) is wired up.
+    if APP_ENV in {"production", "prod", "pilot"}:
+        ALLOW_DEV_PAYMENTS = os.environ.get("ALLOW_DEV_PAYMENTS", "0").lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+    else:
+        ALLOW_DEV_PAYMENTS = os.environ.get("ALLOW_DEV_PAYMENTS", "1").lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+
+    # Content-Security-Policy. Enabled by default. Because the app currently
+    # relies on CDN scripts (Tailwind play CDN needs 'unsafe-eval', model-viewer
+    # from unpkg/ajax.googleapis) and lots of inline styles/scripts, the policy
+    # whitelists those origins plus 'unsafe-inline'/'unsafe-eval'. Set
+    # CSP_REPORT_ONLY=1 to roll it out without enforcing (violations only
+    # reported), or CSP_ENABLED=0 to disable entirely as an escape hatch.
+    CSP_ENABLED = os.environ.get("CSP_ENABLED", "1").lower() in {"1", "true", "yes", "on"}
+    CSP_REPORT_ONLY = os.environ.get("CSP_REPORT_ONLY", "0").lower() in {"1", "true", "yes", "on"}
 
     # Compliance & Legal
     TERMS_VERSION = os.environ.get("TERMS_VERSION", "1.0")

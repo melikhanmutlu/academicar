@@ -84,6 +84,17 @@ LICENSE_PLANS: dict[str, LicensePlan] = {
 }
 
 
+# Single source of truth for the plans a user can self-select / be assigned
+# (a subset of LICENSE_PLANS — "institutional" is provisioned manually, not
+# user-selectable). Used by the profile page and the admin plan controls so
+# they never drift apart.
+USER_SELECTABLE_PLAN_KEYS: tuple[str, ...] = ("free", "academic", "extended_archive")
+
+
+def is_valid_user_plan(value: str | None) -> bool:
+    return (value or "").strip().lower() in USER_SELECTABLE_PLAN_KEYS
+
+
 def normalize_license_type(value: str | None) -> str:
     key = (value or "free").strip().lower()
     return key if key in LICENSE_PLANS else "free"

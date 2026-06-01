@@ -271,8 +271,8 @@
                     <input type="checkbox" name="color_enabled" value="yes" data-color-toggle>
                     <span class="color-optional-swatch" aria-hidden="true"></span>
                     <span class="color-optional-label">Color</span>
-                    <input type="color" name="color" value="#cccccc" disabled aria-label="Model color" data-color-input>
                   </label>
+                  <input type="color" name="color" value="#cccccc" disabled aria-label="Model color" class="color-optional-picker" data-color-input>
                   <button type="submit" class="detail-action detail-action-primary" data-upload-submit>Upload and Generate QR</button>
                 </div>
                 <p class="hidden text-sm text-[#475569] rounded border border-[#e2e8f0] bg-[#f8fafc] px-4 py-2" data-upload-status>Preparing model, viewer, and QR...</p>
@@ -295,80 +295,6 @@
   if (uploadSection && modelRegistry) {
     modelRegistry.parentNode.insertBefore(uploadSection, modelRegistry);
   }
-
-  // Smooth Details Toggle Animation
-  const detailsElement = document.querySelector('details[data-upload-panel]');
-  if (detailsElement) {
-    const summaryElement = detailsElement.querySelector('summary');
-    const contentElement = detailsElement.querySelector('[data-upload-panel-body]');
-    let animation = null;
-    let isClosing = false;
-    let isExpanding = false;
-
-    if (summaryElement && contentElement) {
-      summaryElement.addEventListener('click', (e) => {
-        e.preventDefault();
-        detailsElement.style.overflow = 'hidden';
-        if (isClosing || !detailsElement.open) {
-          open();
-        } else if (isExpanding || detailsElement.open) {
-          shrink();
-        }
-      });
-    }
-
-    function shrink() {
-      isClosing = true;
-      const startHeight = `${detailsElement.offsetHeight}px`;
-      const endHeight = `${summaryElement.offsetHeight}px`;
-
-      if (animation) animation.cancel();
-
-      animation = detailsElement.animate({
-        height: [startHeight, endHeight]
-      }, {
-        duration: 300,
-        easing: 'cubic-bezier(0.4, 0, 0.2, 1)'
-      });
-
-      animation.onfinish = () => onAnimationFinish(false);
-      animation.oncancel = () => isClosing = false;
-    }
-
-    function open() {
-      detailsElement.style.height = `${detailsElement.offsetHeight}px`;
-      detailsElement.open = true;
-      window.requestAnimationFrame(() => expand());
-    }
-
-    function expand() {
-      isExpanding = true;
-      const startHeight = `${detailsElement.offsetHeight}px`;
-      const endHeight = `${summaryElement.offsetHeight + contentElement.offsetHeight}px`;
-
-      if (animation) animation.cancel();
-
-      animation = detailsElement.animate({
-        height: [startHeight, endHeight]
-      }, {
-        duration: 300,
-        easing: 'cubic-bezier(0.4, 0, 0.2, 1)'
-      });
-
-      animation.onfinish = () => onAnimationFinish(true);
-      animation.oncancel = () => isExpanding = false;
-    }
-
-    function onAnimationFinish(openState) {
-      detailsElement.open = openState;
-      animation = null;
-      isClosing = false;
-      isExpanding = false;
-      detailsElement.style.height = '';
-      detailsElement.style.overflow = '';
-    }
-  }
-
 
   const uploadForm = document.querySelector('[data-upload-form]');
   if (uploadForm) {
@@ -499,23 +425,6 @@
     if (colorControl && colorToggle && colorInput) {
       colorToggle.addEventListener('change', updateColorState);
       updateColorState();
-
-      colorControl.addEventListener('click', (e) => {
-        if (e.target === colorInput || e.target === colorToggle) return;
-        const enabled = colorToggle.checked;
-        if (!enabled) {
-          e.preventDefault();
-          colorToggle.checked = true;
-          updateColorState();
-          colorInput.click();
-        } else {
-          // If already enabled, clicking the swatch opens the color picker instead of turning it off
-          if (e.target.closest('.color-optional-swatch')) {
-            e.preventDefault();
-            colorInput.click();
-          }
-        }
-      });
 
       colorInput.addEventListener('input', () => {
         const swatch = colorControl.querySelector('.color-optional-swatch');

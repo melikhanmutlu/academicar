@@ -29,9 +29,11 @@ from converters import FBXConverter, OBJConverter, STLConverter
 from converters.stl_converter import convert_glb_to_usdz, enrich_glb_for_ar
 from licensing import (
     LICENSE_PLANS,
+    USER_SELECTABLE_PLAN_KEYS,
     apply_model_license_defaults,
     get_license_plan,
     is_access_expired,
+    is_valid_user_plan,
     license_expires_at,
     model_access_status,
     model_file_limit_error,
@@ -47,6 +49,28 @@ from services.storage_service import StorageError, safe_move_file, safe_save_fil
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
+
+# Baseline Content-Security-Policy. Whitelists the CDNs the app currently
+# depends on (Tailwind play CDN, Google model-viewer on unpkg/ajax.googleapis,
+# Google Fonts). 'unsafe-eval' is required by the Tailwind play CDN's JIT; both
+# it and the inline <script>/<style> blocks need 'unsafe-inline'. Tightening
+# these (self-hosted Tailwind build, nonce-based scripts) is a follow-up.
+CONTENT_SECURITY_POLICY = "; ".join(
+    [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' "
+        "https://cdn.tailwindcss.com https://unpkg.com https://ajax.googleapis.com https://www.gstatic.com",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src 'self' data: https://fonts.gstatic.com",
+        "img-src 'self' data: blob: https:",
+        "connect-src 'self' blob: https://unpkg.com https://ajax.googleapis.com https://www.gstatic.com",
+        "worker-src 'self' blob:",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+    ]
+)
+
 csrf = CSRFProtect()
 limiter = Limiter(key_func=lambda: rate_limit_key(), default_limits=[])
 
@@ -117,8 +141,7 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     @app.after_request
     def set_security_headers(response):
-        # Lightweight set of always-on hardening headers. Full CSP is opt-in
-        # to avoid breaking the model-viewer / Tailwind CDN pages.
+        # Lightweight set of always-on hardening headers.
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
@@ -127,6 +150,13 @@ def create_app(test_config: dict | None = None) -> Flask:
                 "Strict-Transport-Security",
                 "max-age=31536000; includeSubDomains",
             )
+        if app.config.get("CSP_ENABLED", True):
+            header_name = (
+                "Content-Security-Policy-Report-Only"
+                if app.config.get("CSP_REPORT_ONLY")
+                else "Content-Security-Policy"
+            )
+            response.headers.setdefault(header_name, CONTENT_SECURITY_POLICY)
         return response
 
     register_error_handlers(app)
@@ -229,26 +259,40 @@ def _model_glb_candidate_paths(model: Model3D) -> list[str]:
     return paths
 
 
-def format_model_dimensions_cm(model: Model3D | None) -> str:
-    if not model:
-        return "Not measured"
-    glb_path = next((path for path in _model_glb_candidate_paths(model) if path and os.path.exists(path)), None)
-    if not glb_path:
-        return "Not measured"
+def compute_glb_dimensions_cm(glb_path: str | None) -> str | None:
+    """Measure a GLB's bounding-box extents and return a formatted string like
+    "12.3 x 4.5 x 6.7 cm", or None if it cannot be measured.
+
+    Called once during conversion so the result can be cached on the model row.
+    """
+    if not glb_path or not os.path.exists(glb_path):
+        return None
     try:
         import trimesh
 
         loaded = trimesh.load(glb_path, force="scene")
         bounds = getattr(loaded, "bounds", None)
         if bounds is None:
-            return "Not measured"
+            return None
         extents_cm = [(float(axis) * 100) for axis in (bounds[1] - bounds[0])]
         if not extents_cm or max(extents_cm) <= 0:
-            return "Not measured"
+            return None
         return " x ".join(f"{axis:.1f}" for axis in extents_cm) + " cm"
     except Exception:
-        logger.debug("Could not read model dimensions for %s", getattr(model, "id", None), exc_info=True)
+        logger.debug("Could not measure GLB dimensions for %s", glb_path, exc_info=True)
+        return None
+
+
+def format_model_dimensions_cm(model: Model3D | None) -> str:
+    if not model:
         return "Not measured"
+    # Prefer the value measured once at conversion time (cheap). Fall back to a
+    # lazy on-disk measurement only for legacy rows that predate the column.
+    if getattr(model, "dimensions_cm", None):
+        return model.dimensions_cm
+    glb_path = next((path for path in _model_glb_candidate_paths(model) if path and os.path.exists(path)), None)
+    measured = compute_glb_dimensions_cm(glb_path)
+    return measured or "Not measured"
 
 
 def configured_admin_emails(app: Flask | None = None) -> set[str]:
@@ -410,6 +454,14 @@ def validate_secret_key(app: Flask) -> None:
 
 
 def ensure_sqlite_schema(app: Flask) -> None:
+    """Add newer columns to legacy SQLite DBs that predate them (papers
+    soft-delete columns, models.dimensions_cm).
+
+    Idempotent: each ALTER is guarded by a PRAGMA column check, so running this
+    on an already-migrated (or freshly create_all'd) database is a no-op. Only
+    needed for SQLite because the corresponding Alembic migration skips
+    add_column on SQLite.
+    """
     if not str(app.config.get("SQLALCHEMY_DATABASE_URI", "")).startswith("sqlite"):
         return
     with db.engine.begin() as connection:
@@ -418,33 +470,74 @@ def ensure_sqlite_schema(app: Flask) -> None:
             connection.execute(text("ALTER TABLE papers ADD COLUMN deleted_at DATETIME"))
         if "deleted_by_user_id" not in columns:
             connection.execute(text("ALTER TABLE papers ADD COLUMN deleted_by_user_id INTEGER"))
+        model_columns = {row[1] for row in connection.execute(text("PRAGMA table_info(models)")).fetchall()}
+        if model_columns and "dimensions_cm" not in model_columns:
+            connection.execute(text("ALTER TABLE models ADD COLUMN dimensions_cm VARCHAR(50)"))
+
+
+def _alembic_head_revision(app: Flask) -> str | None:
+    """Resolve the current Alembic head revision from the migrations/ folder.
+
+    Returns None if it cannot be determined (e.g. migrations dir missing).
+    """
+    try:
+        from alembic.script import ScriptDirectory
+
+        migrations_dir = os.path.join(app.root_path, "migrations")
+        if not os.path.isdir(migrations_dir):
+            return None
+        script = ScriptDirectory(migrations_dir)
+        return script.get_current_head()
+    except Exception:
+        logger.exception("Could not determine Alembic head revision")
+        return None
 
 
 def stamp_alembic_version_if_needed(app: Flask) -> None:
     """
-    Ensure the production database (e.g. PostgreSQL) is stamped with the initial
-    migration version '669b2de1fcd7' if tables already exist but alembic_version is missing.
-    This prevents Alembic from trying to run the initial schema creation,
-    which fails due to duplicate tables/indexes.
+    Stamp a non-SQLite database (e.g. PostgreSQL on Railway) with the CURRENT
+    Alembic head revision when tables already exist but ``alembic_version`` is
+    missing.
+
+    The schema is bootstrapped by ``db.create_all()`` (the project's de-facto
+    baseline), so it already matches the latest models. Stamping to the head
+    revision — resolved dynamically instead of a hardcoded id — tells Alembic
+    the DB is fully up to date and prevents ``flask db upgrade`` from trying to
+    re-apply migrations whose columns/indexes already exist.
     """
     import sqlalchemy as sa
     from sqlalchemy import text
     try:
         with app.app_context():
-            # Only apply this workaround on non-SQLite databases (like PostgreSQL on Railway)
+            # Only relevant for non-SQLite databases (PostgreSQL on Railway).
             if db.engine.dialect.name == "sqlite":
                 return
-                
+
             inspector = sa.inspect(db.engine)
             tables = inspector.get_table_names()
-            
-            # If the schema is already populated but alembic_version hasn't been created yet:
+
+            # Schema is populated but alembic_version has not been created yet.
             if "models" in tables and "alembic_version" not in tables:
-                logger.info("Production database tables found but no alembic_version table. Stamping to '669b2de1fcd7'...")
+                head = _alembic_head_revision(app)
+                if not head:
+                    logger.warning(
+                        "Tables exist without alembic_version, but the Alembic head "
+                        "revision could not be resolved; skipping stamp."
+                    )
+                    return
+                logger.info(
+                    "Tables found but no alembic_version table. Stamping to head '%s'...",
+                    head,
+                )
                 with db.engine.begin() as connection:
-                    connection.execute(text("CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL PRIMARY KEY)"))
-                    connection.execute(text("INSERT INTO alembic_version (version_num) VALUES ('669b2de1fcd7')"))
-                logger.info("Successfully stamped alembic_version to '669b2de1fcd7'.")
+                    connection.execute(
+                        text("CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL PRIMARY KEY)")
+                    )
+                    connection.execute(
+                        text("INSERT INTO alembic_version (version_num) VALUES (:rev)"),
+                        {"rev": head},
+                    )
+                logger.info("Successfully stamped alembic_version to '%s'.", head)
     except Exception as e:
         logger.error(f"Error checking or stamping alembic version: {e}")
 
@@ -589,26 +682,6 @@ def validate_paper_form(form) -> tuple[dict, list[str]]:
         },
         errors,
     )
-
-
-def package_expires_at(package_type: str) -> datetime | None:
-    if package_type == "academic":
-        return datetime.now(UTC) + timedelta(days=365 * 3)
-    if package_type == "model_based":
-        return None
-    return datetime.now(UTC) + timedelta(days=3)
-
-
-def sync_paper_entitlements(paper: Paper) -> None:
-    """Keep paper payment state enforceable without expiring publications."""
-    if paper.package_type == "model_based":
-        paper.payment_status = paper.payment_status or "model_based"
-    elif paper.package_type == "academic":
-        paper.payment_status = paper.payment_status or "paid"
-    else:
-        paper.package_type = "temporary"
-        paper.payment_status = "free"
-    paper.expires_at = None
 
 
 def paper_is_expired(paper: Paper) -> bool:
@@ -799,23 +872,6 @@ def hex_to_rgba(hex_color: str | None) -> tuple[float, float, float, float] | No
 
 def build_invoice_number(payment_id: int) -> str:
     return f"AAR-{datetime.now(UTC).strftime('%Y%m')}-{payment_id:05d}"
-
-
-def generate_qr(model_id: str, qr_folder: str, view_url: str) -> str:
-    import qrcode
-
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_M,
-        box_size=10,
-        border=4,
-    )
-    qr.add_data(view_url)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white")
-    filename = f"qr_{model_id}.png"
-    img.save(os.path.join(qr_folder, filename))
-    return filename
 
 
 def paper_qr_filename(paper_id: int) -> str:
@@ -1115,6 +1171,9 @@ def process_model_upload_job(
             qr_filename = generate_model_qr(model, app.config["QR_FOLDER"])
             model.qr_code_path = qr_filename
             model.file_size = os.path.getsize(glb_path)
+            # Measure dimensions once here so listing/detail pages don't re-parse
+            # the GLB with trimesh on every request.
+            model.dimensions_cm = compute_glb_dimensions_cm(glb_path)
             model.processing_status = "ready"
             model.processing_error = None
             if color:
@@ -1182,18 +1241,13 @@ def enqueue_conversion_job(
     job_kwargs = dict(job_kwargs)
     job_kwargs["job_id"] = job.id
     if app.config.get("TESTING") or app.config.get("DEV_INLINE_JOBS"):
+        # Tests and explicit local dev (DEV_INLINE_JOBS=1) run conversion inline
+        # so uploads appear immediately without a separate worker process.
         process_model_upload_job(app, **job_kwargs)
-    else:
-        import threading
-        # Resolve the actual application object from the LocalProxy proxy if needed
-        actual_app = app._get_current_object() if hasattr(app, "_get_current_object") else app
-        thread = threading.Thread(
-            target=process_model_upload_job,
-            args=(actual_app,),
-            kwargs=job_kwargs,
-            daemon=True
-        )
-        thread.start()
+    # Otherwise the ConversionJob row stays "pending" for the isolated worker
+    # (worker.py / run_next_conversion_job) to claim. Production web processes
+    # MUST NOT run CPU/RAM-heavy 3D conversions inline; doing so here would also
+    # race the worker for the same job.
     return job
 
 
@@ -1205,16 +1259,20 @@ def run_next_conversion_job(app: Flask) -> bool:
     the next job rather than sleeping.
     """
     with app.app_context():
-        job = (
+        # Claim the oldest pending job atomically. On PostgreSQL/MySQL we take a
+        # row lock with SKIP LOCKED so multiple concurrent workers never grab the
+        # same job. SQLite ignores FOR UPDATE (single-writer), which is fine for
+        # local/dev single-worker setups.
+        query = (
             ConversionJob.query
             .filter(ConversionJob.status == "pending")
             .order_by(ConversionJob.created_at.asc())
-            .first()
         )
+        if db.engine.dialect.name in {"postgresql", "mysql"}:
+            query = query.with_for_update(skip_locked=True)
+        job = query.first()
         if job is None:
             return False
-        # Claim the job atomically. We rely on the queue being read by a single
-        # worker for the MVP; multi-worker deployments should add SELECT FOR UPDATE.
         job.status = "processing"
         job.started_at = datetime.now(UTC)
         job.attempts = (job.attempts or 0) + 1
@@ -1593,11 +1651,16 @@ def register_routes(app: Flask) -> None:
         mimetype = (
             "model/vnd.usdz+zip" if filename == "model.usdz" else "model/gltf-binary"
         )
-        response = send_from_directory(directory, filename, mimetype=mimetype)
-        # Discourage casual download/caching by browsers and crawlers. The browser
-        # still needs the bytes to render, so this is friction, not a hard barrier.
+        # send_from_directory adds ETag + Last-Modified and honours
+        # If-None-Match / If-Modified-Since (conditional=True by default), so a
+        # repeat view gets a cheap 304 instead of re-downloading the whole GLB.
+        response = send_from_directory(directory, filename, mimetype=mimetype, conditional=True)
         response.headers["Content-Disposition"] = f'inline; filename="{filename}"'
-        response.headers["Cache-Control"] = "private, no-store, max-age=0"
+        # "private, no-cache" = never cached by shared/CDN caches and the browser
+        # must revalidate every time (so our access checks above always run), but
+        # it MAY keep the bytes and reuse them on a 304. A replace/appearance
+        # update rewrites the file, changing the ETag, which invalidates the copy.
+        response.headers["Cache-Control"] = "private, no-cache"
         response.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
         return response
 
@@ -1742,7 +1805,7 @@ def register_routes(app: Flask) -> None:
                     func.lower(User.username).like(pattern),
                 )
             )
-        if user_plan_filter in {"free", "academic"}:
+        if user_plan_filter in USER_SELECTABLE_PLAN_KEYS:
             users_query = users_query.filter(User.plan == user_plan_filter)
         if user_role_filter == "admin":
             users_query = users_query.filter(User.is_admin.is_(True))
@@ -1792,7 +1855,10 @@ def register_routes(app: Flask) -> None:
             "papers": Paper.query.count(),
             "public_papers": Paper.query.filter_by(is_public=True).count(),
             "models": Model3D.query.count(),
-            "active_models": sum(1 for model in Model3D.query.all() if model_access_status(model) == "active"),
+            "active_models": Model3D.query.filter(
+                Model3D.processing_status.notin_(["queued", "processing", "failed"]),
+                or_(Model3D.access_expires_at.is_(None), Model3D.access_expires_at >= now),
+            ).count(),
             "qr_links": QRLink.query.count(),
             "payments": Payment.query.count(),
             "paid_revenue": paid_revenue,
@@ -1839,8 +1905,23 @@ def register_routes(app: Flask) -> None:
         viewer_access_total = AuditLog.query.filter(AuditLog.event_type == "public_model_viewed").count()
         last_qr_resolved = QRLink.query.filter(QRLink.last_resolved_at.isnot(None)).order_by(QRLink.last_resolved_at.desc()).first()
         disabled_qr_count = QRLink.query.filter(QRLink.status != "active").count()
-        expired_qr_count = sum(1 for link in QRLink.query.all() if model_access_status(link.model) == "expired")
-        expired_public_papers = sum(1 for paper in Paper.query.filter_by(is_public=True).all() if paper_is_expired(paper))
+        # A model is "expired" only when it is not still queued/processing/failed
+        # and not kept-alive as replacement_failed, and its access window has
+        # lapsed (mirrors licensing.model_access_status, but in SQL).
+        expired_qr_count = (
+            db.session.query(func.count(QRLink.id))
+            .join(Model3D, QRLink.model_id == Model3D.id)
+            .filter(
+                Model3D.processing_status.notin_(["queued", "processing", "failed", "replacement_failed"]),
+                Model3D.access_expires_at.isnot(None),
+                Model3D.access_expires_at < now,
+            )
+            .scalar()
+        ) or 0
+        # paper_is_expired() is currently always False (publications do not
+        # expire), so this is 0 by definition. Kept as a named value so the
+        # template/stats stay stable if expiry logic returns later.
+        expired_public_papers = 0
         near_limit_models = (
             Model3D.query.filter(
                 Model3D.file_size.isnot(None),
@@ -1863,9 +1944,14 @@ def register_routes(app: Flask) -> None:
         average_conversion_seconds = int(sum(conversion_durations) / len(conversion_durations)) if conversion_durations else 0
         failed_jobs = ConversionJob.query.filter_by(status="failed").order_by(ConversionJob.finished_at.desc()).limit(10).all()
         failed_format_counts: dict[str, int] = {}
-        for failed_job in ConversionJob.query.filter_by(status="failed").all():
-            fmt = (failed_job.model.source_format if failed_job.model else None) or "unknown"
-            failed_format_counts[fmt] = failed_format_counts.get(fmt, 0) + 1
+        for source_format, count in (
+            db.session.query(Model3D.source_format, func.count(ConversionJob.id))
+            .join(Model3D, ConversionJob.model_id == Model3D.id)
+            .filter(ConversionJob.status == "failed")
+            .group_by(Model3D.source_format)
+            .all()
+        ):
+            failed_format_counts[source_format or "unknown"] = count
         field_counts = {}
         for field, count in db.session.query(Paper.field, func.count(Paper.id)).group_by(Paper.field).order_by(func.count(Paper.id).desc()).limit(8).all():
             key = field or "Unspecified"
@@ -1928,36 +2014,50 @@ def register_routes(app: Flask) -> None:
         ):
             user = db.session.get(User, user_id)
             storage_by_user.append({"user": user, "user_id": user_id, "size": total_size or 0, "models": model_count})
-        upload_size, upload_files = scan_folder_size(app.config["UPLOAD_FOLDER"])
-        converted_size, converted_files = scan_folder_size(app.config["CONVERTED_FOLDER"])
-        qr_size, qr_files = scan_folder_size(app.config["QR_FOLDER"])
-        pdf_size, pdf_files = scan_folder_size(app.config["PDF_FOLDER"])
-        expected_pdf_files = {
-            os.path.abspath(os.path.join(app.config["PDF_FOLDER"], os.path.basename(paper.pdf_path)))
-            for paper in Paper.query.filter(Paper.pdf_path.isnot(None)).all()
-            if paper.pdf_path
-        }
-        expected_qr_files = {
-            os.path.abspath(os.path.join(app.config["QR_FOLDER"], os.path.basename(model.qr_code_path)))
-            for model in Model3D.query.filter(Model3D.qr_code_path.isnot(None)).all()
-            if model.qr_code_path
-        }
-        expected_model_files = set()
-        for model in Model3D.query.all():
-            model_folder = os.path.abspath(os.path.join(app.config["CONVERTED_FOLDER"], model.id))
-            expected_model_files.add(os.path.join(model_folder, "model.glb"))
-            expected_model_files.add(os.path.join(model_folder, "model.usdz"))
-        orphan_counts = {
-            "converted": count_orphan_files(app.config["CONVERTED_FOLDER"], expected_model_files),
-            "pdf": count_orphan_files(app.config["PDF_FOLDER"], expected_pdf_files),
-            "qr": count_orphan_files(app.config["QR_FOLDER"], expected_qr_files),
-        }
+        # Filesystem scanning (os.walk over four folders) and orphan detection
+        # are expensive, so only run them on the pages that actually display the
+        # results: "overview" needs the orphan count for critical alerts, and
+        # "storage" renders the full breakdown. Other pages get cheap defaults.
+        orphan_counts = {"converted": 0, "pdf": 0, "qr": 0}
         storage_breakdown = {
-            "uploads": {"size": upload_size, "files": upload_files},
-            "models": {"size": converted_size, "files": converted_files},
-            "pdfs": {"size": pdf_size, "files": pdf_files},
-            "qr": {"size": qr_size, "files": qr_files},
+            "uploads": {"size": 0, "files": 0},
+            "models": {"size": 0, "files": 0},
+            "pdfs": {"size": 0, "files": 0},
+            "qr": {"size": 0, "files": 0},
         }
+        if admin_page in {"overview", "storage"}:
+            upload_size, upload_files = scan_folder_size(app.config["UPLOAD_FOLDER"])
+            converted_size, converted_files = scan_folder_size(app.config["CONVERTED_FOLDER"])
+            qr_size, qr_files = scan_folder_size(app.config["QR_FOLDER"])
+            pdf_size, pdf_files = scan_folder_size(app.config["PDF_FOLDER"])
+            # Only the path columns are needed for orphan detection, so query those
+            # columns directly instead of hydrating full ORM objects.
+            expected_pdf_files = {
+                os.path.abspath(os.path.join(app.config["PDF_FOLDER"], os.path.basename(pdf_path)))
+                for (pdf_path,) in db.session.query(Paper.pdf_path).filter(Paper.pdf_path.isnot(None)).all()
+                if pdf_path
+            }
+            expected_qr_files = {
+                os.path.abspath(os.path.join(app.config["QR_FOLDER"], os.path.basename(qr_code_path)))
+                for (qr_code_path,) in db.session.query(Model3D.qr_code_path).filter(Model3D.qr_code_path.isnot(None)).all()
+                if qr_code_path
+            }
+            expected_model_files = set()
+            for (model_pk,) in db.session.query(Model3D.id).all():
+                model_folder = os.path.abspath(os.path.join(app.config["CONVERTED_FOLDER"], model_pk))
+                expected_model_files.add(os.path.join(model_folder, "model.glb"))
+                expected_model_files.add(os.path.join(model_folder, "model.usdz"))
+            orphan_counts = {
+                "converted": count_orphan_files(app.config["CONVERTED_FOLDER"], expected_model_files),
+                "pdf": count_orphan_files(app.config["PDF_FOLDER"], expected_pdf_files),
+                "qr": count_orphan_files(app.config["QR_FOLDER"], expected_qr_files),
+            }
+            storage_breakdown = {
+                "uploads": {"size": upload_size, "files": upload_files},
+                "models": {"size": converted_size, "files": converted_files},
+                "pdfs": {"size": pdf_size, "files": pdf_files},
+                "qr": {"size": qr_size, "files": qr_files},
+            }
         security_events = {
             "admin_actions": AuditLog.query.filter(AuditLog.event_type.like("admin_%")).count(),
             "account_deleted": AuditLog.query.filter_by(event_type="account_deleted").count(),
@@ -2151,7 +2251,7 @@ def register_routes(app: Flask) -> None:
         if not user:
             abort(404)
         new_plan = (request.form.get("plan") or "free").strip().lower()
-        if new_plan not in {"free", "academic"}:
+        if not is_valid_user_plan(new_plan):
             flash("Invalid user plan.", "danger")
             return redirect(url_for("admin_dashboard", admin_page="users"))
         previous = user.plan
@@ -2307,12 +2407,24 @@ def register_routes(app: Flask) -> None:
     def profile():
         if request.method == "POST":
             new_plan = (request.form.get("plan") or "").strip().lower()
-            if new_plan not in {"free", "academic", "extended_archive"}:
+            if not is_valid_user_plan(new_plan):
                 flash("Invalid plan choice.", "danger")
                 return redirect(url_for("profile"))
             previous = current_user.plan or "free"
             if new_plan == previous:
                 flash("You're already on this plan.", "info")
+                return redirect(url_for("profile"))
+
+            # Guard the development-only "instant paid upgrade". Without a real
+            # payment gateway we must never grant paid plans for free in
+            # production (see Config.ALLOW_DEV_PAYMENTS).
+            paid_plans = {"academic", "extended_archive"}
+            if new_plan in paid_plans and not current_app.config.get("ALLOW_DEV_PAYMENTS", False):
+                flash(
+                    "Paid plans are not available yet — online payment is not "
+                    "configured. Please contact support to upgrade your account.",
+                    "warning",
+                )
                 return redirect(url_for("profile"))
 
             current_user.plan = new_plan
@@ -3079,7 +3191,7 @@ def register_routes(app: Flask) -> None:
         model.current_source_path = archived_source
         model.source_format = source_format
         model.version = next_version
-        model.last_replaced_at = datetime.now(UTC)
+        model.replaced_at = datetime.now(UTC)
         model.replacement_status = "replacement_processing"
         model.replacement_error = None
         db.session.commit()

@@ -97,6 +97,10 @@ class Model3D(db.Model):
     storage_key = db.Column(db.String(500), nullable=True)
     qr_code_path = db.Column(db.String(500), nullable=True)
     file_size = db.Column(db.Integer, nullable=True)
+    # Precomputed bounding-box dimensions (e.g. "12.3 x 4.5 x 6.7 cm"), measured
+    # once during conversion so listing/detail pages never have to re-parse the
+    # GLB with trimesh on every request.
+    dimensions_cm = db.Column(db.String(50), nullable=True)
     public_id = db.Column(db.String(40), unique=True, nullable=True, index=True)
     license_type = db.Column(db.String(30), nullable=False, default="free", index=True)
     license_status = db.Column(db.String(30), nullable=False, default="active", index=True)

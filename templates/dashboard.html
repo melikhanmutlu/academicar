@@ -40,7 +40,7 @@
         <span class="metric-icon">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h12l4 4v12H4z"/><path d="M16 4v4h4"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
         </span>
-        <span class="metric-label">Publications</span>
+        <span class="metric-label" data-mobile-label="Publications">Publications</span>
         <strong class="metric-value-compact">{{ papers|length }}</strong>
       </div>
     </div>
@@ -49,7 +49,7 @@
         <span class="metric-icon">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 4 6v12l8 4 8-4V6z"/><path d="M4 6l8 4 8-4"/><line x1="12" y1="22" x2="12" y2="10"/></svg>
         </span>
-        <span class="metric-label">3D Models</span>
+        <span class="metric-label" data-mobile-label="3D Models">3D Models</span>
         <strong class="metric-value-compact">{{ stats.total_models }}</strong>
       </div>
     </div>
@@ -58,7 +58,7 @@
         <span class="metric-icon">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="3" width="16" height="18" rx="1"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>
         </span>
-        <span class="metric-label">PDF Attachments</span>
+        <span class="metric-label" data-mobile-label="PDFs">PDF Attachments</span>
         <strong class="metric-value-compact">{{ papers_with_pdf }}</strong>
       </div>
     </div>
@@ -67,7 +67,7 @@
         <span class="metric-icon">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18"/><path d="M12 3a14 14 0 0 0 0 18"/></svg>
         </span>
-        <span class="metric-label">Public Links</span>
+        <span class="metric-label" data-mobile-label="Public Links">Public Links</span>
         <strong class="metric-value-compact">{{ public_count }}<small class="metric-divider">/{{ papers|length }}</small></strong>
       </div>
     </div>
@@ -222,26 +222,27 @@
 
           <div class="publication-count">
             <strong>{{ p.models|length }}</strong>
+            <span class="publication-count-label">{{ 'model' if p.models|length == 1 else 'models' }}</span>
           </div>
 
           <div class="publication-share">
             {% if p.pdf_path %}
-              <a href="{{ url_for('paper_public_pdf', slug=p.slug) }}" target="_blank" rel="noopener noreferrer" class="dash-action dash-action-primary">PDF</a>
+              <a href="{{ url_for('paper_public_pdf', slug=p.slug) }}" target="_blank" rel="noopener noreferrer" class="dash-action dash-action-primary dash-action-pdf">PDF</a>
             {% else %}
               {% if not (admin_view is defined and admin_view) %}
                 <input type="file" id="pdf-input-{{ p.slug }}" accept=".pdf" style="display: none;" onchange="uploadDashboardPdf('{{ p.slug }}')">
-                <button type="button" class="dash-action" id="pdf-btn-{{ p.slug }}" onclick="document.getElementById('pdf-input-{{ p.slug }}').click()">Add PDF</button>
+                <button type="button" class="dash-action dash-action-pdf" id="pdf-btn-{{ p.slug }}" onclick="document.getElementById('pdf-input-{{ p.slug }}').click()">Add PDF</button>
               {% else %}
-                <button type="button" class="dash-action dash-action-muted" disabled title="No PDF uploaded">PDF missing</button>
+                <button type="button" class="dash-action dash-action-muted dash-action-pdf" disabled title="No PDF uploaded">PDF missing</button>
               {% endif %}
             {% endif %}
             {% if admin_view is defined and admin_view %}
-              <a href="{{ url_for('paper_public', slug=p.slug) }}" target="_blank" rel="noopener noreferrer" class="dash-action">Open</a>
-              <a href="{{ url_for('admin_dashboard', admin_page='content') }}" class="dash-action">Manage</a>
+              <a href="{{ url_for('paper_public', slug=p.slug) }}" target="_blank" rel="noopener noreferrer" class="dash-action dash-action-details">Open</a>
+              <a href="{{ url_for('admin_dashboard', admin_page='content') }}" class="dash-action dash-action-edit">Manage</a>
             {% else %}
-              <a href="{{ url_for('paper_edit', slug=p.slug) }}" class="dash-action">Edit</a>
-              <a href="{{ url_for('paper_detail', slug=p.slug) }}#add-model" class="dash-action">Add model</a>
-              <a href="{{ url_for('paper_detail', slug=p.slug) }}" class="dash-action">Details</a>
+              <a href="{{ url_for('paper_edit', slug=p.slug) }}" class="dash-action dash-action-edit">Edit</a>
+              <a href="{{ url_for('paper_detail', slug=p.slug) }}#add-model" class="dash-action dash-action-add-model">Add model</a>
+              <a href="{{ url_for('paper_detail', slug=p.slug) }}" class="dash-action dash-action-details">Details</a>
             {% endif %}
           </div>
         </div>
