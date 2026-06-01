@@ -185,8 +185,9 @@
 /* Hero Metrics */
 .hero-metrics {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 32px;
+  grid-template-columns: repeat(3, auto);
+  justify-content: space-between;
+  gap: 36px;
   max-width: 560px;
   padding-top: 32px;
   border-top: 1px solid var(--color-light-pearl);
