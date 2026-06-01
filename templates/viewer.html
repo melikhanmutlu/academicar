@@ -558,7 +558,7 @@
       } else {
         viewer.removeAttribute('auto-rotate');
         viewer.removeAttribute('auto-rotate-delay');
-        if (typeof viewer.pause === 'function') viewer.pause();
+        if (typeof viewer.play === 'function') viewer.play();
       }
       autoRotateToggle.setAttribute('aria-pressed', enabled ? 'true' : 'false');
       autoRotateToggle.textContent = enabled ? 'Auto rotate on' : 'Auto rotate off';
@@ -569,6 +569,7 @@
       viewer.orientation = orientation;
       if (typeof viewer.requestUpdate === 'function') viewer.requestUpdate('orientation', orientation);
       if (viewer.updateComplete) await viewer.updateComplete;
+      if (typeof viewer.play === 'function') viewer.play();
     };
     const cameraState = () => ({
       orbit: viewer.getCameraOrbit ? viewer.getCameraOrbit().toString() : viewer.cameraOrbit,
