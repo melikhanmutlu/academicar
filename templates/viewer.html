@@ -11,6 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script type="module" src="https://unpkg.com/@google/model-viewer@4.2.0/dist/model-viewer.min.js"></script>
+  <script src="{{ url_for('static', filename='vendor/jszip.min.js') }}" defer></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 
   <style>
@@ -52,10 +53,104 @@
       transform: none;
       visibility: visible;
     }
+    .viewer-tool-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      color: rgba(255,255,255,0.72);
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .viewer-tool-heading button,
+    .viewer-shot-actions button,
+    .viewer-shot-card a {
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.78);
+      min-height: 32px;
+      padding: 0.45rem 0.75rem;
+      font-weight: 700;
+      transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+    }
+    .viewer-tool-heading button:hover,
+    .viewer-shot-actions button:hover,
+    .viewer-shot-card a:hover {
+      background: rgba(255,255,255,0.14);
+      color: #fff;
+      border-color: rgba(255,255,255,0.22);
+    }
+    .viewer-tool-heading button:disabled {
+      opacity: 0.38;
+      cursor: not-allowed;
+    }
+    .viewer-rotation-tools,
+    .viewer-shot-tools {
+      border-top: 1px solid rgba(255,255,255,0.10);
+      padding-top: 0.85rem;
+    }
+    .viewer-rotation-tools label {
+      display: grid;
+      grid-template-columns: 1.1rem minmax(0, 1fr) 3.5rem;
+      align-items: center;
+      gap: 0.65rem;
+      margin-top: 0.55rem;
+      color: rgba(255,255,255,0.64);
+      font-weight: 700;
+    }
+    .viewer-rotation-tools input[type="range"] {
+      width: 100%;
+      accent-color: #fff;
+    }
+    .viewer-rotation-tools span[data-rotate-value] {
+      text-align: right;
+      color: rgba(255,255,255,0.72);
+      font-variant-numeric: tabular-nums;
+    }
+    .viewer-shot-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.5rem;
+      margin-top: 0.65rem;
+    }
+    .viewer-shot-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.45rem;
+      margin-top: 0.65rem;
+      max-height: 148px;
+      overflow-y: auto;
+    }
+    .viewer-shot-card {
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 0.55rem;
+      background: rgba(255,255,255,0.05);
+      overflow: hidden;
+    }
+    .viewer-shot-card img {
+      display: block;
+      width: 100%;
+      aspect-ratio: 1.35;
+      object-fit: cover;
+      background: #111;
+    }
+    .viewer-shot-card span {
+      display: block;
+      padding: 0.35rem;
+      color: rgba(255,255,255,0.62);
+      font-size: 0.62rem;
+      font-weight: 700;
+      text-align: center;
+    }
     @media (max-width: 640px) {
       .viewer-tool-btn { min-height: 36px; padding: 0.5rem 0.7rem; }
       model-viewer { left: 0 !important; right: 0 !important; width: 100vw !important; transform: none !important; }
       .info-drawer { left: 0 !important; right: 0 !important; width: 100vw !important; max-width: 100vw !important; }
+      .viewer-shot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 180px; }
+      .viewer-shot-actions { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -163,12 +258,28 @@
           <p class="font-bold mt-1">Ready</p>
         </div>
       </div>
-      <div class="mt-3 flex flex-wrap gap-2 text-xs" data-screenshot-tools>
-        <button type="button" data-shot="front" class="rounded-full bg-white/[0.08] px-3 py-2 text-white/75 hover:bg-white/[0.14]">Front</button>
-        <button type="button" data-shot="right" class="rounded-full bg-white/[0.08] px-3 py-2 text-white/75 hover:bg-white/[0.14]">Right</button>
-        <button type="button" data-shot="left" class="rounded-full bg-white/[0.08] px-3 py-2 text-white/75 hover:bg-white/[0.14]">Left</button>
-        <button type="button" data-shot="top" class="rounded-full bg-white/[0.08] px-3 py-2 text-white/75 hover:bg-white/[0.14]">Top</button>
-        <button type="button" data-shot="perspective" class="rounded-full bg-white/[0.08] px-3 py-2 text-white/75 hover:bg-white/[0.14]">Perspective</button>
+      <div class="mt-4 grid gap-3 text-xs">
+        <div class="viewer-rotation-tools" data-rotation-tools>
+          <div class="viewer-tool-heading">
+            <span>Preview rotation</span>
+            <button type="button" data-reset-rotation>Reset rotation</button>
+          </div>
+          <label> X <input type="range" min="0" max="360" step="1" value="0" data-rotate-axis="x"><span data-rotate-value="x">0deg</span></label>
+          <label> Y <input type="range" min="0" max="360" step="1" value="0" data-rotate-axis="y"><span data-rotate-value="y">0deg</span></label>
+          <label> Z <input type="range" min="0" max="360" step="1" value="0" data-rotate-axis="z"><span data-rotate-value="z">0deg</span></label>
+        </div>
+
+        <div class="viewer-shot-tools" data-screenshot-tools>
+          <div class="viewer-tool-heading">
+            <span>Screenshots</span>
+            <button type="button" data-download-zip disabled>Download ZIP</button>
+          </div>
+          <div class="viewer-shot-actions">
+            <button type="button" data-current-shot>Current view</button>
+            <button type="button" data-generate-shot-set>Generate 8 views</button>
+          </div>
+          <div class="viewer-shot-grid" data-shot-gallery aria-live="polite"></div>
+        </div>
       </div>
     </section>
     {% endif %}
@@ -245,13 +356,24 @@
     const arBtn = document.getElementById('arBtn');
     const qrModal = document.getElementById('qrModal');
     const closeQr = document.getElementById('closeQr');
-    const shotOrbits = {
-      front: '0deg 90deg auto',
-      right: '90deg 90deg auto',
-      left: '-90deg 90deg auto',
-      top: '0deg 0deg auto',
-      perspective: '35deg 70deg auto'
-    };
+    const rotateInputs = [...document.querySelectorAll('[data-rotate-axis]')];
+    const resetRotation = document.querySelector('[data-reset-rotation]');
+    const currentShotButton = document.querySelector('[data-current-shot]');
+    const generateShotSetButton = document.querySelector('[data-generate-shot-set]');
+    const downloadZipButton = document.querySelector('[data-download-zip]');
+    const shotGalleryEl = document.querySelector('[data-shot-gallery]');
+    const modelBaseName = {{ (model.display_name or model.original_filename or 'model')|tojson }};
+    const shotViews = [
+      { key: 'top', label: 'Top', orbit: '0deg 0deg auto' },
+      { key: 'bottom', label: 'Bottom', orbit: '0deg 180deg auto' },
+      { key: 'right', label: 'Right', orbit: '90deg 90deg auto' },
+      { key: 'left', label: 'Left', orbit: '-90deg 90deg auto' },
+      { key: 'front', label: 'Front', orbit: '0deg 90deg auto' },
+      { key: 'back', label: 'Back', orbit: '180deg 90deg auto' },
+      { key: 'left-perspective', label: 'Left perspective', orbit: '-35deg 65deg auto' },
+      { key: 'right-perspective', label: 'Right perspective', orbit: '35deg 65deg auto' }
+    ];
+    let shotGallery = [];
 
     if (infoBtn && infoPanel) infoBtn.addEventListener('click', () => infoPanel.classList.add('open'));
     if (closeInfo && infoPanel) closeInfo.addEventListener('click', () => infoPanel.classList.remove('open'));
@@ -318,24 +440,124 @@
     });
 
     const waitFrame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    const downloadShot = async (viewName) => {
-      if (!viewer.loaded || typeof viewer.toDataURL !== 'function') return;
-      viewer.pause();
-      viewer.cameraOrbit = shotOrbits[viewName] || shotOrbits.perspective;
+    const safeName = (value) => String(value || 'model').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'model';
+    const downloadDataUrl = (dataUrl, name) => {
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = `${safeName(modelBaseName)}-${name}.png`;
+      link.click();
+    };
+    const cameraState = () => ({
+      orbit: viewer.getCameraOrbit ? viewer.getCameraOrbit().toString() : viewer.cameraOrbit,
+      target: viewer.getCameraTarget ? viewer.getCameraTarget().toString() : viewer.cameraTarget,
+      fov: viewer.getFieldOfView ? `${viewer.getFieldOfView()}deg` : viewer.fieldOfView
+    });
+    const restoreCamera = async (state) => {
+      if (!state) return;
+      viewer.cameraOrbit = state.orbit;
+      viewer.cameraTarget = state.target;
+      viewer.fieldOfView = state.fov;
       if (typeof viewer.jumpCameraToGoal === 'function') viewer.jumpCameraToGoal();
       if (viewer.updateComplete) await viewer.updateComplete;
       await waitFrame();
+    };
+    const captureShot = async (view) => {
+      if (!viewer.loaded || typeof viewer.toDataURL !== 'function') return;
+      viewer.pause();
+      if (view?.orbit) {
+        viewer.cameraOrbit = view.orbit;
+        if (typeof viewer.jumpCameraToGoal === 'function') viewer.jumpCameraToGoal();
+      }
+      if (viewer.updateComplete) await viewer.updateComplete;
+      await waitFrame();
+      return viewer.toDataURL('image/png');
+    };
+    const renderShotGallery = () => {
+      if (!shotGalleryEl) return;
+      shotGalleryEl.innerHTML = '';
+      shotGallery.forEach((shot) => {
+        const card = document.createElement('div');
+        card.className = 'viewer-shot-card';
+        const img = document.createElement('img');
+        img.src = shot.dataUrl;
+        img.alt = `${shot.label} screenshot`;
+        const label = document.createElement('span');
+        label.textContent = shot.label;
+        card.appendChild(img);
+        card.appendChild(label);
+        shotGalleryEl.appendChild(card);
+      });
+      if (downloadZipButton) downloadZipButton.disabled = shotGallery.length === 0 || typeof JSZip === 'undefined';
+    };
+    const downloadCurrentShot = async () => {
+      const dataUrl = await captureShot(null);
+      if (dataUrl) downloadDataUrl(dataUrl, 'current-view');
+    };
+    const generateShotSet = async () => {
+      const state = cameraState();
+      shotGallery = [];
+      if (generateShotSetButton) {
+        generateShotSetButton.disabled = true;
+        generateShotSetButton.textContent = 'Generating...';
+      }
+      for (const view of shotViews) {
+        const dataUrl = await captureShot(view);
+        if (dataUrl) {
+          shotGallery.push({ ...view, dataUrl });
+          renderShotGallery();
+        }
+      }
+      await restoreCamera(state);
+      if (generateShotSetButton) {
+        generateShotSetButton.disabled = false;
+        generateShotSetButton.textContent = 'Generate 8 views';
+      }
+    };
+    const downloadShotZip = async () => {
+      if (!shotGallery.length || typeof JSZip === 'undefined') return;
+      const zip = new JSZip();
+      for (const shot of shotGallery) {
+        const payload = await fetch(shot.dataUrl).then((res) => res.arrayBuffer());
+        zip.file(`${safeName(modelBaseName)}-${shot.key}.png`, payload);
+      }
+      const blob = await zip.generateAsync({ type: 'blob' });
       const link = document.createElement('a');
-      link.href = viewer.toDataURL('image/png');
-      link.download = `{{ (model.display_name or model.original_filename)|replace(' ', '-') }}-${viewName}.png`;
+      link.href = URL.createObjectURL(blob);
+      link.download = `${safeName(modelBaseName)}-8-view-screenshots.zip`;
       link.click();
+      setTimeout(() => URL.revokeObjectURL(link.href), 1200);
     };
 
-    if (screenshotTools) {
-      screenshotTools.addEventListener('click', (event) => {
-        const button = event.target.closest('[data-shot]');
-        if (button) downloadShot(button.dataset.shot);
+    rotateInputs.forEach((input) => {
+      input.addEventListener('input', () => {
+        const values = { x: 0, y: 0, z: 0 };
+        rotateInputs.forEach((item) => {
+          values[item.dataset.rotateAxis] = Number(item.value || 0);
+          const valueEl = document.querySelector(`[data-rotate-value="${item.dataset.rotateAxis}"]`);
+          if (valueEl) valueEl.textContent = `${item.value}deg`;
+        });
+        viewer.orientation = `${values.x}deg ${values.y}deg ${values.z}deg`;
       });
+    });
+    resetRotation?.addEventListener('click', () => {
+      rotateInputs.forEach((input) => {
+        input.value = 0;
+        const valueEl = document.querySelector(`[data-rotate-value="${input.dataset.rotateAxis}"]`);
+        if (valueEl) valueEl.textContent = '0deg';
+      });
+      viewer.orientation = '0deg 0deg 0deg';
+    });
+    currentShotButton?.addEventListener('click', downloadCurrentShot);
+    generateShotSetButton?.addEventListener('click', generateShotSet);
+    downloadZipButton?.addEventListener('click', downloadShotZip);
+    window.addEventListener('load', () => {
+      if (downloadZipButton && typeof JSZip === 'undefined') {
+        downloadZipButton.textContent = 'ZIP unavailable';
+        downloadZipButton.disabled = true;
+      }
+    });
+    if (downloadZipButton && typeof JSZip === 'undefined') {
+      downloadZipButton.disabled = true;
     }
 
     // Discourage casual download attempts. None of these stop a determined

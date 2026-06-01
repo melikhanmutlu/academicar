@@ -14,7 +14,8 @@ import subprocess
 from pathlib import Path
 
 from .base_converter import BaseConverter
-from .stl_converter import enrich_glb_for_ar, inject_pbr_material
+from .glb_quality import embed_external_textures, ensure_pbr_materials, has_base_color_textures
+from .stl_converter import _srgb_to_linear, enrich_glb_for_ar, inject_pbr_material
 
 
 class ExternalConverter(BaseConverter):
@@ -56,16 +57,18 @@ class ExternalConverter(BaseConverter):
         except subprocess.TimeoutExpired as exc:
             return subprocess.CompletedProcess(command, 124, exc.stdout or "", exc.stderr or "Conversion timed out.")
 
-    def _post_process_glb(self, output_path: str, color: str | None) -> None:
-        if not color:
+    def _post_process_glb(self, output_path: str, color: str | None, search_dirs: list[str] | None = None) -> None:
+        embed_external_textures(output_path, search_dirs=search_dirs)
+        ensure_pbr_materials(output_path)
+        if not color or has_base_color_textures(output_path):
             return
         hex_color = color.strip()
         if not hex_color.startswith("#") or len(hex_color) != 7:
             return
         try:
-            r = int(hex_color[1:3], 16) / 255.0
-            g = int(hex_color[3:5], 16) / 255.0
-            b = int(hex_color[5:7], 16) / 255.0
+            r = _srgb_to_linear(int(hex_color[1:3], 16) / 255.0)
+            g = _srgb_to_linear(int(hex_color[3:5], 16) / 255.0)
+            b = _srgb_to_linear(int(hex_color[5:7], 16) / 255.0)
         except ValueError:
             return
         rgba = (r, g, b, 1.0)
@@ -101,7 +104,7 @@ class OBJConverter(ExternalConverter):
         if result.returncode != 0 or not os.path.exists(output_path):
             self.handle_error(result.stderr or result.stdout or "OBJ to GLB conversion failed.")
             return False
-        self._post_process_glb(output_path, color)
+        self._post_process_glb(output_path, color, search_dirs=[os.path.dirname(input_path), os.path.dirname(output_path)])
         return True
 
 
@@ -151,5 +154,5 @@ class FBXConverter(ExternalConverter):
         if result.returncode != 0 or not os.path.exists(output_path):
             self.handle_error(result.stderr or result.stdout or "FBX to GLB conversion failed.")
             return False
-        self._post_process_glb(output_path, color)
+        self._post_process_glb(output_path, color, search_dirs=[os.path.dirname(input_path), os.path.dirname(output_path)])
         return True

@@ -12,7 +12,7 @@
         Share 3D and AR models with academic papers, posters, and presentations.
       </p>
       <p class="landing-body">
-        Upload an STL or GLB model, generate a browser-ready viewer link, create a QR code, and let readers inspect your model in 3D or AR from mobile devices.
+        Upload GLB, STL, OBJ, or FBX models, generate a browser-ready viewer link, create a QR code, and let readers inspect your model in 3D or AR from mobile devices.
       </p>
       <div class="hero-actions">
         <a href="{{ url_for('auth.register') }}" class="btn-primary">Create Workspace</a>
@@ -21,8 +21,8 @@
 
       <div class="hero-metrics">
         <div>
-          <div class="hero-metric-value">STL/GLB</div>
-          <div class="hero-metric-label">Model upload</div>
+          <div class="hero-metric-value">4 formats</div>
+          <div class="hero-metric-label">GLB, STL, OBJ, FBX</div>
         </div>
         <div>
           <div class="hero-metric-value">QR</div>
@@ -80,12 +80,12 @@
       <span class="landing-eyebrow">How it works</span>
       <h2 class="landing-h2">From segmentation model to publication link.</h2>
       <p class="landing-body">
-        AcademicAR turns technical model files into a shareable academic asset: model upload, GLB viewer, screenshots, QR code, and mobile AR access in one flow.
+        AcademicAR turns GLB, STL, OBJ, and FBX files into a shareable academic asset: model upload, GLB viewer, screenshots, QR code, and mobile AR access in one flow.
       </p>
 
       <div class="workflow-timeline">
         {% for step in [
-          ('01', 'Upload your model', 'Upload an anonymized STL or GLB segmentation model from your account.'),
+          ('01', 'Upload your model', 'Upload an anonymized GLB, STL, OBJ, or FBX model from your account.'),
           ('02', 'Create a publication page', 'Add title, authors, institution, DOI/PMID, description, and model notes.'),
           ('03', 'Get QR and link', 'Use the generated viewer URL and QR code in papers, posters, and presentations.'),
           ('04', 'Show in 3D or AR', 'Readers can rotate, zoom, inspect, and open the model in AR on supported phones and tablets.')
@@ -121,11 +121,11 @@
 
   <div class="features-grid">
     {% for item in [
-      ('3D model upload', 'STL and GLB support now, with OBJ planned for the next converter pass.', 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.27 6.96 12 12.01l8.73-5.05 M12 22.08V12'),
+      ('3D model upload', 'Upload GLB, STL, OBJ, and FBX files with AR-ready conversion and stable viewer links.', 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.27 6.96 12 12.01l8.73-5.05 M12 22.08V12'),
       ('Web-based viewer', 'A full-screen browser viewer with metadata and mobile AR controls.', 'M2 3h20v14H2z M8 21h8 M12 17v4'),
       ('Automatic QR code', 'Every model receives a shareable viewer URL and QR image.', 'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h2v2h-2z M18 14h2v2h-2z M14 18h2v2h-2z M18 18h2v2h-2z'),
       ('Publication archive', 'Project-based model records for papers, posters, and presentations.', 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8'),
-      ('Screenshots', 'Front, right, left, top, and perspective captures for publication assets.', 'M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'),
+      ('Screenshots', 'Capture current views or generate a complete 8-angle publication asset set.', 'M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'),
       ('Privacy guardrails', 'Uploads require anonymization, rights, and ethics responsibility confirmation.', 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z')
     ] %}
       <div class="feature-card reveal-up delay-{{ loop.index }}">
@@ -293,6 +293,9 @@
         <a href="{{ url_for('auth.register') }}" class="pricing-cta">Get started</a>
         <p class="pricing-microcopy">Renewable after 10 years</p>
       </div>
+    </div>
+    <div class="pricing-detail-link reveal-up delay-3">
+      <a href="{{ url_for('pricing') }}">Compare all plan details</a>
     </div>
   </div>
 </section>

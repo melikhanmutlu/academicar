@@ -26,6 +26,7 @@ from werkzeug.utils import secure_filename
 from auth import auth_bp, init_oauth
 from config import Config
 from converters import FBXConverter, OBJConverter, STLConverter
+from converters.glb_quality import GLBQualityError, embed_external_textures, ensure_pbr_materials, validate_glb_quality
 from converters.stl_converter import convert_glb_to_usdz, enrich_glb_for_ar
 from licensing import (
     LICENSE_PLANS,
@@ -59,7 +60,7 @@ CONTENT_SECURITY_POLICY = "; ".join(
     [
         "default-src 'self'",
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' "
-        "https://cdn.tailwindcss.com https://unpkg.com https://ajax.googleapis.com https://www.gstatic.com",
+        "https://cdn.tailwindcss.com https://unpkg.com https://ajax.googleapis.com https://www.gstatic.com https://cdnjs.cloudflare.com",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' data: https://fonts.gstatic.com",
         "img-src 'self' data: blob: https:",
@@ -1013,6 +1014,13 @@ def _run_converter(converter, source_path: str, glb_path: str, *, color: str | N
         return converter.convert(source_path, glb_path, color=color)
 
 
+def finalize_converted_glb(glb_path: str, *, source_dir: str) -> None:
+    """Pack texture references, ensure baseline PBR materials, and validate GLB output."""
+    embed_external_textures(glb_path, search_dirs=[source_dir, os.path.dirname(glb_path)])
+    ensure_pbr_materials(glb_path)
+    validate_glb_quality(glb_path)
+
+
 def process_model_upload_job(
     app: Flask,
     *,
@@ -1151,6 +1159,20 @@ def process_model_upload_job(
                     )
                     cleanup_dir(upload_dir)
                     return
+
+            try:
+                finalize_converted_glb(target_glb, source_dir=os.path.dirname(source_path))
+            except GLBQualityError as e:
+                cleanup_file(target_glb)
+                mark_model_failed(
+                    model_id,
+                    "Conversion quality check failed: " + str(e),
+                    is_replacement=is_replacement,
+                    job=job,
+                    version=version,
+                )
+                cleanup_dir(upload_dir)
+                return
 
             # Atomic swap for replacements: the previous working GLB is only
             # overwritten when the new GLB is fully on disk.
@@ -1527,6 +1549,10 @@ def register_routes(app: Flask) -> None:
     @app.route("/")
     def landing():
         return render_template("landing.html")
+
+    @app.route("/pricing")
+    def pricing():
+        return render_template("pricing.html", license_plans=LICENSE_PLANS)
 
     @app.route("/demo/mitochondria/ar")
     def demo_mitochondria_ar():

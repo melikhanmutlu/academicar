@@ -3,7 +3,11 @@ import os
 import shutil
 import subprocess
 
+import pytest
+import trimesh
+
 from converters.external_converter import FBXConverter, OBJConverter
+from converters.glb_quality import GLBQualityError, ensure_pbr_materials, validate_glb_quality
 
 
 def temp_converter_dir() -> Path:
@@ -49,5 +53,29 @@ def test_fbx_converter_accepts_generated_glb_candidate(monkeypatch):
 
         assert converter.convert(str(source), str(output), color="#nothex") is True
         assert output.read_bytes() == b"glb"
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+def test_glb_quality_rejects_invalid_output():
+    tmp_dir = temp_converter_dir()
+    bad_glb = tmp_dir / "bad.glb"
+    bad_glb.write_bytes(b"not-a-glb")
+
+    try:
+        with pytest.raises(GLBQualityError):
+            validate_glb_quality(str(bad_glb))
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+def test_glb_quality_adds_missing_pbr_materials():
+    tmp_dir = temp_converter_dir()
+    glb_path = tmp_dir / "box.glb"
+
+    try:
+        trimesh.creation.box().export(glb_path)
+        ensure_pbr_materials(str(glb_path))
+        validate_glb_quality(str(glb_path))
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)

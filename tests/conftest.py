@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 
-from app import create_app
+from app import create_app, limiter
 from models import User, db
 
 
@@ -28,8 +28,10 @@ def app():
             "QR_FOLDER": str(qr_dir.resolve()),
             "PDF_FOLDER": str(pdf_dir.resolve()),
             "SECRET_KEY": "test-secret",
+            "UPLOAD_RATE_LIMIT_COUNT": 1000,
         }
     )
+    limiter.reset()
     with flask_app.app_context():
         db.drop_all()
         db.create_all()

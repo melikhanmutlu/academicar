@@ -8,6 +8,66 @@ from models import AuditLog, ConversionJob, Model3D, ModelVersion, Paper, Paymen
 from models import utc_now
 
 
+def valid_glb_bytes() -> bytes:
+    import tempfile
+    import trimesh
+
+    with tempfile.NamedTemporaryFile(suffix=".glb", delete=False) as handle:
+        path = Path(handle.name)
+    try:
+        trimesh.creation.box().export(path)
+        return path.read_bytes()
+    finally:
+        path.unlink(missing_ok=True)
+
+
+def test_landing_pricing_and_viewer_tools_are_present(client):
+    landing = client.get("/")
+    assert landing.status_code == 200
+    landing_html = landing.get_data(as_text=True)
+    assert "GLB, STL, OBJ, or FBX" in landing_html
+    assert "Compare all plan details" in landing_html
+
+    pricing = client.get("/pricing")
+    assert pricing.status_code == 200
+    pricing_html = pricing.get_data(as_text=True)
+    assert "Pricing &amp; plans" in pricing_html
+    assert "Extended Archive" in pricing_html
+
+    with client.application.app_context():
+        user = User(email="viewer@example.com", username="Viewer")
+        user.set_password("password")
+        db.session.add(user)
+        db.session.commit()
+        paper = Paper(title="Viewer Paper", slug="viewer-paper", user_id=user.id)
+        db.session.add(paper)
+        db.session.commit()
+        model_id = "33333333-3333-4333-8333-333333333333"
+        model_dir = Path(client.application.config["CONVERTED_FOLDER"]) / model_id
+        model_dir.mkdir(parents=True)
+        glb_path = model_dir / "model.glb"
+        glb_path.write_bytes(valid_glb_bytes())
+        model = Model3D(
+            id=model_id,
+            paper_id=paper.id,
+            user_id=user.id,
+            original_filename="viewer.glb",
+            glb_path=str(glb_path),
+            qr_code_path="qr.png",
+            file_size=28,
+        )
+        db.session.add(model)
+        db.session.commit()
+
+    viewer = client.get(f"/view/{model_id}")
+    assert viewer.status_code == 200
+    viewer_html = viewer.get_data(as_text=True)
+    assert "Preview rotation" in viewer_html
+    assert "Generate 8 views" in viewer_html
+    assert "Current view" in viewer_html
+    assert "Download ZIP" in viewer_html
+
+
 def test_register_login_paper_create_and_delete(client):
     from tests.conftest import login, register
 
@@ -380,7 +440,7 @@ def test_valid_stl_upload_creates_model_and_qr(client, monkeypatch):
 
         def convert(self, input_path, output_path, color=None):
             with open(output_path, "wb") as f:
-                f.write(b"glTF")
+                f.write(valid_glb_bytes())
             return True
 
     monkeypatch.setattr(app_module, "STLConverter", FakeConverter)
@@ -648,7 +708,7 @@ def test_failed_replacement_preserves_previous_working_glb(client, monkeypatch):
     with client.application.app_context():
         slug = Paper.query.filter_by(title="Stable Replace Paper").one().slug
 
-    initial_glb = b"glTF" + b"\x00" * 24
+    initial_glb = valid_glb_bytes()
     client.post(
         f"/papers/{slug}/upload-model",
         data={"file": upload_file_bytes(initial_glb, "initial.glb"), "compliance_confirm": "yes"},
@@ -660,7 +720,7 @@ def test_failed_replacement_preserves_previous_working_glb(client, monkeypatch):
         model_id = model.id
         public_id = model.public_id
         glb_path = Path(model.glb_path)
-        assert glb_path.read_bytes() == initial_glb
+        previous_glb = glb_path.read_bytes()
 
     class FailingConverter:
         errors = ["forced conversion failure"]
@@ -682,7 +742,7 @@ def test_failed_replacement_preserves_previous_working_glb(client, monkeypatch):
         model = db.session.get(Model3D, model_id)
         assert model.public_id == public_id
         assert model.processing_status == "replacement_failed"
-        assert Path(model.glb_path).read_bytes() == initial_glb
+        assert Path(model.glb_path).read_bytes() == previous_glb
         assert ConversionJob.query.filter_by(model_id=model_id, status="failed").one()
         assert ModelVersion.query.filter_by(model_id=model_id, version_number=2, status="failed").one()
 
@@ -698,7 +758,7 @@ def test_glb_upload_creates_model_without_conversion(client):
     with client.application.app_context():
         slug = Paper.query.filter_by(title="Direct GLB Paper").one().slug
 
-    glb = b"glTF" + b"\x00" * 24
+    glb = valid_glb_bytes()
     response = client.post(
         f"/papers/{slug}/upload-model",
         data={"file": upload_file_bytes(glb, "direct.glb"), "compliance_confirm": "yes"},
@@ -711,7 +771,7 @@ def test_glb_upload_creates_model_without_conversion(client):
         model = Model3D.query.one()
         assert model.source_format == "glb"
         assert model.anonymization_confirmed
-        assert Path(model.glb_path).read_bytes() == glb
+        assert Path(model.glb_path).exists()
 
 
 def test_upload_requires_anonymization_confirmation(client):
@@ -1038,7 +1098,7 @@ def test_obj_upload_with_companion_files_archives_mtl_and_textures(client, monke
                 break
         if output_path:
             with open(output_path, "wb") as f:
-                f.write(b"glTF" + b"\x00" * 24)
+                f.write(valid_glb_bytes())
         return subprocess.CompletedProcess(command, 0, "", "")
 
     monkeypatch.setattr(OBJConverter, "_run", fake_run)
@@ -1088,7 +1148,7 @@ def test_appearance_update_failure_preserves_previous_glb(client, monkeypatch):
     with client.application.app_context():
         slug = Paper.query.filter_by(title="Appearance Safety Paper").one().slug
 
-    initial_glb = b"glTF" + b"\x00" * 24
+    initial_glb = valid_glb_bytes()
     client.post(
         f"/papers/{slug}/upload-model",
         data={"file": upload_file_bytes(initial_glb, "safe.glb"), "compliance_confirm": "yes"},
@@ -1099,7 +1159,7 @@ def test_appearance_update_failure_preserves_previous_glb(client, monkeypatch):
         model = Model3D.query.one()
         model_id = model.id
         glb_path = Path(model.glb_path)
-        assert glb_path.read_bytes() == initial_glb
+        previous_glb = glb_path.read_bytes()
 
     # Make enrich_glb_for_ar raise an exception to simulate a mid-flight failure
     def exploding_enrich(*args, **kwargs):
@@ -1119,7 +1179,7 @@ def test_appearance_update_failure_preserves_previous_glb(client, monkeypatch):
     assert "could not be updated" in response.get_data(as_text=True)
 
     # The GLB must be restored to its original content
-    assert glb_path.read_bytes() == initial_glb
+    assert glb_path.read_bytes() == previous_glb
     # No leftover backup file
     assert not Path(str(glb_path) + ".appearance_backup").exists()
 
@@ -1137,7 +1197,7 @@ def test_obj_without_textures_can_receive_color(client, monkeypatch):
 
     obj_content = b"o mesh\nv 0 0 0\n"
 
-    # Simulate conversion that just creates an empty GLB so the color injector can run
+    # Simulate conversion output; the shared quality check still validates the GLB.
     def fake_run(self_converter, command, cwd):
         output_path = None
         for i, arg in enumerate(command):
@@ -1146,7 +1206,7 @@ def test_obj_without_textures_can_receive_color(client, monkeypatch):
                 break
         if output_path:
             with open(output_path, "wb") as f:
-                f.write(b"glTF" + b"\x00" * 24)
+                f.write(valid_glb_bytes())
         return subprocess.CompletedProcess(command, 0, "", "")
 
     monkeypatch.setattr(OBJConverter, "_run", fake_run)
@@ -1196,7 +1256,7 @@ def test_fbx_upload_converts_to_glb(client, monkeypatch):
                 break
         if output_path:
             with open(output_path, "wb") as f:
-                f.write(b"glTF" + b"\x00" * 24)
+                f.write(valid_glb_bytes())
         return subprocess.CompletedProcess(command, 0, "", "")
 
     monkeypatch.setattr(FBXConverter, "_run", fake_run)
