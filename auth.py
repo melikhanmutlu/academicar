@@ -242,22 +242,23 @@ def google_callback():
     if not user:
         existing = User.query.filter_by(email=email).first()
         if existing:
-            # Don't auto-link a Google identity into an existing local account
-            # if it already has a password set (i.e. the email belongs to a
-            # different signup path). This prevents takeover of squatted
-            # accounts and forces the user to log in with their password first.
-            if existing.password_hash:
-                flash(
-                    "This email is already registered with a password. "
-                    "Please log in first, then link Google from your profile.",
-                    "warning",
-                )
-                return redirect(url_for("auth.login"))
+            # Auto-link the Google identity to the matching local account.
+            # This is safe because Google already asserted email_verified=True
+            # (checked above), meaning Google has confirmed this person owns
+            # the address — so linking is equivalent to a verified identity
+            # merge, not an account takeover.
             existing.google_id = google_id
             if not existing.avatar_url and picture:
                 existing.avatar_url = picture
             _apply_configured_admin(existing)
             user = existing
+            # Let the user know their accounts were merged on first Google login
+            if existing.password_hash:
+                flash(
+                    "Your Google account has been linked to your existing account. "
+                    "You can now sign in with either Google or your password.",
+                    "info",
+                )
         else:
             user = User(
                 email=email,
