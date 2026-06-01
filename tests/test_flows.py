@@ -66,6 +66,10 @@ def test_landing_pricing_and_viewer_tools_are_present(client):
     assert "Generate 8 views" in viewer_html
     assert "Current view" in viewer_html
     assert "Download ZIP" in viewer_html
+    assert "Auto rotate off" in viewer_html
+    assert "data-shot-modal" in viewer_html
+    model_viewer_tag = viewer_html.split("<model-viewer", 1)[1].split("</model-viewer>", 1)[0]
+    assert " auto-rotate" not in model_viewer_tag
 
 
 def test_register_login_paper_create_and_delete(client):

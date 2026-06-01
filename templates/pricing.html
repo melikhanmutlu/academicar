@@ -4,15 +4,47 @@
 {% block content %}
 <section class="plans-hero">
   <div class="plans-hero-inner reveal-up">
-    <span class="landing-eyebrow">Pricing &amp; plans</span>
-    <h1 class="landing-h1">Model-based access for academic publishing.</h1>
-    <p class="landing-lead">
-      AcademicAR keeps accounts lightweight and prices each published model by its viewer, QR, screenshot, and AR access window.
-    </p>
+    <div class="plans-hero-copy">
+      <span class="landing-eyebrow">Pricing &amp; plans</span>
+      <h1 class="landing-h1">Model-based access for academic publishing.</h1>
+      <p class="landing-lead">
+        Keep the publication workspace free, then choose an access window for each published 3D / AR model.
+        The viewer URL and QR resolver stay stable when a model is upgraded, renewed, or replaced.
+      </p>
+      <div class="plans-hero-actions">
+        <a href="#plans" class="pricing-cta">Compare plans</a>
+        <a href="#institutional" class="pricing-cta muted">Institutional licensing</a>
+      </div>
+    </div>
+    <div class="plans-principles" aria-label="Pricing principles">
+      <div>
+        <span>01</span>
+        <strong>Publication pages are free</strong>
+        <p>Paper metadata, PDF links, and model registry stay grouped in one workspace.</p>
+      </div>
+      <div>
+        <span>02</span>
+        <strong>Access is per model</strong>
+        <p>Each model keeps its own license window, QR code, viewer link, and AR-ready GLB.</p>
+      </div>
+      <div>
+        <span>03</span>
+        <strong>Links stay durable</strong>
+        <p>Printed QR codes and shared viewer URLs can survive upgrades and replacement uploads.</p>
+      </div>
+    </div>
   </div>
 </section>
 
-<section class="plans-section">
+<section class="plans-section" id="plans">
+  <div class="plans-section-header reveal-up">
+    <span class="landing-eyebrow">Access windows</span>
+    <h2 class="landing-h2">Choose by publication lifetime.</h2>
+    <p class="landing-body">
+      Plans are designed around how long readers, reviewers, students, or lab teams need the model to remain available.
+    </p>
+  </div>
+
   <div class="plans-grid">
     <article class="plan-detail-card reveal-up">
       <div class="plan-detail-top">
@@ -20,16 +52,17 @@
         <span class="pricing-meta">Preview</span>
       </div>
       <h2>$0</h2>
-      <p>For quick validation before a model is attached to a final publication or poster.</p>
+      <p>For internal validation, reviewer demos, and quick model checks before a public publication is finalized.</p>
       <dl>
         <div><dt>Access window</dt><dd>3 days</dd></div>
         <div><dt>Storage limit</dt><dd>Up to 100 MB / model</dd></div>
-        <div><dt>Best for</dt><dd>Internal review, demos, and short-lived previews</dd></div>
+        <div><dt>Viewer</dt><dd>Watermarked public viewer</dd></div>
+        <div><dt>Best for</dt><dd>Short-lived previews and upload tests</dd></div>
       </dl>
       <ul>
-        <li>Viewer, QR resolver, screenshots, and AR access</li>
+        <li>Viewer, QR resolver, screenshots, and mobile AR access</li>
         <li>Stable model URL during the preview window</li>
-        <li>Watermarked viewer</li>
+        <li>Upgrade path without changing the model registry item</li>
       </ul>
       <a href="{{ url_for('auth.register') }}" class="pricing-cta">Start free</a>
     </article>
@@ -44,12 +77,13 @@
       <dl>
         <div><dt>Access window</dt><dd>3 years</dd></div>
         <div><dt>Storage limit</dt><dd>Up to 200 MB / model</dd></div>
-        <div><dt>Best for</dt><dd>Published research assets and citation-ready links</dd></div>
+        <div><dt>Viewer</dt><dd>No public watermark</dd></div>
+        <div><dt>Best for</dt><dd>Citation-ready research assets</dd></div>
       </dl>
       <ul>
-        <li>No watermark on the public viewer</li>
         <li>Persistent QR and viewer URL</li>
         <li>AR-ready GLB, screenshot tools, and metadata page</li>
+        <li>Model replacement while retaining the same resolver</li>
       </ul>
       <a href="{{ url_for('auth.register') }}" class="pricing-cta">Get started</a>
     </article>
@@ -60,11 +94,12 @@
         <span class="pricing-meta">Long term</span>
       </div>
       <h2>$24.90</h2>
-      <p>Longer-lived model access for assets that need to remain available across thesis, archive, and lab reference cycles.</p>
+      <p>Long-lived model access for assets that need to remain available across thesis, archive, and teaching cycles.</p>
       <dl>
         <div><dt>Access window</dt><dd>10 years</dd></div>
         <div><dt>Storage limit</dt><dd>Up to 200 MB / model</dd></div>
-        <div><dt>Best for</dt><dd>Reference models, teaching material, and durable archives</dd></div>
+        <div><dt>Viewer</dt><dd>No public watermark</dd></div>
+        <div><dt>Best for</dt><dd>Reference models and durable archives</dd></div>
       </dl>
       <ul>
         <li>Priority archival storage</li>
@@ -78,17 +113,67 @@
 
 <section class="plans-section plans-compare">
   <div class="plans-compare-inner reveal-up">
+    <div class="plans-compare-copy">
+      <span class="landing-eyebrow">Detailed comparison</span>
+      <h2 class="landing-h2">The difference is the access window, not the workflow.</h2>
+      <p class="landing-body">
+        Every plan keeps the same publishing flow: upload a model, generate a QR resolver, open the viewer,
+        capture screenshots, and share the model from the paper page.
+      </p>
+    </div>
+    <div class="plans-table-wrap">
+      <table class="plans-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>Free</th>
+            <th>Academic</th>
+            <th>Extended</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Access window</td><td>3 days</td><td>3 years</td><td>10 years</td></tr>
+          <tr><td>Model storage</td><td>100 MB</td><td>200 MB</td><td>200 MB</td></tr>
+          <tr><td>Supported uploads</td><td>GLB, STL, OBJ, FBX</td><td>GLB, STL, OBJ, FBX</td><td>GLB, STL, OBJ, FBX</td></tr>
+          <tr><td>QR resolver</td><td>Included</td><td>Persistent</td><td>Persistent</td></tr>
+          <tr><td>Viewer screenshots</td><td>Included</td><td>Included</td><td>Included</td></tr>
+          <tr><td>Mobile AR</td><td>Included</td><td>Included</td><td>Included</td></tr>
+          <tr><td>Public watermark</td><td>Visible</td><td>Removed</td><td>Removed</td></tr>
+          <tr><td>Recommended use</td><td>Preview</td><td>Publication</td><td>Archive</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="plans-section">
+  <div class="plans-flow reveal-up">
+    <span class="landing-eyebrow">How billing maps to publishing</span>
+    <h2 class="landing-h2">A plan follows the model, not the whole account.</h2>
+    <div class="plans-flow-grid">
+      <div><span>01</span><strong>Create a publication</strong><p>Add paper metadata, DOI/PMID fields, PDF, and public/private visibility.</p></div>
+      <div><span>02</span><strong>Upload models</strong><p>Each GLB, STL, OBJ, or FBX asset becomes its own model registry item.</p></div>
+      <div><span>03</span><strong>Choose access</strong><p>Select Free, Academic, or Extended per model based on how long it should stay active.</p></div>
+      <div><span>04</span><strong>Share durable links</strong><p>Use the paper page, model viewer, QR resolver, screenshots, and mobile AR entry point.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="plans-section plans-compare" id="institutional">
+  <div class="plans-compare-inner reveal-up">
     <div>
       <span class="landing-eyebrow">Institutional</span>
       <h2 class="landing-h2">For labs, departments, and universities.</h2>
       <p class="landing-body">
-        Institutional licensing supports shared teams, higher limits, bulk model credits, procurement workflows, and custom infrastructure needs.
+        Institutional licensing supports shared teams, higher limits, bulk model credits, procurement workflows,
+        invoices, and custom infrastructure requirements.
       </p>
     </div>
     <div class="plans-institutional-list">
       <div><strong>Shared workspace</strong><span>Role-based publishing and lab-wide model management.</span></div>
       <div><strong>Bulk licensing</strong><span>Pre-purchased credits for recurring publication workflows.</span></div>
-      <div><strong>Custom support</strong><span>Higher upload limits, invoices, and deployment alignment.</span></div>
+      <div><strong>Custom limits</strong><span>Higher upload limits for large scans, collections, or teaching assets.</span></div>
+      <div><strong>Support alignment</strong><span>Invoice, onboarding, data retention, and deployment coordination.</span></div>
       <a href="mailto:hello@academicar.com?subject=AcademicAR%20Institutional%20Licensing" class="pricing-cta">Contact sales</a>
     </div>
   </div>
