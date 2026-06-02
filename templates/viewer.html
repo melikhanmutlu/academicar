@@ -99,7 +99,13 @@
       color: #111111;
       border-color: #ffffff;
     }
+    .viewer-animation-toggle[aria-pressed="true"] {
+      background: #ffffff;
+      color: #111111;
+      border-color: #ffffff;
+    }
     .viewer-rotation-tools,
+    .viewer-animation-tools,
     .viewer-shot-tools {
       border-top: 1px solid rgba(255,255,255,0.10);
       padding-top: 0.85rem;
@@ -189,7 +195,7 @@
       }
       .viewer-control-panel .viewer-meta-grid > div { padding: 0.65rem; }
       .viewer-control-panel .viewer-tool-stack { gap: 0.65rem; margin-top: 0.75rem; }
-      .viewer-rotation-tools, .viewer-shot-tools { padding-top: 0.65rem; }
+      .viewer-rotation-tools, .viewer-animation-tools, .viewer-shot-tools { padding-top: 0.65rem; }
       .viewer-rotation-tools label {
         grid-template-columns: 1rem minmax(0, 1fr) 3rem;
         gap: 0.45rem;
@@ -232,6 +238,8 @@
       max-field-of-view="60deg"
       bounds="tight"
       interaction-prompt="none"
+      autoplay
+      animation-crossfade-duration="300"
       reveal="auto">
       <button slot="ar-button" class="hidden" aria-hidden="true" tabindex="-1">
         View in AR
@@ -317,6 +325,15 @@
           <label> X <input type="range" min="0" max="360" step="1" value="0" data-rotate-axis="x"><span data-rotate-value="x">0deg</span></label>
           <label> Y <input type="range" min="0" max="360" step="1" value="0" data-rotate-axis="y"><span data-rotate-value="y">0deg</span></label>
           <label> Z <input type="range" min="0" max="360" step="1" value="0" data-rotate-axis="z"><span data-rotate-value="z">0deg</span></label>
+        </div>
+
+        <div class="viewer-animation-tools" data-animation-tools hidden>
+          <div class="viewer-tool-heading">
+            <span>Model animation</span>
+            <div class="flex items-center gap-2">
+              <button class="viewer-animation-toggle" type="button" data-animation-toggle aria-pressed="true" disabled>Animation on</button>
+            </div>
+          </div>
         </div>
 
         <div class="viewer-shot-tools" data-screenshot-tools>
@@ -427,6 +444,8 @@
     const rotateInputs = [...document.querySelectorAll('[data-rotate-axis]')];
     const resetRotation = document.querySelector('[data-reset-rotation]');
     const autoRotateToggle = document.querySelector('[data-auto-rotate-toggle]');
+    const animationTools = document.querySelector('[data-animation-tools]');
+    const animationToggle = document.querySelector('[data-animation-toggle]');
     const currentShotButton = document.querySelector('[data-current-shot]');
     const generateShotSetButton = document.querySelector('[data-generate-shot-set]');
     const downloadZipButton = document.querySelector('[data-download-zip]');
@@ -451,6 +470,8 @@
     const defaultFieldOfView = '28deg';
     const defaultOrientation = '0deg 0deg 0deg';
     let shotGallery = [];
+    let modelAnimationAvailable = false;
+    let modelAnimationPlaying = true;
 
     if (infoBtn && infoPanel) infoBtn.addEventListener('click', () => infoPanel.classList.add('open'));
     if (closeInfo && infoPanel) closeInfo.addEventListener('click', () => infoPanel.classList.remove('open'));
@@ -510,6 +531,7 @@
     viewer.addEventListener('load', () => {
       viewer.classList.add('is-loaded');
       viewerStatus.classList.add('hidden');
+      initializeModelAnimation();
     });
     viewer.addEventListener('error', () => {
       viewerStatus.textContent = 'The model could not be loaded. The GLB file may be unavailable or invalid.';
@@ -549,17 +571,53 @@
       link.download = `${safeName(modelBaseName)}-${name}.png`;
       link.click();
     };
+    const hasModelAnimations = () => (
+      Array.isArray(viewer.availableAnimations) && viewer.availableAnimations.length > 0
+    );
+    const syncAnimationButton = () => {
+      if (!animationToggle) return;
+      animationToggle.disabled = !modelAnimationAvailable;
+      animationToggle.setAttribute('aria-pressed', modelAnimationPlaying ? 'true' : 'false');
+      animationToggle.textContent = modelAnimationPlaying ? 'Animation on' : 'Animation off';
+    };
+    const setAnimationPlayback = (enabled) => {
+      if (!modelAnimationAvailable) return;
+      modelAnimationPlaying = Boolean(enabled);
+      if (modelAnimationPlaying) {
+        if (!viewer.animationName && viewer.availableAnimations?.length) {
+          viewer.animationName = viewer.availableAnimations[0];
+        }
+        if (typeof viewer.play === 'function') viewer.play();
+      } else if (typeof viewer.pause === 'function') {
+        viewer.pause();
+      }
+      syncAnimationButton();
+    };
+    const initializeModelAnimation = () => {
+      modelAnimationAvailable = hasModelAnimations();
+      if (animationTools) animationTools.hidden = !modelAnimationAvailable;
+      if (!modelAnimationAvailable) {
+        modelAnimationPlaying = false;
+        syncAnimationButton();
+        return;
+      }
+      if (!viewer.animationName && viewer.availableAnimations.length) {
+        viewer.animationName = viewer.availableAnimations[0];
+      }
+      modelAnimationPlaying = true;
+      if (typeof viewer.play === 'function') viewer.play();
+      syncAnimationButton();
+    };
     const setAutoRotateState = (enabled) => {
       if (!autoRotateToggle) return;
       if (enabled) {
         viewer.setAttribute('auto-rotate', '');
         viewer.setAttribute('auto-rotate-delay', '0');
-        if (typeof viewer.play === 'function') viewer.play();
       } else {
         viewer.removeAttribute('auto-rotate');
         viewer.removeAttribute('auto-rotate-delay');
-        if (typeof viewer.play === 'function') viewer.play();
       }
+      if (modelAnimationPlaying && typeof viewer.play === 'function') viewer.play();
       autoRotateToggle.setAttribute('aria-pressed', enabled ? 'true' : 'false');
       autoRotateToggle.textContent = enabled ? 'Auto rotate on' : 'Auto rotate off';
     };
@@ -575,7 +633,7 @@
       if (typeof viewer.requestUpdate === 'function') viewer.requestUpdate('orientation', orientation);
       if (viewer.updateComplete) await viewer.updateComplete;
       if (typeof viewer.updateFraming === 'function') await viewer.updateFraming();
-      if (typeof viewer.play === 'function') viewer.play();
+      if (modelAnimationPlaying && typeof viewer.play === 'function') viewer.play();
     };
     const cameraState = () => ({
       orbit: viewer.getCameraOrbit ? viewer.getCameraOrbit().toString() : viewer.cameraOrbit,
@@ -590,12 +648,12 @@
       if (typeof viewer.jumpCameraToGoal === 'function') viewer.jumpCameraToGoal();
       if (viewer.updateComplete) await viewer.updateComplete;
       await waitFrame();
-      if (viewer.hasAttribute('auto-rotate') && typeof viewer.play === 'function') viewer.play();
+      if (modelAnimationPlaying && typeof viewer.play === 'function') viewer.play();
     };
     const captureShot = async (view) => {
       if (!viewer.loaded || typeof viewer.toDataURL !== 'function') return;
-      const shouldResume = viewer.hasAttribute('auto-rotate');
-      viewer.pause();
+      const shouldResumeAnimation = modelAnimationAvailable && modelAnimationPlaying;
+      if (typeof viewer.pause === 'function') viewer.pause();
       if (view?.orbit) {
         viewer.cameraOrbit = view.orbit;
         if (typeof viewer.jumpCameraToGoal === 'function') viewer.jumpCameraToGoal();
@@ -603,7 +661,7 @@
       if (viewer.updateComplete) await viewer.updateComplete;
       await waitFrame();
       const dataUrl = viewer.toDataURL('image/png');
-      if (shouldResume && typeof viewer.play === 'function') viewer.play();
+      if (shouldResumeAnimation && typeof viewer.play === 'function') viewer.play();
       return dataUrl;
     };
     const renderShotGallery = () => {
@@ -727,6 +785,9 @@
     viewer.setAttribute('orientation', defaultOrientation);
     autoRotateToggle?.addEventListener('click', () => {
       setAutoRotateState(!viewer.hasAttribute('auto-rotate'));
+    });
+    animationToggle?.addEventListener('click', () => {
+      setAnimationPlayback(!modelAnimationPlaying);
     });
     setAutoRotateState(false);
     currentShotButton?.addEventListener('click', downloadCurrentShot);
