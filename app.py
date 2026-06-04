@@ -420,6 +420,7 @@ def create_backup_archive(app: Flask, created_by_user_id: int | None = None, rea
     filename = f"academic_ar_backup_{timestamp}.zip"
     archive_path = os.path.join(folder, filename)
     manifest_lines = [
+        "format_version=1",
         f"created_at={datetime.now(UTC).isoformat()}",
         f"created_by_user_id={created_by_user_id or ''}",
         f"reason={reason}",
@@ -1709,7 +1710,11 @@ def register_routes(app: Flask) -> None:
         model = db.session.get(Model3D, model_id)
         if not model or not model.qr_code_path:
             abort(404)
+        if not model.paper:
+            abort(404)
         if paper_is_expired(model.paper):
+            abort(404)
+        if not _paper_visible_to_request(model.paper):
             abort(404)
         return send_from_directory(app.config["QR_FOLDER"], os.path.basename(model.qr_code_path))
 
@@ -1718,6 +1723,8 @@ def register_routes(app: Flask) -> None:
     def qr_print(model_id):
         model = db.session.get(Model3D, model_id)
         if not model:
+            abort(404)
+        if not model.paper:
             abort(404)
         if model.user_id != current_user.id:
             abort(403)
@@ -2054,12 +2061,13 @@ def register_routes(app: Flask) -> None:
             .limit(10)
             .all()
         )
-        top_viewed_models = []
-        for model_id, count in top_viewed_rows:
-            model = db.session.get(Model3D, model_id)
-            top_viewed_models.append({"model": model, "model_id": model_id, "count": count})
-        storage_by_user = []
-        for user_id, total_size, model_count in (
+        viewed_model_ids = [r[0] for r in top_viewed_rows]
+        viewed_models_map = {m.id: m for m in Model3D.query.filter(Model3D.id.in_(viewed_model_ids)).all()} if viewed_model_ids else {}
+        top_viewed_models = [
+            {"model": viewed_models_map.get(model_id), "model_id": model_id, "count": count}
+            for model_id, count in top_viewed_rows
+        ]
+        storage_rows = (
             db.session.query(
                 Model3D.user_id,
                 func.coalesce(func.sum(Model3D.file_size), 0),
@@ -2069,9 +2077,13 @@ def register_routes(app: Flask) -> None:
             .order_by(func.coalesce(func.sum(Model3D.file_size), 0).desc())
             .limit(10)
             .all()
-        ):
-            user = db.session.get(User, user_id)
-            storage_by_user.append({"user": user, "user_id": user_id, "size": total_size or 0, "models": model_count})
+        )
+        storage_user_ids = [r[0] for r in storage_rows]
+        storage_users_map = {u.id: u for u in User.query.filter(User.id.in_(storage_user_ids)).all()} if storage_user_ids else {}
+        storage_by_user = [
+            {"user": storage_users_map.get(user_id), "user_id": user_id, "size": total_size or 0, "models": model_count}
+            for user_id, total_size, model_count in storage_rows
+        ]
         # Filesystem scanning (os.walk over four folders) and orphan detection
         # are expensive, so only run them on the pages that actually display the
         # results: "overview" needs the orphan count for critical alerts, and
@@ -2270,7 +2282,7 @@ def register_routes(app: Flask) -> None:
         flash(f"Backup created: {filename}", "success")
         return redirect(url_for("admin_dashboard", admin_page="backups"))
 
-    @app.route("/admin/backups/<path:filename>")
+    @app.route("/admin/backups/<filename>")
     @login_required
     def admin_backup_download(filename):
         require_admin()
@@ -2803,7 +2815,7 @@ def register_routes(app: Flask) -> None:
             doi = query
             doi = re.sub(r'^(https?://)?(dx\.)?doi\.org/', '', doi, flags=re.IGNORECASE)
             url = f"https://api.crossref.org/works/{urllib.parse.quote(doi)}"
-            headers = {"User-Agent": f"AcademicAR/1.0 (mailto:{current_app.config['CONTACT_EMAIL']})"}
+            headers = {"User-Agent": f"AcademicAR/1.0 (mailto:{current_app.config.get('CONTACT_EMAIL', 'info@academicar.com')})"}
             req = urllib.request.Request(url, headers=headers)
             try:
                 with urllib.request.urlopen(req, timeout=5) as response:
@@ -2855,7 +2867,7 @@ def register_routes(app: Flask) -> None:
 
         elif is_pmid:
             url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id={query}&retmode=json"
-            req = urllib.request.Request(url, headers={"User-Agent": f"AcademicAR/1.0 (mailto:{current_app.config['CONTACT_EMAIL']})"})
+            req = urllib.request.Request(url, headers={"User-Agent": f"AcademicAR/1.0 (mailto:{current_app.config.get('CONTACT_EMAIL', 'info@academicar.com')})"})
             try:
                 with urllib.request.urlopen(req, timeout=5) as response:
                     if response.status == 200:

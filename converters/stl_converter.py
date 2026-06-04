@@ -339,7 +339,8 @@ def load_stl_mesh_without_normals(file_path: str) -> trimesh.Trimesh:
     if header.lower().lstrip().startswith(b"solid") and (
         b"facet" in header.lower() or b"endsolid" in header.lower()
     ):
-        text = open(file_path, "r", encoding="utf-8", errors="ignore").read()
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            text = f.read()
         vertex_lines = re.findall(
             r"vertex\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)",
             text,

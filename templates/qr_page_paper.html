@@ -54,7 +54,7 @@
       {% if paper.authors %}<p class="subtitle">{{ paper.authors }}{% if paper.institution %} · {{ paper.institution }}{% endif %}</p>{% endif %}
       <p class="url">{{ public_url('paper_public', slug=paper.slug) }}</p>
       <div class="actions">
-        <a href="javascript:window.print()" class="btn">Print</a>
+        <button type="button" onclick="window.print()" class="btn">Print</button>
         <a href="{{ url_for('qr_image_paper', paper_id=paper.id) }}" download="qr_paper_{{ paper.id }}.png" class="btn btn-outline">Download PNG</a>
         <a href="{{ url_for('paper_detail', slug=paper.slug) }}" class="btn btn-outline">Back</a>
       </div>

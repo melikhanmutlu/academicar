@@ -196,9 +196,9 @@
         {% if has_password %}
           <form method="POST" action="{{ url_for('account_change_password') }}" class="space-y-3 mt-4">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="password" name="current_password" required autocomplete="current-password" placeholder="Current password" class="field-input">
-            <input type="password" name="new_password" required minlength="6" autocomplete="new-password" placeholder="New password" class="field-input">
-            <input type="password" name="confirm_password" required minlength="6" autocomplete="new-password" placeholder="Confirm new password" class="field-input">
+            <input type="password" name="current_password" required maxlength="128" autocomplete="current-password" placeholder="Current password" class="field-input">
+            <input type="password" name="new_password" required minlength="6" maxlength="128" autocomplete="new-password" placeholder="New password" class="field-input">
+            <input type="password" name="confirm_password" required minlength="6" maxlength="128" autocomplete="new-password" placeholder="Confirm new password" class="field-input">
             <button type="submit" class="btn-primary compact">Update password</button>
           </form>
         {% else %}
@@ -220,7 +220,7 @@
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="email" name="new_email" required maxlength="120" placeholder="name@university.edu" class="field-input">
           {% if has_password %}
-            <input type="password" name="current_password" required autocomplete="current-password" placeholder="Current password" class="field-input">
+            <input type="password" name="current_password" required maxlength="128" autocomplete="current-password" placeholder="Current password" class="field-input">
           {% endif %}
           <button type="submit" class="btn-primary compact">Update email</button>
         </form>
@@ -236,7 +236,7 @@
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="text" name="confirm" required pattern="DELETE" placeholder="Type DELETE" class="field-input">
           {% if has_password %}
-            <input type="password" name="current_password" required autocomplete="current-password" placeholder="Current password" class="field-input">
+            <input type="password" name="current_password" required maxlength="128" autocomplete="current-password" placeholder="Current password" class="field-input">
           {% endif %}
           <button type="submit" class="btn-secondary compact danger-button">Delete my account permanently</button>
         </form>

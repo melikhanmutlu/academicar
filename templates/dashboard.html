@@ -231,7 +231,7 @@
               <a href="{{ url_for('paper_public_pdf', slug=p.slug) }}" target="_blank" rel="noopener noreferrer" class="dash-action dash-action-primary dash-action-pdf">PDF</a>
             {% else %}
               {% if not (admin_view is defined and admin_view) %}
-                <input type="file" id="pdf-input-{{ p.slug }}" accept=".pdf" style="display: none;" onchange="uploadDashboardPdf('{{ p.slug }}')">
+                <input type="file" id="pdf-input-{{ p.slug }}" accept=".pdf" style="display: none;" onchange="uploadDashboardPdf({{ p.slug|tojson }})">
                 <button type="button" class="dash-action dash-action-pdf" id="pdf-btn-{{ p.slug }}" onclick="document.getElementById('pdf-input-{{ p.slug }}').click()">Add PDF</button>
               {% else %}
                 <button type="button" class="dash-action dash-action-muted dash-action-pdf" disabled title="No PDF uploaded">PDF missing</button>

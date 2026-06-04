@@ -7,11 +7,14 @@ the proven Node CLIs used by the older web_ar project.
 
 from __future__ import annotations
 
+import logging
 import os
 import shlex
 import shutil
 import subprocess
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from .base_converter import BaseConverter
 from .glb_quality import embed_external_textures, ensure_pbr_materials, has_base_color_textures
@@ -58,8 +61,14 @@ class ExternalConverter(BaseConverter):
             return subprocess.CompletedProcess(command, 124, exc.stdout or "", exc.stderr or "Conversion timed out.")
 
     def _post_process_glb(self, output_path: str, color: str | None, search_dirs: list[str] | None = None) -> None:
-        embed_external_textures(output_path, search_dirs=search_dirs)
-        ensure_pbr_materials(output_path)
+        try:
+            embed_external_textures(output_path, search_dirs=search_dirs)
+        except Exception:
+            logger.exception("embed_external_textures failed for %s; continuing", output_path)
+        try:
+            ensure_pbr_materials(output_path)
+        except Exception:
+            logger.exception("ensure_pbr_materials failed for %s; continuing", output_path)
         if not color or has_base_color_textures(output_path):
             return
         hex_color = color.strip()
@@ -148,7 +157,12 @@ class FBXConverter(ExternalConverter):
         result = self._run(command, cwd=os.path.dirname(input_path))
         produced = Path(output_path)
         if not produced.exists():
-            candidates = sorted(Path(os.path.dirname(output_path)).glob("*.glb"))
+            out_stem = produced.stem
+            out_dir = Path(os.path.dirname(output_path))
+            candidates = [
+                p for p in sorted(out_dir.glob("*.glb"))
+                if p.stem.startswith(out_stem) or p.stem.startswith(Path(input_path).stem)
+            ]
             if candidates:
                 shutil.move(str(candidates[0]), output_path)
         if result.returncode != 0 or not os.path.exists(output_path):
