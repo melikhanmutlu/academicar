@@ -24,6 +24,7 @@ from werkzeug.utils import secure_filename
 
 from auth import auth_bp, init_oauth
 from config import Config
+from constants import JobStatus, PaperStatus, ProcessingStatus
 from extensions import csrf, limiter, rate_limit_key
 from converters import FBXConverter, OBJConverter, STLConverter
 from converters.glb_quality import GLBQualityError, embed_external_textures, ensure_pbr_materials, validate_glb_quality
@@ -32,6 +33,7 @@ from licensing import (
     LICENSE_PLANS,
     USER_SELECTABLE_PLAN_KEYS,
     apply_model_license_defaults,
+    ensure_utc,
     get_license_plan,
     is_access_expired,
     is_valid_user_plan,
@@ -45,7 +47,7 @@ from licensing import paper_is_expired as licensing_paper_is_expired
 from models import AuditLog, ConversionJob, Model3D, ModelVersion, Paper, Payment, QRLink, User, db
 from url_helpers import public_url
 from utils.security import require_model_ownership, require_paper_ownership
-from services.storage_service import StorageError, safe_move_file, safe_save_file, save_companion_files
+from services.storage_service import StorageError, safe_save_file, save_companion_files
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -401,6 +403,27 @@ def list_backup_archives(app: Flask) -> list[dict]:
     return sorted(backups, key=lambda item: item["created_at"], reverse=True)
 
 
+def prune_old_backups(app: Flask) -> int:
+    """Delete backup archives beyond the most recent BACKUP_RETENTION_COUNT so
+    they don't accumulate unbounded on the volume. Returns the count removed.
+    0 keeps everything."""
+    keep = int(app.config.get("BACKUP_RETENTION_COUNT", 0))
+    if keep <= 0:
+        return 0
+    archives = list_backup_archives(app)  # already newest-first
+    removed = 0
+    folder = backup_folder(app)
+    for item in archives[keep:]:
+        try:
+            os.remove(os.path.join(folder, item["filename"]))
+            removed += 1
+        except OSError as exc:
+            logger.warning("Failed to prune backup %s: %s", item["filename"], exc)
+    if removed:
+        logger.info("Pruned %d old backup archive(s) (keeping %d).", removed, keep)
+    return removed
+
+
 def add_folder_to_zip(zip_file: zipfile.ZipFile, folder: str, archive_prefix: str) -> int:
     added = 0
     if not folder or not os.path.exists(folder):
@@ -448,6 +471,7 @@ def create_backup_archive(app: Flask, created_by_user_id: int | None = None, rea
         resource_id=filename,
         details={"reason": reason, "filename": filename},
     )
+    prune_old_backups(app)
     return filename
 
 
@@ -740,12 +764,12 @@ def paper_is_deleted(paper: Paper | None) -> bool:
     # deleted so a half-written record can never leak back as active.
     if not paper:
         return True
-    return (paper.status or "active").lower() == "deleted" or paper.deleted_at is not None
+    return (paper.status or PaperStatus.ACTIVE).lower() == PaperStatus.DELETED or paper.deleted_at is not None
 
 
 def active_paper_query():
     return Paper.query.filter(
-        or_(Paper.status.is_(None), Paper.status != "deleted"),
+        or_(Paper.status.is_(None), Paper.status != PaperStatus.DELETED),
         Paper.deleted_at.is_(None),
     )
 
@@ -1355,7 +1379,7 @@ def reclaim_stale_conversion_jobs(app: Flask) -> int:
     with app.app_context():
         stale_jobs = (
             ConversionJob.query
-            .filter(ConversionJob.status == "processing")
+            .filter(ConversionJob.status == JobStatus.PROCESSING)
             .filter(ConversionJob.started_at.isnot(None))
             .filter(ConversionJob.started_at < cutoff)
             .all()
@@ -1363,7 +1387,7 @@ def reclaim_stale_conversion_jobs(app: Flask) -> int:
         for job in stale_jobs:
             if (job.attempts or 0) < (job.max_attempts or 3):
                 # Attempts remain: hand it back to the pending queue.
-                job.status = "pending"
+                job.status = JobStatus.PENDING
                 job.started_at = None
                 job.error = "Worker stopped mid-conversion; job requeued."
                 try:
@@ -1456,7 +1480,7 @@ def run_next_conversion_job(app: Flask) -> bool:
         # can never be retried beyond its bound.
         query = (
             ConversionJob.query
-            .filter(ConversionJob.status == "pending")
+            .filter(ConversionJob.status == JobStatus.PENDING)
             .filter(ConversionJob.attempts < ConversionJob.max_attempts)
             .order_by(ConversionJob.created_at.asc())
         )
@@ -1465,7 +1489,7 @@ def run_next_conversion_job(app: Flask) -> bool:
         job = query.first()
         if job is None:
             return False
-        job.status = "processing"
+        job.status = JobStatus.PROCESSING
         job.started_at = datetime.now(UTC)
         job.attempts = (job.attempts or 0) + 1
         try:
@@ -2778,8 +2802,7 @@ def register_routes(app: Flask) -> None:
             exp = m.access_expires_at
             if not exp or is_access_expired(exp):
                 continue
-            if exp.tzinfo is None:
-                exp = exp.replace(tzinfo=UTC)
+            exp = ensure_utc(exp)
             if exp <= soon:
                 expiring_soon += 1
 

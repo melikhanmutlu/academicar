@@ -73,7 +73,7 @@
           {% endif %}
           <a href="{{ url_for('profile') }}" title="Profile" style="display: inline-flex; align-items: center;">
             {% if current_user.avatar_url %}
-              <img src="{{ current_user.avatar_url }}" style="width: 28px; height: 28px; border-radius: 200px;" alt="">
+              <img src="{{ current_user.avatar_url }}" style="width: 28px; height: 28px; border-radius: 200px;" alt="{{ current_user.username }} avatar">
             {% else %}
               <div style="width: 28px; height: 28px; border-radius: 200px; background: var(--color-midnight-graphite); color: var(--color-canvas-white); display: grid; place-items: center; font-family: var(--font-inter); font-size: 13px; font-weight: 600;">
                 {{ current_user.username[0]|upper }}

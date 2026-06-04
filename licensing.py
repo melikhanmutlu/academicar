@@ -22,6 +22,17 @@ class LicensePlan:
 
 MB = 1024 * 1024
 
+
+def ensure_utc(value: datetime | None) -> datetime | None:
+    """Return ``value`` as a timezone-aware UTC datetime. Naive datetimes (as
+    SQLite returns them) are assumed to already be UTC. Single source of truth
+    for the naive→aware coercion that several expiry checks need."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value
+
 LICENSE_PLANS: dict[str, LicensePlan] = {
     "free": LicensePlan(
         key="free",
@@ -108,17 +119,14 @@ def license_expires_at(license_type: str | None, starts_at: datetime | None = No
     plan = get_license_plan(license_type)
     if plan.duration_days is None:
         return None
-    start = starts_at or datetime.now(UTC)
-    if start.tzinfo is None:
-        start = start.replace(tzinfo=UTC)
+    start = ensure_utc(starts_at) or datetime.now(UTC)
     return start + timedelta(days=plan.duration_days)
 
 
 def is_access_expired(expires_at: datetime | None) -> bool:
+    expires_at = ensure_utc(expires_at)
     if not expires_at:
         return False
-    if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=UTC)
     return expires_at < datetime.now(UTC)
 
 
@@ -168,9 +176,9 @@ def paper_is_expired(paper) -> bool:
     that *does* carry an expiry (legacy data, manual admin action) is honored
     instead of silently staying accessible forever.
     """
-    if not paper or not getattr(paper, "expires_at", None):
+    if not paper:
         return False
-    return is_access_expired(paper.expires_at)
+    return is_access_expired(getattr(paper, "expires_at", None))
 
 
 def model_file_limit_error(file_size: int, license_type: str | None) -> str | None:

@@ -368,3 +368,48 @@ def test_admin_users_list_paginates(client):
     assert "Showing 1" in page1
     assert "Showing 3" in page2  # page 2 starts at row 3
     assert page1 != page2
+
+
+# --------------------------------------------------------------------------- #
+# 4.1 ensure_utc
+# --------------------------------------------------------------------------- #
+def test_ensure_utc_coerces_naive():
+    from licensing import ensure_utc
+
+    assert ensure_utc(None) is None
+    naive = datetime(2026, 1, 1, 12, 0, 0)
+    coerced = ensure_utc(naive)
+    assert coerced.tzinfo is not None
+    aware = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
+    assert ensure_utc(aware) == aware
+
+
+# --------------------------------------------------------------------------- #
+# 4.7 Backup retention
+# --------------------------------------------------------------------------- #
+def test_prune_old_backups_keeps_newest(app):
+    import os
+    import time
+
+    from app import backup_folder, prune_old_backups
+
+    with app.app_context():
+        app.config["BACKUP_RETENTION_COUNT"] = 2
+        folder = backup_folder(app)
+        os.makedirs(folder, exist_ok=True)
+        names = []
+        for i in range(4):
+            name = f"academic_ar_backup_2026010{i}-000000.zip"
+            path = os.path.join(folder, name)
+            with open(path, "wb") as f:
+                f.write(b"zip")
+            # Stagger mtimes so newest-first ordering is deterministic.
+            os.utime(path, (time.time() + i, time.time() + i))
+            names.append(name)
+
+        removed = prune_old_backups(app)
+        assert removed == 2
+        remaining = set(os.listdir(folder))
+        # The two newest (highest mtime) survive.
+        assert names[3] in remaining and names[2] in remaining
+        assert names[0] not in remaining and names[1] not in remaining

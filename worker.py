@@ -11,7 +11,12 @@ from __future__ import annotations
 import os
 import time
 
-from app import create_app, purge_soft_deleted_papers, run_next_conversion_job
+from app import (
+    create_app,
+    prune_old_backups,
+    purge_soft_deleted_papers,
+    run_next_conversion_job,
+)
 
 
 def main() -> None:
@@ -30,6 +35,8 @@ def main() -> None:
         if now - last_maintenance >= maintenance_interval:
             try:
                 purge_soft_deleted_papers(app)
+                with app.app_context():
+                    prune_old_backups(app)
             except Exception:  # pragma: no cover - defensive, never kill the loop
                 app.logger.exception("Periodic maintenance failed")
             last_maintenance = now

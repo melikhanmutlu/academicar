@@ -60,6 +60,10 @@ class Paper(db.Model):
     pdf_path = db.Column(db.String(500), nullable=True)
     slug = db.Column(db.String(250), unique=True, nullable=False, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    # Legacy field from the old user/publication-level plan model. Under
+    # model-based licensing it is always set to "model_based" at creation and is
+    # not used for any access decision; kept (not dropped) to avoid a migration
+    # and because a few templates still read it as a display hint.
     package_type = db.Column(db.String(30), nullable=False, default="temporary")
     status = db.Column(db.String(30), nullable=False, default="active")
     is_public = db.Column(db.Boolean, nullable=False, default=False)

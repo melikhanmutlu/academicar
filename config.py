@@ -129,6 +129,9 @@ class Config:
     DELETED_PAPER_GRACE_DAYS = int(os.environ.get("DELETED_PAPER_GRACE_DAYS", 30))
     # Rows per page for the admin dashboard's users/papers/models lists.
     ADMIN_LIST_PAGE_SIZE = int(os.environ.get("ADMIN_LIST_PAGE_SIZE", 100))
+    # Keep at most this many backup archives; older ones are pruned after each
+    # new backup and by the worker's periodic maintenance. 0 keeps all.
+    BACKUP_RETENTION_COUNT = int(os.environ.get("BACKUP_RETENTION_COUNT", 14))
     if APP_ENV in {"production", "prod", "pilot"}:
         DEV_INLINE_JOBS = os.environ.get("ALLOW_PRODUCTION_INLINE_JOBS", "0").lower() in {
             "1",

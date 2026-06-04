@@ -1,0 +1,24 @@
+# Keep the production image / Railway slug lean: ship only what runs.
+.git/
+.gitignore
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+env/
+instance/
+tests/
+tests_runtime/
+requirements-dev.txt
+*.md
+.env
+.env.*
+!.env.example
+storage/
+uploads/
+converted/
+qr_codes/
+pdfs/
+backups/
+run_local_server.py

@@ -17,7 +17,7 @@
     <div class="profile-identity">
       <div class="profile-avatar-wrap">
         {% if user.avatar_url %}
-          <img src="{{ user.avatar_url }}" class="profile-avatar" alt="">
+          <img src="{{ user.avatar_url }}" class="profile-avatar" alt="{{ user.username }} avatar">
         {% else %}
           <div class="profile-avatar fallback">{{ user.username[0]|upper }}</div>
         {% endif %}

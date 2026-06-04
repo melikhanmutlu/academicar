@@ -27,6 +27,9 @@ def app():
             "CONVERTED_FOLDER": str(converted_dir.resolve()),
             "QR_FOLDER": str(qr_dir.resolve()),
             "PDF_FOLDER": str(pdf_dir.resolve()),
+            # Isolate backups (and anything else under STORAGE_ROOT) per test so
+            # they don't accumulate in the repo's real storage/ directory.
+            "STORAGE_ROOT": str(base_dir.resolve()),
             "SECRET_KEY": "test-secret",
             "UPLOAD_RATE_LIMIT_COUNT": 1000,
         }
