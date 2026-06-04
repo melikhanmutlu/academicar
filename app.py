@@ -571,6 +571,33 @@ def upload_rate_limit_disabled() -> bool:
     return limit <= 0 or window <= 0
 
 
+def user_storage_used_bytes(user_id: int, *, exclude_model_id: str | None = None) -> int:
+    """Total stored bytes across a user's models (excludes one model when
+    replacing its file so the swap isn't double-counted)."""
+    query = db.session.query(func.coalesce(func.sum(Model3D.file_size), 0)).filter(
+        Model3D.user_id == user_id
+    )
+    if exclude_model_id is not None:
+        query = query.filter(Model3D.id != exclude_model_id)
+    return int(query.scalar() or 0)
+
+
+def user_storage_error(user_id: int, incoming_bytes: int, *, exclude_model_id: str | None = None) -> str | None:
+    """Return a user-facing error if adding ``incoming_bytes`` would push the
+    user over the optional per-user total storage cap, else None. Disabled when
+    USER_TOTAL_STORAGE_BYTES is 0."""
+    limit = int(current_app.config.get("USER_TOTAL_STORAGE_BYTES", 0))
+    if limit <= 0:
+        return None
+    used = user_storage_used_bytes(user_id, exclude_model_id=exclude_model_id)
+    if used + incoming_bytes > limit:
+        return (
+            f"This upload would exceed your total storage quota "
+            f"({limit / (1024 * 1024):.0f} MB). Delete an existing model first."
+        )
+    return None
+
+
 def public_view_rate_limit_value() -> str:
     return str(current_app.config.get("PUBLIC_VIEW_RATE_LIMIT") or "120 per minute")
 
@@ -708,11 +735,19 @@ def paper_is_expired(paper: Paper) -> bool:
 
 
 def paper_is_deleted(paper: Paper | None) -> bool:
-    return not paper or (paper.status or "active").lower() == "deleted"
+    # `status` is the authoritative soft-delete signal and `deleted_at` is the
+    # audit timestamp; the two are written together. Treat EITHER being set as
+    # deleted so a half-written record can never leak back as active.
+    if not paper:
+        return True
+    return (paper.status or "active").lower() == "deleted" or paper.deleted_at is not None
 
 
 def active_paper_query():
-    return Paper.query.filter(or_(Paper.status.is_(None), Paper.status != "deleted"))
+    return Paper.query.filter(
+        or_(Paper.status.is_(None), Paper.status != "deleted"),
+        Paper.deleted_at.is_(None),
+    )
 
 
 def new_public_id() -> str:
@@ -1357,6 +1392,49 @@ def reclaim_stale_conversion_jobs(app: Flask) -> int:
     return reclaimed
 
 
+def purge_soft_deleted_papers(app: Flask) -> int:
+    """Hard-delete publications that have been soft-deleted longer than the
+    configured grace period, removing their DB rows (cascade) and their files
+    from disk. Runs in the worker, never the web process. Returns the count
+    purged. Disabled when DELETED_PAPER_GRACE_DAYS is 0."""
+    grace_days = int(app.config.get("DELETED_PAPER_GRACE_DAYS", 0))
+    if grace_days <= 0:
+        return 0
+    cutoff = datetime.now(UTC) - timedelta(days=grace_days)
+    purged = 0
+    with app.app_context():
+        stale_papers = (
+            Paper.query
+            .filter(Paper.deleted_at.isnot(None))
+            .filter(Paper.deleted_at < cutoff)
+            .all()
+        )
+        for paper in stale_papers:
+            # Collect paths before the cascade delete removes the model rows.
+            file_paths = collect_paper_file_paths(app, paper)
+            paper_id = paper.id
+            try:
+                db.session.delete(paper)
+                db.session.commit()
+            except SQLAlchemyError:
+                db.session.rollback()
+                logger.exception("Failed to purge soft-deleted paper %s", paper_id)
+                continue
+            cleanup_paths(file_paths)
+            db.session.add(
+                AuditLog(event_type="paper_purged", resource_id=str(paper_id),
+                         details={"grace_days": grace_days})
+            )
+            try:
+                db.session.commit()
+            except SQLAlchemyError:
+                db.session.rollback()
+            purged += 1
+        if purged:
+            logger.info("Purged %d soft-deleted publication(s) past grace period.", purged)
+    return purged
+
+
 def run_next_conversion_job(app: Flask) -> bool:
     """Pick up the oldest pending ConversionJob and run it.
 
@@ -1472,6 +1550,11 @@ def _create_model_for_paper(
         cleanup_dir(upload_dir)
         cleanup_dir(converted_dir)
         return False, size_error
+    quota_error = user_storage_error(paper.user_id, file_size)
+    if quota_error:
+        cleanup_dir(upload_dir)
+        cleanup_dir(converted_dir)
+        return False, quota_error
 
     # Cheap preflight on the formats we can introspect without external tools.
     if source_format == "glb":
@@ -2423,8 +2506,16 @@ def register_routes(app: Flask) -> None:
         previous = {"is_public": paper.is_public, "status": paper.status}
         paper.is_public = request.form.get("is_public") == "1"
         paper.status = (request.form.get("status") or "active").strip().lower()
+        # Keep status and the deleted_at timestamp in sync so the two soft-delete
+        # signals never disagree (see paper_is_deleted / active_paper_query).
         if paper.status == "deleted":
             paper.is_public = False
+            if paper.deleted_at is None:
+                paper.deleted_at = datetime.now(UTC)
+                paper.deleted_by_user_id = current_user.id
+        else:
+            paper.deleted_at = None
+            paper.deleted_by_user_id = None
         db.session.commit()
         log_audit(
             "admin_paper_visibility_changed",
@@ -3393,10 +3484,18 @@ def register_routes(app: Flask) -> None:
                 flash(str(e), "danger")
                 return redirect(url_for("paper_detail", slug=model.paper.slug))
 
-        size_error = model_file_limit_error(os.path.getsize(source_path), model.license_type)
+        replacement_size = os.path.getsize(source_path)
+        size_error = model_file_limit_error(replacement_size, model.license_type)
         if size_error:
             cleanup_dir(upload_dir)
             flash(size_error, "danger")
+            return redirect(url_for("paper_detail", slug=model.paper.slug))
+        quota_error = user_storage_error(
+            model.user_id, replacement_size, exclude_model_id=model.id
+        )
+        if quota_error:
+            cleanup_dir(upload_dir)
+            flash(quota_error, "danger")
             return redirect(url_for("paper_detail", slug=model.paper.slug))
 
         # Archive the new source under uploads/<model_id>/v<n>/ so we have a

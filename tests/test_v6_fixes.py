@@ -262,3 +262,82 @@ def test_paper_is_expired_logic():
     assert paper_is_expired(FakePaper(datetime.now(UTC) - timedelta(days=1))) is True
     # Naive datetime is treated as UTC, not crashed on.
     assert paper_is_expired(FakePaper(datetime.utcnow() - timedelta(days=1))) is True
+
+
+# --------------------------------------------------------------------------- #
+# 2.6 Purge soft-deleted papers past grace period
+# --------------------------------------------------------------------------- #
+def test_purge_removes_only_papers_past_grace(app):
+    from app import purge_soft_deleted_papers
+
+    with app.app_context():
+        app.config["DELETED_PAPER_GRACE_DAYS"] = 30
+        user = create_user_in_session("purge@example.com")
+        old = Paper(title="Old", slug="old-paper", user_id=user.id,
+                    status="deleted", deleted_at=datetime.now(UTC) - timedelta(days=31))
+        recent = Paper(title="Recent", slug="recent-paper", user_id=user.id,
+                       status="deleted", deleted_at=datetime.now(UTC) - timedelta(days=2))
+        active = Paper(title="Active", slug="active-paper", user_id=user.id)
+        db.session.add_all([old, recent, active])
+        db.session.commit()
+
+    assert purge_soft_deleted_papers(app) == 1
+
+    with app.app_context():
+        slugs = {p.slug for p in Paper.query.all()}
+        assert "old-paper" not in slugs
+        assert {"recent-paper", "active-paper"} <= slugs
+
+
+def test_purge_disabled_when_grace_zero(app):
+    from app import purge_soft_deleted_papers
+
+    with app.app_context():
+        app.config["DELETED_PAPER_GRACE_DAYS"] = 0
+        user = create_user_in_session("purge0@example.com")
+        old = Paper(title="Old", slug="old-paper-0", user_id=user.id,
+                    status="deleted", deleted_at=datetime.now(UTC) - timedelta(days=999))
+        db.session.add(old)
+        db.session.commit()
+
+    assert purge_soft_deleted_papers(app) == 0
+    with app.app_context():
+        assert Paper.query.filter_by(slug="old-paper-0").count() == 1
+
+
+# --------------------------------------------------------------------------- #
+# 2.7 Per-user total storage cap
+# --------------------------------------------------------------------------- #
+def test_user_storage_error_respects_cap(app):
+    from app import user_storage_error
+
+    with app.app_context():
+        app.config["USER_TOTAL_STORAGE_BYTES"] = 10 * 1024 * 1024  # 10 MB
+        user = create_user_in_session("quota@example.com")
+        paper = Paper(title="Quota", slug="quota-paper", user_id=user.id)
+        db.session.add(paper)
+        db.session.flush()
+        db.session.add(Model3D(id="quota-m1", paper_id=paper.id, user_id=user.id,
+                               glb_path="m.glb", file_size=8 * 1024 * 1024))
+        db.session.commit()
+        # 8 MB used; +1 MB ok, +5 MB over the 10 MB cap.
+        assert user_storage_error(user.id, 1 * 1024 * 1024) is None
+        assert user_storage_error(user.id, 5 * 1024 * 1024) is not None
+        # Excluding the existing model (replacement) frees its 8 MB.
+        assert user_storage_error(user.id, 9 * 1024 * 1024, exclude_model_id="quota-m1") is None
+
+
+def test_user_storage_cap_disabled_by_default(app):
+    from app import user_storage_error
+
+    with app.app_context():
+        user = create_user_in_session("quota-off@example.com")
+        assert user_storage_error(user.id, 10**12) is None
+
+
+def create_user_in_session(email):
+    user = User(email=email, username="U")
+    user.set_password("password123")
+    db.session.add(user)
+    db.session.flush()
+    return user

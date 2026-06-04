@@ -119,6 +119,14 @@ class Config:
     # default so a QR code on a conference poster scanned by a crowd still works,
     # while blocking ID-enumeration / DoS abuse. Set empty to disable.
     PUBLIC_VIEW_RATE_LIMIT = os.environ.get("PUBLIC_VIEW_RATE_LIMIT", "120 per minute")
+    # Optional cap on the total bytes one user may store across all their
+    # models, independent of the per-model license limit. Stops a user from
+    # accumulating unlimited free models. 0 (default) disables the cap.
+    USER_TOTAL_STORAGE_BYTES = int(os.environ.get("USER_TOTAL_STORAGE_BYTES", 0))
+    # Soft-deleted publications stay restorable for this many days; after that
+    # the worker hard-deletes them and removes their files from disk. 0 disables
+    # the purge (files are kept indefinitely).
+    DELETED_PAPER_GRACE_DAYS = int(os.environ.get("DELETED_PAPER_GRACE_DAYS", 30))
     if APP_ENV in {"production", "prod", "pilot"}:
         DEV_INLINE_JOBS = os.environ.get("ALLOW_PRODUCTION_INLINE_JOBS", "0").lower() in {
             "1",
