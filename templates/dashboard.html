@@ -444,7 +444,8 @@
     const formData = new FormData();
     formData.append("pdf", file);
     
-    fetch(`/papers/${slug}/upload-pdf`, {
+    const uploadPdfUrl = "{{ url_for('paper_upload_pdf', slug='__SLUG__') }}".replace('__SLUG__', encodeURIComponent(slug));
+    fetch(uploadPdfUrl, {
       method: "POST",
       body: formData,
       headers: {

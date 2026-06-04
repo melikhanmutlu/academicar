@@ -146,7 +146,7 @@
             <span class="block text-[#111827] font-semibold">Select model file</span>
             <span class="block text-sm text-[#64748b] mt-1" data-dropzone-copy>Drag and drop a model here, or choose a file. The model gets its own license, QR resolver link, and processing job.</span>
             <span class="file-picker-control mt-4"><span>Choose file</span><small data-file-name>No file selected</small></span>
-            <input type="file" name="model_file" accept=".glb,.stl,.obj,.fbx" class="native-file-input" data-dropzone-input>
+            <input type="file" name="file" accept=".glb,.stl,.obj,.fbx" class="native-file-input" data-dropzone-input>
           </label>
 
           <div class="companion-files-section" data-companion-section style="display: none;">
@@ -154,14 +154,14 @@
             <label class="file-picker-control file-picker-control-muted mt-1">
               <span>Choose companion files</span>
               <small data-file-name>No files selected</small>
-              <input type="file" name="model_companion_files" multiple accept=".mtl,.png,.jpg,.jpeg,.webp" class="native-file-input" data-companion-input>
+              <input type="file" name="companion_files" multiple accept=".mtl,.png,.jpg,.jpeg,.webp" class="native-file-input" data-companion-input>
             </label>
             <p class="text-xs text-[#5c6473] mt-2">Upload the material (.mtl) and texture images (.png, .jpg) referenced by the .obj file.</p>
           </div>
 
           <div class="grid sm:grid-cols-2 gap-4">
-            <input type="text" name="model_display_name" placeholder="Model name" class="field-input">
-            <input type="text" name="model_description" placeholder="Short model note" class="field-input">
+            <input type="text" name="display_name" placeholder="Model name" class="field-input">
+            <input type="text" name="description" placeholder="Short model note" class="field-input">
           </div>
 
           <div>
@@ -406,7 +406,7 @@
         showStatus('Fetching metadata...', 'text-[#64748b]');
 
         try {
-          const response = await fetch('/papers/fetch-metadata', {
+          const response = await fetch('{{ url_for("papers_fetch_metadata") }}', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

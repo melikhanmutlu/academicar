@@ -3090,8 +3090,8 @@ def register_routes(app: Flask) -> None:
         methods=["POST"],
         exempt_when=lambda: upload_rate_limit_disabled()
         or not (
-            request.files.get("model_file")
-            and request.files.get("model_file").filename
+            request.files.get("file")
+            and request.files.get("file").filename
         ),
     )
     def paper_new():
@@ -3166,15 +3166,15 @@ def register_routes(app: Flask) -> None:
             # MVP §11 / §8: optional first model upload during paper creation.
             # The model upload must NOT roll back the paper on failure — the
             # user can retry from the paper detail page.
-            first_model_file = request.files.get("model_file") or request.files.get("model")
+            first_model_file = request.files.get("file")
             if first_model_file and first_model_file.filename:
                 ok, message = _create_model_for_paper(
                     paper,
                     first_model_file,
-                    request.files.getlist("model_companion_files"),
+                    request.files.getlist("companion_files"),
                     license_type=request.form.get("license_type"),
-                    display_name=request.form.get("model_display_name"),
-                    description=request.form.get("model_description"),
+                    display_name=request.form.get("display_name"),
+                    description=request.form.get("description"),
                     color=request.form.get("color") if request.form.get("color_enabled") == "yes" else None,
                     source_unit=request.form.get("source_unit"),
                     compliance_confirm=request.form.get("compliance_confirm"),
@@ -3374,7 +3374,7 @@ def register_routes(app: Flask) -> None:
     @require_paper_ownership
     def upload_model(slug):
         paper = active_paper_query().filter_by(slug=slug).first_or_404()
-        file = request.files.get("file") or request.files.get("model_file")
+        file = request.files.get("file")
         if not file or not file.filename:
             flash("No file selected.", "danger")
             return redirect(url_for("paper_detail", slug=slug))
@@ -3431,7 +3431,7 @@ def register_routes(app: Flask) -> None:
         model = db.session.get(Model3D, model_id)
         if not model:
             abort(404)
-        file = request.files.get("file") or request.files.get("model_file")
+        file = request.files.get("file")
         if not file or not file.filename:
             flash("No replacement file selected.", "danger")
             return redirect(url_for("paper_detail", slug=model.paper.slug))
