@@ -6704,6 +6704,33 @@ label.rounded-xl input[type="checkbox"] {
   margin-bottom: 18px;
 }
 
+.email-verify-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--color-sunset-orange, #e07b14);
+  color: #fff;
+  font-family: var(--font-inter);
+  font-size: 13px;
+}
+
+.email-verify-resend {
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  color: #fff;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.email-verify-resend:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
 .admin-pagination {
   display: flex;
   align-items: center;

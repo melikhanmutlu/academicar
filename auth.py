@@ -112,6 +112,76 @@ def _apply_configured_admin(user: User) -> None:
         user.is_admin = True
 
 
+def _email_verify_serializer():
+    from itsdangerous import URLSafeTimedSerializer
+
+    return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="email-verify")
+
+
+def send_email_verification(user) -> None:
+    """Email a signed verification link to the user. Non-blocking: failures to
+    send are logged (send_email already handles unconfigured SMTP)."""
+    from utils.email import send_email
+
+    token = _email_verify_serializer().dumps({"uid": user.id, "email": user.email})
+    verify_url = url_for("auth.verify_email", token=token, _external=True)
+    send_email(
+        user.email,
+        "Confirm your AcademicAR email address",
+        (
+            "Welcome to AcademicAR.\n\n"
+            f"Please confirm this email address by opening this link within 24 hours:\n"
+            f"{verify_url}\n\n"
+            "If you did not create an AcademicAR account, you can ignore this email."
+        ),
+    )
+
+
+@auth_bp.route("/verify-email/<token>")
+def verify_email(token):
+    from itsdangerous import BadSignature, SignatureExpired
+
+    try:
+        data = _email_verify_serializer().loads(token, max_age=86400)
+    except SignatureExpired:
+        flash("This verification link has expired. Sign in and request a new one.", "warning")
+        return redirect(url_for("auth.login"))
+    except BadSignature:
+        flash("This verification link is invalid.", "danger")
+        return redirect(url_for("auth.login"))
+
+    user = db.session.get(User, data.get("uid"))
+    # Bind the token to the address it was issued for, so it can't verify a
+    # later-changed email.
+    if not user or (data.get("email") or "").lower() != (user.email or "").lower():
+        flash("This verification link is no longer valid.", "danger")
+        return redirect(url_for("auth.login"))
+
+    if not user.email_verified:
+        user.email_verified = True
+        db.session.commit()
+        try:
+            from app import log_audit
+
+            log_audit("email_verified", user_id=user.id)
+        except Exception:
+            pass
+    flash("Your email address is verified. Thank you.", "success")
+    return redirect(url_for("dashboard") if current_user.is_authenticated else url_for("auth.login"))
+
+
+@auth_bp.route("/resend-verification", methods=["POST"])
+@login_required
+@limiter.limit("5 per hour", key_func=get_remote_address)
+def resend_verification():
+    if current_user.email_verified:
+        flash("Your email address is already verified.", "info")
+    else:
+        send_email_verification(current_user)
+        flash("We sent a new verification link to your email address.", "success")
+    return redirect(request.referrer or url_for("dashboard"))
+
+
 @auth_bp.route("/register", methods=["GET", "POST"])
 @limiter.limit("10 per hour", methods=["POST"], key_func=get_remote_address)
 @limiter.limit("3 per minute", methods=["POST"], key_func=get_remote_address)
@@ -126,18 +196,24 @@ def register():
             email=form.email.data.lower().strip(),
         )
         user.set_password(form.password.data)
+        user.email_verified = False
         _apply_configured_admin(user)
         db.session.add(user)
         db.session.commit()
         _rotate_session()
         login_user(user)
+        send_email_verification(user)
         # Log registration for privacy compliance
         try:
             from app import log_audit
             log_audit("user_registered", user_id=user.id)
         except Exception:
             pass  # Fail silently if audit logging fails
-        flash("Registration successful. Welcome.", "success")
+        flash(
+            "Registration successful. We sent a verification link to your email "
+            "address — please confirm it when you get a chance.",
+            "success",
+        )
         return redirect(url_for("dashboard"))
 
     return render_template(
@@ -250,6 +326,8 @@ def google_callback():
             existing.google_id = google_id
             if not existing.avatar_url and picture:
                 existing.avatar_url = picture
+            # Google asserted email_verified above, so the address is confirmed.
+            existing.email_verified = True
             _apply_configured_admin(existing)
             user = existing
             # Let the user know their accounts were merged on first Google login
@@ -265,6 +343,7 @@ def google_callback():
                 username=name,
                 google_id=google_id,
                 avatar_url=picture,
+                email_verified=True,  # Google already confirmed ownership.
             )
             _apply_configured_admin(user)
             db.session.add(user)

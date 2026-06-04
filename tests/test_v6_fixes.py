@@ -335,6 +335,43 @@ def test_user_storage_cap_disabled_by_default(app):
         assert user_storage_error(user.id, 10**12) is None
 
 
+# --------------------------------------------------------------------------- #
+# 4.6 Email verification (non-blocking)
+# --------------------------------------------------------------------------- #
+def test_registration_starts_unverified_and_token_verifies(client):
+    from itsdangerous import URLSafeTimedSerializer
+
+    from tests.conftest import register
+
+    register(client, email="verify@example.com")
+    app = client.application
+    with app.app_context():
+        user = User.query.filter_by(email="verify@example.com").one()
+        assert user.email_verified is False
+        uid = user.id
+
+    # The post-registration banner is shown while unverified.
+    assert "verify your email" in client.get("/dashboard").get_data(as_text=True).lower()
+
+    serializer = URLSafeTimedSerializer(app.config["SECRET_KEY"], salt="email-verify")
+    token = serializer.dumps({"uid": uid, "email": "verify@example.com"})
+    resp = client.get(f"/auth/verify-email/{token}", follow_redirects=True)
+    assert resp.status_code == 200
+
+    with app.app_context():
+        assert db.session.get(User, uid).email_verified is True
+
+
+def test_verify_email_rejects_tampered_token(client):
+    from tests.conftest import register
+
+    register(client, email="tamper@example.com")
+    resp = client.get("/auth/verify-email/not-a-real-token", follow_redirects=True)
+    assert resp.status_code == 200  # redirected to login with a flash
+    with client.application.app_context():
+        assert User.query.filter_by(email="tamper@example.com").one().email_verified is False
+
+
 def create_user_in_session(email):
     user = User(email=email, username="U")
     user.set_password("password123")

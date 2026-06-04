@@ -102,6 +102,16 @@
     {% endif %}
   {% endwith %}
 
+  {% if current_user.is_authenticated and not current_user.email_verified %}
+    <div class="email-verify-banner" role="status">
+      <span>Please verify your email address to secure your account.</span>
+      <form method="POST" action="{{ url_for('auth.resend_verification') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="email-verify-resend">Resend link</button>
+      </form>
+    </div>
+  {% endif %}
+
   <main class="flex-1">
     {% block content %}{% endblock %}
   </main>

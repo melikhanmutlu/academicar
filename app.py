@@ -511,6 +511,11 @@ def ensure_sqlite_schema(app: Flask) -> None:
         model_columns = {row[1] for row in connection.execute(text("PRAGMA table_info(models)")).fetchall()}
         if model_columns and "dimensions_cm" not in model_columns:
             connection.execute(text("ALTER TABLE models ADD COLUMN dimensions_cm VARCHAR(50)"))
+        user_columns = {row[1] for row in connection.execute(text("PRAGMA table_info(users)")).fetchall()}
+        if user_columns and "email_verified" not in user_columns:
+            # Backfill existing accounts as verified so the new column never
+            # locks anyone out of a feature they already had.
+            connection.execute(text("ALTER TABLE users ADD COLUMN email_verified BOOLEAN NOT NULL DEFAULT 1"))
 
 
 def _alembic_head_revision(app: Flask) -> str | None:

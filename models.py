@@ -23,6 +23,10 @@ class User(UserMixin, db.Model):
     google_id = db.Column(db.String(100), unique=True, nullable=True, index=True)
     avatar_url = db.Column(db.String(500), nullable=True)
     is_admin = db.Column(db.Boolean, nullable=False, default=False)
+    # Email ownership confirmation. Google-OAuth users are verified by Google;
+    # password registrations start False and confirm via an emailed link. It is
+    # advisory (a banner prompts verification) and does not block access.
+    email_verified = db.Column(db.Boolean, nullable=False, default=False)
     plan = db.Column(db.String(30), nullable=False, default="free")
     created_at = db.Column(db.DateTime, default=utc_now)
 

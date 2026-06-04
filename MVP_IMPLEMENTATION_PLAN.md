@@ -42,19 +42,25 @@ current: tick items as they land and add short notes.
 - [x] Removed hardcoded developer path from `run_local_server.py`.
 - [x] `requirements.txt` security bumps; `pytest` moved to `requirements-dev.txt`.
 - [x] `services/` and `utils/` `__init__.py`.
-- [ ] Admin dashboard pagination (users/papers/models lists).
-- [ ] Status constants module adopted across the codebase.
+- [x] Admin dashboard pagination (users/papers/models lists).
+- [x] Status constants module (`constants.py`); adopted in the job + soft-delete
+      paths (gradual adoption elsewhere — values are unchanged, so safe).
 - [ ] CSP hardening (self-hosted Tailwind build to drop `unsafe-eval`) —
-      tracked as a dedicated follow-up; do not regress the design language.
+      **deferred dedicated task.** Requires adding a Node/PostCSS build to a
+      Python-only repo and re-auditing every inline style/script; high risk to
+      the non-negotiable design language. CSP stays enabled with documented
+      CDN allowances until this is scheduled on its own.
 
 ### Tier 4 — Backlog / polish
-- [ ] Shared `ensure_utc()` helper to de-duplicate timezone handling.
-- [ ] Remove/justify the always-`"model_based"` `package_type` column.
-- [ ] Open Graph meta tags on public paper/viewer pages.
-- [ ] Image alt-text / aria-label accessibility pass.
-- [ ] Email verification on password registration.
-- [ ] Backup retention/cleanup policy.
-- [ ] `.dockerignore` / `.slugignore` to slim the production image.
+- [x] Shared `ensure_utc()` helper to de-duplicate timezone handling.
+- [x] Documented the always-`"model_based"` `package_type` column (kept to
+      avoid a migration; still read as a display hint).
+- [x] Open Graph / Twitter meta tags on public paper + viewer pages.
+- [x] Avatar alt-text; decorative hero already `aria-hidden`.
+- [x] Email verification on password registration (non-blocking banner +
+      signed-token link; Google users auto-verified; legacy users grandfathered).
+- [x] Backup retention/cleanup (`BACKUP_RETENTION_COUNT`).
+- [x] `.dockerignore` / `.slugignore` to slim the production image.
 
 ## Non-Negotiable Preservation Rules
 
