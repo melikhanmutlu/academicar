@@ -111,6 +111,14 @@ class Config:
     ALLOWED_PDF_EXTENSIONS = {"pdf"}
     UPLOAD_RATE_LIMIT_COUNT = int(os.environ.get("UPLOAD_RATE_LIMIT_COUNT", 5))
     UPLOAD_RATE_LIMIT_WINDOW = int(os.environ.get("UPLOAD_RATE_LIMIT_WINDOW", 600))
+    # A ConversionJob left in "processing" longer than this is treated as
+    # orphaned by a crashed worker and is requeued (or failed once attempts are
+    # exhausted). Comfortably above the gunicorn/worker conversion timeout.
+    JOB_STALE_SECONDS = int(os.environ.get("JOB_STALE_SECONDS", 900))
+    # Per-IP throttle for the public viewer and managed QR resolver. Generous by
+    # default so a QR code on a conference poster scanned by a crowd still works,
+    # while blocking ID-enumeration / DoS abuse. Set empty to disable.
+    PUBLIC_VIEW_RATE_LIMIT = os.environ.get("PUBLIC_VIEW_RATE_LIMIT", "120 per minute")
     if APP_ENV in {"production", "prod", "pilot"}:
         DEV_INLINE_JOBS = os.environ.get("ALLOW_PRODUCTION_INLINE_JOBS", "0").lower() in {
             "1",

@@ -59,7 +59,7 @@ class Paper(db.Model):
     institution = db.Column(db.String(300), nullable=True)
     pdf_path = db.Column(db.String(500), nullable=True)
     slug = db.Column(db.String(250), unique=True, nullable=False, index=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     package_type = db.Column(db.String(30), nullable=False, default="temporary")
     status = db.Column(db.String(30), nullable=False, default="active")
     is_public = db.Column(db.Boolean, nullable=False, default=False)
@@ -85,14 +85,17 @@ class Model3D(db.Model):
     __tablename__ = "models"
 
     id = db.Column(db.String(36), primary_key=True)  # UUID
-    paper_id = db.Column(db.Integer, db.ForeignKey("papers.id"), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    paper_id = db.Column(db.Integer, db.ForeignKey("papers.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     display_name = db.Column(db.String(255), nullable=True)
     description = db.Column(db.Text, nullable=True)
     original_filename = db.Column(db.String(255), nullable=True)
     original_source_path = db.Column(db.String(500), nullable=True)
     current_source_path = db.Column(db.String(500), nullable=True)
-    glb_path = db.Column(db.String(500), nullable=False)
+    # Nullable: a Model3D row is created and committed before its conversion
+    # job produces the GLB, so the path is filled in once processing succeeds.
+    # Code that serves the file must null-check (see view_model / serve_model_file).
+    glb_path = db.Column(db.String(500), nullable=True)
     storage_provider = db.Column(db.String(40), nullable=False, default="railway_volume")
     storage_key = db.Column(db.String(500), nullable=True)
     qr_code_path = db.Column(db.String(500), nullable=True)
@@ -162,6 +165,12 @@ class ModelVersion(db.Model):
     created_at = db.Column(db.DateTime, default=utc_now)
 
     model = db.relationship("Model3D", backref=db.backref("versions", lazy=True, cascade="all, delete-orphan"))
+
+    __table_args__ = (
+        # Guards against two concurrent replacements computing the same
+        # next_version and inserting duplicate version rows for one model.
+        db.UniqueConstraint("model_id", "version_number", name="uq_model_version_number"),
+    )
 
     def __repr__(self) -> str:
         return f"<ModelVersion {self.model_id} v{self.version_number} {self.status}>"

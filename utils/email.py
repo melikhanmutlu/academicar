@@ -27,6 +27,12 @@ def send_email(to_address: str, subject: str, body: str) -> bool:
         or "no-reply@academicar.com"
     )
 
+    # Strip CR/LF from header values to prevent email header injection: a
+    # newline in the recipient or subject could otherwise smuggle additional
+    # headers (Bcc, Content-Type, ...) into the outgoing message.
+    to_address = (to_address or "").replace("\r", "").replace("\n", "")
+    subject = (subject or "").replace("\r", "").replace("\n", "")
+
     if not server:
         logger.warning(
             "MAIL_SERVER not configured; email NOT sent to %s.\nSubject: %s\n%s",

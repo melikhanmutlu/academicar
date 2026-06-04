@@ -160,7 +160,17 @@ def model_is_accessible(model) -> bool:
 
 
 def paper_is_expired(paper) -> bool:
-    return False
+    """True when a paper carries an ``expires_at`` in the past.
+
+    Under model-based licensing papers are created with ``expires_at = None``
+    (access is governed per-model), so this is normally a no-op. It is
+    implemented correctly rather than hard-coded to ``False`` so that any paper
+    that *does* carry an expiry (legacy data, manual admin action) is honored
+    instead of silently staying accessible forever.
+    """
+    if not paper or not getattr(paper, "expires_at", None):
+        return False
+    return is_access_expired(paper.expires_at)
 
 
 def model_file_limit_error(file_size: int, license_type: str | None) -> str | None:

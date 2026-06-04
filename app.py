@@ -571,6 +571,14 @@ def upload_rate_limit_disabled() -> bool:
     return limit <= 0 or window <= 0
 
 
+def public_view_rate_limit_value() -> str:
+    return str(current_app.config.get("PUBLIC_VIEW_RATE_LIMIT") or "120 per minute")
+
+
+def public_view_rate_limit_disabled() -> bool:
+    return not str(current_app.config.get("PUBLIC_VIEW_RATE_LIMIT") or "").strip()
+
+
 def validate_stl_file(file_path: str) -> list[str]:
     """Return user-friendly STL validation errors before trimesh parsing."""
     if not os.path.exists(file_path) or not os.path.isfile(file_path):
@@ -710,6 +718,19 @@ def active_paper_query():
 def new_public_id() -> str:
     """Cryptographically random URL-safe public id for QR resolver targets."""
     return secrets.token_urlsafe(16)[:32]
+
+
+def next_model_version_number(model_id: str, current_version: int | None) -> int:
+    """Compute the next ModelVersion.version_number for a model from the actual
+    max already stored, so concurrent replacements don't both reuse
+    (model.version + 1). Paired with a row lock on the Model3D row and the
+    unique (model_id, version_number) constraint as a final backstop."""
+    max_existing = (
+        db.session.query(func.max(ModelVersion.version_number))
+        .filter(ModelVersion.model_id == model_id)
+        .scalar()
+    )
+    return max(max_existing or 0, current_version or 1) + 1
 
 
 def model_resolver_url(model: Model3D) -> str:
@@ -1283,6 +1304,59 @@ def enqueue_conversion_job(
     return job
 
 
+def reclaim_stale_conversion_jobs(app: Flask) -> int:
+    """Recover ConversionJob rows stuck in 'processing' because the worker
+    crashed (OOM, redeploy, SIGKILL) mid-conversion. Such jobs are otherwise
+    invisible forever — the pending query only looks at status == "pending".
+
+    Bounded by ``max_attempts``: a stale job with attempts left is requeued
+    ("pending") for another try; one that has exhausted its attempts is marked
+    "failed" so it can never loop the worker indefinitely. Returns the number
+    of jobs reclaimed.
+    """
+    stale_seconds = int(app.config.get("JOB_STALE_SECONDS", 900))
+    cutoff = datetime.now(UTC) - timedelta(seconds=stale_seconds)
+    reclaimed = 0
+    with app.app_context():
+        stale_jobs = (
+            ConversionJob.query
+            .filter(ConversionJob.status == "processing")
+            .filter(ConversionJob.started_at.isnot(None))
+            .filter(ConversionJob.started_at < cutoff)
+            .all()
+        )
+        for job in stale_jobs:
+            if (job.attempts or 0) < (job.max_attempts or 3):
+                # Attempts remain: hand it back to the pending queue.
+                job.status = "pending"
+                job.started_at = None
+                job.error = "Worker stopped mid-conversion; job requeued."
+                try:
+                    db.session.commit()
+                except SQLAlchemyError:
+                    db.session.rollback()
+                    continue
+            else:
+                # Exhausted: mark the model (and any in-flight version) failed so
+                # the UI stops showing an endless "processing" spinner.
+                payload = dict(job.payload or {})
+                version = None
+                version_id = payload.get("version_id")
+                if version_id is not None:
+                    version = db.session.get(ModelVersion, version_id)
+                mark_model_failed(
+                    job.model_id,
+                    "Conversion did not finish after the maximum number of attempts.",
+                    is_replacement=bool(payload.get("is_replacement")),
+                    job=job,
+                    version=version,
+                )
+            reclaimed += 1
+        if reclaimed:
+            logger.warning("Reclaimed %d stale conversion job(s).", reclaimed)
+    return reclaimed
+
+
 def run_next_conversion_job(app: Flask) -> bool:
     """Pick up the oldest pending ConversionJob and run it.
 
@@ -1290,14 +1364,22 @@ def run_next_conversion_job(app: Flask) -> bool:
     job was processed (or attempted), so the caller can immediately poll for
     the next job rather than sleeping.
     """
+    # First recover any jobs orphaned by a crashed worker so they re-enter the
+    # queue (or fail) instead of blocking conversion forever.
+    reclaim_stale_conversion_jobs(app)
     with app.app_context():
         # Claim the oldest pending job atomically. On PostgreSQL/MySQL we take a
         # row lock with SKIP LOCKED so multiple concurrent workers never grab the
         # same job. SQLite ignores FOR UPDATE (single-writer), which is fine for
         # local/dev single-worker setups.
+        #
+        # The attempts < max_attempts guard ensures a job that keeps killing the
+        # worker (and is therefore requeued by reclaim_stale_conversion_jobs)
+        # can never be retried beyond its bound.
         query = (
             ConversionJob.query
             .filter(ConversionJob.status == "pending")
+            .filter(ConversionJob.attempts < ConversionJob.max_attempts)
             .order_by(ConversionJob.created_at.asc())
         )
         if db.engine.dialect.name in {"postgresql", "mysql"}:
@@ -1610,6 +1692,7 @@ def register_routes(app: Flask) -> None:
         return render_template("legal/data_protection.html")
 
     @app.route("/view/<model_id>")
+    @limiter.limit(public_view_rate_limit_value, exempt_when=public_view_rate_limit_disabled)
     def view_model(model_id):
         model = db.session.get(Model3D, model_id)
         if not model:
@@ -1642,12 +1725,18 @@ def register_routes(app: Flask) -> None:
         )
 
     @app.route("/m/<public_id>")
+    @limiter.limit(public_view_rate_limit_value, exempt_when=public_view_rate_limit_disabled)
     def model_resolver(public_id):
         """Managed QR resolver: stable public URL that survives storage and
         license changes. Always returns one of: 302 redirect to viewer, 410
         unavailable page, or 404."""
         qr_link = QRLink.query.filter_by(public_id=public_id).first()
-        model = qr_link.model if qr_link else Model3D.query.filter_by(public_id=public_id).first()
+        # Fall back to the legacy direct-public_id lookup whenever the QR link
+        # does not resolve to a live model — covers both a missing link and an
+        # orphaned link whose model was hard-deleted (qr_link.model is None).
+        model = qr_link.model if qr_link else None
+        if model is None:
+            model = Model3D.query.filter_by(public_id=public_id).first()
         if not model:
             abort(404)
         if qr_link is not None:
@@ -3267,7 +3356,16 @@ def register_routes(app: Flask) -> None:
 
         original_name = secure_filename(file.filename)
         source_format = original_name.rsplit(".", 1)[1].lower()
-        next_version = (model.version or 1) + 1
+
+        # Lock this model row (PostgreSQL/MySQL) so two concurrent replacements
+        # can't read the same version and insert duplicate ModelVersion rows.
+        # SQLite is single-writer, so the lock is a harmless no-op there. The
+        # unique (model_id, version_number) constraint is the final backstop.
+        if db.engine.dialect.name in {"postgresql", "mysql"}:
+            locked = Model3D.query.filter_by(id=model.id).with_for_update().first()
+            if locked is not None:
+                model = locked
+        next_version = next_model_version_number(model.id, model.version)
 
         # Stage upload in a temporary scratch dir so the previous source files
         # are kept intact until the new version is committed.
