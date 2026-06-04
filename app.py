@@ -627,6 +627,9 @@ def make_slug(title: str) -> str:
     counter = 1
     while Paper.query.filter_by(slug=slug).first() is not None:
         counter += 1
+        if counter > 10000:
+            slug = f"{base}-{uuid.uuid4().hex[:8]}"
+            break
         slug = f"{base}-{counter}"
     return slug
 
@@ -654,6 +657,7 @@ def validate_paper_form(form) -> tuple[dict, list[str]]:
     length_limits = {
         "Authors": (authors, 500),
         "Field": (field, 100),
+        "Abstract": (abstract, 5000),
         "DOI": (doi, 200),
         "Institution / Journal": (institution, 300),
         "PMID": (pmid, 100),
@@ -964,7 +968,7 @@ def collect_paper_file_paths(app: Flask, paper: Paper) -> list[tuple[str, str]]:
     for model in paper.models:
         paths.extend(collect_model_file_paths(app, model))
     if paper.pdf_path:
-        paths.append(("file", os.path.join(app.config["PDF_FOLDER"], paper.pdf_path)))
+        paths.append(("file", os.path.join(app.config["PDF_FOLDER"], os.path.basename(paper.pdf_path))))
     paths.append(("file", os.path.join(app.config["QR_FOLDER"], paper_qr_filename(paper.id))))
     return paths
 
@@ -1350,8 +1354,8 @@ def _create_model_for_paper(
             "the right to share it."
         )
     license_normalized = normalize_license_type(license_type)
-    display_name = (display_name or "").strip() or None
-    description = (description or "").strip() or None
+    display_name = (display_name or "").strip()[:255] or None
+    description = (description or "").strip()[:5000] or None
     color = (color or "").strip() or None
     if color and HEX_COLOR_PATTERN.fullmatch(color) is None:
         color = None
@@ -2356,7 +2360,11 @@ def register_routes(app: Flask) -> None:
             abort(404)
         previous = {"is_public": paper.is_public, "status": paper.status}
         paper.is_public = request.form.get("is_public") == "1"
-        paper.status = (request.form.get("status") or "active").strip().lower()
+        new_status = (request.form.get("status") or "active").strip().lower()
+        if new_status not in {"active", "deleted"}:
+            flash("Invalid status value.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="content"))
+        paper.status = new_status
         if paper.status == "deleted":
             paper.is_public = False
         db.session.commit()
@@ -2611,6 +2619,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/account/password", methods=["POST"])
     @login_required
+    @limiter.limit("5 per hour", methods=["POST"])
     def account_change_password():
         current_pw = request.form.get("current_password") or ""
         new_pw = request.form.get("new_password") or ""
@@ -2626,8 +2635,12 @@ def register_routes(app: Flask) -> None:
             flash("Current password is incorrect.", "danger")
             return redirect(url_for("profile"))
         min_length = app.config.get("PASSWORD_MIN_LENGTH", 8)
+        max_length = 1024
         if len(new_pw) < min_length:
             flash(f"New password must be at least {min_length} characters.", "danger")
+            return redirect(url_for("profile"))
+        if len(new_pw) > max_length:
+            flash(f"Password must be at most {max_length} characters.", "danger")
             return redirect(url_for("profile"))
         if new_pw != confirm:
             flash("New password and confirmation do not match.", "danger")
@@ -2648,6 +2661,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/account/email", methods=["POST"])
     @login_required
+    @limiter.limit("5 per hour", methods=["POST"])
     def account_change_email():
         new_email = (request.form.get("new_email") or "").strip().lower()
         password = request.form.get("current_password") or ""
@@ -2739,6 +2753,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/account/profile", methods=["POST"])
     @login_required
+    @limiter.limit("10 per hour", methods=["POST"])
     def account_update_profile():
         username = (request.form.get("username") or "").strip()
         if len(username) < 2 or len(username) > 80:
@@ -2762,6 +2777,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/account/delete", methods=["POST"])
     @login_required
+    @limiter.limit("3 per hour", methods=["POST"])
     def account_delete():
         confirm = (request.form.get("confirm") or "").strip()
         password = request.form.get("current_password") or ""
