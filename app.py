@@ -48,7 +48,8 @@ from utils.security import require_model_ownership, require_paper_ownership
 from services.storage_service import StorageError, safe_move_file, safe_save_file, save_companion_files
 
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+_log_level = getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper(), logging.INFO)
+logging.basicConfig(level=_log_level, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 # Baseline Content-Security-Policy. Whitelists the CDNs the app currently
@@ -188,14 +189,6 @@ def create_app(test_config: dict | None = None) -> Flask:
         stamp_alembic_version_if_needed(app)
 
     return app
-
-
-def allowed_stl(filename: str) -> bool:
-    return "." in filename and filename.rsplit(".", 1)[1].lower() == "stl"
-
-
-def allowed_glb(filename: str) -> bool:
-    return "." in filename and filename.rsplit(".", 1)[1].lower() == "glb"
 
 
 SUPPORTED_MODEL_EXTENSIONS = {"stl", "glb", "obj", "fbx"}
@@ -1564,6 +1557,14 @@ def register_routes(app: Flask) -> None:
             db.session.commit()
         if not current_user.is_admin:
             abort(403)
+
+    @app.route("/health")
+    def health():
+        try:
+            db.session.execute(db.text("SELECT 1"))
+            return jsonify({"status": "ok"}), 200
+        except Exception:
+            return jsonify({"status": "error"}), 500
 
     @app.route("/")
     def landing():
@@ -3471,8 +3472,8 @@ def register_routes(app: Flask) -> None:
         if not model:
             abort(404)
         if request.method == "POST":
-            model.display_name = (request.form.get("display_name") or "").strip() or None
-            model.description = (request.form.get("description") or "").strip() or None
+            model.display_name = (request.form.get("display_name") or "").strip()[:255] or None
+            model.description = (request.form.get("description") or "").strip()[:5000] or None
             try:
                 db.session.commit()
             except SQLAlchemyError:

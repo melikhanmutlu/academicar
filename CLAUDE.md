@@ -58,17 +58,14 @@ flask db downgrade base
 
 **Core Stack**: Flask (Python 3.12) + SQLAlchemy ORM + Jinja2 templates + Tailwind CSS + PostgreSQL/SQLite
 
-## Current MVP Direction
+## Current State & Implemented Features
 
-Use `MVP_IMPLEMENTATION_PLAN.md` as the working source of truth for the next implementation phase. Update its checklist as tasks are completed, and keep completed work visible by checking items off and optionally using Markdown strikethrough notes.
-
-The next MVP direction is:
-
-- Model-based licensing instead of user/publication-level plan ownership.
-- Stable managed QR resolver URLs (`/m/<public_id>`) instead of QR codes pointing directly at model files or volatile viewer paths.
-- Railway-first deployment with web, worker, PostgreSQL, Redis, and persistent volume, while keeping storage/provider logic portable.
-- Converter expansion for GLB direct upload and STL/OBJ/FBX to GLB conversion, adapting the working converter approach from `C:\Users\syste\Desktop\Web & Dev\Projeler\web_ar-main`.
-- Replace-model and appearance-update flows must preserve the model ID, QR public ID, and resolver URL.
+- **Model-based licensing** (`licensing.py`): per-model plan (free/academic/extended_archive) with `LicensePlan` dataclass, access start/expiry dates, storage limits.
+- **Stable QR resolver** (`/m/<public_id>`): QRLink model maps public_id to model_id. QR codes survive replacements, upgrades, and color changes.
+- **Model versioning**: ModelVersion table tracks replacement history per model. Replace-model flow preserves model ID, QR public ID, and resolver URL.
+- **Converter pipeline**: GLB direct upload + STL/OBJ/FBX to GLB conversion via STLConverter (trimesh) and ExternalConverter (Node CLI wrappers). USDZ companion generated for iOS AR.
+- **Background worker** (`worker.py`): polls ConversionJob rows. Production web processes only enqueue work.
+- **Railway deployment**: web + worker in single container via `railway.json`, PostgreSQL, Redis for rate limits, persistent volume for files.
 
 ### Non-Negotiable Preservation Rules
 

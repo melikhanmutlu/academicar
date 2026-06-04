@@ -201,11 +201,11 @@
     </form>
 
     {% if is_edit %}
-      <dialog class="confirm-dialog" data-delete-paper-dialog>
+      <dialog class="confirm-dialog" data-delete-paper-dialog aria-labelledby="delete-dialog-title">
         <form method="dialog" class="confirm-dialog-card">
           <div>
             <span class="eyebrow">Confirm delete</span>
-            <h2>Delete this publication?</h2>
+            <h2 id="delete-dialog-title">Delete this publication?</h2>
             <p>The publication will be hidden from your dashboard and public links. Admins can restore it later.</p>
           </div>
           <div class="confirm-dialog-actions">

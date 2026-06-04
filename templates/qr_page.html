@@ -62,7 +62,7 @@
 
     <aside class="qr-panel">
       <div class="qr-wrap">
-        <img src="{{ url_for('qr_image', model_id=model.id) }}" alt="QR code">
+        <img src="{{ url_for('qr_image', model_id=model.id) }}" alt="QR code for {{ model.display_name or model.original_filename }}">
       </div>
       <div class="instructions">
         <strong style="color:white;">Usage:</strong>

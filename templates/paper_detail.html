@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ paper.title }} - AcademicAR{% endblock %}
 {% block head %}
-<script type="module" src="https://unpkg.com/@google/model-viewer@4.2.0/dist/model-viewer.min.js"></script>
+<script type="module" src="https://unpkg.com/@google/model-viewer@4.2.0/dist/model-viewer.min.js" crossorigin="anonymous"></script>
 {% endblock %}
 
 {% block content %}
@@ -488,23 +488,27 @@
   const pendingRows = [...document.querySelectorAll('[data-model-row]')]
     .filter((row) => !['ready', 'failed'].includes(row.dataset.status));
   if (pendingRows.length) {
+    let hasReloaded = false;
     const poll = async () => {
+      if (hasReloaded) return;
       let stillPending = false;
       await Promise.all(pendingRows.map(async (row) => {
+        if (hasReloaded) return;
         if (['ready', 'failed'].includes(row.dataset.status)) return;
         stillPending = true;
         try {
           const response = await fetch(row.dataset.statusUrl, { headers: { Accept: 'application/json' } });
           if (!response.ok) return;
           const payload = await response.json();
-          if (['ready', 'failed'].includes(payload.status)) {
+          if (['ready', 'failed'].includes(payload.status) && !hasReloaded) {
+            hasReloaded = true;
             window.location.reload();
           }
         } catch (error) {
           stillPending = true;
         }
       }));
-      if (stillPending) setTimeout(poll, 2500);
+      if (stillPending && !hasReloaded) setTimeout(poll, 2500);
     };
     setTimeout(poll, 1200);
   }
