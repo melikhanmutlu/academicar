@@ -69,7 +69,7 @@ class Paper(db.Model):
     pmid = db.Column(db.String(100), nullable=True)
     expires_at = db.Column(db.DateTime, nullable=True, default=None)
     deleted_at = db.Column(db.DateTime, nullable=True)
-    deleted_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    deleted_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = db.Column(db.DateTime, default=utc_now)
     deleted_by = db.relationship("User", foreign_keys=[deleted_by_user_id])
 
@@ -174,7 +174,7 @@ class ConversionJob(db.Model):
     job_type = db.Column(db.String(40), nullable=False, default="model_upload", index=True)
     status = db.Column(db.String(30), nullable=False, default="pending", index=True)
     model_id = db.Column(db.String(36), db.ForeignKey("models.id"), nullable=False, index=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     payload = db.Column(db.JSON, nullable=False, default=dict)
     attempts = db.Column(db.Integer, nullable=False, default=0)
     max_attempts = db.Column(db.Integer, nullable=False, default=3)
@@ -194,8 +194,8 @@ class Payment(db.Model):
     __tablename__ = "payments"
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
-    paper_id = db.Column(db.Integer, db.ForeignKey("papers.id"), nullable=True, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    paper_id = db.Column(db.Integer, db.ForeignKey("papers.id", ondelete="SET NULL"), nullable=True, index=True)
     amount_kurus = db.Column(db.Integer, nullable=False)
     currency = db.Column(db.String(3), nullable=False, default="TRY")
     provider = db.Column(db.String(50), nullable=False, default="manual")
@@ -217,7 +217,7 @@ class AuditLog(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     event_type = db.Column(db.String(50), nullable=False, index=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     resource_id = db.Column(db.String(255), nullable=True, index=True)
     details = db.Column(db.JSON, nullable=True)
     ip_address = db.Column(db.String(45), nullable=True)

@@ -48,7 +48,8 @@ from utils.security import require_model_ownership, require_paper_ownership
 from services.storage_service import StorageError, safe_move_file, safe_save_file, save_companion_files
 
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+_log_level = getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper(), logging.INFO)
+logging.basicConfig(level=_log_level, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 # Baseline Content-Security-Policy. Whitelists the CDNs the app currently
@@ -188,14 +189,6 @@ def create_app(test_config: dict | None = None) -> Flask:
         stamp_alembic_version_if_needed(app)
 
     return app
-
-
-def allowed_stl(filename: str) -> bool:
-    return "." in filename and filename.rsplit(".", 1)[1].lower() == "stl"
-
-
-def allowed_glb(filename: str) -> bool:
-    return "." in filename and filename.rsplit(".", 1)[1].lower() == "glb"
 
 
 SUPPORTED_MODEL_EXTENSIONS = {"stl", "glb", "obj", "fbx"}
@@ -420,6 +413,7 @@ def create_backup_archive(app: Flask, created_by_user_id: int | None = None, rea
     filename = f"academic_ar_backup_{timestamp}.zip"
     archive_path = os.path.join(folder, filename)
     manifest_lines = [
+        "format_version=1",
         f"created_at={datetime.now(UTC).isoformat()}",
         f"created_by_user_id={created_by_user_id or ''}",
         f"reason={reason}",
@@ -633,6 +627,9 @@ def make_slug(title: str) -> str:
     counter = 1
     while Paper.query.filter_by(slug=slug).first() is not None:
         counter += 1
+        if counter > 10000:
+            slug = f"{base}-{uuid.uuid4().hex[:8]}"
+            break
         slug = f"{base}-{counter}"
     return slug
 
@@ -660,6 +657,7 @@ def validate_paper_form(form) -> tuple[dict, list[str]]:
     length_limits = {
         "Authors": (authors, 500),
         "Field": (field, 100),
+        "Abstract": (abstract, 5000),
         "DOI": (doi, 200),
         "Institution / Journal": (institution, 300),
         "PMID": (pmid, 100),
@@ -730,7 +728,6 @@ def ensure_model_qr_link(model: Model3D) -> QRLink:
     """
     if not model.public_id:
         public_id = new_public_id()
-        # Defensive: ensure global uniqueness across both legacy Model3D and QRLink rows.
         while (
             QRLink.query.filter_by(public_id=public_id).first()
             or Model3D.query.filter_by(public_id=public_id).first()
@@ -746,6 +743,13 @@ def ensure_model_qr_link(model: Model3D) -> QRLink:
             target_type="model_viewer",
         )
         db.session.add(qr_link)
+        try:
+            db.session.flush()
+        except IntegrityError:
+            db.session.rollback()
+            qr_link = QRLink.query.filter_by(model_id=model.id, target_type="model_viewer").first()
+            if qr_link is None:
+                raise
     elif qr_link.public_id != model.public_id:
         qr_link.public_id = model.public_id
     if qr_link.status != "active":
@@ -964,7 +968,7 @@ def collect_paper_file_paths(app: Flask, paper: Paper) -> list[tuple[str, str]]:
     for model in paper.models:
         paths.extend(collect_model_file_paths(app, model))
     if paper.pdf_path:
-        paths.append(("file", os.path.join(app.config["PDF_FOLDER"], paper.pdf_path)))
+        paths.append(("file", os.path.join(app.config["PDF_FOLDER"], os.path.basename(paper.pdf_path))))
     paths.append(("file", os.path.join(app.config["QR_FOLDER"], paper_qr_filename(paper.id))))
     return paths
 
@@ -1238,7 +1242,7 @@ def process_model_upload_job(
         except Exception:
             db.session.rollback()
             logger.exception("Background model processing failed")
-            cleanup_file(target_glb if is_replacement else None)
+            cleanup_file(target_glb)
             mark_model_failed(
                 model_id,
                 "Unexpected conversion error. Please check the file and try again.",
@@ -1247,6 +1251,8 @@ def process_model_upload_job(
                 version=version,
             )
             cleanup_dir(upload_dir)
+            if not is_replacement:
+                cleanup_dir(converted_dir)
 
 
 def enqueue_conversion_job(
@@ -1348,8 +1354,8 @@ def _create_model_for_paper(
             "the right to share it."
         )
     license_normalized = normalize_license_type(license_type)
-    display_name = (display_name or "").strip() or None
-    description = (description or "").strip() or None
+    display_name = (display_name or "").strip()[:255] or None
+    description = (description or "").strip()[:5000] or None
     color = (color or "").strip() or None
     if color and HEX_COLOR_PATTERN.fullmatch(color) is None:
         color = None
@@ -1556,6 +1562,14 @@ def register_routes(app: Flask) -> None:
         if not current_user.is_admin:
             abort(403)
 
+    @app.route("/health")
+    def health():
+        try:
+            db.session.execute(db.text("SELECT 1"))
+            return jsonify({"status": "ok"}), 200
+        except Exception:
+            return jsonify({"status": "error"}), 500
+
     @app.route("/")
     def landing():
         return render_template("landing.html")
@@ -1709,7 +1723,11 @@ def register_routes(app: Flask) -> None:
         model = db.session.get(Model3D, model_id)
         if not model or not model.qr_code_path:
             abort(404)
+        if not model.paper:
+            abort(404)
         if paper_is_expired(model.paper):
+            abort(404)
+        if not _paper_visible_to_request(model.paper):
             abort(404)
         return send_from_directory(app.config["QR_FOLDER"], os.path.basename(model.qr_code_path))
 
@@ -1718,6 +1736,10 @@ def register_routes(app: Flask) -> None:
     def qr_print(model_id):
         model = db.session.get(Model3D, model_id)
         if not model:
+            abort(404)
+        if not model.paper:
+            abort(404)
+        if paper_is_expired(model.paper):
             abort(404)
         if model.user_id != current_user.id:
             abort(403)
@@ -2054,12 +2076,13 @@ def register_routes(app: Flask) -> None:
             .limit(10)
             .all()
         )
-        top_viewed_models = []
-        for model_id, count in top_viewed_rows:
-            model = db.session.get(Model3D, model_id)
-            top_viewed_models.append({"model": model, "model_id": model_id, "count": count})
-        storage_by_user = []
-        for user_id, total_size, model_count in (
+        viewed_model_ids = [r[0] for r in top_viewed_rows]
+        viewed_models_map = {m.id: m for m in Model3D.query.filter(Model3D.id.in_(viewed_model_ids)).all()} if viewed_model_ids else {}
+        top_viewed_models = [
+            {"model": viewed_models_map.get(model_id), "model_id": model_id, "count": count}
+            for model_id, count in top_viewed_rows
+        ]
+        storage_rows = (
             db.session.query(
                 Model3D.user_id,
                 func.coalesce(func.sum(Model3D.file_size), 0),
@@ -2069,9 +2092,13 @@ def register_routes(app: Flask) -> None:
             .order_by(func.coalesce(func.sum(Model3D.file_size), 0).desc())
             .limit(10)
             .all()
-        ):
-            user = db.session.get(User, user_id)
-            storage_by_user.append({"user": user, "user_id": user_id, "size": total_size or 0, "models": model_count})
+        )
+        storage_user_ids = [r[0] for r in storage_rows]
+        storage_users_map = {u.id: u for u in User.query.filter(User.id.in_(storage_user_ids)).all()} if storage_user_ids else {}
+        storage_by_user = [
+            {"user": storage_users_map.get(user_id), "user_id": user_id, "size": total_size or 0, "models": model_count}
+            for user_id, total_size, model_count in storage_rows
+        ]
         # Filesystem scanning (os.walk over four folders) and orphan detection
         # are expensive, so only run them on the pages that actually display the
         # results: "overview" needs the orphan count for critical alerts, and
@@ -2270,7 +2297,7 @@ def register_routes(app: Flask) -> None:
         flash(f"Backup created: {filename}", "success")
         return redirect(url_for("admin_dashboard", admin_page="backups"))
 
-    @app.route("/admin/backups/<path:filename>")
+    @app.route("/admin/backups/<filename>")
     @login_required
     def admin_backup_download(filename):
         require_admin()
@@ -2291,7 +2318,12 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("admin_dashboard", admin_page="users"))
         previous = user.is_admin
         user.is_admin = make_admin
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not update. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="users"))
         log_audit(
             "admin_user_role_changed",
             user_id=current_user.id,
@@ -2314,7 +2346,12 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("admin_dashboard", admin_page="users"))
         previous = user.plan
         user.plan = new_plan
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not update. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="users"))
         log_audit(
             "admin_user_plan_changed",
             user_id=current_user.id,
@@ -2333,10 +2370,19 @@ def register_routes(app: Flask) -> None:
             abort(404)
         previous = {"is_public": paper.is_public, "status": paper.status}
         paper.is_public = request.form.get("is_public") == "1"
-        paper.status = (request.form.get("status") or "active").strip().lower()
+        new_status = (request.form.get("status") or "active").strip().lower()
+        if new_status not in {"active", "deleted"}:
+            flash("Invalid status value.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="content"))
+        paper.status = new_status
         if paper.status == "deleted":
             paper.is_public = False
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not update. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="content"))
         log_audit(
             "admin_paper_visibility_changed",
             user_id=current_user.id,
@@ -2357,7 +2403,12 @@ def register_routes(app: Flask) -> None:
         paper.status = "active"
         paper.deleted_at = None
         paper.deleted_by_user_id = None
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not update. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="content"))
         log_audit(
             "admin_paper_restored",
             user_id=current_user.id,
@@ -2377,7 +2428,12 @@ def register_routes(app: Flask) -> None:
         new_license = normalize_license_type(request.form.get("license_type"))
         previous = model.license_type
         apply_model_license_defaults(model, new_license)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not update. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="models"))
         log_audit(
             "admin_model_license_changed",
             user_id=current_user.id,
@@ -2402,7 +2458,12 @@ def register_routes(app: Flask) -> None:
         model.processing_status = new_status
         if new_status != "failed":
             model.processing_error = None
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not update. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="models"))
         log_audit(
             "admin_model_processing_changed",
             user_id=current_user.id,
@@ -2425,7 +2486,12 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("admin_dashboard", admin_page="access"))
         previous = qr_link.status
         qr_link.status = new_status
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not update. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="access"))
         log_audit(
             "admin_qr_status_changed",
             user_id=current_user.id,
@@ -2450,7 +2516,12 @@ def register_routes(app: Flask) -> None:
         payment.status = new_status
         if new_status == "paid" and not payment.paid_at:
             payment.paid_at = datetime.now(UTC)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not update. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="revenue"))
         log_audit(
             "admin_payment_status_changed",
             user_id=current_user.id,
@@ -2588,6 +2659,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/account/password", methods=["POST"])
     @login_required
+    @limiter.limit("5 per hour", methods=["POST"])
     def account_change_password():
         current_pw = request.form.get("current_password") or ""
         new_pw = request.form.get("new_password") or ""
@@ -2603,8 +2675,12 @@ def register_routes(app: Flask) -> None:
             flash("Current password is incorrect.", "danger")
             return redirect(url_for("profile"))
         min_length = app.config.get("PASSWORD_MIN_LENGTH", 8)
+        max_length = 1024
         if len(new_pw) < min_length:
             flash(f"New password must be at least {min_length} characters.", "danger")
+            return redirect(url_for("profile"))
+        if len(new_pw) > max_length:
+            flash(f"Password must be at most {max_length} characters.", "danger")
             return redirect(url_for("profile"))
         if new_pw != confirm:
             flash("New password and confirmation do not match.", "danger")
@@ -2625,6 +2701,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/account/email", methods=["POST"])
     @login_required
+    @limiter.limit("5 per hour", methods=["POST"])
     def account_change_email():
         new_email = (request.form.get("new_email") or "").strip().lower()
         password = request.form.get("current_password") or ""
@@ -2716,6 +2793,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/account/profile", methods=["POST"])
     @login_required
+    @limiter.limit("10 per hour", methods=["POST"])
     def account_update_profile():
         username = (request.form.get("username") or "").strip()
         if len(username) < 2 or len(username) > 80:
@@ -2739,6 +2817,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/account/delete", methods=["POST"])
     @login_required
+    @limiter.limit("3 per hour", methods=["POST"])
     def account_delete():
         confirm = (request.form.get("confirm") or "").strip()
         password = request.form.get("current_password") or ""
@@ -2749,8 +2828,6 @@ def register_routes(app: Flask) -> None:
             flash("Current password is incorrect.", "danger")
             return redirect(url_for("profile"))
 
-        # Cleanup: collect every file path tied to the user before the cascade
-        # delete removes the database rows.
         files_to_remove = []
         for paper in current_user.papers:
             files_to_remove.extend(collect_paper_file_paths(app, paper))
@@ -2758,6 +2835,11 @@ def register_routes(app: Flask) -> None:
         user_id = current_user.id
         user_email = current_user.email
         try:
+            log_audit("account_deleted", user_id=user_id, details={"email": user_email})
+            ConversionJob.query.filter_by(user_id=user_id).update({"user_id": None})
+            Payment.query.filter_by(user_id=user_id).update({"user_id": None})
+            AuditLog.query.filter(AuditLog.user_id == user_id, AuditLog.event_type != "account_deleted").update({"user_id": None})
+            Paper.query.filter_by(deleted_by_user_id=user_id).update({"deleted_by_user_id": None})
             db.session.delete(current_user)
             db.session.commit()
         except SQLAlchemyError:
@@ -2767,7 +2849,6 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("profile"))
 
         cleanup_paths(files_to_remove)
-        log_audit("account_deleted", user_id=user_id, details={"email": user_email})
         from flask_login import logout_user
         logout_user()
         flash("Your account and all associated data were permanently deleted.", "info")
@@ -2803,7 +2884,7 @@ def register_routes(app: Flask) -> None:
             doi = query
             doi = re.sub(r'^(https?://)?(dx\.)?doi\.org/', '', doi, flags=re.IGNORECASE)
             url = f"https://api.crossref.org/works/{urllib.parse.quote(doi)}"
-            headers = {"User-Agent": f"AcademicAR/1.0 (mailto:{current_app.config['CONTACT_EMAIL']})"}
+            headers = {"User-Agent": f"AcademicAR/1.0 (mailto:{current_app.config.get('CONTACT_EMAIL', 'info@academicar.com')})"}
             req = urllib.request.Request(url, headers=headers)
             try:
                 with urllib.request.urlopen(req, timeout=5) as response:
@@ -2855,7 +2936,7 @@ def register_routes(app: Flask) -> None:
 
         elif is_pmid:
             url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id={query}&retmode=json"
-            req = urllib.request.Request(url, headers={"User-Agent": f"AcademicAR/1.0 (mailto:{current_app.config['CONTACT_EMAIL']})"})
+            req = urllib.request.Request(url, headers={"User-Agent": f"AcademicAR/1.0 (mailto:{current_app.config.get('CONTACT_EMAIL', 'info@academicar.com')})"})
             try:
                 with urllib.request.urlopen(req, timeout=5) as response:
                     if response.status == 200:
@@ -3447,8 +3528,8 @@ def register_routes(app: Flask) -> None:
         if not model:
             abort(404)
         if request.method == "POST":
-            model.display_name = (request.form.get("display_name") or "").strip() or None
-            model.description = (request.form.get("description") or "").strip() or None
+            model.display_name = (request.form.get("display_name") or "").strip()[:255] or None
+            model.description = (request.form.get("description") or "").strip()[:5000] or None
             try:
                 db.session.commit()
             except SQLAlchemyError:
@@ -3465,7 +3546,7 @@ def register_routes(app: Flask) -> None:
     @require_model_ownership
     def model_delete(model_id):
         model = db.session.get(Model3D, model_id)
-        if not model:
+        if not model or not model.paper:
             abort(404)
         slug = model.paper.slug
         file_paths = collect_model_file_paths(app, model)

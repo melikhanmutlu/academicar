@@ -79,7 +79,8 @@ class RegistrationForm(FlaskForm):
             DataRequired(),
             Length(
                 min=PASSWORD_MIN_LENGTH,
-                message=f"Password must be at least {PASSWORD_MIN_LENGTH} characters.",
+                max=1024,
+                message=f"Password must be between {PASSWORD_MIN_LENGTH} and 1024 characters.",
             ),
         ],
     )

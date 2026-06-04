@@ -48,9 +48,14 @@ def _find_texture(uri: str, search_dirs: list[str]) -> Path | None:
     candidates = []
     uri_path = Path(uri.replace("\\", "/"))
     for directory in search_dirs:
-        root = Path(directory)
-        candidates.append(root / uri_path)
-        candidates.append(root / uri_path.name)
+        root = Path(directory).resolve()
+        for candidate in (root / uri_path, root / uri_path.name):
+            try:
+                resolved = candidate.resolve()
+            except (OSError, ValueError):
+                continue
+            if str(resolved).startswith(str(root)):
+                candidates.append(resolved)
     lower_name = uri_path.name.lower()
     for directory in search_dirs:
         root = Path(directory)

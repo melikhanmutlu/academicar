@@ -627,7 +627,10 @@
                       <option value="0" {% if not paper.is_public %}selected{% endif %}>Private</option>
                       <option value="1" {% if paper.is_public %}selected{% endif %}>Public</option>
                     </select>
-                    <input name="status" class="field-input compact-input" value="{{ paper.status or 'active' }}" aria-label="Publication status">
+                    <select name="status" class="field-select compact-select" aria-label="Publication status">
+                      <option value="active" {% if (paper.status or 'active') == 'active' %}selected{% endif %}>Active</option>
+                      <option value="deleted" {% if paper.status == 'deleted' %}selected{% endif %}>Deleted</option>
+                    </select>
                     <button type="submit" class="btn-secondary compact">Update</button>
                   </form>
                   {% if paper.status == "deleted" %}

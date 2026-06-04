@@ -43,12 +43,12 @@
 
       <div>
         <label class="field-label">Title <span class="text-red-500">*</span></label>
-        <input type="text" name="title" value="{{ form.get('title', '') }}" required class="field-input text-lg" placeholder="Full title of the publication or project">
+        <input type="text" name="title" value="{{ form.get('title', '') }}" required maxlength="500" class="field-input text-lg" placeholder="Full title of the publication or project">
       </div>
 
       <div>
         <label class="field-label">Authors</label>
-        <input type="text" name="authors" value="{{ form.get('authors', '') }}" placeholder="Jane Doe, John Smith" class="field-input">
+        <input type="text" name="authors" value="{{ form.get('authors', '') }}" maxlength="500" placeholder="Jane Doe, John Smith" class="field-input">
         <p class="text-xs text-[#5c6473] mt-2">Separate authors with commas.</p>
       </div>
 
@@ -71,17 +71,17 @@
       <div class="grid sm:grid-cols-2 gap-4">
         <div>
           <label class="field-label">Institution / Journal</label>
-          <input type="text" name="institution" value="{{ form.get('institution', '') }}" placeholder="University, lab, journal, or conference" class="field-input">
+          <input type="text" name="institution" value="{{ form.get('institution', '') }}" maxlength="300" placeholder="University, lab, journal, or conference" class="field-input">
         </div>
         <div>
           <label class="field-label">DOI</label>
-          <input type="text" name="doi" value="{{ form.get('doi', '') }}" placeholder="10.1234/example.2026" class="field-input">
+          <input type="text" name="doi" value="{{ form.get('doi', '') }}" maxlength="200" placeholder="10.1234/example.2026" class="field-input">
         </div>
       </div>
 
       <div>
         <label class="field-label">PMID</label>
-        <input type="text" name="pmid" value="{{ form.get('pmid', '') }}" placeholder="Optional PubMed identifier" class="field-input">
+        <input type="text" name="pmid" value="{{ form.get('pmid', '') }}" maxlength="100" placeholder="Optional PubMed identifier" class="field-input">
       </div>
 
       <div>
@@ -117,7 +117,7 @@
                 {{ paper.pdf_path.split('_', 1)[1] if '_' in paper.pdf_path else paper.pdf_path }}
               </span>
             </div>
-            <button type="button" onclick="deletePaperPdfAJAX('{{ paper.slug }}')" class="inline-flex items-center text-sm font-semibold text-[#ef4444] cursor-pointer hover:text-red-700 transition" style="background: none; border: none; padding: 0; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: #ef4444; font-size: 14px; font-weight: 600; transition: color 0.2s; outline: none; font-family: inherit;">
+            <button type="button" onclick="deletePaperPdfAJAX({{ paper.slug|tojson }})" class="inline-flex items-center text-sm font-semibold text-[#ef4444] cursor-pointer hover:text-red-700 transition" style="background: none; border: none; padding: 0; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: #ef4444; font-size: 14px; font-weight: 600; transition: color 0.2s; outline: none; font-family: inherit;">
               <svg class="w-4 h-4 shrink-0" style="width: 16px; height: 16px; color: #ef4444; flex-shrink: 0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
               </svg>
@@ -160,8 +160,8 @@
           </div>
 
           <div class="grid sm:grid-cols-2 gap-4">
-            <input type="text" name="model_display_name" placeholder="Model name" class="field-input">
-            <input type="text" name="model_description" placeholder="Short model note" class="field-input">
+            <input type="text" name="model_display_name" placeholder="Model name" class="field-input" maxlength="255" aria-label="Model name">
+            <input type="text" name="model_description" placeholder="Short model note" class="field-input" maxlength="5000" aria-label="Model description">
           </div>
 
           <div>
@@ -201,11 +201,11 @@
     </form>
 
     {% if is_edit %}
-      <dialog class="confirm-dialog" data-delete-paper-dialog>
+      <dialog class="confirm-dialog" data-delete-paper-dialog aria-labelledby="delete-dialog-title">
         <form method="dialog" class="confirm-dialog-card">
           <div>
             <span class="eyebrow">Confirm delete</span>
-            <h2>Delete this publication?</h2>
+            <h2 id="delete-dialog-title">Delete this publication?</h2>
             <p>The publication will be hidden from your dashboard and public links. Admins can restore it later.</p>
           </div>
           <div class="confirm-dialog-actions">

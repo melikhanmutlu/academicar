@@ -1,7 +1,15 @@
 {% extends "base.html" %}
 {% block title %}{{ paper.title }} - AcademicAR{% endblock %}
 {% block head %}
-<script type="module" src="https://unpkg.com/@google/model-viewer@4.2.0/dist/model-viewer.min.js"></script>
+<meta property="og:type" content="article">
+<meta property="og:title" content="{{ paper.title|striptags|truncate(120) }}">
+<meta property="og:description" content="{{ (paper.abstract or 'Academic publication with interactive 3D models.')|striptags|truncate(200) }}">
+<meta property="og:image" content="{{ url_for('static', filename='images/clinical-spatial-hero.png', _external=True) }}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ paper.title|striptags|truncate(120) }}">
+<meta name="twitter:description" content="{{ (paper.abstract or 'Academic publication with interactive 3D models.')|striptags|truncate(200) }}">
+<meta name="twitter:image" content="{{ url_for('static', filename='images/clinical-spatial-hero.png', _external=True) }}">
+<script type="module" src="https://unpkg.com/@google/model-viewer@4.2.0/dist/model-viewer.min.js" crossorigin="anonymous"></script>
 {% endblock %}
 
 {% block content %}
@@ -94,7 +102,7 @@
                 {% if m.description %}<p class="text-sm text-[#64748b] mt-2 line-clamp-2">{{ m.description }}</p>{% endif %}
                 <div class="model-actions mt-4">
                   <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="btn-primary compact">Open 3D / AR</a>
-                  <button type="button" class="btn-secondary compact" data-copy-link="{{ public_url('view_model', model_id=m.id) }}">Copy link</button>
+                  <button type="button" class="btn-secondary compact" data-copy-link="{{ public_url('view_model', model_id=m.id) }}" aria-label="Copy viewer link">Copy link</button>
                 </div>
               </div>
 

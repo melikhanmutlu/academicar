@@ -39,7 +39,7 @@ python -m pytest tests/test_auth.py::test_register -p no:cacheprovider
 **Validation**
 ```bash
 # Syntax check
-python -m py_compile app.py auth.py models.py config.py converters/base_converter.py converters/stl_converter.py
+python -m py_compile app.py auth.py models.py config.py licensing.py worker.py converters/base_converter.py converters/stl_converter.py converters/external_converter.py
 ```
 
 **Database**
@@ -54,21 +54,28 @@ flask db upgrade
 flask db downgrade base
 ```
 
+> **Migration architecture (deliberate design):** The initial migration
+> (`669b2de1fcd7`) only creates indexes — it does **not** contain `CREATE TABLE`
+> statements. The table schema is materialized at app startup via
+> `db.create_all()`, after which `stamp_alembic_version_if_needed()` stamps the
+> Alembic version to head. Fresh deployments therefore get their tables from
+> `create_all()` (not from migration replay), then subsequent incremental
+> migrations apply column/index changes idempotently. Do **not** rewrite the
+> initial migration to add `CREATE TABLE` statements — doing so risks breaking
+> the existing stamp logic and production schema.
+
 ## Architecture Overview
 
 **Core Stack**: Flask (Python 3.12) + SQLAlchemy ORM + Jinja2 templates + Tailwind CSS + PostgreSQL/SQLite
 
-## Current MVP Direction
+## Current State & Implemented Features
 
-Use `MVP_IMPLEMENTATION_PLAN.md` as the working source of truth for the next implementation phase. Update its checklist as tasks are completed, and keep completed work visible by checking items off and optionally using Markdown strikethrough notes.
-
-The next MVP direction is:
-
-- Model-based licensing instead of user/publication-level plan ownership.
-- Stable managed QR resolver URLs (`/m/<public_id>`) instead of QR codes pointing directly at model files or volatile viewer paths.
-- Railway-first deployment with web, worker, PostgreSQL, Redis, and persistent volume, while keeping storage/provider logic portable.
-- Converter expansion for GLB direct upload and STL/OBJ/FBX to GLB conversion, adapting the working converter approach from `C:\Users\syste\Desktop\Web & Dev\Projeler\web_ar-main`.
-- Replace-model and appearance-update flows must preserve the model ID, QR public ID, and resolver URL.
+- **Model-based licensing** (`licensing.py`): per-model plan (free/academic/extended_archive) with `LicensePlan` dataclass, access start/expiry dates, storage limits.
+- **Stable QR resolver** (`/m/<public_id>`): QRLink model maps public_id to model_id. QR codes survive replacements, upgrades, and color changes.
+- **Model versioning**: ModelVersion table tracks replacement history per model. Replace-model flow preserves model ID, QR public ID, and resolver URL.
+- **Converter pipeline**: GLB direct upload + STL/OBJ/FBX to GLB conversion via STLConverter (trimesh) and ExternalConverter (Node CLI wrappers). USDZ companion generated for iOS AR.
+- **Background worker** (`worker.py`): polls ConversionJob rows. Production web processes only enqueue work.
+- **Railway deployment**: web + worker in single container via `railway.json`, PostgreSQL, Redis for rate limits, persistent volume for files.
 
 ### Non-Negotiable Preservation Rules
 

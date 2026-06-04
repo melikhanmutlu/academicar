@@ -18,7 +18,11 @@ def main() -> None:
     interval = float(os.environ.get("WORKER_POLL_INTERVAL", "2"))
     app.logger.info("AcademicAR worker booted. Polling conversion_jobs every %.1fs.", interval)
     while True:
-        processed = run_next_conversion_job(app)
+        try:
+            processed = run_next_conversion_job(app)
+        except Exception:
+            app.logger.exception("Unexpected error in conversion job processing")
+            processed = False
         if processed:
             continue
         time.sleep(interval)

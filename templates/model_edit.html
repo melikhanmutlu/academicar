@@ -25,12 +25,12 @@
         </div>
         <div class="model-edit-field-grid">
           <label class="field-label">Model name</label>
-          <input type="text" name="display_name" value="{{ model.display_name or '' }}" class="field-input" placeholder="Example: Femur reconstruction">
+          <input type="text" name="display_name" value="{{ model.display_name or '' }}" class="field-input" placeholder="Example: Femur reconstruction" maxlength="255" aria-label="Model name">
         </div>
 
         <div class="model-edit-field-grid">
           <label class="field-label">Model note</label>
-          <textarea name="description" rows="6" class="field-textarea" placeholder="Describe the model context within the publication">{{ model.description or '' }}</textarea>
+          <textarea name="description" rows="6" class="field-textarea" maxlength="5000" aria-label="Model note" placeholder="Describe the model context within the publication">{{ model.description or '' }}</textarea>
         </div>
 
         <div class="model-edit-actions">
