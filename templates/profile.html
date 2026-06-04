@@ -197,8 +197,8 @@
           <form method="POST" action="{{ url_for('account_change_password') }}" class="space-y-3 mt-4">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="password" name="current_password" required maxlength="128" autocomplete="current-password" placeholder="Current password" class="field-input">
-            <input type="password" name="new_password" required minlength="6" maxlength="128" autocomplete="new-password" placeholder="New password" class="field-input">
-            <input type="password" name="confirm_password" required minlength="6" maxlength="128" autocomplete="new-password" placeholder="Confirm new password" class="field-input">
+            <input type="password" name="new_password" required minlength="8" maxlength="1024" autocomplete="new-password" placeholder="New password" class="field-input">
+            <input type="password" name="confirm_password" required minlength="8" maxlength="1024" autocomplete="new-password" placeholder="Confirm new password" class="field-input">
             <button type="submit" class="btn-primary compact">Update password</button>
           </form>
         {% else %}

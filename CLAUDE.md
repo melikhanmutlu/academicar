@@ -39,7 +39,7 @@ python -m pytest tests/test_auth.py::test_register -p no:cacheprovider
 **Validation**
 ```bash
 # Syntax check
-python -m py_compile app.py auth.py models.py config.py converters/base_converter.py converters/stl_converter.py
+python -m py_compile app.py auth.py models.py config.py licensing.py worker.py converters/base_converter.py converters/stl_converter.py converters/external_converter.py
 ```
 
 **Database**

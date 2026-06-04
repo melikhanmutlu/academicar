@@ -6,17 +6,20 @@ from models import db, Paper, Model3D
 def require_paper_ownership(func):
     """
     Decorator to ensure the current_user owns the paper specified by 'slug' or 'paper_id'.
-    Must be used AFTER @login_required.
+    Must be used AFTER @login_required. Excludes soft-deleted papers.
     """
     @wraps(func)
     def decorated_function(*args, **kwargs):
         if "slug" in kwargs:
-            paper = Paper.query.filter_by(slug=kwargs["slug"]).first_or_404()
+            paper = Paper.query.filter(
+                Paper.slug == kwargs["slug"],
+                db.or_(Paper.status.is_(None), Paper.status != "deleted"),
+            ).first_or_404()
             if paper.user_id != current_user.id:
                 abort(403)
         elif "paper_id" in kwargs:
             paper = db.session.get(Paper, kwargs["paper_id"])
-            if not paper:
+            if not paper or (paper.status or "active") == "deleted":
                 abort(404)
             if paper.user_id != current_user.id:
                 abort(403)
