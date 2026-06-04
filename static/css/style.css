@@ -6704,6 +6704,35 @@ label.rounded-xl input[type="checkbox"] {
   margin-bottom: 18px;
 }
 
+.admin-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-light-pearl);
+}
+
+.admin-pagination-info {
+  font-family: var(--font-inter);
+  font-size: 12px;
+  color: var(--color-silver-ash);
+}
+
+.admin-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-pagination-page {
+  font-family: var(--font-inter);
+  font-size: 12px;
+  color: var(--color-midnight-graphite);
+}
+
 .admin-section-head h2 {
   font-family: var(--font-polysans);
   font-size: 28px;

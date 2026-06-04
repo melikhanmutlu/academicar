@@ -341,3 +341,30 @@ def create_user_in_session(email):
     db.session.add(user)
     db.session.flush()
     return user
+
+
+# --------------------------------------------------------------------------- #
+# 3.6 Admin dashboard pagination
+# --------------------------------------------------------------------------- #
+def test_admin_users_list_paginates(client):
+    from tests.conftest import login
+
+    app = client.application
+    app.config["ADMIN_LIST_PAGE_SIZE"] = 2
+    with app.app_context():
+        admin = User(email="admin@example.com", username="Admin", is_admin=True)
+        admin.set_password("password123")
+        db.session.add(admin)
+        for i in range(4):
+            u = User(email=f"member{i}@example.com", username=f"Member{i}")
+            u.set_password("password123")
+            db.session.add(u)
+        db.session.commit()
+
+    login(client, email="admin@example.com")
+    page1 = client.get("/admin/users?page=1").get_data(as_text=True)
+    page2 = client.get("/admin/users?page=2").get_data(as_text=True)
+    assert "admin-pagination" in page1
+    assert "Showing 1" in page1
+    assert "Showing 3" in page2  # page 2 starts at row 3
+    assert page1 != page2

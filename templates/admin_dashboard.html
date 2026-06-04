@@ -1,6 +1,29 @@
 {% extends "base.html" %}
 {% block title %}Admin - AcademicAR{% endblock %}
 
+{% macro pager(meta, label) %}
+  {% if meta and meta.total %}
+  <div class="admin-pagination" role="navigation" aria-label="{{ label }} pagination">
+    <span class="admin-pagination-info">Showing {{ meta.start }}–{{ meta.end }} of {{ meta.total }} {{ label }}</span>
+    {% if meta.pages > 1 %}
+    <span class="admin-pagination-controls">
+      {% if meta.has_prev %}
+        <a class="btn-secondary compact" href="{{ meta.prev_url }}">Previous</a>
+      {% else %}
+        <span class="btn-secondary compact" aria-disabled="true" style="opacity:.4;pointer-events:none;">Previous</span>
+      {% endif %}
+      <span class="admin-pagination-page">Page {{ meta.page }} of {{ meta.pages }}</span>
+      {% if meta.has_next %}
+        <a class="btn-secondary compact" href="{{ meta.next_url }}">Next</a>
+      {% else %}
+        <span class="btn-secondary compact" aria-disabled="true" style="opacity:.4;pointer-events:none;">Next</span>
+      {% endif %}
+    </span>
+    {% endif %}
+  </div>
+  {% endif %}
+{% endmacro %}
+
 {% block content %}
 <div class="app-shell admin-shell">
   <div class="admin-header">
@@ -572,6 +595,7 @@
           {% endfor %}
         </tbody>
       </table>
+      {{ pager(users_pagination, "users") }}
     </div>
   </section>
   {% endif %}
@@ -646,6 +670,7 @@
           {% endfor %}
         </tbody>
       </table>
+      {{ pager(papers_pagination, "publications") }}
     </div>
   </section>
   {% endif %}
@@ -729,6 +754,7 @@
           {% endfor %}
         </tbody>
       </table>
+      {{ pager(models_pagination, "models") }}
     </div>
   </section>
   {% endif %}

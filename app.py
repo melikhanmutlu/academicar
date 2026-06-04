@@ -2063,9 +2063,39 @@ def register_routes(app: Flask) -> None:
                 )
             )
 
-        users = users_query.order_by(User.created_at.desc()).limit(100).all()
-        papers = Paper.query.order_by(Paper.created_at.desc()).limit(100).all()
-        models = models_query.order_by(Model3D.created_at.desc()).limit(100).all()
+        # Paginate the three management lists so admins can page past the first
+        # 100 rows instead of silently losing the rest.
+        per_page = max(int(app.config.get("ADMIN_LIST_PAGE_SIZE", 100)), 1)
+        page = max(request.args.get("page", default=1, type=int) or 1, 1)
+
+        def _page_url(page_num):
+            args = request.args.to_dict()
+            args.pop("admin_page", None)
+            args["page"] = page_num
+            return url_for("admin_dashboard", admin_page=admin_page, **args)
+
+        def _paginate(query):
+            total = query.count()
+            pages = max((total + per_page - 1) // per_page, 1)
+            current = min(page, pages)
+            items = query.offset((current - 1) * per_page).limit(per_page).all()
+            meta = {
+                "page": current,
+                "pages": pages,
+                "total": total,
+                "per_page": per_page,
+                "start": (current - 1) * per_page + 1 if total else 0,
+                "end": min(current * per_page, total),
+                "has_prev": current > 1,
+                "has_next": current < pages,
+                "prev_url": _page_url(current - 1) if current > 1 else None,
+                "next_url": _page_url(current + 1) if current < pages else None,
+            }
+            return items, meta
+
+        users, users_pagination = _paginate(users_query.order_by(User.created_at.desc()))
+        papers, papers_pagination = _paginate(Paper.query.order_by(Paper.created_at.desc()))
+        models, models_pagination = _paginate(models_query.order_by(Model3D.created_at.desc()))
         payments = Payment.query.order_by(Payment.created_at.desc()).limit(50).all()
         qr_links = QRLink.query.order_by(QRLink.created_at.desc()).limit(100).all()
         audit_logs = audit_query.order_by(AuditLog.timestamp.desc()).limit(50).all()
@@ -2360,6 +2390,9 @@ def register_routes(app: Flask) -> None:
             qr_links=qr_links,
             audit_logs=audit_logs,
             jobs=jobs,
+            users_pagination=users_pagination,
+            papers_pagination=papers_pagination,
+            models_pagination=models_pagination,
             totals=totals,
             stats=stats,
             processing_counts=processing_counts,
