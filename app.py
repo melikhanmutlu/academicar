@@ -2318,7 +2318,12 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("admin_dashboard", admin_page="users"))
         previous = user.is_admin
         user.is_admin = make_admin
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not update. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="users"))
         log_audit(
             "admin_user_role_changed",
             user_id=current_user.id,
@@ -2341,7 +2346,12 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("admin_dashboard", admin_page="users"))
         previous = user.plan
         user.plan = new_plan
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not update. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="users"))
         log_audit(
             "admin_user_plan_changed",
             user_id=current_user.id,
@@ -2367,7 +2377,12 @@ def register_routes(app: Flask) -> None:
         paper.status = new_status
         if paper.status == "deleted":
             paper.is_public = False
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not update. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="content"))
         log_audit(
             "admin_paper_visibility_changed",
             user_id=current_user.id,
@@ -2388,7 +2403,12 @@ def register_routes(app: Flask) -> None:
         paper.status = "active"
         paper.deleted_at = None
         paper.deleted_by_user_id = None
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not update. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="content"))
         log_audit(
             "admin_paper_restored",
             user_id=current_user.id,
@@ -2408,7 +2428,12 @@ def register_routes(app: Flask) -> None:
         new_license = normalize_license_type(request.form.get("license_type"))
         previous = model.license_type
         apply_model_license_defaults(model, new_license)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not update. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="models"))
         log_audit(
             "admin_model_license_changed",
             user_id=current_user.id,
@@ -2433,7 +2458,12 @@ def register_routes(app: Flask) -> None:
         model.processing_status = new_status
         if new_status != "failed":
             model.processing_error = None
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not update. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="models"))
         log_audit(
             "admin_model_processing_changed",
             user_id=current_user.id,
@@ -2456,7 +2486,12 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("admin_dashboard", admin_page="access"))
         previous = qr_link.status
         qr_link.status = new_status
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not update. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="access"))
         log_audit(
             "admin_qr_status_changed",
             user_id=current_user.id,
@@ -2481,7 +2516,12 @@ def register_routes(app: Flask) -> None:
         payment.status = new_status
         if new_status == "paid" and not payment.paid_at:
             payment.paid_at = datetime.now(UTC)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not update. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="revenue"))
         log_audit(
             "admin_payment_status_changed",
             user_id=current_user.id,

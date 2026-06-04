@@ -54,6 +54,16 @@ flask db upgrade
 flask db downgrade base
 ```
 
+> **Migration architecture (deliberate design):** The initial migration
+> (`669b2de1fcd7`) only creates indexes — it does **not** contain `CREATE TABLE`
+> statements. The table schema is materialized at app startup via
+> `db.create_all()`, after which `stamp_alembic_version_if_needed()` stamps the
+> Alembic version to head. Fresh deployments therefore get their tables from
+> `create_all()` (not from migration replay), then subsequent incremental
+> migrations apply column/index changes idempotently. Do **not** rewrite the
+> initial migration to add `CREATE TABLE` statements — doing so risks breaking
+> the existing stamp logic and production schema.
+
 ## Architecture Overview
 
 **Core Stack**: Flask (Python 3.12) + SQLAlchemy ORM + Jinja2 templates + Tailwind CSS + PostgreSQL/SQLite
