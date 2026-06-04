@@ -16,6 +16,14 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+
+def _safe_timeout() -> int:
+    try:
+        return int(os.environ.get("MODEL_CONVERT_TIMEOUT", "300"))
+    except (ValueError, TypeError):
+        return 300
+
+
 from .base_converter import BaseConverter
 from .glb_quality import embed_external_textures, ensure_pbr_materials, has_base_color_textures
 from .stl_converter import _srgb_to_linear, enrich_glb_for_ar, inject_pbr_material
@@ -53,7 +61,7 @@ class ExternalConverter(BaseConverter):
                 cwd=cwd,
                 capture_output=True,
                 text=True,
-                timeout=int(os.environ.get("MODEL_CONVERT_TIMEOUT", "300")),
+                timeout=_safe_timeout(),
             )
         except FileNotFoundError as exc:
             return subprocess.CompletedProcess(command, 127, "", str(exc))

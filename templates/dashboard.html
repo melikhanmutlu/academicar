@@ -397,7 +397,8 @@
       e.preventDefault();
       apply();
     });
-    input.addEventListener('input', apply);
+    let _debounceTimer;
+    input.addEventListener('input', () => { clearTimeout(_debounceTimer); _debounceTimer = setTimeout(apply, 250); });
     statusFilter?.addEventListener('change', apply);
     sortSelect?.addEventListener('change', () => { sortRows(); apply(); });
     clear?.addEventListener('click', () => {

@@ -79,7 +79,7 @@
           <p class="share-description">Scan this QR code with a smartphone to view the interactive 3D models and publication details.</p>
           <div class="copy-field mt-3" title="{{ public_url('paper_public', slug=paper.slug) }}">
             <span>{{ public_url('paper_public', slug=paper.slug) }}</span>
-            <button type="button" data-copy-link="{{ public_url('paper_public', slug=paper.slug) }}">Copy</button>
+            <button type="button" data-copy-link="{{ public_url('paper_public', slug=paper.slug) }}" aria-label="Copy publication link">Copy</button>
           </div>
         </div>
       </div>
@@ -166,7 +166,7 @@
                 <div class="model-actions mt-4">
                   {% if model_status == 'ready' %}
                     <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action detail-action-primary">Open 3D / AR</a>
-                    <button type="button" class="detail-action" data-copy-link="{{ model_resolver_url(m) }}">Copy Link</button>
+                    <button type="button" class="detail-action" data-copy-link="{{ model_resolver_url(m) }}" aria-label="Copy viewer link">Copy Link</button>
                     <a href="{{ url_for('qr_print', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action">View QR</a>
                   {% else %}
                     <button type="button" class="detail-action detail-action-muted" disabled>{{ 'Processing' if model_status != 'failed' else 'Not ready' }}</button>

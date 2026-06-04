@@ -43,12 +43,12 @@
 
       <div>
         <label class="field-label">Title <span class="text-red-500">*</span></label>
-        <input type="text" name="title" value="{{ form.get('title', '') }}" required class="field-input text-lg" placeholder="Full title of the publication or project">
+        <input type="text" name="title" value="{{ form.get('title', '') }}" required maxlength="500" class="field-input text-lg" placeholder="Full title of the publication or project">
       </div>
 
       <div>
         <label class="field-label">Authors</label>
-        <input type="text" name="authors" value="{{ form.get('authors', '') }}" placeholder="Jane Doe, John Smith" class="field-input">
+        <input type="text" name="authors" value="{{ form.get('authors', '') }}" maxlength="500" placeholder="Jane Doe, John Smith" class="field-input">
         <p class="text-xs text-[#5c6473] mt-2">Separate authors with commas.</p>
       </div>
 
@@ -71,17 +71,17 @@
       <div class="grid sm:grid-cols-2 gap-4">
         <div>
           <label class="field-label">Institution / Journal</label>
-          <input type="text" name="institution" value="{{ form.get('institution', '') }}" placeholder="University, lab, journal, or conference" class="field-input">
+          <input type="text" name="institution" value="{{ form.get('institution', '') }}" maxlength="300" placeholder="University, lab, journal, or conference" class="field-input">
         </div>
         <div>
           <label class="field-label">DOI</label>
-          <input type="text" name="doi" value="{{ form.get('doi', '') }}" placeholder="10.1234/example.2026" class="field-input">
+          <input type="text" name="doi" value="{{ form.get('doi', '') }}" maxlength="200" placeholder="10.1234/example.2026" class="field-input">
         </div>
       </div>
 
       <div>
         <label class="field-label">PMID</label>
-        <input type="text" name="pmid" value="{{ form.get('pmid', '') }}" placeholder="Optional PubMed identifier" class="field-input">
+        <input type="text" name="pmid" value="{{ form.get('pmid', '') }}" maxlength="100" placeholder="Optional PubMed identifier" class="field-input">
       </div>
 
       <div>

@@ -731,7 +731,6 @@ def ensure_model_qr_link(model: Model3D) -> QRLink:
     """
     if not model.public_id:
         public_id = new_public_id()
-        # Defensive: ensure global uniqueness across both legacy Model3D and QRLink rows.
         while (
             QRLink.query.filter_by(public_id=public_id).first()
             or Model3D.query.filter_by(public_id=public_id).first()
@@ -747,6 +746,13 @@ def ensure_model_qr_link(model: Model3D) -> QRLink:
             target_type="model_viewer",
         )
         db.session.add(qr_link)
+        try:
+            db.session.flush()
+        except IntegrityError:
+            db.session.rollback()
+            qr_link = QRLink.query.filter_by(model_id=model.id, target_type="model_viewer").first()
+            if qr_link is None:
+                raise
     elif qr_link.public_id != model.public_id:
         qr_link.public_id = model.public_id
     if qr_link.status != "active":
@@ -1239,7 +1245,7 @@ def process_model_upload_job(
         except Exception:
             db.session.rollback()
             logger.exception("Background model processing failed")
-            cleanup_file(target_glb if is_replacement else None)
+            cleanup_file(target_glb)
             mark_model_failed(
                 model_id,
                 "Unexpected conversion error. Please check the file and try again.",
@@ -1248,6 +1254,8 @@ def process_model_upload_job(
                 version=version,
             )
             cleanup_dir(upload_dir)
+            if not is_replacement:
+                cleanup_dir(converted_dir)
 
 
 def enqueue_conversion_job(
@@ -1725,6 +1733,8 @@ def register_routes(app: Flask) -> None:
         if not model:
             abort(404)
         if not model.paper:
+            abort(404)
+        if paper_is_expired(model.paper):
             abort(404)
         if model.user_id != current_user.id:
             abort(403)
@@ -2761,8 +2771,6 @@ def register_routes(app: Flask) -> None:
             flash("Current password is incorrect.", "danger")
             return redirect(url_for("profile"))
 
-        # Cleanup: collect every file path tied to the user before the cascade
-        # delete removes the database rows.
         files_to_remove = []
         for paper in current_user.papers:
             files_to_remove.extend(collect_paper_file_paths(app, paper))
@@ -2770,6 +2778,11 @@ def register_routes(app: Flask) -> None:
         user_id = current_user.id
         user_email = current_user.email
         try:
+            log_audit("account_deleted", user_id=user_id, details={"email": user_email})
+            ConversionJob.query.filter_by(user_id=user_id).update({"user_id": None})
+            Payment.query.filter_by(user_id=user_id).update({"user_id": None})
+            AuditLog.query.filter(AuditLog.user_id == user_id, AuditLog.event_type != "account_deleted").update({"user_id": None})
+            Paper.query.filter_by(deleted_by_user_id=user_id).update({"deleted_by_user_id": None})
             db.session.delete(current_user)
             db.session.commit()
         except SQLAlchemyError:
@@ -2779,7 +2792,6 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("profile"))
 
         cleanup_paths(files_to_remove)
-        log_audit("account_deleted", user_id=user_id, details={"email": user_email})
         from flask_login import logout_user
         logout_user()
         flash("Your account and all associated data were permanently deleted.", "info")
@@ -3477,7 +3489,7 @@ def register_routes(app: Flask) -> None:
     @require_model_ownership
     def model_delete(model_id):
         model = db.session.get(Model3D, model_id)
-        if not model:
+        if not model or not model.paper:
             abort(404)
         slug = model.paper.slug
         file_paths = collect_model_file_paths(app, model)
