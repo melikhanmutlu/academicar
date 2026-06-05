@@ -117,30 +117,47 @@ class TestViewerAnnotationHotspots:
         assert "scale_reference" in content
 
 
+class TestViewerInteractiveAnnotation:
+    """Viewer has interactive annotation placement for owners."""
+
+    def test_has_annotate_button(self):
+        content = (TEMPLATES_DIR / "viewer.html").read_text()
+        assert "annotateBtn" in content
+
+    def test_has_annotate_form(self):
+        content = (TEMPLATES_DIR / "viewer.html").read_text()
+        assert "annotateForm" in content
+        assert "annLabelInput" in content
+        assert "annDescInput" in content
+
+    def test_has_position_from_point_api(self):
+        content = (TEMPLATES_DIR / "viewer.html").read_text()
+        assert "positionAndNormalFromPoint" in content
+
+    def test_owner_only_guard(self):
+        content = (TEMPLATES_DIR / "viewer.html").read_text()
+        assert "is_owner" in content
+
+    def test_delete_button_on_hotspots(self):
+        content = (TEMPLATES_DIR / "viewer.html").read_text()
+        assert "annotation-delete-btn" in content
+        assert "data-delete-ann" in content
+
+
 class TestModelEditAnnotations:
-    """model_edit.html has annotation management."""
+    """model_edit.html links to viewer for annotation placement."""
 
     def test_has_annotation_section(self):
         content = (TEMPLATES_DIR / "model_edit.html").read_text()
         assert "annotationSection" in content
 
-    def test_has_add_annotation_button(self):
+    def test_links_to_viewer_for_annotation(self):
         content = (TEMPLATES_DIR / "model_edit.html").read_text()
-        assert "addAnnotation" in content
+        assert "Open Viewer to Annotate" in content
 
     def test_has_delete_annotation(self):
         content = (TEMPLATES_DIR / "model_edit.html").read_text()
         assert "deleteAnnotation" in content
-
-    def test_has_label_input(self):
-        content = (TEMPLATES_DIR / "model_edit.html").read_text()
-        assert 'id="annLabel"' in content
-
-    def test_has_position_inputs(self):
-        content = (TEMPLATES_DIR / "model_edit.html").read_text()
-        assert 'id="annPosX"' in content
-        assert 'id="annPosY"' in content
-        assert 'id="annPosZ"' in content
 
 
 class TestMigrationExists:

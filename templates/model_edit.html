@@ -117,8 +117,9 @@
         <div class="model-edit-card-head">
           <span class="eyebrow">Annotations</span>
           <h2>Educational labels</h2>
-          <p>Place annotation hotspots on the 3D model surface. Viewers see these as clickable labels.</p>
+          <p>Add annotation hotspots directly on the 3D model. Open the viewer and click "Annotate" in the toolbar to place labels interactively on the model surface.</p>
         </div>
+        {% if model.annotations|list %}
         <div id="annotationList" class="space-y-2">
           {% for ann in model.annotations|sort(attribute='order_index') %}
           <div class="flex items-center justify-between rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm" data-annotation-id="{{ ann.id }}">
@@ -130,33 +131,11 @@
           </div>
           {% endfor %}
         </div>
-        <div class="mt-4 space-y-2">
-          <div class="model-edit-field-grid">
-            <label class="field-label">Label</label>
-            <input type="text" id="annLabel" class="field-input" placeholder="e.g. Mitral valve" maxlength="120">
-          </div>
-          <div class="model-edit-field-grid">
-            <label class="field-label">Description (optional)</label>
-            <input type="text" id="annDescription" class="field-input" placeholder="Brief explanation" maxlength="200">
-          </div>
-          <div class="grid grid-cols-3 gap-2">
-            <div class="model-edit-field-grid">
-              <label class="field-label">X</label>
-              <input type="number" id="annPosX" class="field-input" step="0.001" value="0" placeholder="0">
-            </div>
-            <div class="model-edit-field-grid">
-              <label class="field-label">Y</label>
-              <input type="number" id="annPosY" class="field-input" step="0.001" value="0" placeholder="0">
-            </div>
-            <div class="model-edit-field-grid">
-              <label class="field-label">Z</label>
-              <input type="number" id="annPosZ" class="field-input" step="0.001" value="0" placeholder="0">
-            </div>
-          </div>
-          <p class="text-xs text-[#64748b]">Tip: Open the 3D viewer, right-click a point, and use browser dev tools to read the position from model-viewer's positionAndNormalFromPoint API.</p>
-          <div class="model-edit-actions">
-            <button type="button" class="detail-action detail-action-primary" onclick="addAnnotation()">Add Annotation</button>
-          </div>
+        {% else %}
+        <p class="text-sm text-[#64748b]">No annotations yet.</p>
+        {% endif %}
+        <div class="model-edit-actions mt-4">
+          <a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action detail-action-primary">Open Viewer to Annotate</a>
         </div>
       </div>
 
@@ -233,30 +212,6 @@
 
   const csrfToken = document.querySelector('[name="csrf_token"]').value;
   const modelId = '{{ model.id }}';
-
-  window.addAnnotation = async function() {
-    const label = document.getElementById('annLabel').value.trim();
-    if (!label) { alert('Label is required.'); return; }
-    const body = {
-      label: label,
-      description: document.getElementById('annDescription').value.trim(),
-      position: [
-        parseFloat(document.getElementById('annPosX').value) || 0,
-        parseFloat(document.getElementById('annPosY').value) || 0,
-        parseFloat(document.getElementById('annPosZ').value) || 0,
-      ],
-      normal: [0, 1, 0],
-    };
-    try {
-      const resp = await fetch(`/models/${modelId}/annotations`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-        body: JSON.stringify(body),
-      });
-      if (resp.ok) { location.reload(); }
-      else { const err = await resp.json(); alert(err.error || 'Failed to add annotation.'); }
-    } catch (e) { alert('Network error.'); }
-  };
 
   window.deleteAnnotation = async function(annotationId) {
     if (!confirm('Remove this annotation?')) return;

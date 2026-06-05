@@ -51,15 +51,52 @@
       backdrop-filter: blur(8px);
       transition: opacity 0.3s, transform 0.3s;
       white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
-    .annotation-hotspot:hover {
-      background: rgba(255, 104, 44, 0.85);
+    .annotation-hotspot:hover { background: rgba(255, 104, 44, 0.85); }
+    .annotation-hotspot[data-hidden] { opacity: 0; pointer-events: none; transform: scale(0.8); }
+    .annotation-delete-btn {
+      display: none;
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.6);
+      font-size: 13px;
+      cursor: pointer;
+      padding: 0 2px;
+      line-height: 1;
     }
-    .annotation-hotspot[data-hidden] {
-      opacity: 0;
-      pointer-events: none;
-      transform: scale(0.8);
+    .annotation-delete-btn:hover { color: #ff4444; }
+    .owner-mode .annotation-delete-btn { display: inline; }
+    .annotate-mode model-viewer { cursor: crosshair; }
+    #annotateForm {
+      position: absolute;
+      z-index: 50;
+      background: rgba(17,17,17,0.92);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 12px;
+      padding: 14px 16px;
+      backdrop-filter: blur(12px);
+      width: 260px;
+      display: none;
     }
+    #annotateForm input, #annotateForm textarea {
+      width: 100%;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 6px;
+      color: #fff;
+      padding: 6px 8px;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+    #annotateForm label { color: rgba(255,255,255,0.55); font-size: 11px; display: block; margin-top: 8px; }
+    #annotateForm label:first-child { margin-top: 0; }
+    #annotateForm .ann-form-actions { display: flex; gap: 8px; margin-top: 10px; }
+    #annotateForm button { border-radius: 6px; padding: 5px 12px; font-size: 11px; font-weight: 600; cursor: pointer; border: none; }
+    #annotateForm .ann-save { background: #ff682c; color: #fff; }
+    #annotateForm .ann-cancel { background: rgba(255,255,255,0.1); color: #fff; }
     .info-drawer {
       opacity: 0;
       pointer-events: none;
@@ -273,9 +310,21 @@
               data-annotation-id="{{ ann.id }}"
               data-annotation-desc="{{ ann.description or '' }}">
         <span class="annotation-label">{{ ann.label }}</span>
+        <span class="annotation-delete-btn" data-delete-ann="{{ ann.id }}" title="Remove">×</span>
       </button>
       {% endfor %}
     </model-viewer>
+
+    {% if is_owner %}
+    <div id="annotateForm">
+      <label>Label<input type="text" id="annLabelInput" maxlength="120" placeholder="e.g. Mitral valve"></label>
+      <label>Description<textarea id="annDescInput" rows="2" maxlength="200" placeholder="Brief explanation (optional)"></textarea></label>
+      <div class="ann-form-actions">
+        <button type="button" class="ann-save" id="annSaveBtn">Save</button>
+        <button type="button" class="ann-cancel" id="annCancelBtn">Cancel</button>
+      </div>
+    </div>
+    {% endif %}
 
     {% if is_embed %}
     <header class="absolute left-0 right-0 top-0 z-30 p-4 flex items-center justify-between pointer-events-none">
@@ -303,6 +352,7 @@
         </button>
         <button id="qrBtn" class="viewer-tool-btn" type="button">QR</button>
         {% if annotations %}<button id="annotationsBtn" class="viewer-tool-btn" type="button">Labels</button>{% endif %}
+        {% if is_owner %}<button id="annotateBtn" class="viewer-tool-btn" type="button">Annotate</button>{% endif %}
         <button id="arBtn" class="viewer-tool-btn primary" type="button">
           <span class="hidden sm:inline">View in AR</span>
           <span class="sm:hidden">AR</span>
@@ -522,6 +572,7 @@
       });
     }
 
+    // --- Annotation visibility toggle ---
     const annotationsBtn = document.getElementById('annotationsBtn');
     if (annotationsBtn) {
       let annotationsVisible = true;
@@ -535,10 +586,98 @@
       });
     }
 
+    // --- Annotation description popup ---
     document.querySelectorAll('.annotation-hotspot').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        if (e.target.classList.contains('annotation-delete-btn')) return;
         const desc = btn.dataset.annotationDesc;
-        if (desc) alert(btn.querySelector('.annotation-label').textContent + ': ' + desc);
+        const label = btn.querySelector('.annotation-label')?.textContent;
+        if (desc && label) alert(label + ': ' + desc);
+      });
+    });
+
+    // --- Owner: interactive annotation placement ---
+    const annotateBtn = document.getElementById('annotateBtn');
+    const annotateForm = document.getElementById('annotateForm');
+    const modelId = '{{ model.id }}';
+    const csrfToken = '{{ csrf_token() }}';
+
+    if (annotateBtn && annotateForm && viewer) {
+      let annotateMode = false;
+      let pendingPos = null;
+      let pendingNormal = null;
+      const container = viewer.closest('.relative') || viewer.parentElement;
+      if (container) container.classList.add('owner-mode');
+
+      annotateBtn.addEventListener('click', () => {
+        annotateMode = !annotateMode;
+        annotateBtn.textContent = annotateMode ? 'Cancel annotate' : 'Annotate';
+        if (annotateMode) {
+          container.classList.add('annotate-mode');
+        } else {
+          container.classList.remove('annotate-mode');
+          annotateForm.style.display = 'none';
+        }
+      });
+
+      viewer.addEventListener('click', (e) => {
+        if (!annotateMode) return;
+        const rect = viewer.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const hit = viewer.positionAndNormalFromPoint(x, y);
+        if (!hit) return;
+        pendingPos = hit.position;
+        pendingNormal = hit.normal;
+        annotateForm.style.display = 'block';
+        const formX = Math.min(e.clientX + 10, window.innerWidth - 280);
+        const formY = Math.min(e.clientY + 10, window.innerHeight - 220);
+        annotateForm.style.left = formX + 'px';
+        annotateForm.style.top = formY + 'px';
+        document.getElementById('annLabelInput').value = '';
+        document.getElementById('annDescInput').value = '';
+        document.getElementById('annLabelInput').focus();
+      });
+
+      document.getElementById('annCancelBtn').addEventListener('click', () => {
+        annotateForm.style.display = 'none';
+      });
+
+      document.getElementById('annSaveBtn').addEventListener('click', async () => {
+        const label = document.getElementById('annLabelInput').value.trim();
+        if (!label) { document.getElementById('annLabelInput').focus(); return; }
+        const body = {
+          label,
+          description: document.getElementById('annDescInput').value.trim(),
+          position: [pendingPos.x, pendingPos.y, pendingPos.z],
+          normal: [pendingNormal.x, pendingNormal.y, pendingNormal.z],
+        };
+        try {
+          const resp = await fetch('/models/' + modelId + '/annotations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify(body),
+          });
+          if (resp.ok) { location.reload(); }
+          else { const err = await resp.json(); alert(err.error || 'Failed'); }
+        } catch { alert('Network error'); }
+      });
+    }
+
+    // --- Owner: delete annotation ---
+    document.querySelectorAll('.annotation-delete-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const annId = btn.dataset.deleteAnn;
+        if (!confirm('Remove this annotation?')) return;
+        try {
+          const resp = await fetch('/models/' + modelId + '/annotations/' + annId, {
+            method: 'DELETE',
+            headers: { 'X-CSRFToken': csrfToken },
+          });
+          if (resp.ok) { location.reload(); }
+          else { alert('Failed to remove'); }
+        } catch { alert('Network error'); }
       });
     });
 

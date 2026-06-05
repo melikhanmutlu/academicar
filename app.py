@@ -1696,10 +1696,12 @@ def register_routes(app: Flask) -> None:
         )
         annotations = ModelAnnotation.query.filter_by(model_id=model.id).order_by(ModelAnnotation.order_index).all()
         scale_ref = human_scale_reference(format_model_dimensions_cm(model))
+        is_owner = current_user.is_authenticated and current_user.id == model.user_id
         return render_template(
             "viewer.html", model=model, paper=model.paper, has_usdz=has_usdz,
             annotations=annotations, scale_reference=scale_ref,
             dimensions_cm=format_model_dimensions_cm(model),
+            is_owner=is_owner,
         )
 
     @app.route("/m/<public_id>")
