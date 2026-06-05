@@ -3488,13 +3488,21 @@ def register_routes(app: Flask) -> None:
             flash("Invalid color value.", "danger")
             return redirect(url_for("paper_detail", slug=model.paper.slug))
 
+        roughness_raw = request.form.get("roughness")
+        metallic_raw = request.form.get("metallic")
+        roughness = max(0.0, min(1.0, float(roughness_raw))) if roughness_raw else (model.appearance_roughness or 0.45)
+        metallic = max(0.0, min(1.0, float(metallic_raw))) if metallic_raw else (model.appearance_metallic or 0.05)
+
+        ar_placement_raw = request.form.get("ar_placement")
+        ar_placement = ar_placement_raw if ar_placement_raw in ("floor", "wall") else (model.ar_placement or "floor")
+
         glb_path = model.glb_path
         backup_path = glb_path + APPEARANCE_BACKUP_SUFFIX
         try:
             if os.path.exists(glb_path):
                 shutil.copy2(glb_path, backup_path)
             try:
-                enrich_glb_for_ar(glb_path, rgba)
+                enrich_glb_for_ar(glb_path, rgba, roughness=roughness, metallic=metallic)
             except Exception:
                 logger.exception("Appearance enrichment failed; restoring backup")
                 if os.path.exists(backup_path):
@@ -3503,12 +3511,15 @@ def register_routes(app: Flask) -> None:
                 return redirect(url_for("paper_detail", slug=model.paper.slug))
 
             model.appearance_color = new_color
+            model.appearance_roughness = roughness
+            model.appearance_metallic = metallic
+            model.ar_placement = ar_placement
             db.session.commit()
             log_audit(
                 "model_appearance_updated",
                 user_id=current_user.id,
                 resource_id=model_id,
-                details={"color": new_color},
+                details={"color": new_color, "roughness": roughness, "metallic": metallic, "ar_placement": ar_placement},
             )
             flash(f"Model color updated to {new_color}.", "success")
         except SQLAlchemyError:
@@ -3523,6 +3534,79 @@ def register_routes(app: Flask) -> None:
             if os.path.exists(backup_path):
                 cleanup_file(backup_path)
         return redirect(url_for("paper_detail", slug=model.paper.slug))
+
+    @app.route("/models/<model_id>/rescale", methods=["POST"])
+    @login_required
+    @require_model_ownership
+    def model_rescale(model_id):
+        """Rescale the GLB so its longest dimension matches the user-specified cm value."""
+        model = db.session.get(Model3D, model_id)
+        if not model:
+            abort(404)
+        target_cm_raw = request.form.get("target_longest_cm", "").strip()
+        try:
+            target_cm = float(target_cm_raw)
+        except (ValueError, TypeError):
+            flash("Enter a valid number for the target dimension.", "danger")
+            return redirect(url_for("model_edit", model_id=model.id))
+        if target_cm <= 0 or target_cm > 500:
+            flash("Target dimension must be between 0 and 500 cm.", "danger")
+            return redirect(url_for("model_edit", model_id=model.id))
+
+        glb_path = model.glb_path
+        backup_path = glb_path + ".rescale.bak"
+        try:
+            if os.path.exists(glb_path):
+                shutil.copy2(glb_path, backup_path)
+            try:
+                from pygltflib import GLTF2
+                import numpy as _np
+                gltf = GLTF2.load(glb_path)
+                import trimesh as _trimesh
+                loaded = _trimesh.load(glb_path, force="scene")
+                bounds = loaded.bounds
+                current_extent_m = float(_np.ptp(bounds, axis=0).max())
+                if current_extent_m <= 0:
+                    raise ValueError("Cannot measure model extent")
+                target_m = target_cm / 100.0
+                scale_factor = target_m / current_extent_m
+                for node in gltf.nodes or []:
+                    if node.scale:
+                        node.scale = [s * scale_factor for s in node.scale]
+                    else:
+                        node.scale = [scale_factor, scale_factor, scale_factor]
+                gltf.save(glb_path)
+            except Exception:
+                logger.exception("Rescale failed; restoring backup")
+                if os.path.exists(backup_path):
+                    shutil.copy2(backup_path, glb_path)
+                flash("Rescale failed. The previous model is still active.", "warning")
+                return redirect(url_for("model_edit", model_id=model.id))
+
+            model.dimensions_cm = compute_glb_dimensions_cm(glb_path)
+            poster_png = os.path.join(os.path.dirname(glb_path), "poster.png")
+            if generate_poster(glb_path, poster_png):
+                model.poster_path = poster_png
+            db.session.commit()
+            log_audit(
+                "model_rescaled",
+                user_id=current_user.id,
+                resource_id=model_id,
+                details={"target_cm": target_cm},
+            )
+            flash(f"Model rescaled to {target_cm} cm (longest dimension).", "success")
+        except SQLAlchemyError:
+            db.session.rollback()
+            if os.path.exists(backup_path):
+                try:
+                    shutil.copy2(backup_path, glb_path)
+                except OSError:
+                    logger.exception("Failed to restore rescale backup after DB error")
+            flash("Rescale could not be saved.", "danger")
+        finally:
+            if os.path.exists(backup_path):
+                cleanup_file(backup_path)
+        return redirect(url_for("model_edit", model_id=model.id))
 
     @app.route("/models/<model_id>/status")
     @login_required

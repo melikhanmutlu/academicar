@@ -228,7 +228,7 @@
       ar
       ar-modes="webxr scene-viewer quick-look"
       ar-scale="auto"
-      ar-placement="floor"
+      ar-placement="{{ model.ar_placement or 'floor' }}"
       xr-environment
       quick-look-browsers="safari chrome"
       camera-controls

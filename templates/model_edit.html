@@ -73,8 +73,42 @@
             <input type="text" name="color_command" class="field-input" placeholder="Example: bone, orange, or #d9d9d9">
             <p>Optional. A command overrides the picker.</p>
           </div>
+          <div class="model-edit-field-grid">
+            <label class="field-label">Roughness <span id="roughness-val">{{ '%.2f'|format(model.appearance_roughness or 0.45) }}</span></label>
+            <input type="range" name="roughness" min="0" max="1" step="0.05" value="{{ model.appearance_roughness or 0.45 }}" class="w-full" oninput="document.getElementById('roughness-val').textContent=this.value">
+            <p>0 = mirror-smooth, 1 = fully rough/matte.</p>
+          </div>
+          <div class="model-edit-field-grid">
+            <label class="field-label">Metallic <span id="metallic-val">{{ '%.2f'|format(model.appearance_metallic or 0.05) }}</span></label>
+            <input type="range" name="metallic" min="0" max="1" step="0.05" value="{{ model.appearance_metallic or 0.05 }}" class="w-full" oninput="document.getElementById('metallic-val').textContent=this.value">
+            <p>0 = dielectric (plastic, bone), 1 = metallic (implant, steel).</p>
+          </div>
+          <div class="model-edit-field-grid">
+            <label class="field-label">AR placement</label>
+            <div class="flex gap-4">
+              <label><input type="radio" name="ar_placement" value="floor" {% if (model.ar_placement or 'floor') == 'floor' %}checked{% endif %}> Floor</label>
+              <label><input type="radio" name="ar_placement" value="wall" {% if model.ar_placement == 'wall' %}checked{% endif %}> Wall</label>
+            </div>
+            <p>Where the model appears in AR mode.</p>
+          </div>
           <div class="model-edit-actions">
-            <button type="submit" class="detail-action detail-action-primary">Update Color</button>
+            <button type="submit" class="detail-action detail-action-primary">Update Appearance</button>
+          </div>
+        </form>
+
+        <form method="POST" action="{{ url_for('model_rescale', model_id=model.id) }}" class="surface model-edit-card">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="model-edit-card-head">
+            <span class="eyebrow">Scale</span>
+            <h2>Resize model</h2>
+            <p>Set the real-world longest dimension. Current: {{ model.dimensions_cm or 'unknown' }}.</p>
+          </div>
+          <div class="model-edit-field-grid">
+            <label class="field-label">Longest dimension (cm)</label>
+            <input type="number" name="target_longest_cm" min="0.1" max="500" step="0.1" class="field-input" placeholder="e.g. 15.0" required>
+          </div>
+          <div class="model-edit-actions">
+            <button type="submit" class="detail-action detail-action-primary">Rescale Model</button>
           </div>
         </form>
       </div>
