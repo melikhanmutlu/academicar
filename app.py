@@ -269,28 +269,112 @@ def _model_glb_candidate_paths(model: Model3D) -> list[str]:
     return paths
 
 
+def _glb_dimensions_from_accessors(glb_path: str) -> list[float] | None:
+    """Read bounding-box extents (in GLB units) from POSITION accessor min/max,
+    applying node world transforms. Works even on Draco-compressed geometry,
+    since accessor min/max are preserved in the glTF JSON regardless of
+    geometry compression. Returns [x, y, z] extents or None.
+    """
+    try:
+        import numpy as np
+        import pygltflib
+
+        gltf = pygltflib.GLTF2().load(glb_path)
+        if not gltf or not gltf.meshes:
+            return None
+
+        def node_local_matrix(node) -> "np.ndarray":
+            if node.matrix:
+                # glTF stores matrices column-major; reshape and transpose.
+                return np.array(node.matrix, dtype=float).reshape(4, 4).T
+            m = np.identity(4)
+            if node.scale:
+                m[0, 0], m[1, 1], m[2, 2] = node.scale
+            t = np.identity(4)
+            if node.translation:
+                t[:3, 3] = node.translation
+            r = np.identity(4)
+            if node.rotation:
+                x, y, z, w = node.rotation
+                r[:3, :3] = [
+                    [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+                    [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+                    [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
+                ]
+            return t @ r @ m
+
+        world_min = np.array([np.inf, np.inf, np.inf])
+        world_max = np.array([-np.inf, -np.inf, -np.inf])
+
+        scene = gltf.scenes[gltf.scene or 0] if gltf.scenes else None
+        roots = scene.nodes if scene else list(range(len(gltf.nodes or [])))
+
+        stack = [(idx, np.identity(4)) for idx in roots]
+        while stack:
+            idx, parent = stack.pop()
+            node = gltf.nodes[idx]
+            world = parent @ node_local_matrix(node)
+            if node.mesh is not None:
+                mesh = gltf.meshes[node.mesh]
+                for prim in mesh.primitives:
+                    pos = prim.attributes.POSITION
+                    if pos is None:
+                        continue
+                    acc = gltf.accessors[pos]
+                    if not acc.min or not acc.max:
+                        continue
+                    lo, hi = acc.min[:3], acc.max[:3]
+                    corners = np.array([
+                        [lo[0], lo[1], lo[2], 1], [hi[0], lo[1], lo[2], 1],
+                        [lo[0], hi[1], lo[2], 1], [hi[0], hi[1], lo[2], 1],
+                        [lo[0], lo[1], hi[2], 1], [hi[0], lo[1], hi[2], 1],
+                        [lo[0], hi[1], hi[2], 1], [hi[0], hi[1], hi[2], 1],
+                    ], dtype=float)
+                    transformed = (world @ corners.T).T[:, :3]
+                    world_min = np.minimum(world_min, transformed.min(axis=0))
+                    world_max = np.maximum(world_max, transformed.max(axis=0))
+            for child in (node.children or []):
+                stack.append((child, world))
+
+        if not np.all(np.isfinite(world_min)) or not np.all(np.isfinite(world_max)):
+            return None
+        return [float(axis) for axis in (world_max - world_min)]
+    except Exception:
+        logger.warning("Accessor-based dimension read failed for %s", glb_path, exc_info=True)
+        return None
+
+
 def compute_glb_dimensions_cm(glb_path: str | None) -> str | None:
     """Measure a GLB's bounding-box extents and return a formatted string like
     "12.3 x 4.5 x 6.7 cm", or None if it cannot be measured.
 
-    Called once during conversion so the result can be cached on the model row.
+    Tries trimesh first (accurate for uncompressed GLBs), then falls back to
+    reading POSITION accessor min/max — which survives Draco compression, so
+    optimized GLBs and previously-stored models can still be measured.
     """
     if not glb_path or not os.path.exists(glb_path):
         return None
+
+    extents = None
     try:
         import trimesh
 
         loaded = trimesh.load(glb_path, force="scene")
         bounds = getattr(loaded, "bounds", None)
-        if bounds is None:
-            return None
-        extents_cm = [(float(axis) * 100) for axis in (bounds[1] - bounds[0])]
-        if not extents_cm or max(extents_cm) <= 0:
-            return None
-        return " x ".join(f"{axis:.1f}" for axis in extents_cm) + " cm"
+        if bounds is not None:
+            candidate = [float(axis) for axis in (bounds[1] - bounds[0])]
+            if candidate and max(candidate) > 0:
+                extents = candidate
     except Exception:
-        logger.warning("Could not measure GLB dimensions for %s", glb_path, exc_info=True)
+        logger.info("trimesh could not measure %s; trying accessor min/max", glb_path)
+
+    if extents is None:
+        extents = _glb_dimensions_from_accessors(glb_path)
+
+    if not extents or max(extents) <= 0:
         return None
+    extents_cm = [axis * 100 for axis in extents]
+    return " x ".join(f"{axis:.1f}" for axis in extents_cm) + " cm"
 
 
 def format_model_dimensions_cm(model: Model3D | None) -> str:
@@ -1218,6 +1302,12 @@ def process_model_upload_job(
                     cleanup_dir(upload_dir)
                     return
 
+            # Measure bounding-box dimensions from the *uncompressed* GLB before
+            # finalize_converted_glb() applies Draco compression. trimesh cannot
+            # read Draco-compressed geometry, so measuring afterwards yields
+            # "Not measured". Captured here and cached on the model row below.
+            measured_dimensions_cm = compute_glb_dimensions_cm(target_glb)
+
             try:
                 finalize_converted_glb(target_glb, source_dir=os.path.dirname(source_path))
             except GLBQualityError as e:
@@ -1251,9 +1341,10 @@ def process_model_upload_job(
             qr_filename = generate_model_qr(model, app.config["QR_FOLDER"])
             model.qr_code_path = qr_filename
             model.file_size = os.path.getsize(glb_path)
-            # Measure dimensions once here so listing/detail pages don't re-parse
-            # the GLB with trimesh on every request.
-            model.dimensions_cm = compute_glb_dimensions_cm(glb_path)
+            # Dimensions were measured above from the uncompressed GLB (trimesh
+            # cannot read the Draco-compressed output). Fall back to a post-
+            # finalize measurement only if the pre-compression read failed.
+            model.dimensions_cm = measured_dimensions_cm or compute_glb_dimensions_cm(glb_path)
             poster_png = os.path.join(os.path.dirname(glb_path), "poster.png")
             if generate_poster(glb_path, poster_png):
                 model.poster_path = poster_png
