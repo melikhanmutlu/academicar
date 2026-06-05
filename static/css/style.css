@@ -7861,7 +7861,7 @@ body.nav-menu-open {
 .lp-viewer-stage {
   position: relative;
   background: var(--color-cloud-whisper);
-  aspect-ratio: 4 / 3.2;
+  aspect-ratio: 16 / 10;
 }
 .lp-viewer-stage model-viewer {
   width: 100%; height: 100%;
@@ -7883,12 +7883,12 @@ body.nav-menu-open {
   border-color: var(--color-midnight-graphite);
 }
 .lp-viewer-panel {
-  padding: 14px 18px;
-  display: flex; align-items: center; gap: 16px;
+  padding: 16px 20px;
+  display: flex; align-items: center; gap: 18px;
   color: #fff;
 }
 .lp-viewer-panel-text {
-  display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0;
 }
 .lp-viewer-kicker {
   font-family: var(--font-inter); font-size: 10px; font-weight: 700;
