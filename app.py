@@ -3546,11 +3546,13 @@ def register_routes(app: Flask) -> None:
                 shutil.copy2(glb_path, backup_path)
             try:
                 enrich_glb_for_ar(glb_path, rgba, roughness=roughness, metallic=metallic)
-            except Exception:
+            except Exception as exc:
                 logger.exception("Appearance enrichment failed; restoring backup")
                 if os.path.exists(backup_path):
                     shutil.copy2(backup_path, glb_path)
-                flash("The model appearance could not be updated. The previous version is still active.", "warning")
+                glb_exists = os.path.exists(glb_path)
+                detail = f" (GLB {'found' if glb_exists else 'NOT found'} at {glb_path}; {type(exc).__name__}: {exc})"
+                flash(f"The model appearance could not be updated. The previous version is still active.{detail}", "warning")
                 return redirect(url_for("model_edit", model_id=model.id))
 
             model.appearance_color = new_color

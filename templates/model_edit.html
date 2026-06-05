@@ -266,8 +266,9 @@
   });
 
   // Live material preview: roughness / metallic / color sliders update the
-  // embedded model-viewer in real time via the runtime material API. This is
-  // preview-only; the GLB is re-baked server-side when "Update Appearance" saves.
+  // embedded model-viewer in real time via the runtime material API.
+  // model-viewer loads as type="module" (deferred), so we must wait for the
+  // custom element to be defined before accessing its scene graph API.
   const materialPreview = document.getElementById('materialPreview');
   const appearanceRoughness = document.getElementById('appearanceRoughness');
   const appearanceMetallic = document.getElementById('appearanceMetallic');
@@ -293,15 +294,22 @@
         if (!Number.isNaN(roughness)) pbr.setRoughnessFactor(roughness);
         if (!Number.isNaN(metallic)) pbr.setMetallicFactor(metallic);
         if (colorFactor) pbr.setBaseColorFactor(colorFactor);
-      } catch (e) { /* preview only — ignore unsupported material */ }
+      } catch (e) { /* preview only */ }
     });
   }
 
-  if (materialPreview) {
+  function setupLivePreview() {
+    // The model may already be loaded if the custom element registered early
+    if (materialPreview.model) applyLivePreview();
     materialPreview.addEventListener('load', applyLivePreview);
     [appearanceRoughness, appearanceMetallic, appearanceColor].forEach((el) => {
       if (el) el.addEventListener('input', applyLivePreview);
     });
+  }
+
+  if (materialPreview) {
+    // Wait for <model-viewer> custom element to be defined (type="module" is deferred)
+    customElements.whenDefined(materialPreview.localName).then(setupLivePreview);
   }
 </script>
 {% endblock %}
