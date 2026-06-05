@@ -54,9 +54,6 @@
               src="{{ url_for('serve_glb', unique_id=model.id, filename='model.glb') }}"
               alt="Live material preview of {{ model.display_name or model.original_filename }}"
               camera-controls
-              auto-rotate
-              auto-rotate-delay="1200"
-              rotation-per-second="18deg"
               interaction-prompt="none"
               exposure="1.0"
               shadow-intensity="0"
