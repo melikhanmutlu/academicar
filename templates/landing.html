@@ -104,65 +104,10 @@
   <div class="lp-container">
     <div class="lp-ar-layout reveal-up">
       <div class="lp-ar-visual">
-        <div class="lp-ar-phone">
-          <div class="lp-ar-phone-screen">
-            <!-- SVG illustration: AR placement scene -->
-            <svg viewBox="0 0 260 460" aria-hidden="true" class="lp-ar-scene">
-              <!-- room / environment -->
-              <defs>
-                <linearGradient id="arFloor" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="#e8e8e8"/>
-                  <stop offset="100%" stop-color="#d5d5d5"/>
-                </linearGradient>
-                <linearGradient id="arWall" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="#f7f7f7"/>
-                  <stop offset="100%" stop-color="#eeeeee"/>
-                </linearGradient>
-              </defs>
-              <!-- wall -->
-              <rect x="0" y="0" width="260" height="280" fill="url(#arWall)"/>
-              <!-- floor with perspective -->
-              <polygon points="0,280 260,280 260,460 0,460" fill="url(#arFloor)"/>
-              <!-- floor grid lines for AR feel -->
-              <g stroke="#ccc" stroke-width="0.5" opacity="0.5">
-                <line x1="0" y1="320" x2="260" y2="320"/>
-                <line x1="0" y1="360" x2="260" y2="360"/>
-                <line x1="0" y1="400" x2="260" y2="400"/>
-                <line x1="0" y1="440" x2="260" y2="440"/>
-                <line x1="52" y1="280" x2="20" y2="460"/>
-                <line x1="130" y1="280" x2="130" y2="460"/>
-                <line x1="208" y1="280" x2="240" y2="460"/>
-              </g>
-              <!-- AR placement indicator (circle on the floor) -->
-              <ellipse cx="130" cy="370" rx="60" ry="16" fill="none" stroke="#ff682c" stroke-width="2" stroke-dasharray="6 3" opacity="0.7"/>
-              <ellipse cx="130" cy="370" rx="38" ry="10" fill="rgba(255,104,44,0.08)"/>
-              <!-- 3D object sitting on the plane -->
-              <g transform="translate(130,310)">
-                <!-- simplified 3D cube/object -->
-                <polygon points="0,-55 40,-30 40,20 0,45 -40,20 -40,-30" fill="#202020" opacity="0.12"/>
-                <polygon points="0,-55 40,-30 0,-5 -40,-30" fill="#ff682c"/>
-                <polygon points="0,-5 40,-30 40,20 0,45" fill="#e85a22"/>
-                <polygon points="0,-5 -40,-30 -40,20 0,45" fill="#cc4e1c"/>
-              </g>
-              <!-- AR UI elements -->
-              <rect x="16" y="16" width="72" height="24" rx="12" fill="rgba(0,0,0,0.5)"/>
-              <circle cx="30" cy="28" r="4" fill="#ff682c"/>
-              <text x="40" y="33" font-family="Inter,sans-serif" font-size="11" font-weight="600" fill="#fff">AR Mode</text>
-              <!-- scanning dots -->
-              <g opacity="0.4">
-                <circle cx="80" cy="340" r="3" fill="#ff682c"/>
-                <circle cx="180" cy="350" r="3" fill="#ff682c"/>
-                <circle cx="120" cy="410" r="2" fill="#ff682c"/>
-                <circle cx="200" cy="390" r="2" fill="#ff682c"/>
-              </g>
-              <!-- bottom AR button -->
-              <rect x="80" y="420" width="100" height="30" rx="15" fill="#ff682c"/>
-              <text x="130" y="440" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" font-weight="600" fill="#fff">Place Model</text>
-            </svg>
-          </div>
-          <div class="lp-ar-phone-notch"></div>
-        </div>
-        <!-- scatter dots for decoration -->
+        <img src="{{ url_for('static', filename='images/ar-phone-mockup.png') }}"
+             alt="Mitochondria 3D model placed in augmented reality on a desk"
+             class="lp-ar-photo" loading="lazy">
+        <!-- soft glow behind the device -->
         <div class="lp-ar-glow" aria-hidden="true"></div>
       </div>
       <div class="lp-ar-copy">
