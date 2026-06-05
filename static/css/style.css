@@ -7664,7 +7664,7 @@ body.nav-menu-open {
   padding: 0 32px;
   box-sizing: border-box;
 }
-.lp-section { padding: 96px 0; background: var(--color-canvas-white); }
+.lp-section { padding: 120px 0; background: var(--color-canvas-white); }
 .lp-section.lp-alt { background: var(--color-cloud-whisper); }
 
 /* Centered section header */
@@ -7758,7 +7758,7 @@ body.nav-menu-open {
 
 /* ---------- HERO ---------- */
 .lp-hero {
-  padding: 56px 0 48px;
+  padding: 72px 0 64px;
   position: relative;
   overflow: hidden;
   background:
@@ -8167,7 +8167,7 @@ body.nav-menu-open {
   .lp-ar-desc { max-width: none; }
 }
 @media (max-width: 768px) {
-  .lp-section { padding: 64px 0; }
+  .lp-section { padding: 80px 0; }
   .lp-container { padding: 0 20px; }
   .lp-steps { grid-template-columns: 1fr; gap: 32px; }
   .lp-steps::before { display: none; }
