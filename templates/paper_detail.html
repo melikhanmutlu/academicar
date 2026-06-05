@@ -309,12 +309,6 @@
 
 {% block scripts %}
 <script>
-  const uploadSection = document.getElementById('add-model');
-  const modelRegistry = document.querySelector('[data-model-registry]');
-  if (uploadSection && modelRegistry) {
-    modelRegistry.parentNode.insertBefore(uploadSection, modelRegistry);
-  }
-
   const uploadForm = document.querySelector('[data-upload-form]');
   if (uploadForm) {
     const dropzone = uploadForm.querySelector('.upload-dropzone');
