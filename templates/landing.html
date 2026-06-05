@@ -87,7 +87,6 @@
         ('3', 'Publish with your paper', 'DOI, metadata, PDF — all linked', 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M9 13h6 M9 17h6')
       ] %}
       <div class="lp-step reveal-up delay-{{ loop.index }}">
-        <div class="lp-step-badge">{{ step[0] }}</div>
         <svg class="lp-step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           {% for d in step[3].split(' M') %}<path d="{% if not loop.first %}M{% endif %}{{ d }}"/>{% endfor %}
         </svg>
