@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script type="module" src="https://unpkg.com/@google/model-viewer@4.2.0/dist/model-viewer.min.js" crossorigin="anonymous"></script>
+  <script type="module" src="https://unpkg.com/@google/model-viewer@4.3.0/dist/model-viewer.min.js" crossorigin="anonymous"></script>
   <script src="{{ url_for('static', filename='vendor/jszip.min.js') }}"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 
@@ -219,11 +219,11 @@
       src="{{ url_for('serve_glb', unique_id=model.id, filename='model.glb') }}"
       {% if has_usdz %}ios-src="{{ url_for('serve_glb', unique_id=model.id, filename='model.usdz') }}"{% endif %}
       alt="3D model: {{ model.display_name or model.original_filename }}"
-      shadow-intensity="1.4"
-      shadow-softness="0.6"
-      exposure="1.2"
-      tone-mapping="agx"
-      environment-image="neutral"
+      shadow-intensity="1.0"
+      shadow-softness="0.75"
+      exposure="1.0"
+      tone-mapping="neutral"
+      environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
       ar
       ar-modes="webxr scene-viewer quick-look"
       ar-scale="auto"
@@ -237,7 +237,7 @@
       min-field-of-view="10deg"
       max-field-of-view="60deg"
       bounds="tight"
-      interaction-prompt="none"
+      interaction-prompt="auto"
       autoplay
       animation-crossfade-duration="300"
       reveal="auto">

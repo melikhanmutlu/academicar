@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Montserrat:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  <script type="module" src="https://unpkg.com/@google/model-viewer@4.2.0/dist/model-viewer.min.js"></script>
+  <script type="module" src="https://unpkg.com/@google/model-viewer@4.3.0/dist/model-viewer.min.js"></script>
 </head>
 <body class="demo-ar-body">
   <main class="demo-ar-shell">
@@ -23,10 +23,11 @@
       rotation-per-second="18deg"
       camera-orbit="35deg 64deg 10m"
       field-of-view="34deg"
-      exposure="0.95"
-      shadow-intensity="0.12"
-      shadow-softness="0.95"
-      environment-image="neutral">
+      exposure="1.0"
+      shadow-intensity="1.0"
+      shadow-softness="0.75"
+      tone-mapping="neutral"
+      environment-image="{{ url_for('static', filename='environments/studio.webp') }}">
       <button slot="ar-button" id="demoArButton" class="demo-ar-button">Open in AR</button>
     </model-viewer>
     <div class="demo-ar-panel">

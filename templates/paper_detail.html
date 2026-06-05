@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ paper.title }} - AcademicAR{% endblock %}
 {% block head %}
-<script type="module" src="https://unpkg.com/@google/model-viewer@4.2.0/dist/model-viewer.min.js" crossorigin="anonymous"></script>
+<script type="module" src="https://unpkg.com/@google/model-viewer@4.3.0/dist/model-viewer.min.js" crossorigin="anonymous"></script>
 {% endblock %}
 
 {% block content %}
@@ -134,8 +134,11 @@
                     alt="3D preview: {{ m.display_name or m.original_filename }}"
                     camera-orbit="35deg 70deg auto"
                     field-of-view="28deg"
-                    exposure="1"
-                    shadow-intensity="0.6"
+                    exposure="1.0"
+                    shadow-intensity="1.0"
+                    shadow-softness="0.75"
+                    tone-mapping="neutral"
+                    environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
                     bounds="tight"
                     disable-zoom
                     auto-rotate
