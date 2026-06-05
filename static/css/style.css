@@ -1225,12 +1225,10 @@
 /* Reveal animations */
 .reveal-up {
   opacity: 0;
-  transform: translateY(24px);
-  transition: opacity 700ms ease, transform 700ms ease;
+  transition: opacity 800ms ease;
 }
 .reveal-up.is-visible {
   opacity: 1;
-  transform: translateY(0);
 }
 .reveal-up.delay-1 { transition-delay: 100ms; }
 .reveal-up.delay-2 { transition-delay: 200ms; }
@@ -3260,12 +3258,10 @@ details[open] .upload-chevron {
 
 .reveal-up {
   opacity: 0;
-  transform: translate3d(0, calc(28px + var(--parallax-y, 0px)), 0);
-  transition: opacity 720ms ease, transform 720ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: opacity 800ms ease;
 }
 .reveal-up.is-visible {
   opacity: 1;
-  transform: translate3d(0, var(--parallax-y, 0px), 0);
 }
 .delay-1 { transition-delay: 100ms; }
 .delay-2 { transition-delay: 180ms; }
