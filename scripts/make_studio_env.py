@@ -32,7 +32,7 @@ def make_studio_env() -> Path:
         # --- Uniform ambient floor: lifts every direction so no side of the
         # model goes dark (the previous studio map left the sides ~0.4 and
         # looked too shadowy). ---
-        ambient = 0.62
+        ambient = 0.52
 
         # --- Sky dome: soft warm-white overhead light ---
         # Gaussian centered at zenith (theta=0), sigma ~30 deg

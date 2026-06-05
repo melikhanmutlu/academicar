@@ -78,7 +78,7 @@ class TestConsistentRenderAttributes:
         content = (TEMPLATES_DIR / template).read_text()
         matches = re.findall(r'exposure="([^"]+)"', content)
         for val in matches:
-            assert float(val) == 1.15, f'{template} exposure should be 1.15, got {val}'
+            assert float(val) == 1.0, f'{template} exposure should be 1.0, got {val}'
 
     @pytest.mark.parametrize("template", VIEWER_TEMPLATES)
     def test_shadow_intensity_subtle(self, template):
