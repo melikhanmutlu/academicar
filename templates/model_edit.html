@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Edit Model - AcademicAR{% endblock %}
 
+{% block head %}
+<script type="module" src="https://unpkg.com/@google/model-viewer@4.3.0/dist/model-viewer.min.js" crossorigin="anonymous"></script>
+{% endblock %}
+
 {% block content %}
 <div class="app-shell model-edit-shell py-10 pb-10">
   <a href="{{ url_for('paper_detail', slug=paper.slug) }}" class="detail-back-button">&larr; Publication</a>
@@ -39,6 +43,68 @@
         </div>
       </form>
 
+      <form method="POST" action="{{ url_for('model_appearance_update', model_id=model.id) }}" class="surface model-edit-card model-edit-material-card">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="model-edit-card-head">
+          <span class="eyebrow">Appearance</span>
+          <h2>Material &amp; appearance</h2>
+          <p>Adjust the color and surface finish. The preview updates live as you drag the sliders — click "Update Appearance" to save it onto the model. The viewer link and QR stay the same.</p>
+        </div>
+        <div class="model-edit-material-grid">
+          <div class="model-edit-preview">
+            <model-viewer
+              id="materialPreview"
+              src="{{ url_for('serve_glb', unique_id=model.id, filename='model.glb') }}"
+              alt="Live material preview of {{ model.display_name or model.original_filename }}"
+              camera-controls
+              auto-rotate
+              auto-rotate-delay="1200"
+              rotation-per-second="18deg"
+              interaction-prompt="none"
+              exposure="1.0"
+              shadow-intensity="0"
+              shadow-softness="1.0"
+              tone-mapping="neutral"
+              environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
+              bounds="tight">
+            </model-viewer>
+            <p class="model-edit-preview-hint">Live preview — drag to rotate. Unsaved until you update.</p>
+          </div>
+          <div class="model-edit-material-controls">
+            <label class="model-edit-color-row">
+              <span>Model color</span>
+              <input type="color" id="appearanceColor" name="color" value="{{ model.appearance_color or '#cccccc' }}" aria-label="Model color">
+            </label>
+            <div class="model-edit-field-grid">
+              <label class="field-label">Color command</label>
+              <input type="text" name="color_command" class="field-input" placeholder="Example: bone, orange, or #d9d9d9">
+              <p>Optional. A command overrides the picker on save.</p>
+            </div>
+            <div class="model-edit-field-grid">
+              <label class="field-label model-edit-slider-label">Roughness <span id="roughness-val">{{ '%.2f'|format(model.appearance_roughness or 0.35) }}</span></label>
+              <input type="range" id="appearanceRoughness" name="roughness" min="0" max="1" step="0.05" value="{{ model.appearance_roughness or 0.35 }}" class="w-full" oninput="document.getElementById('roughness-val').textContent=this.value">
+              <p>0 = mirror-smooth, 1 = fully rough/matte.</p>
+            </div>
+            <div class="model-edit-field-grid">
+              <label class="field-label model-edit-slider-label">Metallic <span id="metallic-val">{{ '%.2f'|format(model.appearance_metallic or 0.05) }}</span></label>
+              <input type="range" id="appearanceMetallic" name="metallic" min="0" max="1" step="0.05" value="{{ model.appearance_metallic or 0.05 }}" class="w-full" oninput="document.getElementById('metallic-val').textContent=this.value">
+              <p>0 = dielectric (plastic, bone), 1 = metallic (implant, steel).</p>
+            </div>
+            <div class="model-edit-field-grid">
+              <label class="field-label">AR placement</label>
+              <div class="flex gap-4">
+                <label><input type="radio" name="ar_placement" value="floor" {% if (model.ar_placement or 'floor') == 'floor' %}checked{% endif %}> Floor</label>
+                <label><input type="radio" name="ar_placement" value="wall" {% if model.ar_placement == 'wall' %}checked{% endif %}> Wall</label>
+              </div>
+              <p>Where the model appears in AR mode.</p>
+            </div>
+          </div>
+        </div>
+        <div class="model-edit-actions">
+          <button type="submit" class="detail-action detail-action-primary">Update Appearance</button>
+        </div>
+      </form>
+
       <div class="model-edit-secondary-grid">
         <form method="POST" action="{{ url_for('model_license_update', model_id=model.id) }}" class="surface model-edit-card">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -54,45 +120,6 @@
           </select>
           <div class="model-edit-actions">
             <button type="submit" class="detail-action detail-action-primary">Apply License</button>
-          </div>
-        </form>
-
-        <form method="POST" action="{{ url_for('model_appearance_update', model_id=model.id) }}" class="surface model-edit-card">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <div class="model-edit-card-head">
-            <span class="eyebrow">Appearance</span>
-            <h2>Viewer color</h2>
-            <p>Apply a new material color to the current GLB without changing the viewer link or QR.</p>
-          </div>
-          <label class="model-edit-color-row">
-            <span>Model color</span>
-            <input type="color" name="color" value="{{ model.appearance_color or '#cccccc' }}" aria-label="Model color">
-          </label>
-          <div class="model-edit-field-grid">
-            <label class="field-label">Color command</label>
-            <input type="text" name="color_command" class="field-input" placeholder="Example: bone, orange, or #d9d9d9">
-            <p>Optional. A command overrides the picker.</p>
-          </div>
-          <div class="model-edit-field-grid">
-            <label class="field-label">Roughness <span id="roughness-val">{{ '%.2f'|format(model.appearance_roughness or 0.45) }}</span></label>
-            <input type="range" name="roughness" min="0" max="1" step="0.05" value="{{ model.appearance_roughness or 0.45 }}" class="w-full" oninput="document.getElementById('roughness-val').textContent=this.value">
-            <p>0 = mirror-smooth, 1 = fully rough/matte.</p>
-          </div>
-          <div class="model-edit-field-grid">
-            <label class="field-label">Metallic <span id="metallic-val">{{ '%.2f'|format(model.appearance_metallic or 0.05) }}</span></label>
-            <input type="range" name="metallic" min="0" max="1" step="0.05" value="{{ model.appearance_metallic or 0.05 }}" class="w-full" oninput="document.getElementById('metallic-val').textContent=this.value">
-            <p>0 = dielectric (plastic, bone), 1 = metallic (implant, steel).</p>
-          </div>
-          <div class="model-edit-field-grid">
-            <label class="field-label">AR placement</label>
-            <div class="flex gap-4">
-              <label><input type="radio" name="ar_placement" value="floor" {% if (model.ar_placement or 'floor') == 'floor' %}checked{% endif %}> Floor</label>
-              <label><input type="radio" name="ar_placement" value="wall" {% if model.ar_placement == 'wall' %}checked{% endif %}> Wall</label>
-            </div>
-            <p>Where the model appears in AR mode.</p>
-          </div>
-          <div class="model-edit-actions">
-            <button type="submit" class="detail-action detail-action-primary">Update Appearance</button>
           </div>
         </form>
 
@@ -237,5 +264,44 @@
       }
     });
   });
+
+  // Live material preview: roughness / metallic / color sliders update the
+  // embedded model-viewer in real time via the runtime material API. This is
+  // preview-only; the GLB is re-baked server-side when "Update Appearance" saves.
+  const materialPreview = document.getElementById('materialPreview');
+  const appearanceRoughness = document.getElementById('appearanceRoughness');
+  const appearanceMetallic = document.getElementById('appearanceMetallic');
+  const appearanceColor = document.getElementById('appearanceColor');
+
+  function hexToColorFactor(hex) {
+    const match = /^#?([0-9a-f]{6})$/i.exec((hex || '').trim());
+    if (!match) return null;
+    const value = parseInt(match[1], 16);
+    return [((value >> 16) & 255) / 255, ((value >> 8) & 255) / 255, (value & 255) / 255, 1];
+  }
+
+  function applyLivePreview() {
+    if (!materialPreview || !materialPreview.model) return;
+    const materials = materialPreview.model.materials || [];
+    const roughness = appearanceRoughness ? parseFloat(appearanceRoughness.value) : NaN;
+    const metallic = appearanceMetallic ? parseFloat(appearanceMetallic.value) : NaN;
+    const colorFactor = appearanceColor ? hexToColorFactor(appearanceColor.value) : null;
+    materials.forEach((material) => {
+      const pbr = material && material.pbrMetallicRoughness;
+      if (!pbr) return;
+      try {
+        if (!Number.isNaN(roughness)) pbr.setRoughnessFactor(roughness);
+        if (!Number.isNaN(metallic)) pbr.setMetallicFactor(metallic);
+        if (colorFactor) pbr.setBaseColorFactor(colorFactor);
+      } catch (e) { /* preview only — ignore unsupported material */ }
+    });
+  }
+
+  if (materialPreview) {
+    materialPreview.addEventListener('load', applyLivePreview);
+    [appearanceRoughness, appearanceMetallic, appearanceColor].forEach((el) => {
+      if (el) el.addEventListener('input', applyLivePreview);
+    });
+  }
 </script>
 {% endblock %}

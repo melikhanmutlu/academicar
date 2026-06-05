@@ -87,6 +87,29 @@ class TestModelEditUI:
         assert 'target_longest_cm' in content
 
 
+class TestModelEditLivePreview:
+    """model_edit.html should embed a live material preview viewer + JS hooks."""
+
+    def test_embeds_preview_model_viewer(self):
+        content = (TEMPLATES_DIR / "model_edit.html").read_text()
+        # model-viewer script loaded + a preview element with the expected id
+        assert "model-viewer@4.3.0" in content
+        assert 'id="materialPreview"' in content
+
+    def test_live_preview_uses_runtime_material_api(self):
+        content = (TEMPLATES_DIR / "model_edit.html").read_text()
+        assert "setRoughnessFactor" in content
+        assert "setMetallicFactor" in content
+        assert "setBaseColorFactor" in content
+
+    def test_slider_inputs_have_ids_for_live_binding(self):
+        content = (TEMPLATES_DIR / "model_edit.html").read_text()
+        # input names preserved (route compatibility) + ids added for JS binding
+        assert 'id="appearanceRoughness"' in content and 'name="roughness"' in content
+        assert 'id="appearanceMetallic"' in content and 'name="metallic"' in content
+        assert 'id="appearanceColor"' in content and 'name="color"' in content
+
+
 class TestMigrationExists:
     """Migration for material/AR columns."""
 

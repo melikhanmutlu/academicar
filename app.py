@@ -3524,16 +3524,16 @@ def register_routes(app: Flask) -> None:
         new_color = parsed or color_input
         if not new_color or HEX_COLOR_PATTERN.fullmatch(new_color) is None:
             flash("Provide a valid hex color (#RRGGBB) or a known color name.", "danger")
-            return redirect(url_for("paper_detail", slug=model.paper.slug))
+            return redirect(url_for("model_edit", model_id=model.id))
 
         rgba = hex_to_rgba(new_color)
         if rgba is None:
             flash("Invalid color value.", "danger")
-            return redirect(url_for("paper_detail", slug=model.paper.slug))
+            return redirect(url_for("model_edit", model_id=model.id))
 
         roughness_raw = request.form.get("roughness")
         metallic_raw = request.form.get("metallic")
-        roughness = max(0.0, min(1.0, float(roughness_raw))) if roughness_raw else (model.appearance_roughness or 0.45)
+        roughness = max(0.0, min(1.0, float(roughness_raw))) if roughness_raw else (model.appearance_roughness or 0.35)
         metallic = max(0.0, min(1.0, float(metallic_raw))) if metallic_raw else (model.appearance_metallic or 0.05)
 
         ar_placement_raw = request.form.get("ar_placement")
@@ -3551,7 +3551,7 @@ def register_routes(app: Flask) -> None:
                 if os.path.exists(backup_path):
                     shutil.copy2(backup_path, glb_path)
                 flash("The model appearance could not be updated. The previous version is still active.", "warning")
-                return redirect(url_for("paper_detail", slug=model.paper.slug))
+                return redirect(url_for("model_edit", model_id=model.id))
 
             model.appearance_color = new_color
             model.appearance_roughness = roughness
@@ -3576,7 +3576,7 @@ def register_routes(app: Flask) -> None:
         finally:
             if os.path.exists(backup_path):
                 cleanup_file(backup_path)
-        return redirect(url_for("paper_detail", slug=model.paper.slug))
+        return redirect(url_for("model_edit", model_id=model.id))
 
     @app.route("/models/<model_id>/rescale", methods=["POST"])
     @login_required

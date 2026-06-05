@@ -109,7 +109,7 @@ class Model3D(db.Model):
     access_expires_at = db.Column(db.DateTime, nullable=True)
     storage_limit_bytes = db.Column(db.Integer, nullable=True)
     appearance_color = db.Column(db.String(20), nullable=True)
-    appearance_roughness = db.Column(db.Float, nullable=True, default=0.45)
+    appearance_roughness = db.Column(db.Float, nullable=True, default=0.35)
     appearance_metallic = db.Column(db.Float, nullable=True, default=0.05)
     ar_placement = db.Column(db.String(10), nullable=True, default="floor")
     replaced_at = db.Column(db.DateTime, nullable=True)

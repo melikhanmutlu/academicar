@@ -100,7 +100,7 @@ def convert_glb_to_usdz(glb_path: str, usdz_path: str) -> bool:
 def enrich_glb_for_ar(
     glb_path: str,
     base_color_rgba: tuple,
-    roughness: float = 0.45,
+    roughness: float = 0.35,
     metallic: float = 0.05,
     double_sided: bool = True,
 ) -> bool:
@@ -261,7 +261,7 @@ def enrich_glb_for_ar(
 def inject_pbr_material(
     glb_path: str,
     base_color_rgba: tuple,
-    roughness: float = 0.45,
+    roughness: float = 0.35,
     metallic: float = 0.05,
     double_sided: bool = True,
 ) -> None:
@@ -629,7 +629,7 @@ class STLConverter(BaseConverter):
                 if enriched:
                     self.log_operation(
                         f"Enriched GLB: PBR material "
-                        f"baseColorFactor={target_color} (roughness=0.45, "
+                        f"baseColorFactor={target_color} (roughness=0.35, "
                         f"metallic=0.05, doubleSided=true) + triplanar UVs"
                     )
                 else:

@@ -32,11 +32,14 @@ def make_studio_env() -> Path:
         # --- Uniform ambient floor: lifts every direction so no side of the
         # model goes dark (the previous studio map left the sides ~0.4 and
         # looked too shadowy). ---
-        ambient = 0.52
+        ambient = 0.47
 
         # --- Sky dome: soft warm-white overhead light ---
-        # Gaussian centered at zenith (theta=0), sigma ~30 deg
-        overhead = 0.45 * np.exp(-0.5 * (theta / 0.55) ** 2)
+        # A more concentrated, brighter key light (narrower Gaussian) gives a
+        # crisper specular streak so surface curvature reads better and models
+        # look less flat/"pastel" — without raising the ambient fill that would
+        # wash detail back out.
+        overhead = 0.60 * np.exp(-0.5 * (theta / 0.42) ** 2)
 
         # --- Horizon band: gentle brightening around eye level ---
         horizon = 0.20 * np.exp(-0.5 * ((theta - np.pi / 2) / 0.5) ** 2)

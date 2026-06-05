@@ -4976,6 +4976,56 @@ input[type="file"]::-webkit-file-upload-button {
   background: var(--color-canvas-white) !important;
   padding: 28px !important;
 }
+.model-edit-material-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+.model-edit-preview {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+.model-edit-preview model-viewer {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  min-height: 280px;
+  border: 1px solid var(--color-light-pearl);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 50% 36%, #ffffff 0%, #f1f2f4 100%);
+  --poster-color: transparent;
+}
+.model-edit-preview-hint {
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-inter);
+  font-size: 12px;
+  color: var(--color-silver-ash);
+}
+.model-edit-material-controls {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  min-width: 0;
+}
+.model-edit-slider-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.model-edit-slider-label span {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--color-midnight-graphite);
+}
+@media (max-width: 860px) {
+  .model-edit-material-grid {
+    grid-template-columns: 1fr;
+  }
+}
 .model-edit-card-primary {
   grid-template-columns: minmax(220px, 0.36fr) minmax(0, 1fr);
   align-items: start;
