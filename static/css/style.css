@@ -7758,7 +7758,7 @@ body.nav-menu-open {
 
 /* ---------- HERO ---------- */
 .lp-hero {
-  padding: 72px 0 88px;
+  padding: 56px 0 48px;
   position: relative;
   overflow: hidden;
   background:
@@ -7781,9 +7781,10 @@ body.nav-menu-open {
 .lp-hero .lp-container { position: relative; z-index: 1; }
 .lp-hero-grid {
   display: grid;
-  grid-template-columns: 1.02fr 1.1fr;
-  gap: 56px;
-  align-items: center;
+  grid-template-columns: 1fr 1.25fr;
+  gap: 40px;
+  align-items: start;
+  padding-top: 24px;
 }
 /* Eyebrow pill above the headline */
 .lp-hero-badge {
@@ -7798,7 +7799,7 @@ body.nav-menu-open {
   border: 1px solid var(--color-orange-soft-border);
   border-radius: 999px;
   padding: 6px 14px 6px 10px;
-  margin-bottom: 22px;
+  margin-bottom: 16px;
   backdrop-filter: blur(6px);
 }
 .lp-hero-badge-dot {
@@ -7820,23 +7821,27 @@ body.nav-menu-open {
   font-size: 17px;
   line-height: 1.55;
   color: var(--color-dark-shale);
-  max-width: 460px;
+  max-width: 520px;
   margin: 0 0 28px;
 }
-.lp-hero-actions { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 28px; }
+.lp-hero-actions {
+  display: flex; gap: 14px; flex-wrap: nowrap; margin-bottom: 24px;
+  align-items: center;
+}
 .lp-hero-checks {
   list-style: none; padding: 0; margin: 0;
-  display: flex; flex-wrap: wrap; gap: 12px 22px;
+  display: grid; grid-template-columns: auto auto;
+  gap: 10px 28px;
 }
 .lp-hero-checks li {
   display: inline-flex; align-items: center; gap: 8px;
   font-family: var(--font-inter); font-size: 14px; font-weight: 500;
-  color: var(--color-dark-shale);
+  color: var(--color-dark-shale); white-space: nowrap;
 }
 .lp-hero-checks svg { width: 18px; height: 18px; color: var(--color-sunset-orange); flex-shrink: 0; }
 
 /* ---------- Viewer-style hero mockup ---------- */
-.lp-hero-visual { position: relative; }
+.lp-hero-visual { position: relative; margin-top: 18px; }
 .lp-hero-visual::after {
   content: '';
   position: absolute;
@@ -7847,7 +7852,7 @@ body.nav-menu-open {
 }
 .lp-viewer-mock {
   position: relative; z-index: 1;
-  display: grid; grid-template-columns: 1.6fr 1fr;
+  display: grid; grid-template-columns: 1.4fr 0.85fr;
   border-radius: 16px; overflow: hidden;
   border: 1px solid var(--color-light-pearl);
   background: var(--color-midnight-graphite);
@@ -8221,8 +8226,9 @@ body.nav-menu-open {
 
 /* ---------- RESPONSIVE ---------- */
 @media (max-width: 1024px) {
-  .lp-hero-grid { grid-template-columns: 1fr; gap: 48px; }
+  .lp-hero-grid { grid-template-columns: 1fr; gap: 40px; padding-top: 0; }
   .lp-hero-lead { max-width: none; }
+  .lp-hero-actions { flex-wrap: wrap; }
   .lp-features { grid-template-columns: repeat(2, 1fr); }
   .lp-usecases { grid-template-columns: repeat(2, 1fr); }
   .lp-ar-layout { grid-template-columns: 1fr; gap: 48px; }
@@ -8247,6 +8253,7 @@ body.nav-menu-open {
   }
   .lp-upgrade-arrow { position: relative; }
   .lp-cta { padding: 32px 24px; flex-direction: column; align-items: flex-start; }
+  .lp-hero-checks { grid-template-columns: 1fr; }
   .lp-viewer-mock { grid-template-columns: 1fr; }
   .lp-viewer-stage { aspect-ratio: 16 / 10; }
   .lp-process { flex-wrap: wrap; gap: 24px 12px; }
