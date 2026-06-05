@@ -70,9 +70,23 @@
               <input type="color" id="appearanceColor" name="color" value="{{ model.appearance_color or '#cccccc' }}" aria-label="Model color">
             </label>
             <div class="model-edit-field-grid">
-              <label class="field-label">Color command</label>
-              <input type="text" name="color_command" class="field-input" placeholder="Example: bone, orange, or #d9d9d9">
-              <p>Optional. A command overrides the picker on save.</p>
+              <label class="field-label">Hex code</label>
+              <input type="text" class="color-hex-input" data-color-hex placeholder="#CCCCCC" maxlength="7" pattern="^#[0-9A-Fa-f]{6}$" value="{{ model.appearance_color or '#cccccc' }}">
+              <div class="color-presets" data-color-presets>
+                <button type="button" class="color-preset" data-preset="#E8D5B7" title="Bone" style="background:#E8D5B7"></button>
+                <button type="button" class="color-preset" data-preset="#8B2252" title="Vein" style="background:#8B2252"></button>
+                <button type="button" class="color-preset" data-preset="#CC2222" title="Artery" style="background:#CC2222"></button>
+                <button type="button" class="color-preset" data-preset="#FFCBA4" title="Skin" style="background:#FFCBA4"></button>
+                <button type="button" class="color-preset" data-preset="#8B3A3A" title="Muscle" style="background:#8B3A3A"></button>
+                <button type="button" class="color-preset" data-preset="#D4E4E4" title="Cartilage" style="background:#D4E4E4"></button>
+                <button type="button" class="color-preset" data-preset="#C0C0C0" title="Steel" style="background:#C0C0C0"></button>
+                <button type="button" class="color-preset" data-preset="#DDDDDD" title="Chrome" style="background:#DDDDDD"></button>
+                <button type="button" class="color-preset" data-preset="#B87333" title="Copper" style="background:#B87333"></button>
+                <button type="button" class="color-preset" data-preset="#D4AF37" title="Gold" style="background:#D4AF37"></button>
+                <button type="button" class="color-preset" data-preset="#8B6914" title="Wood" style="background:#8B6914"></button>
+                <button type="button" class="color-preset" data-preset="#FFFFF0" title="Ivory" style="background:#FFFFF0"></button>
+              </div>
+              <p>Pick a color above or type a hex code. Syncs with the color picker.</p>
             </div>
             <div class="model-edit-field-grid">
               <label class="field-label model-edit-slider-label">Roughness <span id="roughness-val">{{ '%.2f'|format(model.appearance_roughness or 0.35) }}</span></label>
@@ -300,5 +314,52 @@
     // Wait for <model-viewer> custom element to be defined (type="module" is deferred)
     customElements.whenDefined(materialPreview.localName).then(setupLivePreview);
   }
+
+  // Color presets and hex input sync for model edit page
+  (function() {
+    const editHexInput = document.querySelector('[data-color-hex]');
+    const editPresets = document.querySelectorAll('[data-color-presets] [data-preset]');
+
+    const highlightEditPreset = (hex) => {
+      const upper = (hex || '').toUpperCase();
+      editPresets.forEach((btn) => {
+        btn.classList.toggle('is-active', btn.dataset.preset.toUpperCase() === upper);
+      });
+    };
+
+    // Initial highlight on page load
+    if (appearanceColor) highlightEditPreset(appearanceColor.value);
+
+    if (appearanceColor && editHexInput) {
+      // Native picker -> hex input + presets
+      appearanceColor.addEventListener('input', () => {
+        editHexInput.value = appearanceColor.value.toUpperCase();
+        highlightEditPreset(appearanceColor.value);
+      });
+
+      // Hex input -> native picker + presets + live preview
+      editHexInput.addEventListener('input', () => {
+        let val = editHexInput.value.trim();
+        if (val.length && val[0] !== '#') val = '#' + val;
+        if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+          appearanceColor.value = val;
+          applyLivePreview();
+        }
+        highlightEditPreset(val);
+      });
+    }
+
+    editPresets.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const hex = btn.dataset.preset;
+        if (appearanceColor) {
+          appearanceColor.value = hex;
+          applyLivePreview();
+        }
+        if (editHexInput) editHexInput.value = hex.toUpperCase();
+        highlightEditPreset(hex);
+      });
+    });
+  })();
 </script>
 {% endblock %}

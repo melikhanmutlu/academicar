@@ -118,8 +118,8 @@ def test_landing_mitochondria_qr_and_ar_page(client):
 
     ar_page = client.get("/demo/mitochondria/ar")
     assert ar_page.status_code == 200
-    assert "Mitochondria AR" in ar_page.get_data(as_text=True)
-    assert "activateAR" in ar_page.get_data(as_text=True)
+    assert "Mitochondria" in ar_page.get_data(as_text=True)
+    assert "model-viewer" in ar_page.get_data(as_text=True)
 
 
 def test_paper_detail_uses_clear_actions_without_publication_expiry(client):

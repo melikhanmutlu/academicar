@@ -7,15 +7,6 @@
   {% set stats.total_models = stats.total_models + (paper.models|length) %}
 {% endfor %}
 {% set papers_with_pdf = papers|selectattr('pdf_path')|list|length if papers else 0 %}
-{% set step1_done = papers|length > 0 %}
-{% set step2_done = stats.total_models > 0 %}
-{% set step3_done = papers_with_pdf > 0 %}
-{% set step4_done = papers|selectattr('is_public')|list|length > 0 %}
-{# BUG-4: show the getting-started guide until every step is complete. #}
-{% set show_onboarding = not (step1_done and step2_done and step3_done and step4_done) %}
-{% if admin_view is defined and admin_view %}
-  {% set show_onboarding = (false) %}
-{% endif %}
 
 <div class="app-shell dashboard-shell py-8">
   <div class="dashboard-header reveal-up">
@@ -93,56 +84,6 @@
     </div>
   </section>
 
-  {% if show_onboarding %}
-    <section class="onboarding-card surface rounded-xl p-6 sm:p-7 mb-6 reveal-up">
-      <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
-        <div>
-          <h2 class="font-serif text-2xl font-semibold text-[#111827] mt-2">
-            {% if papers|length == 0 %}Welcome to AcademicAR.{% else %}You're almost there.{% endif %}
-          </h2>
-          <p class="text-sm text-[#5c6473] mt-1">
-            {% if papers|length == 0 %}Four small steps and your first paper is ready to share with a QR.{% else %}Finish these to unlock the public viewer page and AR.{% endif %}
-          </p>
-        </div>
-        <a href="{{ url_for('paper_new') }}" class="btn-primary compact whitespace-nowrap">+ New Publication</a>
-      </div>
-
-      <ol class="onboarding-steps">
-        <li class="onboarding-step{% if step1_done %} is-done{% endif %}">
-          <span class="onboarding-step-mark">{% if step1_done %}✓{% else %}1{% endif %}</span>
-          <div>
-            <p class="font-semibold text-[#111827]">Create your first publication page</p>
-            <p class="text-sm text-[#5c6473]">Add the title, authors, institution, year — minimal metadata is fine to start.</p>
-            {% if not step1_done %}<a href="{{ url_for('paper_new') }}" class="text-sm font-semibold text-[#111827] underline mt-1 inline-block">Create publication →</a>{% endif %}
-          </div>
-        </li>
-        <li class="onboarding-step{% if step2_done %} is-done{% endif %}">
-          <span class="onboarding-step-mark">{% if step2_done %}✓{% else %}2{% endif %}</span>
-          <div>
-            <p class="font-semibold text-[#111827]">Upload an anonymized 3D model</p>
-            <p class="text-sm text-[#5c6473]">STL or GLB. Pick the source unit (mm/cm/m) so the model lands at real-world scale in AR.</p>
-            {% if step1_done and not step2_done and papers %}<a href="{{ url_for('paper_detail', slug=papers[0].slug) }}#add-model" class="text-sm font-semibold text-[#111827] underline mt-1 inline-block">Add model →</a>{% endif %}
-          </div>
-        </li>
-        <li class="onboarding-step{% if step3_done %} is-done{% endif %}">
-          <span class="onboarding-step-mark">{% if step3_done %}✓{% else %}3{% endif %}</span>
-          <div>
-            <p class="font-semibold text-[#111827]">Attach the paper PDF (optional)</p>
-            <p class="text-sm text-[#5c6473]">Lets visitors read the paper directly from the public landing page.</p>
-            {% if step1_done and not step3_done and papers %}<a href="{{ url_for('paper_edit', slug=papers[0].slug) }}" class="text-sm font-semibold text-[#111827] underline mt-1 inline-block">Add PDF →</a>{% endif %}
-          </div>
-        </li>
-        <li class="onboarding-step{% if step4_done %} is-done{% endif %}">
-          <span class="onboarding-step-mark">{% if step4_done %}✓{% else %}4{% endif %}</span>
-          <div>
-            <p class="font-semibold text-[#111827]">Make it public and grab the QR</p>
-            <p class="text-sm text-[#5c6473]">Switch visibility to Public on the publication and download the paper QR for your manuscript or poster.</p>
-            {% if step1_done and not step4_done and papers %}<a href="{{ url_for('paper_detail', slug=papers[0].slug) }}" class="text-sm font-semibold text-[#111827] underline mt-1 inline-block">Open paper →</a>{% endif %}
-          </div>
-        </li>
-      </ol>
-    </section>
-  {% endif %}
 
   {% if papers %}
     <div class="dashboard-list-header reveal-up">

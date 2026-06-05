@@ -7112,6 +7112,51 @@ details[open] > .upload-summary .upload-inline-action svg {
   color: var(--color-midnight-graphite);
 }
 
+.color-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.color-preset {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+  padding: 0;
+}
+
+.color-preset:hover {
+  transform: scale(1.15);
+}
+
+.color-preset.is-active {
+  border-color: var(--color-midnight-graphite, #202020);
+}
+
+.color-preset:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.color-hex-input {
+  font-family: var(--font-inter, 'Inter', sans-serif);
+  font-size: 13px;
+  width: 90px;
+  padding: 6px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  text-transform: uppercase;
+}
+
+.color-hex-input:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
 .admin-filter-bar .field-input {
   width: min(100%, 280px);
   height: 36px;

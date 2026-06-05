@@ -277,6 +277,21 @@
                     <span class="color-optional-label">Color</span>
                   </label>
                   <input type="color" name="color" value="#cccccc" disabled aria-label="Model color" class="color-optional-picker" data-color-input>
+                  <div class="color-presets" data-color-presets>
+                    <button type="button" class="color-preset" data-preset="#E8D5B7" title="Bone" style="background:#E8D5B7" disabled></button>
+                    <button type="button" class="color-preset" data-preset="#8B2252" title="Vein" style="background:#8B2252" disabled></button>
+                    <button type="button" class="color-preset" data-preset="#CC2222" title="Artery" style="background:#CC2222" disabled></button>
+                    <button type="button" class="color-preset" data-preset="#FFCBA4" title="Skin" style="background:#FFCBA4" disabled></button>
+                    <button type="button" class="color-preset" data-preset="#8B3A3A" title="Muscle" style="background:#8B3A3A" disabled></button>
+                    <button type="button" class="color-preset" data-preset="#D4E4E4" title="Cartilage" style="background:#D4E4E4" disabled></button>
+                    <button type="button" class="color-preset" data-preset="#C0C0C0" title="Steel" style="background:#C0C0C0" disabled></button>
+                    <button type="button" class="color-preset" data-preset="#DDDDDD" title="Chrome" style="background:#DDDDDD" disabled></button>
+                    <button type="button" class="color-preset" data-preset="#B87333" title="Copper" style="background:#B87333" disabled></button>
+                    <button type="button" class="color-preset" data-preset="#D4AF37" title="Gold" style="background:#D4AF37" disabled></button>
+                    <button type="button" class="color-preset" data-preset="#8B6914" title="Wood" style="background:#8B6914" disabled></button>
+                    <button type="button" class="color-preset" data-preset="#FFFFF0" title="Ivory" style="background:#FFFFF0" disabled></button>
+                  </div>
+                  <input type="text" class="color-hex-input" data-color-hex placeholder="#CCCCCC" maxlength="7" pattern="^#[0-9A-Fa-f]{6}$" disabled>
                   <button type="submit" class="detail-action detail-action-primary" data-upload-submit>Upload and Generate QR</button>
                 </div>
                 <p class="hidden text-sm text-[#475569] rounded border border-[#e2e8f0] bg-[#f8fafc] px-4 py-2" data-upload-status>Preparing model, viewer, and QR...</p>
@@ -419,12 +434,30 @@
 
     if (companionInput) companionInput.addEventListener('change', updateDropzoneState);
 
+    const colorHexInput = uploadForm.querySelector('[data-color-hex]');
+    const colorPresets = uploadForm.querySelectorAll('[data-preset]');
+
+    const highlightPreset = (hex) => {
+      const upper = (hex || '').toUpperCase();
+      colorPresets.forEach((btn) => {
+        btn.classList.toggle('is-active', btn.dataset.preset.toUpperCase() === upper);
+      });
+    };
+
+    const syncColorFromPicker = () => {
+      if (colorHexInput) colorHexInput.value = colorInput.value.toUpperCase();
+      highlightPreset(colorInput.value);
+    };
+
     const updateColorState = () => {
       const enabled = Boolean(colorToggle && colorToggle.checked);
       if (colorInput) colorInput.disabled = !enabled;
+      if (colorHexInput) colorHexInput.disabled = !enabled;
+      colorPresets.forEach((btn) => { btn.disabled = !enabled; });
       if (colorControl) colorControl.classList.toggle('is-enabled', enabled);
       const swatch = colorControl && colorControl.querySelector('.color-optional-swatch');
       if (swatch) swatch.style.background = enabled && colorInput ? colorInput.value : '';
+      if (enabled) syncColorFromPicker();
     };
     if (colorControl && colorToggle && colorInput) {
       colorToggle.addEventListener('change', updateColorState);
@@ -435,6 +468,32 @@
         if (swatch && colorControl.classList.contains('is-enabled')) {
           swatch.style.background = colorInput.value;
         }
+        syncColorFromPicker();
+      });
+
+      if (colorHexInput) {
+        colorHexInput.addEventListener('input', () => {
+          let val = colorHexInput.value.trim();
+          if (val.length && val[0] !== '#') val = '#' + val;
+          if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+            colorInput.value = val;
+            colorInput.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+          highlightPreset(val);
+        });
+      }
+
+      colorPresets.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const hex = btn.dataset.preset;
+          colorInput.value = hex;
+          if (colorHexInput) colorHexInput.value = hex.toUpperCase();
+          highlightPreset(hex);
+          const swatch = colorControl.querySelector('.color-optional-swatch');
+          if (swatch && colorControl.classList.contains('is-enabled')) {
+            swatch.style.background = hex;
+          }
+        });
       });
     }
 

@@ -5,6 +5,7 @@ import re
 import secrets
 import shutil
 import struct
+import types
 import uuid
 import zipfile
 from datetime import UTC, datetime, timedelta
@@ -1629,7 +1630,39 @@ def register_routes(app: Flask) -> None:
     @app.route("/demo/mitochondria/ar")
     def demo_mitochondria_ar():
         log_audit("demo_mitochondria_ar_opened", details={"source": request.args.get("source") or "direct"})
-        return render_template("demo_mitochondria_ar.html")
+        demo_model = types.SimpleNamespace(
+            id="demo-mitochondria",
+            display_name="Mitochondria",
+            original_filename="mitochondria.glb",
+            file_size=2_400_000,
+            ar_placement="floor",
+            poster_path=None,
+            description="Cross-section of a mitochondrion showing the inner membrane cristae, outer membrane, and matrix. Prepared for interactive 3D visualization and augmented reality placement in academic publications.",
+            appearance_color=None,
+        )
+        demo_paper = types.SimpleNamespace(
+            title="Cellular Organelle Morphology in Human Hepatocytes",
+            authors="Dr. Sarah Chen, Prof. James Miller, Dr. Ayşe Yılmaz",
+            year=2025,
+            field="Cell Biology",
+            institution="ETH Zurich — Department of Biology",
+            doi="10.1234/cellbio.2025.mito",
+            pmid="39281047",
+            abstract="This study presents high-resolution 3D reconstructions of mitochondrial ultrastructure in human hepatocytes using serial block-face scanning electron microscopy. Interactive models enable spatial exploration of cristae morphology and membrane topology, bridging the gap between 2D micrographs and volumetric understanding.",
+            slug="demo-mitochondria",
+            is_public=True,
+        )
+        return render_template(
+            "viewer.html",
+            model=demo_model,
+            paper=demo_paper,
+            has_usdz=False,
+            annotations=[],
+            scale_reference="About the size of a tennis ball (scaled 50,000×)",
+            dimensions_cm="5.2 × 3.1 × 2.8 cm",
+            is_owner=False,
+            demo_mode=True,
+        )
 
     @app.route("/demo/mitochondria/qr.png")
     def demo_mitochondria_qr():

@@ -289,7 +289,7 @@
     <model-viewer
       id="viewer"
       class="absolute inset-0 z-10"
-      src="{{ url_for('serve_glb', unique_id=model.id, filename='model.glb') }}"
+      src="{% if demo_mode is defined and demo_mode %}{{ url_for('static', filename='models/model.compressed.glb') }}{% else %}{{ url_for('serve_glb', unique_id=model.id, filename='model.glb') }}{% endif %}"
       {% if has_usdz %}ios-src="{{ url_for('serve_glb', unique_id=model.id, filename='model.usdz') }}"{% endif %}
       {% if model.poster_path %}poster="{{ url_for('serve_poster', unique_id=model.id) }}"{% endif %}
       alt="3D model: {{ model.display_name or model.original_filename }}"
@@ -479,7 +479,7 @@
     {% if not is_embed %}
     <aside class="viewer-inline-qr absolute right-6 bottom-6 z-30 hidden lg:block rounded-xl border border-white/10 bg-[#111111]/76 p-3 backdrop-blur-2xl">
       <div class="rounded-lg bg-white p-2">
-        <img src="{{ url_for('qr_image', model_id=model.id) }}" class="h-24 w-24" alt="QR code for mobile AR">
+        <img src="{{ url_for('demo_mitochondria_qr') if demo_mode is defined and demo_mode else url_for('qr_image', model_id=model.id) }}" class="h-24 w-24" alt="QR code for mobile AR">
       </div>
       <p class="mt-2 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">Scan for AR</p>
     </aside>
@@ -529,7 +529,7 @@
           <button id="closeQr" class="rounded border border-white/10 px-3 py-2 text-sm text-white/70 hover:bg-white/10" type="button">Close</button>
         </div>
         <div class="mt-5 grid place-items-center rounded-lg bg-white p-4">
-          <img src="{{ url_for('qr_image', model_id=model.id) }}" class="h-56 w-56" alt="QR code for mobile AR">
+          <img src="{{ url_for('demo_mitochondria_qr') if demo_mode is defined and demo_mode else url_for('qr_image', model_id=model.id) }}" class="h-56 w-56" alt="QR code for mobile AR">
         </div>
         <p class="mt-4 text-sm leading-relaxed text-white/60">AR opens best from a phone or tablet. Scan this QR code, then tap View in AR on the mobile viewer.</p>
       </div>
