@@ -7976,8 +7976,7 @@ body.nav-menu-open {
 .lp-ar-visual { position: relative; display: flex; justify-content: center; }
 .lp-ar-photo {
   position: relative; z-index: 1;
-  width: 300px; max-width: 100%; height: auto; display: block;
-  filter: drop-shadow(0 30px 60px rgba(32,32,32,0.22));
+  width: 320px; max-width: 100%; height: auto; display: block;
 }
 .lp-ar-glow {
   position: absolute; left: 50%; top: 55%; transform: translate(-50%, -50%);
