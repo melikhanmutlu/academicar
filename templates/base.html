@@ -115,7 +115,7 @@
   <script>
     (() => {
       const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      const revealItems = [...document.querySelectorAll(".reveal-up")];
+      const revealItems = [...document.querySelectorAll(".reveal-up, .lp-scale-in")];
 
       if (!reduceMotion && "IntersectionObserver" in window) {
         const observer = new IntersectionObserver((entries) => {
