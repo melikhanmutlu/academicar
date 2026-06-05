@@ -110,6 +110,30 @@ class TestModelEditLivePreview:
         assert 'id="appearanceColor"' in content and 'name="color"' in content
 
 
+class TestViewerCollapsiblePanel:
+    """Viewer control panel should be collapsible with toggle button."""
+
+    def test_panel_has_toggle_button(self):
+        content = (TEMPLATES_DIR / "viewer.html").read_text()
+        assert 'id="panelToggle"' in content
+        assert 'id="panelBody"' in content
+        assert 'id="controlPanel"' in content
+
+    def test_panel_has_collapse_css(self):
+        content = (TEMPLATES_DIR / "viewer.html").read_text()
+        assert "viewer-panel-body" in content
+        assert 'data-collapsed="true"' in content
+
+    def test_mobile_starts_collapsed(self):
+        content = (TEMPLATES_DIR / "viewer.html").read_text()
+        assert "matchMedia" in content
+        assert "640px" in content
+
+    def test_panel_has_chevron_icon(self):
+        content = (TEMPLATES_DIR / "viewer.html").read_text()
+        assert 'id="panelChevron"' in content
+
+
 class TestMigrationExists:
     """Migration for material/AR columns."""
 

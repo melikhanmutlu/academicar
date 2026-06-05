@@ -233,7 +233,7 @@
       object-fit: contain;
     }
     @media (max-width: 640px) {
-      .viewer-tool-btn { min-height: 36px; padding: 0.5rem 0.7rem; }
+      .viewer-tool-btn { min-height: 32px; padding: 0.4rem 0.6rem; font-size: 0.75rem; }
       model-viewer { left: 0 !important; right: 0 !important; width: 100vw !important; transform: none !important; }
       .info-drawer { left: 0 !important; right: 0 !important; width: 100vw !important; max-width: 100vw !important; }
       .viewer-control-panel {
@@ -264,6 +264,19 @@
       .viewer-shot-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); max-height: 96px; }
       .viewer-shot-actions { grid-template-columns: 1fr; }
       .viewer-inline-qr { display: none !important; }
+      .viewer-control-panel[data-collapsed="true"] { max-height: none; overflow: visible; }
+    }
+    .viewer-panel-body {
+      overflow: hidden;
+      transition: max-height 280ms ease, opacity 200ms ease;
+    }
+    .viewer-control-panel[data-collapsed="true"] .viewer-panel-body {
+      max-height: 0 !important;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .viewer-control-panel[data-collapsed="true"] #panelChevron {
+      transform: rotate(180deg);
     }
   </style>
 </head>
@@ -377,64 +390,73 @@
       <p class="text-[10px] text-white/40 line-clamp-1">{{ paper.title }}</p>
     </div>
     {% else %}
-    <section class="viewer-control-panel absolute left-4 right-4 bottom-4 z-30 sm:left-6 sm:right-auto sm:w-[520px] rounded-xl border border-white/10 bg-[#111111]/76 p-4 backdrop-blur-2xl">
-      <p class="text-xs uppercase tracking-[0.18em] text-white/55">Live spatial viewer</p>
-      <h1 class="font-serif text-2xl sm:text-3xl font-semibold mt-1 line-clamp-1">{{ model.display_name or model.original_filename }}</h1>
-      <p class="text-sm text-white/60 mt-1 line-clamp-1">{{ paper.title }}</p>
-      <div class="viewer-meta-grid mt-4 grid grid-cols-3 gap-2 text-xs">
-        <div class="rounded-lg bg-white/[0.06] p-3">
-        <p class="text-white/40">Format</p>
-          <p class="font-bold mt-1">GLB</p>
+    <section id="controlPanel" class="viewer-control-panel absolute left-4 right-4 bottom-4 z-30 sm:left-6 sm:right-auto sm:w-[520px] rounded-xl border border-white/10 bg-[#111111]/76 p-4 backdrop-blur-2xl" data-collapsed="false">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <p class="text-xs uppercase tracking-[0.18em] text-white/55">Live spatial viewer</p>
+          <h1 class="font-serif text-2xl sm:text-3xl font-semibold mt-1 line-clamp-1">{{ model.display_name or model.original_filename }}</h1>
+          <p class="text-sm text-white/60 mt-1 line-clamp-1">{{ paper.title }}</p>
         </div>
-        <div class="rounded-lg bg-white/[0.06] p-3">
-        <p class="text-white/40">Size</p>
-          <p class="font-bold mt-1">{{ format_file_size(model.file_size) if format_file_size is defined else model.file_size }}</p>
-        </div>
-        <div class="rounded-lg bg-white/[0.06] p-3">
-        <p class="text-white/40">AR</p>
-          <p class="font-bold mt-1">Ready</p>
-        </div>
+        <button id="panelToggle" type="button" class="flex-shrink-0 mt-1 rounded-full border border-white/10 w-8 h-8 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors" aria-label="Toggle panel">
+          <svg id="panelChevron" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition:transform 200ms ease"><polyline points="3 5 7 9 11 5"/></svg>
+        </button>
       </div>
-      {% if dimensions_cm and dimensions_cm != 'Not measured' %}
-      <div class="mt-2 rounded-lg bg-white/[0.06] p-3 text-xs">
-        <p class="text-white/40">Dimensions</p>
-        <p class="font-bold mt-1">{{ dimensions_cm }}</p>
-        {% if scale_reference %}<p class="text-white/50 mt-0.5">{{ scale_reference }}</p>{% endif %}
-      </div>
-      {% endif %}
-      <div class="viewer-tool-stack mt-4 grid gap-3 text-xs">
-        <div class="viewer-rotation-tools" data-rotation-tools>
-          <div class="viewer-tool-heading">
-            <span>Preview rotation</span>
-            <div class="flex items-center gap-2">
-              <button class="viewer-auto-toggle" type="button" data-auto-rotate-toggle aria-pressed="false">Auto rotate off</button>
-              <button type="button" data-reset-rotation>Reset view</button>
+      <div id="panelBody" class="viewer-panel-body">
+        <div class="viewer-meta-grid mt-4 grid grid-cols-3 gap-2 text-xs">
+          <div class="rounded-lg bg-white/[0.06] p-3">
+          <p class="text-white/40">Format</p>
+            <p class="font-bold mt-1">GLB</p>
+          </div>
+          <div class="rounded-lg bg-white/[0.06] p-3">
+          <p class="text-white/40">Size</p>
+            <p class="font-bold mt-1">{{ format_file_size(model.file_size) if format_file_size is defined else model.file_size }}</p>
+          </div>
+          <div class="rounded-lg bg-white/[0.06] p-3">
+          <p class="text-white/40">AR</p>
+            <p class="font-bold mt-1">Ready</p>
+          </div>
+        </div>
+        {% if dimensions_cm and dimensions_cm != 'Not measured' %}
+        <div class="mt-2 rounded-lg bg-white/[0.06] p-3 text-xs">
+          <p class="text-white/40">Dimensions</p>
+          <p class="font-bold mt-1">{{ dimensions_cm }}</p>
+          {% if scale_reference %}<p class="text-white/50 mt-0.5">{{ scale_reference }}</p>{% endif %}
+        </div>
+        {% endif %}
+        <div class="viewer-tool-stack mt-4 grid gap-3 text-xs">
+          <div class="viewer-rotation-tools" data-rotation-tools>
+            <div class="viewer-tool-heading">
+              <span>Preview rotation</span>
+              <div class="flex items-center gap-2">
+                <button class="viewer-auto-toggle" type="button" data-auto-rotate-toggle aria-pressed="false">Auto rotate off</button>
+                <button type="button" data-reset-rotation>Reset view</button>
+              </div>
+            </div>
+            <label> X <input type="range" min="0" max="360" step="1" value="0" data-rotate-axis="x"><span data-rotate-value="x">0deg</span></label>
+            <label> Y <input type="range" min="0" max="360" step="1" value="0" data-rotate-axis="y"><span data-rotate-value="y">0deg</span></label>
+            <label> Z <input type="range" min="0" max="360" step="1" value="0" data-rotate-axis="z"><span data-rotate-value="z">0deg</span></label>
+          </div>
+
+          <div class="viewer-animation-tools" data-animation-tools hidden>
+            <div class="viewer-tool-heading">
+              <span>Model animation</span>
+              <div class="flex items-center gap-2">
+                <button class="viewer-animation-toggle" type="button" data-animation-toggle aria-pressed="true" disabled>Animation on</button>
+              </div>
             </div>
           </div>
-          <label> X <input type="range" min="0" max="360" step="1" value="0" data-rotate-axis="x"><span data-rotate-value="x">0deg</span></label>
-          <label> Y <input type="range" min="0" max="360" step="1" value="0" data-rotate-axis="y"><span data-rotate-value="y">0deg</span></label>
-          <label> Z <input type="range" min="0" max="360" step="1" value="0" data-rotate-axis="z"><span data-rotate-value="z">0deg</span></label>
-        </div>
 
-        <div class="viewer-animation-tools" data-animation-tools hidden>
-          <div class="viewer-tool-heading">
-            <span>Model animation</span>
-            <div class="flex items-center gap-2">
-              <button class="viewer-animation-toggle" type="button" data-animation-toggle aria-pressed="true" disabled>Animation on</button>
+          <div class="viewer-shot-tools" data-screenshot-tools>
+            <div class="viewer-tool-heading">
+              <span>Screenshots</span>
+              <button type="button" data-download-zip disabled>Download ZIP</button>
             </div>
+            <div class="viewer-shot-actions">
+              <button type="button" data-current-shot>Current view</button>
+              <button type="button" data-generate-shot-set>Generate 8 views</button>
+            </div>
+            <div class="viewer-shot-grid" data-shot-gallery aria-live="polite"></div>
           </div>
-        </div>
-
-        <div class="viewer-shot-tools" data-screenshot-tools>
-          <div class="viewer-tool-heading">
-            <span>Screenshots</span>
-            <button type="button" data-download-zip disabled>Download ZIP</button>
-          </div>
-          <div class="viewer-shot-actions">
-            <button type="button" data-current-shot>Current view</button>
-            <button type="button" data-generate-shot-set>Generate 8 views</button>
-          </div>
-          <div class="viewer-shot-grid" data-shot-gallery aria-live="polite"></div>
         </div>
       </div>
     </section>
@@ -561,6 +583,36 @@
     let shotGallery = [];
     let modelAnimationAvailable = false;
     let modelAnimationPlaying = true;
+
+    // --- Collapsible control panel ---
+    const controlPanel = document.getElementById('controlPanel');
+    const panelToggle = document.getElementById('panelToggle');
+    const panelBody = document.getElementById('panelBody');
+    if (panelToggle && controlPanel && panelBody) {
+      const isMobile = window.matchMedia('(max-width: 640px)').matches;
+      if (isMobile) {
+        controlPanel.setAttribute('data-collapsed', 'true');
+      }
+      panelToggle.addEventListener('click', () => {
+        const collapsed = controlPanel.getAttribute('data-collapsed') === 'true';
+        if (collapsed) {
+          panelBody.style.maxHeight = panelBody.scrollHeight + 'px';
+          panelBody.style.opacity = '1';
+          controlPanel.setAttribute('data-collapsed', 'false');
+        } else {
+          panelBody.style.maxHeight = panelBody.scrollHeight + 'px';
+          requestAnimationFrame(() => {
+            panelBody.style.maxHeight = '0';
+            controlPanel.setAttribute('data-collapsed', 'true');
+          });
+        }
+      });
+      panelBody.addEventListener('transitionend', () => {
+        if (controlPanel.getAttribute('data-collapsed') === 'false') {
+          panelBody.style.maxHeight = 'none';
+        }
+      });
+    }
 
     if (infoBtn && infoPanel) infoBtn.addEventListener('click', () => infoPanel.classList.add('open'));
     if (closeInfo && infoPanel) closeInfo.addEventListener('click', () => infoPanel.classList.remove('open'));

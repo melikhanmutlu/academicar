@@ -288,20 +288,25 @@ def compute_glb_dimensions_cm(glb_path: str | None) -> str | None:
             return None
         return " x ".join(f"{axis:.1f}" for axis in extents_cm) + " cm"
     except Exception:
-        logger.debug("Could not measure GLB dimensions for %s", glb_path, exc_info=True)
+        logger.warning("Could not measure GLB dimensions for %s", glb_path, exc_info=True)
         return None
 
 
 def format_model_dimensions_cm(model: Model3D | None) -> str:
     if not model:
         return "Not measured"
-    # Prefer the value measured once at conversion time (cheap). Fall back to a
-    # lazy on-disk measurement only for legacy rows that predate the column.
     if getattr(model, "dimensions_cm", None):
         return model.dimensions_cm
     glb_path = next((path for path in _model_glb_candidate_paths(model) if path and os.path.exists(path)), None)
     measured = compute_glb_dimensions_cm(glb_path)
-    return measured or "Not measured"
+    if measured:
+        try:
+            model.dimensions_cm = measured
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+        return measured
+    return "Not measured"
 
 
 def human_scale_reference(dimensions_cm: str | None) -> str | None:
