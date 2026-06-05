@@ -7966,6 +7966,7 @@ body.nav-menu-open {
 
 /* ---------- AR EXPERIENCE SECTION ---------- */
 .lp-ar-section {
+  padding-top: 32px;
   background:
     radial-gradient(700px 500px at 20% 60%, rgba(255,104,44,0.06), transparent 55%),
     var(--color-canvas-white);
