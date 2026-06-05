@@ -118,9 +118,8 @@ def enrich_glb_for_ar(
        smoothed/blob look.
 
     Implemented with pygltflib so the GLB binary is rebuilt by a
-    well-tested library instead of by hand-rolled JSON+struct code.
-    Returns True on success, False if pygltflib isn't installed (in
-    which case the caller falls back to the legacy raw injector).
+    well-tested library instead of hand-rolled byte manipulation.
+    Returns True on success, False if pygltflib isn't installed.
     """
     try:
         import pygltflib
@@ -266,69 +265,32 @@ def inject_pbr_material(
     metallic: float = 0.05,
     double_sided: bool = True,
 ) -> None:
-    """Rewrite a GLB file in place, attaching a PBR material with the given
-    baseColorFactor to every primitive.
+    """Inject a PBR material into a GLB using pygltflib.
 
-    trimesh exports vertex colors via the COLOR_0 vertex attribute, but iOS
-    Quick Look (USDZ conversion) and several Android Scene Viewer paths
-    ignore COLOR_0 when rendering AR — the model appears stark white. By
-    injecting a proper PBR material with baseColorFactor we get consistent
-    color rendering across desktop three.js, iOS Quick Look, and Android
-    Scene Viewer. doubleSided=true also avoids invisible back faces on
-    non-watertight anatomical meshes.
-
-    Operates on the JSON chunk only; binary buffers are left untouched.
+    Replaces the legacy raw-byte struct manipulation with the same library
+    used elsewhere in the pipeline, ensuring consistent and spec-safe output.
     """
-    import json
-    import struct
+    from pygltflib import GLTF2, Material, PbrMetallicRoughness
 
-    with open(glb_path, "rb") as f:
-        data = f.read()
-
-    if len(data) < 20:
-        raise ValueError("GLB file too small to be valid")
-
-    magic, version, _total = struct.unpack("<4sII", data[:12])
-    if magic != b"glTF" or version != 2:
-        raise ValueError(f"Unexpected GLB header: magic={magic!r}, version={version}")
-
-    json_length, json_type = struct.unpack("<II", data[12:20])
-    if json_type != 0x4E4F534A:  # 'JSON' little-endian
-        raise ValueError(f"First chunk is not JSON (type=0x{json_type:08x})")
-
-    json_bytes = data[20 : 20 + json_length]
-    gltf = json.loads(json_bytes.decode("utf-8").rstrip("\x00"))
-
-    materials = gltf.setdefault("materials", [])
-    new_index = len(materials)
-    materials.append(
-        {
-            "name": "AcademicAR_Default",
-            "pbrMetallicRoughness": {
-                "baseColorFactor": [float(c) for c in base_color_rgba],
-                "metallicFactor": float(metallic),
-                "roughnessFactor": float(roughness),
-            },
-            "doubleSided": bool(double_sided),
-        }
+    gltf = GLTF2.load(glb_path)
+    if gltf.materials is None:
+        gltf.materials = []
+    new_index = len(gltf.materials)
+    gltf.materials.append(
+        Material(
+            name="AcademicAR_Default",
+            pbrMetallicRoughness=PbrMetallicRoughness(
+                baseColorFactor=[float(c) for c in base_color_rgba],
+                metallicFactor=float(metallic),
+                roughnessFactor=float(roughness),
+            ),
+            doubleSided=bool(double_sided),
+        )
     )
-
-    for mesh_def in gltf.get("meshes", []):
-        for primitive in mesh_def.get("primitives", []):
-            primitive["material"] = new_index
-
-    new_json = json.dumps(gltf, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-    pad = (4 - len(new_json) % 4) % 4
-    new_json += b" " * pad
-
-    rest = data[20 + json_length :]
-    new_total = 12 + 8 + len(new_json) + len(rest)
-
-    with open(glb_path, "wb") as f:
-        f.write(struct.pack("<4sII", b"glTF", 2, new_total))
-        f.write(struct.pack("<II", len(new_json), 0x4E4F534A))
-        f.write(new_json)
-        f.write(rest)
+    for mesh_def in gltf.meshes or []:
+        for prim in mesh_def.primitives or []:
+            prim.material = new_index
+    gltf.save(glb_path)
 
 
 def load_stl_mesh_without_normals(file_path: str) -> trimesh.Trimesh:
@@ -499,18 +461,42 @@ class STLConverter(BaseConverter):
 
             # Explicit user override beats heuristic. The form sends mm/cm/m;
             # anything else (including "auto") falls back to the heuristic.
+            #
+            # Heuristic bands (based on real-world model survey):
+            #   >1000  → likely microns (µm), e.g. microscopy data
+            #   >100   → likely mm, e.g. anatomical models (skull ~200mm)
+            #   >1     → likely cm, e.g. tabletop objects (box ~30cm)
+            #   ≤1     → likely already meters
+            # Target: the final mesh should be in meters for glTF/AR.
             explicit_units = {"mm": 0.001, "cm": 0.01, "m": 1.0}
             if source_unit in explicit_units:
                 unit_scale = explicit_units[source_unit]
                 unit_label = f"{source_unit} (user-specified)"
-            elif max_extent_raw > 10.0:
+            elif max_extent_raw > 1000.0:
+                unit_scale, unit_label = 0.000001, "µm (auto-detected)"
+            elif max_extent_raw > 100.0:
                 unit_scale, unit_label = 0.001, "mm (auto-detected)"
-            elif max_extent_raw > 0.1:
+            elif max_extent_raw > 1.0:
                 unit_scale, unit_label = 0.01, "cm (auto-detected)"
             else:
                 unit_scale, unit_label = 1.0, "m (auto-detected)"
+
             mesh.apply_scale(unit_scale)
             scaled_max = max_extent_raw * unit_scale
+
+            # Safety clamp: if the scaled model is still unreasonably large
+            # (>10m in any dimension), scale it down to fit 2m — prevents
+            # absurdly large models from breaking AR placement.
+            AR_MAX_EXTENT_M = float(os.environ.get("AR_MAX_EXTENT_M", "2.0"))
+            if scaled_max > AR_MAX_EXTENT_M:
+                clamp_factor = AR_MAX_EXTENT_M / scaled_max
+                mesh.apply_scale(clamp_factor)
+                self.log_operation(
+                    f"Safety clamp: scaled model ({scaled_max:.2f}m) exceeded "
+                    f"{AR_MAX_EXTENT_M}m; applied additional {clamp_factor:.4f}x"
+                )
+                scaled_max = AR_MAX_EXTENT_M
+
             self.log_operation(
                 f"Source unit: {unit_label} (raw max extent {max_extent_raw:.2f}); "
                 f"applied scale {unit_scale} -> {scaled_max * 100:.1f} cm in AR"
@@ -638,21 +624,19 @@ class STLConverter(BaseConverter):
             # UVs so AR engines (iOS Quick Look, Android Scene Viewer) get a
             # complete primitive — explicit baseColorFactor (linear), doubleSided,
             # roughness/metallic, and TEXCOORD_0 for shaders that need it.
-            # Falls back to the legacy raw-struct injector (material only, no
-            # UVs) if pygltflib isn't installed.
             try:
                 enriched = enrich_glb_for_ar(output_path, target_color)
                 if enriched:
                     self.log_operation(
-                        f"Enriched GLB via pygltflib: PBR material "
+                        f"Enriched GLB: PBR material "
                         f"baseColorFactor={target_color} (roughness=0.45, "
                         f"metallic=0.05, doubleSided=true) + triplanar UVs"
                     )
                 else:
                     inject_pbr_material(output_path, target_color)
                     self.log_operation(
-                        f"Injected PBR material via raw struct fallback "
-                        f"(no UVs): baseColorFactor={target_color}"
+                        f"Injected PBR material "
+                        f"baseColorFactor={target_color}"
                     )
             except Exception as e:
                 self.log_operation(

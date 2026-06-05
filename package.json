@@ -4,7 +4,8 @@
   "private": true,
   "description": "Node-based model conversion helpers for AcademicAR",
   "dependencies": {
-    "fbx2gltf": "^0.9.7-p1",
+    "@gltf-transform/cli": "^4.3.0",
+    "fbx2gltf": "0.9.7-p1",
     "jszip": "^3.10.1",
     "obj2gltf": "^3.1.6"
   },

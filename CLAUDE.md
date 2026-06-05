@@ -7,6 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Web requests must enqueue `ConversionJob` rows only; production conversion work belongs to `worker.py`, not the Flask web process.
 - Upload rate limiting uses `Flask-Limiter`. In Railway/production, point `RATELIMIT_STORAGE_URI` at `REDIS_URL`; local dev and tests can use `memory://`.
 - The model upload surface now accepts GLB, STL, OBJ, and FBX. OBJ/FBX conversion is handled by external converter wrappers.
+- GLB output is optimized via `gltf-transform` (Draco geometry compression + webp textures) in `finalize_converted_glb()`. The optimizer is best-effort: if `gltf-transform` is unavailable the original GLB passes through unchanged.
+- `fbx2gltf` is pinned to 0.9.7-p1 (the project is effectively unmaintained upstream). Do not upgrade without testing.
 
 ## Quick Commands
 
@@ -16,6 +18,7 @@ python -m venv venv
 venv\Scripts\activate  # Windows
 source venv/bin/activate  # macOS/Linux
 pip install -r requirements.txt
+npm install  # Node converter tools (obj2gltf, fbx2gltf, gltf-transform)
 
 # Development server
 python app.py
