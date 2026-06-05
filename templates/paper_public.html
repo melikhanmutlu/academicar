@@ -81,6 +81,7 @@
               <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-preview" aria-label="Open 3D viewer for {{ m.display_name or m.original_filename }}">
                 <model-viewer
                   src="{{ url_for('serve_glb', unique_id=m.id, filename='model.glb') }}"
+                  {% if m.poster_path %}poster="{{ url_for('serve_poster', unique_id=m.id) }}"{% endif %}
                   alt="3D preview: {{ m.display_name or m.original_filename }}"
                   camera-orbit="35deg 70deg auto"
                   field-of-view="28deg"

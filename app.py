@@ -28,6 +28,7 @@ from extensions import csrf, limiter, rate_limit_key
 from converters import FBXConverter, OBJConverter, STLConverter
 from converters.glb_quality import GLBQualityError, embed_external_textures, ensure_pbr_materials, validate_glb_quality
 from converters.glb_optimize import optimize_glb
+from converters.poster import generate_poster
 from converters.stl_converter import convert_glb_to_usdz, enrich_glb_for_ar
 from licensing import (
     LICENSE_PLANS,
@@ -1212,6 +1213,9 @@ def process_model_upload_job(
             # Measure dimensions once here so listing/detail pages don't re-parse
             # the GLB with trimesh on every request.
             model.dimensions_cm = compute_glb_dimensions_cm(glb_path)
+            poster_png = os.path.join(os.path.dirname(glb_path), "poster.png")
+            if generate_poster(glb_path, poster_png):
+                model.poster_path = poster_png
             model.processing_status = "ready"
             model.processing_error = None
             if color:
@@ -1718,6 +1722,22 @@ def register_routes(app: Flask) -> None:
         # update rewrites the file, changing the ETag, which invalidates the copy.
         response.headers["Cache-Control"] = "private, no-cache"
         response.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+        return response
+
+    @app.route("/files/<unique_id>/poster.png")
+    def serve_poster(unique_id):
+        if not is_uuid(unique_id):
+            abort(404)
+        model = db.session.get(Model3D, unique_id)
+        if not model or not model.poster_path:
+            abort(404)
+        if not _paper_visible_to_request(model.paper) or not model_is_accessible(model):
+            abort(404)
+        directory = os.path.join(app.config["CONVERTED_FOLDER"], unique_id)
+        if not os.path.exists(os.path.join(directory, "poster.png")):
+            abort(404)
+        response = send_from_directory(directory, "poster.png", mimetype="image/png", conditional=True)
+        response.headers["Cache-Control"] = "private, no-cache"
         return response
 
     @app.route("/qr-image/<model_id>")

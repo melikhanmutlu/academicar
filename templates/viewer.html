@@ -218,6 +218,7 @@
       class="absolute inset-0 z-10"
       src="{{ url_for('serve_glb', unique_id=model.id, filename='model.glb') }}"
       {% if has_usdz %}ios-src="{{ url_for('serve_glb', unique_id=model.id, filename='model.usdz') }}"{% endif %}
+      {% if model.poster_path %}poster="{{ url_for('serve_poster', unique_id=model.id) }}"{% endif %}
       alt="3D model: {{ model.display_name or model.original_filename }}"
       shadow-intensity="1.0"
       shadow-softness="0.75"

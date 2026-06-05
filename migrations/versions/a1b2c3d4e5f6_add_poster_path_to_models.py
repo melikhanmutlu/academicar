@@ -1,0 +1,36 @@
+"""add poster_path to models table
+
+Revision ID: a1b2c3d4e5f6
+Revises: 19a41d926f4a
+Create Date: 2026-06-05
+
+Stores the path to a server-generated poster/thumbnail PNG for each model.
+"""
+from alembic import op
+import sqlalchemy as sa
+from sqlalchemy import inspect
+
+
+revision = 'a1b2c3d4e5f6'
+down_revision = '19a41d926f4a'
+branch_labels = None
+depends_on = None
+
+
+def _column_exists(table_name, column_name):
+    bind = op.get_bind()
+    insp = inspect(bind)
+    columns = [col['name'] for col in insp.get_columns(table_name)]
+    return column_name in columns
+
+
+def upgrade():
+    if not _column_exists('models', 'poster_path'):
+        with op.batch_alter_table('models', schema=None) as batch_op:
+            batch_op.add_column(sa.Column('poster_path', sa.String(500), nullable=True))
+
+
+def downgrade():
+    if _column_exists('models', 'poster_path'):
+        with op.batch_alter_table('models', schema=None) as batch_op:
+            batch_op.drop_column('poster_path')
