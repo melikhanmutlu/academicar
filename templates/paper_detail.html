@@ -165,7 +165,7 @@
                   <div><span>Access</span><strong>{{ 'Until ' ~ m.access_expires_at.strftime('%b %d, %Y') if m.access_expires_at else 'No expiry' }}</strong></div>
                   <div><span>Conversion</span><strong>{{ conversion_label }}</strong></div>
                   <div><span>Size</span><strong>{{ format_file_size(m.file_size) }}</strong></div>
-                  <div><span>Dimensions</span><strong title="{{ dimensions_label }}">{{ dimensions_label }}</strong></div>
+                  <div><span>W × H × D</span><strong title="{{ dimensions_label }}">{{ dimensions_label }}</strong></div>
                 </div>
                 <div class="model-actions mt-4">
                   {% if model_status == 'ready' %}

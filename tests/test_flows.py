@@ -549,7 +549,7 @@ def test_valid_stl_upload_creates_model_and_qr(client, monkeypatch):
     assert "Conversion" in html
     assert "STL -&gt; GLB" in html
     assert "Size" in html
-    assert "Dimensions" in html
+    assert "W × H × D" in html
     assert "File limit" not in html
     assert "Version" not in html
 

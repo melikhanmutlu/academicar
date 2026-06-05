@@ -194,19 +194,7 @@
     <div class="lp-usecases">
       <div class="lp-usecase reveal-up delay-1">
         <div class="lp-usecase-thumb">
-          <svg viewBox="0 0 200 140" aria-hidden="true">
-            <line x1="70" y1="55" x2="100" y2="80" stroke="#9aa0a6" stroke-width="2"/>
-            <line x1="130" y1="55" x2="100" y2="80" stroke="#9aa0a6" stroke-width="2"/>
-            <line x1="100" y1="80" x2="100" y2="115" stroke="#9aa0a6" stroke-width="2"/>
-            <line x1="70" y1="55" x2="45" y2="40" stroke="#9aa0a6" stroke-width="2"/>
-            <line x1="130" y1="55" x2="155" y2="40" stroke="#9aa0a6" stroke-width="2"/>
-            <circle cx="100" cy="80" r="14" fill="#202020"/>
-            <circle cx="70" cy="55" r="11" fill="#ff682c"/>
-            <circle cx="130" cy="55" r="11" fill="#5b8def"/>
-            <circle cx="45" cy="40" r="8" fill="#cfd3d8"/>
-            <circle cx="155" cy="40" r="8" fill="#cfd3d8"/>
-            <circle cx="100" cy="115" r="9" fill="#7d8590"/>
-          </svg>
+          <img src="{{ url_for('static', filename='images/use-scientific-publication.png') }}" alt="Scientific Publication" loading="lazy"/>
         </div>
         <div class="lp-usecase-body">
           <span class="lp-usecase-badge" aria-hidden="true">
@@ -219,13 +207,7 @@
 
       <div class="lp-usecase reveal-up delay-2">
         <div class="lp-usecase-thumb">
-          <svg viewBox="0 0 200 140" aria-hidden="true">
-            <path d="M60 50c0-22 80-22 80 0 0 14-10 20-10 32 0 8-6 10-10 10h-30c-4 0-10-2-10-10 0-12-10-18-10-32z" fill="#e3e6ea" stroke="#202020" stroke-width="2"/>
-            <circle cx="84" cy="62" r="7" fill="#202020"/>
-            <circle cx="116" cy="62" r="7" fill="#ff682c"/>
-            <path d="M96 74l-4 10h16l-4-10" fill="#9aa0a6"/>
-            <path d="M88 96h24" stroke="#202020" stroke-width="2" stroke-linecap="round"/>
-          </svg>
+          <img src="{{ url_for('static', filename='images/use-theses-dissertations.png') }}" alt="Theses &amp; Dissertations" loading="lazy"/>
         </div>
         <div class="lp-usecase-body">
           <span class="lp-usecase-badge" aria-hidden="true">
@@ -238,14 +220,7 @@
 
       <div class="lp-usecase reveal-up delay-3">
         <div class="lp-usecase-thumb">
-          <svg viewBox="0 0 200 140" aria-hidden="true">
-            <line x1="100" y1="28" x2="100" y2="112" stroke="#202020" stroke-width="3" stroke-linecap="round"/>
-            <path d="M100 40c-18 6-30 6-40 2 M100 40c18 6 30 6 40 2" fill="none" stroke="#9aa0a6" stroke-width="3" stroke-linecap="round"/>
-            <path d="M100 54c-16 6-26 6-34 3 M100 54c16 6 26 6 34 3" fill="none" stroke="#9aa0a6" stroke-width="3" stroke-linecap="round"/>
-            <path d="M100 68c-13 5-21 5-28 2 M100 68c13 5 21 5 28 2" fill="none" stroke="#ff682c" stroke-width="3" stroke-linecap="round"/>
-            <path d="M100 82c-10 4-16 4-22 2 M100 82c10 4 16 4 22 2" fill="none" stroke="#9aa0a6" stroke-width="3" stroke-linecap="round"/>
-            <circle cx="100" cy="30" r="6" fill="#202020"/>
-          </svg>
+          <img src="{{ url_for('static', filename='images/use-medical-education.png') }}" alt="Medical Education" loading="lazy"/>
         </div>
         <div class="lp-usecase-body">
           <span class="lp-usecase-badge" aria-hidden="true">
@@ -258,15 +233,7 @@
 
       <div class="lp-usecase reveal-up delay-4">
         <div class="lp-usecase-thumb">
-          <svg viewBox="0 0 200 140" aria-hidden="true">
-            <circle cx="100" cy="70" r="30" fill="none" stroke="#202020" stroke-width="3"/>
-            <circle cx="100" cy="70" r="12" fill="#e3e6ea" stroke="#202020" stroke-width="2"/>
-            <circle cx="100" cy="70" r="4" fill="#ff682c"/>
-            {% for a in range(0, 360, 45) %}
-            <rect x="97" y="28" width="6" height="14" rx="2" fill="#7d8590" transform="rotate({{ a }} 100 70)"/>
-            {% endfor %}
-            <rect x="150" y="64" width="26" height="12" rx="3" fill="#cfd3d8"/>
-          </svg>
+          <img src="{{ url_for('static', filename='images/use-research-projects.png') }}" alt="Research Projects" loading="lazy"/>
         </div>
         <div class="lp-usecase-body">
           <span class="lp-usecase-badge" aria-hidden="true">
