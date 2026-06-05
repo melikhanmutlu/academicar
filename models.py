@@ -131,6 +131,39 @@ class Model3D(db.Model):
         return f"<Model3D {self.id}>"
 
 
+class ModelAnnotation(db.Model):
+    __tablename__ = "model_annotations"
+
+    id = db.Column(db.Integer, primary_key=True)
+    model_id = db.Column(db.String(36), db.ForeignKey("models.id"), nullable=False, index=True)
+    position_x = db.Column(db.Float, nullable=False)
+    position_y = db.Column(db.Float, nullable=False)
+    position_z = db.Column(db.Float, nullable=False)
+    normal_x = db.Column(db.Float, nullable=False, default=0.0)
+    normal_y = db.Column(db.Float, nullable=False, default=1.0)
+    normal_z = db.Column(db.Float, nullable=False, default=0.0)
+    label = db.Column(db.String(120), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    order_index = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, default=utc_now)
+
+    model = db.relationship("Model3D", backref=db.backref("annotations", lazy=True, cascade="all, delete-orphan"))
+
+    def __repr__(self) -> str:
+        return f"<ModelAnnotation {self.id} '{self.label}'>"
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "model_id": self.model_id,
+            "position": [self.position_x, self.position_y, self.position_z],
+            "normal": [self.normal_x, self.normal_y, self.normal_z],
+            "label": self.label,
+            "description": self.description,
+            "order_index": self.order_index,
+        }
+
+
 class QRLink(db.Model):
     __tablename__ = "qr_links"
 

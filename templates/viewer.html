@@ -39,6 +39,27 @@
       opacity: 1;
       transform: none;
     }
+    .annotation-hotspot {
+      background: rgba(17, 17, 17, 0.82);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 8px;
+      padding: 4px 10px;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      transition: opacity 0.3s, transform 0.3s;
+      white-space: nowrap;
+    }
+    .annotation-hotspot:hover {
+      background: rgba(255, 104, 44, 0.85);
+    }
+    .annotation-hotspot[data-hidden] {
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(0.8);
+    }
     .info-drawer {
       opacity: 0;
       pointer-events: none;
@@ -245,6 +266,15 @@
       <button slot="ar-button" class="hidden" aria-hidden="true" tabindex="-1">
         View in AR
       </button>
+      {% for ann in annotations %}
+      <button class="annotation-hotspot" slot="hotspot-ann-{{ ann.id }}"
+              data-position="{{ ann.position_x }} {{ ann.position_y }} {{ ann.position_z }}"
+              data-normal="{{ ann.normal_x }} {{ ann.normal_y }} {{ ann.normal_z }}"
+              data-annotation-id="{{ ann.id }}"
+              data-annotation-desc="{{ ann.description or '' }}">
+        <span class="annotation-label">{{ ann.label }}</span>
+      </button>
+      {% endfor %}
     </model-viewer>
 
     {% if is_embed %}
@@ -272,6 +302,7 @@
           <span class="sm:hidden">Full</span>
         </button>
         <button id="qrBtn" class="viewer-tool-btn" type="button">QR</button>
+        {% if annotations %}<button id="annotationsBtn" class="viewer-tool-btn" type="button">Labels</button>{% endif %}
         <button id="arBtn" class="viewer-tool-btn primary" type="button">
           <span class="hidden sm:inline">View in AR</span>
           <span class="sm:hidden">AR</span>
@@ -314,6 +345,13 @@
           <p class="font-bold mt-1">Ready</p>
         </div>
       </div>
+      {% if dimensions_cm and dimensions_cm != 'Not measured' %}
+      <div class="mt-2 rounded-lg bg-white/[0.06] p-3 text-xs">
+        <p class="text-white/40">Dimensions</p>
+        <p class="font-bold mt-1">{{ dimensions_cm }}</p>
+        {% if scale_reference %}<p class="text-white/50 mt-0.5">{{ scale_reference }}</p>{% endif %}
+      </div>
+      {% endif %}
       <div class="viewer-tool-stack mt-4 grid gap-3 text-xs">
         <div class="viewer-rotation-tools" data-rotation-tools>
           <div class="viewer-tool-heading">
@@ -483,6 +521,26 @@
         if (event.target === qrModal) qrModal.classList.add('hidden');
       });
     }
+
+    const annotationsBtn = document.getElementById('annotationsBtn');
+    if (annotationsBtn) {
+      let annotationsVisible = true;
+      annotationsBtn.addEventListener('click', () => {
+        annotationsVisible = !annotationsVisible;
+        document.querySelectorAll('.annotation-hotspot').forEach(el => {
+          if (annotationsVisible) el.removeAttribute('data-hidden');
+          else el.setAttribute('data-hidden', '');
+        });
+        annotationsBtn.textContent = annotationsVisible ? 'Labels' : 'Labels off';
+      });
+    }
+
+    document.querySelectorAll('.annotation-hotspot').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const desc = btn.dataset.annotationDesc;
+        if (desc) alert(btn.querySelector('.annotation-label').textContent + ': ' + desc);
+      });
+    });
 
     if (fullscreenBtn) {
       fullscreenBtn.addEventListener('click', async () => {

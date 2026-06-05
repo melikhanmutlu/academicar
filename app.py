@@ -44,7 +44,7 @@ from licensing import (
     normalize_license_type,
 )
 from licensing import paper_is_expired as licensing_paper_is_expired
-from models import AuditLog, ConversionJob, Model3D, ModelVersion, Paper, Payment, QRLink, User, db
+from models import AuditLog, ConversionJob, Model3D, ModelAnnotation, ModelVersion, Paper, Payment, QRLink, User, db
 from url_helpers import public_url
 from utils.security import require_model_ownership, require_paper_ownership
 from services.storage_service import StorageError, safe_move_file, safe_save_file, save_companion_files
@@ -302,6 +302,41 @@ def format_model_dimensions_cm(model: Model3D | None) -> str:
     glb_path = next((path for path in _model_glb_candidate_paths(model) if path and os.path.exists(path)), None)
     measured = compute_glb_dimensions_cm(glb_path)
     return measured or "Not measured"
+
+
+def human_scale_reference(dimensions_cm: str | None) -> str | None:
+    """Return a real-world size reference like '~ credit card (8.5 cm)'."""
+    if not dimensions_cm:
+        return None
+    try:
+        parts = dimensions_cm.replace(" cm", "").split(" x ")
+        longest = max(float(p.strip()) for p in parts)
+    except (ValueError, TypeError):
+        return None
+    references = [
+        (0.5, "grain of rice"),
+        (1.5, "fingernail"),
+        (3.0, "coin"),
+        (5.0, "thumb"),
+        (8.5, "credit card"),
+        (15.0, "hand span"),
+        (22.0, "A5 paper"),
+        (30.0, "ruler"),
+        (45.0, "laptop"),
+        (60.0, "desk width"),
+        (100.0, "arm span"),
+        (180.0, "human height"),
+    ]
+    best = None
+    best_dist = float("inf")
+    for ref_cm, ref_name in references:
+        dist = abs(longest - ref_cm)
+        if dist < best_dist:
+            best_dist = dist
+            best = (ref_cm, ref_name)
+    if best:
+        return f"≈ {best[1]} ({best[0]} cm)"
+    return None
 
 
 def configured_admin_emails(app: Flask | None = None) -> set[str]:
@@ -1657,8 +1692,12 @@ def register_routes(app: Flask) -> None:
             resource_id=model.id,
             details={"paper_id": model.paper_id, "public_id": model.public_id},
         )
+        annotations = ModelAnnotation.query.filter_by(model_id=model.id).order_by(ModelAnnotation.order_index).all()
+        scale_ref = human_scale_reference(format_model_dimensions_cm(model))
         return render_template(
-            "viewer.html", model=model, paper=model.paper, has_usdz=has_usdz
+            "viewer.html", model=model, paper=model.paper, has_usdz=has_usdz,
+            annotations=annotations, scale_reference=scale_ref,
+            dimensions_cm=format_model_dimensions_cm(model),
         )
 
     @app.route("/m/<public_id>")
@@ -3607,6 +3646,74 @@ def register_routes(app: Flask) -> None:
             if os.path.exists(backup_path):
                 cleanup_file(backup_path)
         return redirect(url_for("model_edit", model_id=model.id))
+
+    @app.route("/models/<model_id>/annotations", methods=["GET"])
+    def model_annotations_list(model_id):
+        """Public JSON endpoint: returns annotations for a model."""
+        if not is_uuid(model_id):
+            abort(404)
+        model = db.session.get(Model3D, model_id)
+        if not model:
+            abort(404)
+        if not _paper_visible_to_request(model.paper) or not model_is_accessible(model):
+            abort(404)
+        annotations = ModelAnnotation.query.filter_by(model_id=model_id).order_by(ModelAnnotation.order_index).all()
+        return jsonify([a.to_dict() for a in annotations])
+
+    @app.route("/models/<model_id>/annotations", methods=["POST"])
+    @login_required
+    @require_model_ownership
+    def model_annotation_add(model_id):
+        """Add a single annotation to the model."""
+        model = db.session.get(Model3D, model_id)
+        if not model:
+            abort(404)
+        data = request.get_json(silent=True) or {}
+        label = (data.get("label") or "").strip()
+        if not label or len(label) > 120:
+            return jsonify({"error": "Label is required (max 120 chars)"}), 400
+        position = data.get("position", [0, 0, 0])
+        normal = data.get("normal", [0, 1, 0])
+        if not (isinstance(position, list) and len(position) == 3):
+            return jsonify({"error": "Position must be [x, y, z]"}), 400
+        if not (isinstance(normal, list) and len(normal) == 3):
+            return jsonify({"error": "Normal must be [x, y, z]"}), 400
+        max_order = db.session.query(func.max(ModelAnnotation.order_index)).filter_by(model_id=model_id).scalar() or 0
+        try:
+            annotation = ModelAnnotation(
+                model_id=model_id,
+                position_x=float(position[0]),
+                position_y=float(position[1]),
+                position_z=float(position[2]),
+                normal_x=float(normal[0]),
+                normal_y=float(normal[1]),
+                normal_z=float(normal[2]),
+                label=label,
+                description=(data.get("description") or "").strip()[:2000] or None,
+                order_index=max_order + 1,
+            )
+            db.session.add(annotation)
+            db.session.commit()
+            return jsonify(annotation.to_dict()), 201
+        except SQLAlchemyError:
+            db.session.rollback()
+            return jsonify({"error": "Could not save annotation"}), 500
+
+    @app.route("/models/<model_id>/annotations/<int:annotation_id>", methods=["DELETE"])
+    @login_required
+    @require_model_ownership
+    def model_annotation_delete(model_id, annotation_id):
+        """Delete a single annotation."""
+        annotation = db.session.get(ModelAnnotation, annotation_id)
+        if not annotation or annotation.model_id != model_id:
+            abort(404)
+        try:
+            db.session.delete(annotation)
+            db.session.commit()
+            return jsonify({"ok": True})
+        except SQLAlchemyError:
+            db.session.rollback()
+            return jsonify({"error": "Could not delete annotation"}), 500
 
     @app.route("/models/<model_id>/status")
     @login_required
