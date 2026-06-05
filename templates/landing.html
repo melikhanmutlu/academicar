@@ -21,7 +21,7 @@
         <a href="{{ url_for('demo_mitochondria_ar', source='hero_example') }}" class="lp-btn lp-btn-ghost">View Example Publication</a>
       </div>
       <ul class="lp-hero-checks">
-        {% for label in ['No coding', 'DOI & PMID support', 'QR generated automatically', 'AR ready'] %}
+        {% for label in ['No coding required', 'Auto format conversion', 'QR generated automatically', 'Mobile AR ready'] %}
         <li>
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           {{ label }}
@@ -30,66 +30,64 @@
       </ul>
     </div>
 
-    <!-- Live product mockup inside a laptop frame -->
+    <!-- Viewer-style product mockup -->
     <div class="lp-hero-visual reveal-up delay-2">
-      <div class="lp-laptop">
-        <div class="lp-laptop-screen">
-          <div class="lp-mock">
-            <div class="lp-mock-bar">
-              <span class="lp-mock-dot"></span><span class="lp-mock-dot"></span><span class="lp-mock-dot"></span>
-              <span class="lp-mock-url">academicar.com/view</span>
+      <div class="lp-viewer-mock">
+        <div class="lp-viewer-stage">
+          <model-viewer
+            src="{{ url_for('static', filename='models/model.compressed.glb') }}"
+            alt="AcademicAR demo — Mitochondria 3D model"
+            camera-controls
+            disable-zoom
+            auto-rotate
+            rotation-per-second="16deg"
+            camera-orbit="35deg 65deg 9m"
+            field-of-view="32deg"
+            exposure="1.0"
+            shadow-intensity="0"
+            tone-mapping="neutral"
+            environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
+            reveal="auto"
+            poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 180'%3E%3Crect width='240' height='180' fill='%23f5f5f5'/%3E%3Cg fill='none' stroke='%23c9ccd1' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M120 58l34 20v44l-34 20-34-20V78z'/%3E%3Cpath d='M120 58v44M120 102l34-24M120 102l-34-24'/%3E%3C/g%3E%3C/svg%3E"
+            loading="lazy">
+          </model-viewer>
+          <div class="lp-viewer-toolbar">
+            <span class="lp-viewer-tool">
+              <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14.5 8A6.5 6.5 0 1 1 1.5 8a6.5 6.5 0 0 1 13 0z"/><path d="M8 5v3l2 2"/></svg>
+              Rotate
+            </span>
+            <span class="lp-viewer-tool">
+              <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="12" height="12" rx="2"/><circle cx="5.5" cy="5.5" r="1.5"/><path d="M14 10l-3.5-3.5L2 14"/></svg>
+              Screenshot
+            </span>
+            <span class="lp-viewer-tool lp-viewer-tool-ar">
+              <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2l5.2 3v6L8 14l-5.2-3V5z"/><path d="M8 2v6m0 0l5.2-3M8 8L2.8 5"/></svg>
+              View in AR
+            </span>
+          </div>
+        </div>
+        <div class="lp-viewer-panel">
+          <p class="lp-viewer-kicker">Live spatial viewer</p>
+          <h3 class="lp-viewer-title">Mitochondria</h3>
+          <p class="lp-viewer-paper">Cell Biology — Interactive Publication</p>
+          <div class="lp-viewer-meta-grid">
+            <div><span>Format</span><strong>GLB</strong></div>
+            <div><span>AR</span><strong>Ready</strong></div>
+            <div><span>Access</span><strong>Public</strong></div>
+          </div>
+          <div class="lp-viewer-qr-row">
+            <div class="lp-viewer-qr-img">
+              <img src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code">
             </div>
-            <div class="lp-mock-body">
-              <div class="lp-mock-main">
-                <p class="lp-mock-kicker">Interactive publication</p>
-                <h3 class="lp-mock-title">Calcaneus segmentation</h3>
-                <div class="lp-mock-tags">
-                  <span>Medical</span><span>2024</span><span>Public</span>
-                </div>
-                <div class="lp-mock-stage">
-                  <model-viewer
-                    src="{{ url_for('static', filename='models/model.compressed.glb') }}"
-                    alt="AcademicAR demo 3D model"
-                    camera-controls
-                    disable-zoom
-                    auto-rotate
-                    rotation-per-second="16deg"
-                    camera-orbit="35deg 65deg 9m"
-                    field-of-view="32deg"
-                    exposure="1.0"
-                    shadow-intensity="0"
-                    tone-mapping="neutral"
-                    environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
-                    reveal="auto"
-                    poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 180'%3E%3Crect width='240' height='180' fill='%23f5f5f5'/%3E%3Cg fill='none' stroke='%23c9ccd1' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M120 58l34 20v44l-34 20-34-20V78z'/%3E%3Cpath d='M120 58v44M120 102l34-24M120 102l-34-24'/%3E%3C/g%3E%3C/svg%3E"
-                    loading="lazy">
-                  </model-viewer>
-                  <div class="lp-mock-toolbar">
-                    <span class="lp-mock-tool">Rotate</span>
-                    <span class="lp-mock-tool">Screenshot</span>
-                    <span class="lp-mock-tool lp-mock-tool-ar">View in AR</span>
-                  </div>
-                </div>
-                <div class="lp-mock-meta">
-                  <div><label>Authors</label><strong>S. Yolcu</strong></div>
-                  <div><label>Institution</label><strong>—</strong></div>
-                  <div><label>DOI</label><strong>10.0000/xxx</strong></div>
-                  <div><label>PMID</label><strong>00000</strong></div>
-                </div>
+            <div class="lp-viewer-qr-info">
+              <span>Scan to view in AR</span>
+              <div class="lp-viewer-qr-link">
+                <span>academicar.com/m/…</span>
+                <button type="button">Copy</button>
               </div>
-              <aside class="lp-mock-share">
-                <p class="lp-mock-share-title">Share this publication</p>
-                <div class="lp-mock-qr">
-                  <img src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code">
-                </div>
-                <div class="lp-mock-copyrow"><span>academicar.com/m/…</span><button type="button">Copy</button></div>
-                <button type="button" class="lp-mock-sharebtn">View Paper PDF</button>
-                <button type="button" class="lp-mock-sharebtn">Open Public Page</button>
-              </aside>
             </div>
           </div>
         </div>
-        <div class="lp-laptop-base"></div>
       </div>
     </div>
   </div>
@@ -98,9 +96,9 @@
 <!-- ============================= TRUST STRIP ============================= -->
 <section class="lp-trust">
   <div class="lp-container">
-    <p class="lp-trust-label">Works with the standards researchers already rely on</p>
+    <p class="lp-trust-label">Supported formats and technologies</p>
     <div class="lp-trust-items">
-      {% for item in ['DOI', 'PMID', 'glTF / GLB', 'STL · OBJ · FBX', 'WebXR AR', 'QR'] %}
+      {% for item in ['glTF / GLB', 'STL · OBJ · FBX', 'WebXR', 'Augmented Reality', 'QR Codes'] %}
       <span class="lp-trust-item">{{ item }}</span>
       {% endfor %}
     </div>
@@ -108,7 +106,7 @@
 </section>
 
 <!-- ============================= HOW IT WORKS ============================= -->
-<section class="lp-section lp-scale-in" id="how-it-works">
+<section class="lp-section" id="how-it-works">
   <div class="lp-container">
     <div class="lp-head reveal-up">
       <span class="lp-eyebrow">Workflow</span>
@@ -137,7 +135,7 @@
 </section>
 
 <!-- ============================= FEATURES ============================= -->
-<section class="lp-section lp-alt lp-scale-in" id="features">
+<section class="lp-section lp-alt" id="features">
   <div class="lp-container">
     <div class="lp-head reveal-up">
       <span class="lp-eyebrow">Capabilities</span>
@@ -169,7 +167,7 @@
 </section>
 
 <!-- ============================= USE CASES ============================= -->
-<section class="lp-section lp-scale-in" id="use-cases">
+<section class="lp-section" id="use-cases">
   <div class="lp-container">
     <div class="lp-head reveal-up">
       <span class="lp-eyebrow">Where it's used</span>
@@ -178,7 +176,6 @@
     </div>
 
     <div class="lp-usecases">
-      <!-- Scientific Publication -->
       <div class="lp-usecase reveal-up delay-1">
         <div class="lp-usecase-thumb">
           <svg viewBox="0 0 200 140" aria-hidden="true">
@@ -204,7 +201,6 @@
         </div>
       </div>
 
-      <!-- Theses & Dissertations -->
       <div class="lp-usecase reveal-up delay-2">
         <div class="lp-usecase-thumb">
           <svg viewBox="0 0 200 140" aria-hidden="true">
@@ -224,7 +220,6 @@
         </div>
       </div>
 
-      <!-- Medical Education -->
       <div class="lp-usecase reveal-up delay-3">
         <div class="lp-usecase-thumb">
           <svg viewBox="0 0 200 140" aria-hidden="true">
@@ -245,7 +240,6 @@
         </div>
       </div>
 
-      <!-- Research Projects -->
       <div class="lp-usecase reveal-up delay-4">
         <div class="lp-usecase-thumb">
           <svg viewBox="0 0 200 140" aria-hidden="true">
@@ -270,54 +264,221 @@
   </div>
 </section>
 
-<!-- ============================= BEFORE / AFTER ============================= -->
-<section class="lp-section lp-alt lp-scale-in" id="before-after">
+<!-- ============================= AR EXPERIENCE ============================= -->
+<section class="lp-section lp-ar-section" id="ar-experience">
+  <div class="lp-container">
+    <div class="lp-ar-layout reveal-up">
+      <div class="lp-ar-visual">
+        <div class="lp-ar-phone">
+          <div class="lp-ar-phone-screen">
+            <!-- SVG illustration: AR placement scene -->
+            <svg viewBox="0 0 260 460" aria-hidden="true" class="lp-ar-scene">
+              <!-- room / environment -->
+              <defs>
+                <linearGradient id="arFloor" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#e8e8e8"/>
+                  <stop offset="100%" stop-color="#d5d5d5"/>
+                </linearGradient>
+                <linearGradient id="arWall" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#f7f7f7"/>
+                  <stop offset="100%" stop-color="#eeeeee"/>
+                </linearGradient>
+              </defs>
+              <!-- wall -->
+              <rect x="0" y="0" width="260" height="280" fill="url(#arWall)"/>
+              <!-- floor with perspective -->
+              <polygon points="0,280 260,280 260,460 0,460" fill="url(#arFloor)"/>
+              <!-- floor grid lines for AR feel -->
+              <g stroke="#ccc" stroke-width="0.5" opacity="0.5">
+                <line x1="0" y1="320" x2="260" y2="320"/>
+                <line x1="0" y1="360" x2="260" y2="360"/>
+                <line x1="0" y1="400" x2="260" y2="400"/>
+                <line x1="0" y1="440" x2="260" y2="440"/>
+                <line x1="52" y1="280" x2="20" y2="460"/>
+                <line x1="130" y1="280" x2="130" y2="460"/>
+                <line x1="208" y1="280" x2="240" y2="460"/>
+              </g>
+              <!-- AR placement indicator (circle on the floor) -->
+              <ellipse cx="130" cy="370" rx="60" ry="16" fill="none" stroke="#ff682c" stroke-width="2" stroke-dasharray="6 3" opacity="0.7"/>
+              <ellipse cx="130" cy="370" rx="38" ry="10" fill="rgba(255,104,44,0.08)"/>
+              <!-- 3D object sitting on the plane -->
+              <g transform="translate(130,310)">
+                <!-- simplified 3D cube/object -->
+                <polygon points="0,-55 40,-30 40,20 0,45 -40,20 -40,-30" fill="#202020" opacity="0.12"/>
+                <polygon points="0,-55 40,-30 0,-5 -40,-30" fill="#ff682c"/>
+                <polygon points="0,-5 40,-30 40,20 0,45" fill="#e85a22"/>
+                <polygon points="0,-5 -40,-30 -40,20 0,45" fill="#cc4e1c"/>
+              </g>
+              <!-- AR UI elements -->
+              <rect x="16" y="16" width="72" height="24" rx="12" fill="rgba(0,0,0,0.5)"/>
+              <circle cx="30" cy="28" r="4" fill="#ff682c"/>
+              <text x="40" y="33" font-family="Inter,sans-serif" font-size="11" font-weight="600" fill="#fff">AR Mode</text>
+              <!-- scanning dots -->
+              <g opacity="0.4">
+                <circle cx="80" cy="340" r="3" fill="#ff682c"/>
+                <circle cx="180" cy="350" r="3" fill="#ff682c"/>
+                <circle cx="120" cy="410" r="2" fill="#ff682c"/>
+                <circle cx="200" cy="390" r="2" fill="#ff682c"/>
+              </g>
+              <!-- bottom AR button -->
+              <rect x="80" y="420" width="100" height="30" rx="15" fill="#ff682c"/>
+              <text x="130" y="440" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" font-weight="600" fill="#fff">Place Model</text>
+            </svg>
+          </div>
+          <div class="lp-ar-phone-notch"></div>
+        </div>
+        <!-- scatter dots for decoration -->
+        <div class="lp-ar-glow" aria-hidden="true"></div>
+      </div>
+      <div class="lp-ar-copy">
+        <span class="lp-eyebrow">Augmented Reality</span>
+        <h2 class="lp-h2" style="text-align:left; margin-bottom:18px;">Place 3D models in the real world</h2>
+        <p class="lp-ar-desc">
+          Readers scan the QR code from your publication and instantly place the 3D model on any surface using their phone camera. No app download needed — it works directly in the mobile browser via WebXR.
+        </p>
+        <ul class="lp-ar-features">
+          <li>
+            <span class="lp-ar-feat-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2h8a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><path d="M11 18h2"/></svg>
+            </span>
+            <div>
+              <strong>Mobile-native AR</strong>
+              <span>iOS & Android browsers, powered by WebXR</span>
+            </div>
+          </li>
+          <li>
+            <span class="lp-ar-feat-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+            </span>
+            <div>
+              <strong>True-to-scale placement</strong>
+              <span>Models render at real dimensions on any surface</span>
+            </div>
+          </li>
+          <li>
+            <span class="lp-ar-feat-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z"/><path d="M15 15h2 M19 15v4 M15 19h4"/></svg>
+            </span>
+            <div>
+              <strong>QR-powered access</strong>
+              <span>One scan from the printed paper opens AR instantly</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= UPGRADE YOUR PUBLICATIONS ============================= -->
+<section class="lp-section lp-alt" id="upgrade">
   <div class="lp-container">
     <div class="lp-head reveal-up">
-      <span class="lp-eyebrow">The difference</span>
-      <h2 class="lp-h2">Before / After</h2>
-      <p class="lp-sub">Bring scientific models beyond the PDF.</p>
+      <span class="lp-eyebrow">Upgrade your research</span>
+      <h2 class="lp-h2">Make every publication interactive</h2>
+      <p class="lp-sub">Transform static research into explorable, shareable 3D experiences.</p>
     </div>
 
-    <div class="lp-compare reveal-up">
-      <div class="lp-compare-card lp-compare-before">
-        <h3 class="lp-compare-title">Traditional Publication</h3>
-        <ul class="lp-compare-list">
-          {% for item in ['PDF only', 'Static figures', 'Limited visualization'] %}
-          <li><span class="lp-x" aria-hidden="true">✕</span>{{ item }}</li>
-          {% endfor %}
+    <div class="lp-upgrade reveal-up">
+      <div class="lp-upgrade-col lp-upgrade-legacy">
+        <div class="lp-upgrade-header">
+          <span class="lp-upgrade-label">Traditional</span>
+        </div>
+        <ul class="lp-upgrade-list">
+          <li class="lp-upgrade-item lp-upgrade-item-off">
+            <span class="lp-upgrade-icon-x" aria-hidden="true">
+              <svg viewBox="0 0 16 16" width="16" height="16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </span>
+            <div>
+              <strong>Static PDF figures</strong>
+              <span>2D screenshots of 3D data, no interaction</span>
+            </div>
+          </li>
+          <li class="lp-upgrade-item lp-upgrade-item-off">
+            <span class="lp-upgrade-icon-x" aria-hidden="true">
+              <svg viewBox="0 0 16 16" width="16" height="16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </span>
+            <div>
+              <strong>No spatial context</strong>
+              <span>Readers guess depth and scale from flat images</span>
+            </div>
+          </li>
+          <li class="lp-upgrade-item lp-upgrade-item-off">
+            <span class="lp-upgrade-icon-x" aria-hidden="true">
+              <svg viewBox="0 0 16 16" width="16" height="16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </span>
+            <div>
+              <strong>Siloed supplementary</strong>
+              <span>3D files on external repos, broken links over time</span>
+            </div>
+          </li>
+          <li class="lp-upgrade-item lp-upgrade-item-off">
+            <span class="lp-upgrade-icon-x" aria-hidden="true">
+              <svg viewBox="0 0 16 16" width="16" height="16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </span>
+            <div>
+              <strong>Specialized software</strong>
+              <span>Readers need specific apps to open model files</span>
+            </div>
+          </li>
         </ul>
-        <div class="lp-compare-art lp-compare-art-muted" aria-hidden="true">
-          <svg viewBox="0 0 60 72"><rect x="6" y="2" width="48" height="68" rx="4" fill="#e3e6ea" stroke="#b9bec4" stroke-width="2"/><text x="30" y="44" text-anchor="middle" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#9aa0a6">PDF</text></svg>
+      </div>
+
+      <div class="lp-upgrade-divider" aria-hidden="true">
+        <div class="lp-upgrade-arrow">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
         </div>
       </div>
 
-      <div class="lp-vs" aria-hidden="true">VS</div>
-
-      <div class="lp-compare-card lp-compare-after">
-        <h3 class="lp-compare-title">AcademicAR Publication</h3>
-        <ul class="lp-compare-list">
-          {% for item in ['PDF', 'Interactive 3D model', 'QR access', 'AR viewing', 'Shareable viewer'] %}
-          <li>
-            <span class="lp-check" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-            {{ item }}
-          </li>
-          {% endfor %}
-        </ul>
-        <div class="lp-compare-art" aria-hidden="true">
-          <svg viewBox="0 0 120 72">
-            <rect x="4" y="6" width="40" height="60" rx="4" fill="#fff" stroke="#ffd9c7" stroke-width="2"/><text x="24" y="40" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#ff682c">PDF</text>
-            <rect x="50" y="14" width="30" height="30" rx="3" fill="#fff" stroke="#ffd9c7" stroke-width="2"/><path d="M55 19h6v6h-6z M69 19h6v6h-6z M55 33h6v6h-6z M71 33h4v4h-4z" fill="#ff682c"/>
-            <rect x="86" y="6" width="30" height="60" rx="6" fill="#202020"/><rect x="90" y="12" width="22" height="40" rx="2" fill="#2f2f2f"/><circle cx="101" cy="60" r="3" fill="#4d4d4d"/>
-          </svg>
+      <div class="lp-upgrade-col lp-upgrade-enhanced">
+        <div class="lp-upgrade-header">
+          <span class="lp-upgrade-label lp-upgrade-label-accent">With AcademicAR</span>
         </div>
+        <ul class="lp-upgrade-list">
+          <li class="lp-upgrade-item lp-upgrade-item-on">
+            <span class="lp-upgrade-icon-check" aria-hidden="true">
+              <svg viewBox="0 0 16 16" width="16" height="16"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <div>
+              <strong>Interactive 3D viewer</strong>
+              <span>Rotate, zoom, and explore models in the browser</span>
+            </div>
+          </li>
+          <li class="lp-upgrade-item lp-upgrade-item-on">
+            <span class="lp-upgrade-icon-check" aria-hidden="true">
+              <svg viewBox="0 0 16 16" width="16" height="16"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <div>
+              <strong>Augmented Reality</strong>
+              <span>Place models on real surfaces via phone camera</span>
+            </div>
+          </li>
+          <li class="lp-upgrade-item lp-upgrade-item-on">
+            <span class="lp-upgrade-icon-check" aria-hidden="true">
+              <svg viewBox="0 0 16 16" width="16" height="16"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <div>
+              <strong>Permanent QR & links</strong>
+              <span>Stable URLs that survive model updates and replacements</span>
+            </div>
+          </li>
+          <li class="lp-upgrade-item lp-upgrade-item-on">
+            <span class="lp-upgrade-icon-check" aria-hidden="true">
+              <svg viewBox="0 0 16 16" width="16" height="16"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <div>
+              <strong>Zero installation</strong>
+              <span>Works in any modern browser — nothing to install</span>
+            </div>
+          </li>
+        </ul>
       </div>
     </div>
   </div>
 </section>
 
 <!-- ============================= DARK CTA BAND ============================= -->
-<section class="lp-section lp-cta-section lp-scale-in">
+<section class="lp-section lp-cta-section">
   <div class="lp-container">
     <div class="lp-cta reveal-up">
       <div class="lp-cta-copy">
@@ -332,23 +493,55 @@
   </div>
 </section>
 
-<!-- ============================= STATS BAR ============================= -->
-<section class="lp-stats-section">
-  <div class="lp-container lp-stats">
-    {% for stat in [
-      ('2,000+', 'Publications', 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6'),
-      ('3,500+', '3D Models', 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.3 7L12 12l8.7-5 M12 22V12'),
-      ('1,200+', 'Researchers', 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M22 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75'),
-      ('80+', 'Countries', 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M2 12h20 M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z')
-    ] %}
-    <div class="lp-stat reveal-up delay-{{ loop.index }}">
-      <svg class="lp-stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        {% for d in stat[2].split(' M') %}<path d="{% if not loop.first %}M{% endif %}{{ d }}"/>{% endfor %}
-      </svg>
-      <div class="lp-stat-value" data-count-target="{{ stat[0] }}">{{ stat[0] }}</div>
-      <div class="lp-stat-label">{{ stat[1] }}</div>
+<!-- ============================= PROCESS STRIP ============================= -->
+<section class="lp-process-section">
+  <div class="lp-container">
+    <div class="lp-process reveal-up">
+      <div class="lp-process-item">
+        <div class="lp-process-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4 M7 9l5-5 5 5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>
+        </div>
+        <div class="lp-process-num">01</div>
+        <div class="lp-process-label">Upload</div>
+        <div class="lp-process-desc">GLB · STL · OBJ · FBX</div>
+      </div>
+      <div class="lp-process-connector" aria-hidden="true"></div>
+      <div class="lp-process-item">
+        <div class="lp-process-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4 M12 18v4 M4.93 4.93l2.83 2.83 M16.24 16.24l2.83 2.83 M2 12h4 M18 12h4 M4.93 19.07l2.83-2.83 M16.24 7.76l2.83-2.83"/></svg>
+        </div>
+        <div class="lp-process-num">02</div>
+        <div class="lp-process-label">Convert</div>
+        <div class="lp-process-desc">Optimized GLB output</div>
+      </div>
+      <div class="lp-process-connector" aria-hidden="true"></div>
+      <div class="lp-process-item">
+        <div class="lp-process-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z"/><path d="M15 15h2 M19 15v4 M15 19h4"/></svg>
+        </div>
+        <div class="lp-process-num">03</div>
+        <div class="lp-process-label">QR & Link</div>
+        <div class="lp-process-desc">Permanent identifiers</div>
+      </div>
+      <div class="lp-process-connector" aria-hidden="true"></div>
+      <div class="lp-process-item">
+        <div class="lp-process-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7L12 12l8.7-5 M12 22V12"/></svg>
+        </div>
+        <div class="lp-process-num">04</div>
+        <div class="lp-process-label">View & AR</div>
+        <div class="lp-process-desc">Browser + augmented reality</div>
+      </div>
+      <div class="lp-process-connector" aria-hidden="true"></div>
+      <div class="lp-process-item">
+        <div class="lp-process-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6 M9 13h6 M9 17h6"/></svg>
+        </div>
+        <div class="lp-process-num">05</div>
+        <div class="lp-process-label">Publish</div>
+        <div class="lp-process-desc">Paper + PDF + model</div>
+      </div>
     </div>
-    {% endfor %}
   </div>
 </section>
 {% endblock %}
@@ -372,37 +565,6 @@
           if (!ticking) { window.requestAnimationFrame(updateParallax); ticking = true; }
         }, { passive: true });
       }
-    }
-
-    // Animated stat counters
-    const statEls = document.querySelectorAll('[data-count-target]');
-    if (statEls.length && !reduceMotion) {
-      const easeOutExpo = t => t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
-      const animateCounter = (el) => {
-        const raw = el.dataset.countTarget.replace(/[,+]/g, '');
-        const target = parseInt(raw, 10);
-        if (isNaN(target)) return;
-        const suffix = el.dataset.countTarget.includes('+') ? '+' : '';
-        const duration = 1600;
-        const start = performance.now();
-        const step = (now) => {
-          const elapsed = Math.min((now - start) / duration, 1);
-          const val = Math.round(easeOutExpo(elapsed) * target);
-          el.textContent = val.toLocaleString('en-US') + suffix;
-          if (elapsed < 1) requestAnimationFrame(step);
-        };
-        el.textContent = '0' + suffix;
-        requestAnimationFrame(step);
-      };
-      const counterObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            animateCounter(entry.target);
-            counterObserver.unobserve(entry.target);
-          }
-        });
-      }, { threshold: 0.3 });
-      statEls.forEach(el => counterObserver.observe(el));
     }
   })();
   </script>
