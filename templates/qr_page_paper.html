@@ -49,7 +49,6 @@
 <body>
   <main class="sheet">
     <section class="meta">
-      <span class="eyebrow">AcademicAR Paper QR</span>
       <h1>{{ paper.title }}</h1>
       {% if paper.authors %}<p class="subtitle">{{ paper.authors }}{% if paper.institution %} · {{ paper.institution }}{% endif %}</p>{% endif %}
       <p class="url">{{ public_url('paper_public', slug=paper.slug) }}</p>

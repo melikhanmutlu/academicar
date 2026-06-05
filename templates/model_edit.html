@@ -11,7 +11,6 @@
 
   <div class="model-edit-header">
     <div>
-      <span class="eyebrow">Model settings</span>
       <h1>Edit model</h1>
       <p>Update the model card, access plan, appearance, or replacement file without changing the stable viewer link and QR.</p>
     </div>
@@ -23,7 +22,6 @@
       <form method="POST" class="surface model-edit-card model-edit-card-primary">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="model-edit-card-head">
-          <span class="eyebrow">Metadata</span>
           <h2>Viewer card</h2>
           <p>The model name and note appear on the publication detail page and public viewer surfaces.</p>
         </div>
@@ -46,7 +44,6 @@
       <form method="POST" action="{{ url_for('model_appearance_update', model_id=model.id) }}" class="surface model-edit-card model-edit-material-card">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="model-edit-card-head">
-          <span class="eyebrow">Appearance</span>
           <h2>Material &amp; appearance</h2>
           <p>Adjust the color and surface finish. The preview updates live as you drag the sliders — click "Update Appearance" to save it onto the model. The viewer link and QR stay the same.</p>
         </div>
@@ -109,7 +106,6 @@
         <form method="POST" action="{{ url_for('model_license_update', model_id=model.id) }}" class="surface model-edit-card">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="model-edit-card-head">
-            <span class="eyebrow">License</span>
             <h2>Access plan</h2>
             <p>Changes access duration and upload limit while preserving QR and resolver URL.</p>
           </div>
@@ -126,7 +122,6 @@
         <form method="POST" action="{{ url_for('model_rescale', model_id=model.id) }}" class="surface model-edit-card">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="model-edit-card-head">
-            <span class="eyebrow">Scale</span>
             <h2>Resize model</h2>
             <p>Set the real-world longest dimension. Current: {{ model.dimensions_cm or 'unknown' }}.</p>
           </div>
@@ -142,7 +137,6 @@
 
       <div class="surface model-edit-card" id="annotationSection">
         <div class="model-edit-card-head">
-          <span class="eyebrow">Annotations</span>
           <h2>Educational labels</h2>
           <p>Add annotation hotspots directly on the 3D model. Open the viewer and click "Annotate" in the toolbar to place labels interactively on the model surface.</p>
         </div>
@@ -169,7 +163,6 @@
       <form method="POST" action="{{ url_for('model_replace', model_id=model.id) }}" enctype="multipart/form-data" class="surface model-edit-card">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="model-edit-card-head">
-          <span class="eyebrow">Replace file</span>
           <h2>Update model, keep link</h2>
           <p>Upload a replacement GLB, STL, OBJ, or FBX. The model ID, QR image, resolver URL, and publication placement remain the same.</p>
         </div>
@@ -199,7 +192,6 @@
 
     <aside class="model-edit-side surface">
       <div>
-        <span class="eyebrow">Current model</span>
         <h2>{{ model.display_name or model.original_filename }}</h2>
         <p>{{ paper.title }}</p>
       </div>

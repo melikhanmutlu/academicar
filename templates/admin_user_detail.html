@@ -5,7 +5,6 @@
 <div class="app-shell admin-shell">
   <div class="admin-header">
     <div>
-      <span class="eyebrow">Admin user detail</span>
       <h1>{{ user.username }}</h1>
       <p>{{ user.email }} · joined {{ user.created_at.strftime("%Y-%m-%d") if user.created_at else "-" }}</p>
     </div>

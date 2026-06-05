@@ -233,7 +233,7 @@ def test_model_edit_page_uses_wide_settings_layout(client):
     assert "model-edit-shell" in html
     assert "model-edit-layout" in html
     assert "model-edit-secondary-grid" in html
-    assert "Current model" in html
+    assert "model-edit-side" in html
 
 
 def test_authenticated_user_can_view_landing_page(client):
