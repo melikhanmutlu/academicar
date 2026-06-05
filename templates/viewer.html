@@ -241,9 +241,9 @@
       {% if has_usdz %}ios-src="{{ url_for('serve_glb', unique_id=model.id, filename='model.usdz') }}"{% endif %}
       {% if model.poster_path %}poster="{{ url_for('serve_poster', unique_id=model.id) }}"{% endif %}
       alt="3D model: {{ model.display_name or model.original_filename }}"
-      shadow-intensity="1.0"
-      shadow-softness="0.75"
-      exposure="1.0"
+      shadow-intensity="0.3"
+      shadow-softness="1.0"
+      exposure="1.15"
       tone-mapping="neutral"
       environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
       ar

@@ -29,21 +29,26 @@ def make_studio_env() -> Path:
         # theta: 0 at zenith, pi at nadir
         theta = v * np.pi
 
+        # --- Uniform ambient floor: lifts every direction so no side of the
+        # model goes dark (the previous studio map left the sides ~0.4 and
+        # looked too shadowy). ---
+        ambient = 0.62
+
         # --- Sky dome: soft warm-white overhead light ---
         # Gaussian centered at zenith (theta=0), sigma ~30 deg
-        overhead = 0.95 * np.exp(-0.5 * (theta / 0.52) ** 2)
+        overhead = 0.45 * np.exp(-0.5 * (theta / 0.55) ** 2)
 
-        # --- Horizon band: neutral gray ---
-        horizon = 0.38 * np.exp(-0.5 * ((theta - np.pi / 2) / 0.45) ** 2)
+        # --- Horizon band: gentle brightening around eye level ---
+        horizon = 0.20 * np.exp(-0.5 * ((theta - np.pi / 2) / 0.5) ** 2)
 
-        # --- Floor bounce: subtle warm fill from below ---
+        # --- Floor bounce: soft fill from below ---
         floor_angle = np.pi - theta
-        bounce = 0.22 * np.exp(-0.5 * (floor_angle / 0.6) ** 2)
+        bounce = 0.18 * np.exp(-0.5 * (floor_angle / 0.7) ** 2)
 
         # Combine
-        base = overhead + horizon + bounce
-        r = base + overhead * 0.04 + bounce * 0.03
-        g = base + overhead * 0.02
+        base = ambient + overhead + horizon + bounce
+        r = base + overhead * 0.03 + bounce * 0.02
+        g = base + overhead * 0.015
         b = base - overhead * 0.01
 
         img[y, :, 0] = np.clip(r, 0, 1)

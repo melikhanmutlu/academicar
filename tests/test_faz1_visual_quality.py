@@ -74,11 +74,19 @@ class TestConsistentRenderAttributes:
         )
 
     @pytest.mark.parametrize("template", VIEWER_TEMPLATES)
-    def test_exposure_one(self, template):
+    def test_exposure_consistent(self, template):
         content = (TEMPLATES_DIR / template).read_text()
         matches = re.findall(r'exposure="([^"]+)"', content)
         for val in matches:
-            assert float(val) == 1.0, f'{template} exposure should be 1.0, got {val}'
+            assert float(val) == 1.15, f'{template} exposure should be 1.15, got {val}'
+
+    @pytest.mark.parametrize("template", VIEWER_TEMPLATES)
+    def test_shadow_intensity_subtle(self, template):
+        """Shadows must stay subtle so the contact-shadow plane isn't obtrusive."""
+        content = (TEMPLATES_DIR / template).read_text()
+        matches = re.findall(r'shadow-intensity="([^"]+)"', content)
+        for val in matches:
+            assert float(val) <= 0.5, f'{template} shadow-intensity should be subtle, got {val}'
 
     def test_viewer_interaction_prompt_auto(self):
         content = (TEMPLATES_DIR / "viewer.html").read_text()
