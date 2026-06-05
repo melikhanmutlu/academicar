@@ -25,7 +25,7 @@ def test_landing_pricing_and_viewer_tools_are_present(client):
     landing = client.get("/")
     assert landing.status_code == 200
     landing_html = landing.get_data(as_text=True)
-    assert "GLB, STL, OBJ, or FBX" in landing_html
+    assert "GLB, STL, OBJ or FBX" in landing_html
     assert "View Pricing Plans" in landing_html
 
     pricing = client.get("/pricing")

@@ -150,37 +150,6 @@
   </div>
 </section>
 
-<!-- ============================= FEATURES ============================= -->
-<section class="lp-section lp-alt" id="features">
-  <div class="lp-container">
-    <div class="lp-head reveal-up">
-      <span class="lp-eyebrow">Capabilities</span>
-      <h2 class="lp-h2">Features</h2>
-      <p class="lp-sub">Everything you need to publish 3D models with your research.</p>
-    </div>
-
-    <div class="lp-features">
-      {% for feat in [
-        ('Stable QR Links', 'Your QR never changes — even after replacing the model, upgrading, or recoloring.', 'M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M15 15h2 M19 15v4 M15 19h4'),
-        ('3D & AR Ready', 'Upload GLB, STL, OBJ, or FBX — readers view in the browser or open in mobile AR.', 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.3 7L12 12l8.7-5 M12 22V12'),
-        ('Academic Metadata', 'DOI, PMID, authors, institution, and abstract travel with every publication.', 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M9 13h6 M9 17h6'),
-        ('Long-Term Hosting', '3-year and 10-year archival options keep links and QR codes alive.', 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z M9 12l2 2 4-4'),
-        ('PDF + Model Together', 'Keep the paper and its 3D assets in one shareable publication page.', 'M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z M14 3v5h5 M9 13h6 M9 16h4'),
-        ('No App Required', 'Works directly from a browser — nothing for your readers to install.', 'M2 4h20v13H2z M8 21h8 M12 17v4')
-      ] %}
-      <div class="lp-feature reveal-up delay-{{ loop.index }}">
-        <span class="lp-feature-chip">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            {% for d in feat[2].split(' M') %}<path d="{% if not loop.first %}M{% endif %}{{ d }}"/>{% endfor %}
-          </svg>
-        </span>
-        <h3 class="lp-feature-title">{{ feat[0] }}</h3>
-        <p class="lp-feature-desc">{{ feat[1] }}</p>
-      </div>
-      {% endfor %}
-    </div>
-  </div>
-</section>
 
 <!-- ============================= USE CASES ============================= -->
 <section class="lp-section" id="use-cases">
