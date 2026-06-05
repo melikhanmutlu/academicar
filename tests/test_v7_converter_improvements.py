@@ -144,6 +144,25 @@ class TestUnitScaleHeuristic:
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_default_source_unit_autodetects_cm(self):
+        """Regression: the converter default (no source_unit passed) must
+        auto-detect, so cm-authored STLs don't render ~100x too large.
+
+        The production upload path relies on this default, so a 30cm object
+        (raw extent 30) must come out <1m, not 30m."""
+        tmp = _tmp_dir()
+        try:
+            stl_path = _make_stl(tmp, scale=30.0)
+            glb_path = str(tmp / "output.glb")
+            converter = STLConverter()
+            # No source_unit -> uses the default, which must be auto-detect.
+            assert converter.convert(stl_path, glb_path) is True
+            mesh = trimesh.load(glb_path, force="mesh")
+            max_extent = float(np.ptp(mesh.bounds, axis=0).max())
+            assert max_extent < 1.0, f"cm default should be <1m, got {max_extent}m"
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
     def test_safety_clamp_prevents_absurd_size(self):
         """Even if heuristic miscategorizes, safety clamp caps at AR_MAX_EXTENT_M."""
         tmp = _tmp_dir()

@@ -371,7 +371,7 @@ class STLConverter(BaseConverter):
         input_path: str,
         output_path: str,
         color: str = None,
-        source_unit: str = "m",
+        source_unit: str = "auto",
     ) -> bool:
         """
         Convert STL file to GLB format using trimesh

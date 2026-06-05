@@ -1400,9 +1400,11 @@ def _create_model_for_paper(
     color = (color or "").strip() or None
     if color and HEX_COLOR_PATTERN.fullmatch(color) is None:
         color = None
-    # Source-unit controls are intentionally disabled in the UI. Keep the
-    # uploaded model's native scale instead of applying the previous heuristic.
-    source_unit_norm = "m"
+    # Source-unit controls are intentionally disabled in the UI. STL files are
+    # unitless, so we auto-detect the scale from the raw mesh extents (µm/mm/cm/m
+    # bands + safety clamp in STLConverter) instead of assuming meters — that
+    # assumption made cm-authored models render ~100x too large.
+    source_unit_norm = "auto"
 
     unique_id = str(uuid.uuid4())
     original_name = secure_filename(file.filename)
@@ -3485,7 +3487,7 @@ def register_routes(app: Flask) -> None:
             "usdz_path": usdz_path,
             "source_format": source_format,
             "color": model.appearance_color,
-            "source_unit": "m",
+            "source_unit": "auto",
             "is_replacement": True,
             "version_id": version_row.id,
         }
