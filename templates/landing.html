@@ -33,47 +33,27 @@
     <!-- Viewer-style product mockup -->
     <div class="lp-hero-visual reveal-up delay-2">
       <div class="lp-viewer-mock">
-        <div class="lp-viewer-stage">
-          <model-viewer
-            src="{{ url_for('static', filename='models/model.compressed.glb') }}"
-            alt="AcademicAR demo — Mitochondria 3D model"
-            camera-controls
-            disable-zoom
-            auto-rotate
-            rotation-per-second="16deg"
-            camera-orbit="35deg 65deg 9m"
-            field-of-view="32deg"
-            exposure="1.0"
-            shadow-intensity="0"
-            tone-mapping="neutral"
-            environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
-            reveal="auto"
-            poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 180'%3E%3Crect width='240' height='180' fill='%23f5f5f5'/%3E%3Cg fill='none' stroke='%23c9ccd1' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M120 58l34 20v44l-34 20-34-20V78z'/%3E%3Cpath d='M120 58v44M120 102l34-24M120 102l-34-24'/%3E%3C/g%3E%3C/svg%3E"
-            loading="lazy">
-          </model-viewer>
-          <div class="lp-viewer-toolbar">
-            <span class="lp-viewer-tool">
-              <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14.5 8A6.5 6.5 0 1 1 1.5 8a6.5 6.5 0 0 1 13 0z"/><path d="M8 5v3l2 2"/></svg>
-              Rotate
-            </span>
-            <span class="lp-viewer-tool">
-              <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="12" height="12" rx="2"/><circle cx="5.5" cy="5.5" r="1.5"/><path d="M14 10l-3.5-3.5L2 14"/></svg>
-              Screenshot
-            </span>
-            <span class="lp-viewer-tool lp-viewer-tool-ar">
-              <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2l5.2 3v6L8 14l-5.2-3V5z"/><path d="M8 2v6m0 0l5.2-3M8 8L2.8 5"/></svg>
-              View in AR
-            </span>
-          </div>
-        </div>
-        <div class="lp-viewer-panel">
-          <div class="lp-viewer-qr-row">
-            <div class="lp-viewer-qr-img">
-              <img src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code">
-            </div>
-            <span class="lp-viewer-qr-label">Scan to view in AR</span>
-          </div>
-        </div>
+        <model-viewer
+          src="{{ url_for('static', filename='models/model.compressed.glb') }}"
+          alt="AcademicAR demo — Mitochondria 3D model"
+          camera-controls
+          disable-zoom
+          auto-rotate
+          rotation-per-second="16deg"
+          camera-orbit="35deg 65deg 9m"
+          field-of-view="32deg"
+          exposure="1.0"
+          shadow-intensity="0"
+          tone-mapping="neutral"
+          environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
+          reveal="auto"
+          poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 180'%3E%3Crect width='240' height='180' fill='%23f5f5f5'/%3E%3Cg fill='none' stroke='%23c9ccd1' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M120 58l34 20v44l-34 20-34-20V78z'/%3E%3Cpath d='M120 58v44M120 102l34-24M120 102l-34-24'/%3E%3C/g%3E%3C/svg%3E"
+          loading="lazy">
+        </model-viewer>
+        <a href="{{ url_for('demo_mitochondria_ar') }}" class="lp-viewer-qr-float" title="Scan to view in AR">
+          <img src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code — scan to view in AR">
+          <span>Scan for AR</span>
+        </a>
       </div>
     </div>
   </div>
