@@ -1,394 +1,338 @@
 {% extends "base.html" %}
-{% block title %}AcademicAR - 3D and AR models for academic publications{% endblock %}
+{% block title %}AcademicAR - Publish interactive 3D models with your research{% endblock %}
 
 {% block content %}
-<!-- HERO -->
-<section class="hero-section">
-  <div class="hero-grid">
-    <div class="reveal-up">
-      <span class="landing-eyebrow">Academic spatial publishing</span>
-      <h1 class="landing-h1">AcademicAR</h1>
-      <p class="landing-lead">
-        Share 3D and AR models with academic papers, posters, and presentations.
+<!-- ============================= HERO ============================= -->
+<section class="lp-hero">
+  <div class="lp-container lp-hero-grid">
+    <div class="lp-hero-copy reveal-up">
+      <h1 class="lp-hero-title">
+        Publish Interactive <span class="lp-accent">3D Models</span> with Your Research
+      </h1>
+      <p class="lp-hero-lead">
+        Add QR codes, AR experiences and browser-based 3D viewers to papers, theses and scientific projects.
       </p>
-      <p class="landing-body">
-        Upload GLB, STL, OBJ, or FBX models, generate a browser-ready viewer link, create a QR code, and let readers inspect your model in 3D or AR from mobile devices.
-      </p>
-      <div class="hero-actions">
-        <a href="{{ url_for('auth.register') }}" class="btn-primary">Create Workspace</a>
-        <a href="#workflow" class="btn-secondary">See Workflow</a>
+      <div class="lp-hero-actions">
+        <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn-dark">Start Publishing</a>
+        <a href="{{ url_for('demo_mitochondria_ar', source='hero_example') }}" class="lp-btn lp-btn-ghost">View Example Publication</a>
       </div>
-
-      <div class="hero-metrics">
-        <div>
-          <div class="hero-metric-value">3D Models</div>
-          <div class="hero-metric-label">GLB, STL, OBJ, FBX</div>
-        </div>
-        <div>
-          <div class="hero-metric-value">QR</div>
-          <div class="hero-metric-label">Publication link</div>
-        </div>
-        <div>
-          <div class="hero-metric-value">AR</div>
-          <div class="hero-metric-label">Mobile viewing</div>
-        </div>
-      </div>
+      <ul class="lp-hero-checks">
+        {% for label in ['No coding', 'DOI & PMID support', 'QR generated automatically', 'AR ready'] %}
+        <li>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          {{ label }}
+        </li>
+        {% endfor %}
+      </ul>
     </div>
 
-    <div class="hero-viewer-stage reveal-up delay-2">
-      <model-viewer
-        src="{{ url_for('static', filename='models/model.compressed.glb') }}"
-        alt="AcademicAR demo 3D model"
-        camera-controls
-        disable-zoom
-        auto-rotate
-        rotation-per-second="18deg"
-        camera-orbit="35deg 64deg 10m"
-        field-of-view="34deg"
-        exposure="1.0"
-        shadow-intensity="0"
-        shadow-softness="1.0"
-        tone-mapping="neutral"
-        environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
-        loading="lazy">
-      </model-viewer>
-      <a class="hero-ar-qr" href="{{ url_for('demo_mitochondria_ar', source='hero_link') }}" target="_blank" rel="noopener noreferrer" aria-label="Open mitochondria model in AR">
-        <img src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code for mitochondria AR demo">
-        <span>Scan for AR</span>
-      </a>
-    </div>
-  </div>
-</section>
-
-<!-- TRUST BAR -->
-<section class="trust-bar">
-  <div class="trust-bar-inner">
-    <span class="trust-bar-label">Built for researchers across</span>
-    <div class="trust-bar-items">
-      <span class="trust-bar-item">Medical imaging</span>
-      <span class="trust-bar-item">Anatomy &amp; surgery</span>
-      <span class="trust-bar-item">Archaeology</span>
-      <span class="trust-bar-item">Engineering</span>
-      <span class="trust-bar-item">Earth sciences</span>
-    </div>
-  </div>
-</section>
-
-<!-- WORKFLOW -->
-<section id="workflow" class="landing-section">
-  <div class="workflow-grid">
-    <div class="reveal-up">
-      <span class="landing-eyebrow">How it works</span>
-      <h2 class="landing-h2">From segmentation model to publication link.</h2>
-      <p class="landing-body">
-        AcademicAR turns GLB, STL, OBJ, and FBX files into a shareable academic asset: model upload, GLB viewer, screenshots, QR code, and mobile AR access in one flow.
-      </p>
-
-      <div class="workflow-timeline">
-        {% for step in [
-          ('01', 'Upload your model', 'Upload an anonymized GLB, STL, OBJ, or FBX model from your account.'),
-          ('02', 'Create a publication page', 'Add title, authors, institution, DOI/PMID, description, and model notes.'),
-          ('03', 'Get QR and link', 'Use the generated viewer URL and QR code in papers, posters, and presentations.'),
-          ('04', 'Show in 3D or AR', 'Readers can rotate, zoom, inspect, and open the model in AR on supported phones and tablets.')
-        ] %}
-          <div class="workflow-step reveal-up delay-{{ loop.index }}">
-            <div class="workflow-step-num">{{ step[0] }}</div>
-            <div>
-              <h3 class="workflow-step-title">{{ step[1] }}</h3>
-              <p class="workflow-step-desc">{{ step[2] }}</p>
+    <!-- Live product mockup inside a laptop frame -->
+    <div class="lp-hero-visual reveal-up delay-2">
+      <div class="lp-laptop">
+        <div class="lp-laptop-screen">
+          <div class="lp-mock">
+            <div class="lp-mock-bar">
+              <span class="lp-mock-dot"></span><span class="lp-mock-dot"></span><span class="lp-mock-dot"></span>
+              <span class="lp-mock-url">academicar.com/view</span>
+            </div>
+            <div class="lp-mock-body">
+              <div class="lp-mock-main">
+                <p class="lp-mock-kicker">Interactive publication</p>
+                <h3 class="lp-mock-title">Calcaneus segmentation</h3>
+                <div class="lp-mock-tags">
+                  <span>Medical</span><span>2024</span><span>Public</span>
+                </div>
+                <div class="lp-mock-stage">
+                  <model-viewer
+                    src="{{ url_for('static', filename='models/model.compressed.glb') }}"
+                    alt="AcademicAR demo 3D model"
+                    camera-controls
+                    disable-zoom
+                    auto-rotate
+                    rotation-per-second="16deg"
+                    camera-orbit="35deg 65deg 9m"
+                    field-of-view="32deg"
+                    exposure="1.0"
+                    shadow-intensity="0"
+                    tone-mapping="neutral"
+                    environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
+                    reveal="auto"
+                    poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 180'%3E%3Crect width='240' height='180' fill='%23f5f5f5'/%3E%3Cg fill='none' stroke='%23c9ccd1' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M120 58l34 20v44l-34 20-34-20V78z'/%3E%3Cpath d='M120 58v44M120 102l34-24M120 102l-34-24'/%3E%3C/g%3E%3C/svg%3E"
+                    loading="lazy">
+                  </model-viewer>
+                  <div class="lp-mock-toolbar">
+                    <span class="lp-mock-tool">Rotate</span>
+                    <span class="lp-mock-tool">Screenshot</span>
+                    <span class="lp-mock-tool lp-mock-tool-ar">View in AR</span>
+                  </div>
+                </div>
+                <div class="lp-mock-meta">
+                  <div><label>Authors</label><strong>S. Yolcu</strong></div>
+                  <div><label>Institution</label><strong>—</strong></div>
+                  <div><label>DOI</label><strong>10.0000/xxx</strong></div>
+                  <div><label>PMID</label><strong>00000</strong></div>
+                </div>
+              </div>
+              <aside class="lp-mock-share">
+                <p class="lp-mock-share-title">Share this publication</p>
+                <div class="lp-mock-qr">
+                  <img src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code">
+                </div>
+                <div class="lp-mock-copyrow"><span>academicar.com/m/…</span><button type="button">Copy</button></div>
+                <button type="button" class="lp-mock-sharebtn">View Paper PDF</button>
+                <button type="button" class="lp-mock-sharebtn">Open Public Page</button>
+              </aside>
             </div>
           </div>
-        {% endfor %}
-      </div>
-    </div>
-
-    <div class="workflow-visual-card reveal-up delay-2" aria-hidden="true">
-      <img src="{{ url_for('static', filename='images/clinical-spatial-hero.png') }}" alt="">
-    </div>
-  </div>
-</section>
-
-<!-- FEATURES -->
-<section class="landing-section alt-surface">
-  <div class="landing-container" style="margin-bottom: 60px;">
-    <div class="reveal-up">
-      <span class="landing-eyebrow">Features</span>
-      <h2 class="landing-h2">A publication-ready workspace for 3D academic models.</h2>
-      <p class="landing-body">
-        Manage publication metadata, upload models, generate QR codes, capture standard views, and keep public links active for temporary or paid publication windows.
-      </p>
-    </div>
-  </div>
-
-  <div class="features-grid">
-    {% for item in [
-      ('3D model upload', 'Upload GLB, STL, OBJ, and FBX files with AR-ready conversion and stable viewer links.', 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.27 6.96 12 12.01l8.73-5.05 M12 22.08V12'),
-      ('Web-based viewer', 'A full-screen browser viewer with metadata and mobile AR controls.', 'M2 3h20v14H2z M8 21h8 M12 17v4'),
-      ('Automatic QR code', 'Every model receives a shareable viewer URL and QR image.', 'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h2v2h-2z M18 14h2v2h-2z M14 18h2v2h-2z M18 18h2v2h-2z'),
-      ('Publication archive', 'Project-based model records for papers, posters, and presentations.', 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8'),
-      ('Screenshots', 'Capture current views or generate a complete 8-angle publication asset set.', 'M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'),
-      ('Privacy guardrails', 'Uploads require anonymization, rights, and ethics responsibility confirmation.', 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z')
-    ] %}
-      <div class="feature-card reveal-up delay-{{ loop.index }}">
-        <svg class="feature-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
-          {% for d in item[2].split(' M') %}
-            <path d="{% if not loop.first %}M{% endif %}{{ d }}"/>
-          {% endfor %}
-        </svg>
-        <h3 class="feature-title">{{ item[0] }}</h3>
-        <p class="feature-desc">{{ item[1] }}</p>
-      </div>
-    {% endfor %}
-  </div>
-</section>
-
-<!-- USE CASES -->
-<section class="landing-section">
-  <div class="landing-container" style="margin-bottom: 60px;">
-    <div class="reveal-up">
-      <span class="landing-eyebrow">Use cases</span>
-      <h2 class="landing-h2">Spatial context for any research output.</h2>
-      <p class="landing-body">
-        From clinical segmentations to cultural heritage scans, AcademicAR adapts to the way your readers explore evidence.
-      </p>
-    </div>
-  </div>
-
-  <div class="usecases-grid">
-    <div class="usecase-card reveal-up delay-1">
-      <div class="usecase-thumb">
-        <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg" style="width: 60%; height: auto;">
-          <circle cx="100" cy="60" r="40" fill="none" stroke="#202020" stroke-width="1.5"/>
-          <ellipse cx="100" cy="60" rx="40" ry="14" fill="none" stroke="#828282" stroke-width="1"/>
-          <ellipse cx="100" cy="60" rx="14" ry="40" fill="none" stroke="#828282" stroke-width="1"/>
-          <circle cx="100" cy="60" r="3" fill="#ff682c"/>
-          <line x1="40" y1="100" x2="60" y2="80" stroke="#202020" stroke-width="1"/>
-          <line x1="160" y1="100" x2="140" y2="80" stroke="#202020" stroke-width="1"/>
-        </svg>
-      </div>
-      <div class="usecase-body">
-        <span class="usecase-tag">Clinical</span>
-        <h3 class="usecase-title">Patient-specific anatomy</h3>
-        <p class="usecase-desc">Share segmented CT/MRI structures with the supplementary material of your paper.</p>
-      </div>
-    </div>
-
-    <div class="usecase-card reveal-up delay-2">
-      <div class="usecase-thumb">
-        <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg" style="width: 60%; height: auto;">
-          <rect x="40" y="30" width="120" height="70" rx="4" fill="none" stroke="#202020" stroke-width="1.5"/>
-          <line x1="40" y1="50" x2="160" y2="50" stroke="#828282" stroke-width="1"/>
-          <circle cx="55" cy="40" r="2" fill="#ff682c"/>
-          <rect x="55" y="65" width="40" height="3" fill="#828282"/>
-          <rect x="55" y="75" width="60" height="3" fill="#828282"/>
-          <rect x="55" y="85" width="30" height="3" fill="#828282"/>
-          <rect x="120" y="65" width="30" height="25" fill="none" stroke="#ff682c" stroke-width="1"/>
-        </svg>
-      </div>
-      <div class="usecase-body">
-        <span class="usecase-tag">Education</span>
-        <h3 class="usecase-title">Interactive anatomy</h3>
-        <p class="usecase-desc">Embed AR-ready models in lecture slides and open them on student devices.</p>
-      </div>
-    </div>
-
-    <div class="usecase-card reveal-up delay-3">
-      <div class="usecase-thumb">
-        <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg" style="width: 60%; height: auto;">
-          <polygon points="100,20 150,50 150,90 100,100 50,90 50,50" fill="none" stroke="#202020" stroke-width="1.5"/>
-          <line x1="100" y1="20" x2="100" y2="100" stroke="#828282" stroke-width="1"/>
-          <line x1="50" y1="50" x2="150" y2="50" stroke="#828282" stroke-width="1"/>
-          <line x1="50" y1="90" x2="150" y2="90" stroke="#828282" stroke-width="1"/>
-          <circle cx="100" cy="60" r="4" fill="#ff682c"/>
-          <line x1="20" y1="105" x2="180" y2="105" stroke="#202020" stroke-width="1" stroke-dasharray="3,3"/>
-        </svg>
-      </div>
-      <div class="usecase-body">
-        <span class="usecase-tag">Heritage</span>
-        <h3 class="usecase-title">Site &amp; artifact scans</h3>
-        <p class="usecase-desc">Publish photogrammetry results alongside descriptive metadata.</p>
+        </div>
+        <div class="lp-laptop-base"></div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- PRICING -->
-<section class="landing-section alt-surface pricing-section" id="pricing">
-  <div class="pricing-layout">
-    <div class="pricing-header-block reveal-up">
-      <div>
-        <span class="landing-eyebrow">Pricing</span>
-        <h2 class="landing-h2">Simple, publication-aligned plans.</h2>
-        <p class="landing-body">
-          Start with a free preview link. Upgrade per model when the viewer and QR need to stay active alongside the publication.
-        </p>
-      </div>
-      <div class="pricing-context-stats" aria-label="Plan duration summary">
-        <div>
-          <div class="pricing-stat-value">3 days</div>
-          <div class="pricing-stat-label">Free preview</div>
-        </div>
-        <div>
-          <div class="pricing-stat-value">3 years</div>
-          <div class="pricing-stat-label">Academic access</div>
-        </div>
-        <div>
-          <div class="pricing-stat-value">10 years</div>
-          <div class="pricing-stat-label">Extended archive</div>
-        </div>
-      </div>
+<!-- ============================= HOW IT WORKS ============================= -->
+<section class="lp-section" id="how-it-works">
+  <div class="lp-container">
+    <div class="lp-head reveal-up">
+      <h2 class="lp-h2">How it works</h2>
+      <p class="lp-sub">From upload to shareable 3D publication in minutes.</p>
     </div>
 
-    <div class="pricing-cards-col">
-      <div class="pricing-card reveal-up delay-1">
-        <div class="pricing-card-top">
-          <span class="pricing-eyebrow">Free Access</span>
-          <span class="pricing-meta">3-day active</span>
-        </div>
-        <h3 class="pricing-price">$0</h3>
-        <p class="pricing-period">For quick model previews before committing to long-term access.</p>
-        <ul class="pricing-features">
-          <li>3-day active AR & QR access</li>
-          <li>1 interactive model</li>
-          <li>Up to 100 MB storage</li>
-          <li>Screenshot capture</li>
-          <li>Watermarked viewer</li>
-        </ul>
-        <a href="{{ url_for('auth.register') }}" class="pricing-cta">Start free</a>
-        <p class="pricing-microcopy">No credit card required</p>
-      </div>
-
-      <div class="pricing-card reveal-up delay-2">
-        <div class="pricing-card-top">
-          <span class="pricing-eyebrow">Academic</span>
-          <span class="pricing-meta">3-year active</span>
-        </div>
-        <h3 class="pricing-price">$9.90</h3>
-        <p class="pricing-period">One-time, per model. Built for papers, posters, and thesis links.</p>
-        <ul class="pricing-features">
-          <li>3-year active AR & QR access</li>
-          <li>1 interactive model</li>
-          <li>Up to 200 MB storage</li>
-          <li>No watermark</li>
-          <li>Persistent QR & viewer URL</li>
-        </ul>
-        <a href="{{ url_for('auth.register') }}" class="pricing-cta">Get started</a>
-        <p class="pricing-microcopy">Billed once at activation</p>
-      </div>
-
-      <div class="pricing-card featured-pricing reveal-up delay-3">
-        <span class="pricing-badge">Recommended</span>
-        <div class="pricing-card-top">
-          <span class="pricing-eyebrow">Extended Archive</span>
-          <span class="pricing-meta">10-year active</span>
-        </div>
-        <h3 class="pricing-price">$24.90</h3>
-        <p class="pricing-period">One-time, per model. Longer access for long-lived academic references.</p>
-        <ul class="pricing-features">
-          <li>10-year active AR & QR access</li>
-          <li>Priority archival storage</li>
-          <li>Guided viewing</li>
-          <li>Saved camera views</li>
-          <li>Rich metadata fields</li>
-        </ul>
-        <a href="{{ url_for('auth.register') }}" class="pricing-cta">Get started</a>
-        <p class="pricing-microcopy">Renewable after 10 years</p>
-      </div>
-    </div>
-    <div class="pricing-detail-link reveal-up delay-3">
-      <a href="{{ url_for('pricing') }}">Compare all plan details</a>
-    </div>
-  </div>
-</section>
-
-<!-- INSTITUTIONAL LICENSING -->
-<section class="landing-section" id="institutional">
-  <div class="institutional-grid">
-    <div class="institutional-copy reveal-up">
-      <span class="landing-eyebrow">Institutional licensing</span>
-      <h2 class="landing-h2">For labs, research groups, and universities.</h2>
-      <p class="landing-body">
-        AcademicAR can support multi-user workspaces, shared publication management, higher model limits, and custom deployment requirements through a sales-led institutional package.
-      </p>
-      <a href="mailto:hello@academicar.com?subject=AcademicAR%20Institutional%20Licensing" class="pricing-cta institutional-cta">Contact sales</a>
-      <span class="institutional-note">Custom pricing for shared labs, cohorts, and infrastructure needs.</span>
-    </div>
-    <ul class="institutional-list reveal-up delay-2">
-      <li>
-        <strong>Team workspace</strong>
-        <span>Shared dashboards, role-based publishing, and lab-wide model management.</span>
-      </li>
-      <li>
-        <strong>Bulk model licensing</strong>
-        <span>Pre-purchased model credits for recurring publication and thesis workflows.</span>
-      </li>
-      <li>
-        <strong>Custom infrastructure</strong>
-        <span>Higher upload limits, dedicated support, and domain or storage alignment.</span>
-      </li>
-      <li>
-        <strong>Procurement-ready</strong>
-        <span>Custom invoicing, institutional contracts, and renewal planning.</span>
-      </li>
-    </ul>
-  </div>
-</section>
-
-<!-- FAQ -->
-<section class="landing-section">
-  <div class="faq-grid">
-    <div class="reveal-up">
-      <span class="landing-eyebrow">FAQ</span>
-      <h2 class="landing-h2">Quick answers.</h2>
-      <p class="landing-body">More in the documentation once you create a workspace.</p>
-    </div>
-    <div class="faq-list reveal-up delay-2">
-      {% for qa in [
-        ('Which file formats can I upload?', 'GLB, STL, OBJ, and FBX are supported. OBJ/FBX are converted to AR-ready GLB.'),
-        ('Do my readers need an app for AR?', 'No. Modern iOS and Android browsers open AR directly via Quick Look (USDZ) and Scene Viewer.'),
-        ('Are uploads private by default?', 'Yes. You control visibility per publication and can keep models unlisted before paper acceptance.'),
-        ('What happens after the access window?', 'The QR resolver stays stable. Readers see a controlled renewal notice instead of a dead link.')
+    <div class="lp-steps">
+      {% for step in [
+        ('1', 'Upload your paper and 3D model', 'PDF + GLB/STL', 'M12 16V4 M7 9l5-5 5 5 M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2'),
+        ('2', 'AcademicAR creates a permanent QR and viewer page', 'QR, link, AR-ready viewer', 'M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M15 15h2 M19 15v4 M15 19h4'),
+        ('3', 'Readers scan, explore and interact', 'No software installation required', 'M8 2h8a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z M11 18h2')
       ] %}
-        <div class="faq-item">
-          <h3 class="faq-q">{{ qa[0] }}</h3>
-          <p class="faq-a">{{ qa[1] }}</p>
-        </div>
+      <div class="lp-step reveal-up delay-{{ loop.index }}">
+        <div class="lp-step-badge">{{ step[0] }}</div>
+        <svg class="lp-step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          {% for d in step[3].split(' M') %}<path d="{% if not loop.first %}M{% endif %}{{ d }}"/>{% endfor %}
+        </svg>
+        <h3 class="lp-step-title">{{ step[1] }}</h3>
+        <p class="lp-step-note">{{ step[2] }}</p>
+        {% if not loop.last %}<span class="lp-step-arrow" aria-hidden="true">&rarr;</span>{% endif %}
+      </div>
       {% endfor %}
     </div>
   </div>
 </section>
 
-<!-- FINAL CTA -->
-<section class="final-cta">
-  <div class="final-cta-inner reveal-up">
-    <h2>Start publishing in 3D.</h2>
-    <p>Create a workspace, upload your first model, and share an AR-ready link with your next paper.</p>
-    <div class="final-cta-actions">
-      <a href="{{ url_for('auth.register') }}" class="btn-primary-light">Create Workspace</a>
-      <a href="#workflow" class="btn-secondary-light">See workflow again</a>
+<!-- ============================= FEATURES ============================= -->
+<section class="lp-section lp-alt" id="features">
+  <div class="lp-container">
+    <div class="lp-head reveal-up">
+      <h2 class="lp-h2">Features</h2>
+      <p class="lp-sub">Everything you need to publish 3D models with your research.</p>
     </div>
+
+    <div class="lp-features">
+      {% for feat in [
+        ('Stable QR Links', 'Your QR never changes — even after replacing the model, upgrading, or recoloring.', 'M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M15 15h2 M19 15v4 M15 19h4'),
+        ('3D & AR Ready', 'Upload GLB, STL, OBJ, or FBX — readers view in the browser or open in mobile AR.', 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.3 7L12 12l8.7-5 M12 22V12'),
+        ('Academic Metadata', 'DOI, PMID, authors, institution, and abstract travel with every publication.', 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M9 13h6 M9 17h6'),
+        ('Long-Term Hosting', '3-year and 10-year archival options keep links and QR codes alive.', 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z M9 12l2 2 4-4'),
+        ('PDF + Model Together', 'Keep the paper and its 3D assets in one shareable publication page.', 'M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z M14 3v5h5 M9 13h6 M9 16h4'),
+        ('No App Required', 'Works directly from a browser — nothing for your readers to install.', 'M2 4h20v13H2z M8 21h8 M12 17v4')
+      ] %}
+      <div class="lp-feature reveal-up delay-{{ loop.index }}">
+        <span class="lp-feature-chip">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            {% for d in feat[2].split(' M') %}<path d="{% if not loop.first %}M{% endif %}{{ d }}"/>{% endfor %}
+          </svg>
+        </span>
+        <h3 class="lp-feature-title">{{ feat[0] }}</h3>
+        <p class="lp-feature-desc">{{ feat[1] }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ============================= USE CASES ============================= -->
+<section class="lp-section" id="use-cases">
+  <div class="lp-container">
+    <div class="lp-head reveal-up">
+      <h2 class="lp-h2">Use Cases</h2>
+      <p class="lp-sub">AcademicAR is used in many areas of research and education.</p>
+    </div>
+
+    <div class="lp-usecases">
+      <!-- Scientific Publication -->
+      <div class="lp-usecase reveal-up delay-1">
+        <div class="lp-usecase-thumb">
+          <svg viewBox="0 0 200 140" aria-hidden="true">
+            <line x1="70" y1="55" x2="100" y2="80" stroke="#9aa0a6" stroke-width="2"/>
+            <line x1="130" y1="55" x2="100" y2="80" stroke="#9aa0a6" stroke-width="2"/>
+            <line x1="100" y1="80" x2="100" y2="115" stroke="#9aa0a6" stroke-width="2"/>
+            <line x1="70" y1="55" x2="45" y2="40" stroke="#9aa0a6" stroke-width="2"/>
+            <line x1="130" y1="55" x2="155" y2="40" stroke="#9aa0a6" stroke-width="2"/>
+            <circle cx="100" cy="80" r="14" fill="#202020"/>
+            <circle cx="70" cy="55" r="11" fill="#ff682c"/>
+            <circle cx="130" cy="55" r="11" fill="#5b8def"/>
+            <circle cx="45" cy="40" r="8" fill="#cfd3d8"/>
+            <circle cx="155" cy="40" r="8" fill="#cfd3d8"/>
+            <circle cx="100" cy="115" r="9" fill="#7d8590"/>
+          </svg>
+        </div>
+        <div class="lp-usecase-body">
+          <span class="lp-usecase-badge" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/></svg>
+          </span>
+          <h3 class="lp-usecase-title">Scientific Publication</h3>
+          <p class="lp-usecase-desc">Attach interactive 3D models to journal articles and supplementary material.</p>
+        </div>
+      </div>
+
+      <!-- Theses & Dissertations -->
+      <div class="lp-usecase reveal-up delay-2">
+        <div class="lp-usecase-thumb">
+          <svg viewBox="0 0 200 140" aria-hidden="true">
+            <path d="M60 50c0-22 80-22 80 0 0 14-10 20-10 32 0 8-6 10-10 10h-30c-4 0-10-2-10-10 0-12-10-18-10-32z" fill="#e3e6ea" stroke="#202020" stroke-width="2"/>
+            <circle cx="84" cy="62" r="7" fill="#202020"/>
+            <circle cx="116" cy="62" r="7" fill="#ff682c"/>
+            <path d="M96 74l-4 10h16l-4-10" fill="#9aa0a6"/>
+            <path d="M88 96h24" stroke="#202020" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="lp-usecase-body">
+          <span class="lp-usecase-badge" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4z"/><path d="M7 9v5c0 1 5 3 5 3s5-2 5-3V9"/></svg>
+          </span>
+          <h3 class="lp-usecase-title">Theses &amp; Dissertations</h3>
+          <p class="lp-usecase-desc">Share anatomical, engineering, or scientific models alongside your thesis.</p>
+        </div>
+      </div>
+
+      <!-- Medical Education -->
+      <div class="lp-usecase reveal-up delay-3">
+        <div class="lp-usecase-thumb">
+          <svg viewBox="0 0 200 140" aria-hidden="true">
+            <line x1="100" y1="28" x2="100" y2="112" stroke="#202020" stroke-width="3" stroke-linecap="round"/>
+            <path d="M100 40c-18 6-30 6-40 2 M100 40c18 6 30 6 40 2" fill="none" stroke="#9aa0a6" stroke-width="3" stroke-linecap="round"/>
+            <path d="M100 54c-16 6-26 6-34 3 M100 54c16 6 26 6 34 3" fill="none" stroke="#9aa0a6" stroke-width="3" stroke-linecap="round"/>
+            <path d="M100 68c-13 5-21 5-28 2 M100 68c13 5 21 5 28 2" fill="none" stroke="#ff682c" stroke-width="3" stroke-linecap="round"/>
+            <path d="M100 82c-10 4-16 4-22 2 M100 82c10 4 16 4 22 2" fill="none" stroke="#9aa0a6" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="100" cy="30" r="6" fill="#202020"/>
+          </svg>
+        </div>
+        <div class="lp-usecase-body">
+          <span class="lp-usecase-badge" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14 M5 12h14"/></svg>
+          </span>
+          <h3 class="lp-usecase-title">Medical Education</h3>
+          <p class="lp-usecase-desc">Publish anatomy, surgical planning, and simulation models for students.</p>
+        </div>
+      </div>
+
+      <!-- Research Projects -->
+      <div class="lp-usecase reveal-up delay-4">
+        <div class="lp-usecase-thumb">
+          <svg viewBox="0 0 200 140" aria-hidden="true">
+            <circle cx="100" cy="70" r="30" fill="none" stroke="#202020" stroke-width="3"/>
+            <circle cx="100" cy="70" r="12" fill="#e3e6ea" stroke="#202020" stroke-width="2"/>
+            <circle cx="100" cy="70" r="4" fill="#ff682c"/>
+            {% for a in range(0, 360, 45) %}
+            <rect x="97" y="28" width="6" height="14" rx="2" fill="#7d8590" transform="rotate({{ a }} 100 70)"/>
+            {% endfor %}
+            <rect x="150" y="64" width="26" height="12" rx="3" fill="#cfd3d8"/>
+          </svg>
+        </div>
+        <div class="lp-usecase-body">
+          <span class="lp-usecase-badge" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          </span>
+          <h3 class="lp-usecase-title">Research Projects</h3>
+          <p class="lp-usecase-desc">Create permanent links and QR codes for project outputs and datasets.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= BEFORE / AFTER ============================= -->
+<section class="lp-section lp-alt" id="before-after">
+  <div class="lp-container">
+    <div class="lp-head reveal-up">
+      <h2 class="lp-h2">Before / After</h2>
+      <p class="lp-sub">Bring scientific models beyond the PDF.</p>
+    </div>
+
+    <div class="lp-compare reveal-up">
+      <div class="lp-compare-card lp-compare-before">
+        <h3 class="lp-compare-title">Traditional Publication</h3>
+        <ul class="lp-compare-list">
+          {% for item in ['PDF only', 'Static figures', 'Limited visualization'] %}
+          <li><span class="lp-x" aria-hidden="true">✕</span>{{ item }}</li>
+          {% endfor %}
+        </ul>
+        <div class="lp-compare-art lp-compare-art-muted" aria-hidden="true">
+          <svg viewBox="0 0 60 72"><rect x="6" y="2" width="48" height="68" rx="4" fill="#e3e6ea" stroke="#b9bec4" stroke-width="2"/><text x="30" y="44" text-anchor="middle" font-family="Inter, sans-serif" font-size="13" font-weight="700" fill="#9aa0a6">PDF</text></svg>
+        </div>
+      </div>
+
+      <div class="lp-vs" aria-hidden="true">VS</div>
+
+      <div class="lp-compare-card lp-compare-after">
+        <h3 class="lp-compare-title">AcademicAR Publication</h3>
+        <ul class="lp-compare-list">
+          {% for item in ['PDF', 'Interactive 3D model', 'QR access', 'AR viewing', 'Shareable viewer'] %}
+          <li>
+            <span class="lp-check" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            {{ item }}
+          </li>
+          {% endfor %}
+        </ul>
+        <div class="lp-compare-art" aria-hidden="true">
+          <svg viewBox="0 0 120 72">
+            <rect x="4" y="6" width="40" height="60" rx="4" fill="#fff" stroke="#ffd9c7" stroke-width="2"/><text x="24" y="40" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="#ff682c">PDF</text>
+            <rect x="50" y="14" width="30" height="30" rx="3" fill="#fff" stroke="#ffd9c7" stroke-width="2"/><path d="M55 19h6v6h-6z M69 19h6v6h-6z M55 33h6v6h-6z M71 33h4v4h-4z" fill="#ff682c"/>
+            <rect x="86" y="6" width="30" height="60" rx="6" fill="#202020"/><rect x="90" y="12" width="22" height="40" rx="2" fill="#2f2f2f"/><circle cx="101" cy="60" r="3" fill="#4d4d4d"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= DARK CTA BAND ============================= -->
+<section class="lp-section lp-cta-section">
+  <div class="lp-container">
+    <div class="lp-cta reveal-up">
+      <div class="lp-cta-copy">
+        <h2 class="lp-cta-title">Ready to publish your 3D models with your research?</h2>
+        <p class="lp-cta-sub">Join researchers, universities and journals already using AcademicAR.</p>
+      </div>
+      <div class="lp-cta-actions">
+        <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn-orange">Start Publishing Now</a>
+        <a href="{{ url_for('pricing') }}" class="lp-btn lp-btn-ghost-light">View Pricing Plans &rarr;</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= STATS BAR ============================= -->
+<section class="lp-stats-section">
+  <div class="lp-container lp-stats">
+    {% for stat in [
+      ('2,000+', 'Publications', 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6'),
+      ('3,500+', '3D Models', 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.3 7L12 12l8.7-5 M12 22V12'),
+      ('1,200+', 'Researchers', 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M22 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75'),
+      ('80+', 'Countries', 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M2 12h20 M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z')
+    ] %}
+    <div class="lp-stat reveal-up delay-{{ loop.index }}">
+      <svg class="lp-stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        {% for d in stat[2].split(' M') %}<path d="{% if not loop.first %}M{% endif %}{{ d }}"/>{% endfor %}
+      </svg>
+      <div class="lp-stat-value">{{ stat[0] }}</div>
+      <div class="lp-stat-label">{{ stat[1] }}</div>
+    </div>
+    {% endfor %}
   </div>
 </section>
 {% endblock %}
 
 {% block scripts %}
   <script type="module" src="https://unpkg.com/@google/model-viewer@4.3.0/dist/model-viewer.min.js" crossorigin="anonymous"></script>
-  <script>
-    (function() {
-      const els = document.querySelectorAll('.reveal-up');
-      if (!('IntersectionObserver' in window)) {
-        els.forEach(el => el.classList.add('is-visible'));
-        return;
-      }
-      const io = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('is-visible');
-            io.unobserve(entry.target);
-          }
-        });
-      }, { threshold: 0.12 });
-      els.forEach(el => io.observe(el));
-    })();
-  </script>
 {% endblock %}
