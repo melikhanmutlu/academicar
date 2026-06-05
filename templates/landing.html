@@ -67,9 +67,11 @@
           </div>
         </div>
         <div class="lp-viewer-panel">
-          <p class="lp-viewer-kicker">Live spatial viewer</p>
-          <h3 class="lp-viewer-title">Mitochondria</h3>
-          <p class="lp-viewer-paper">Cell Biology — Interactive Publication</p>
+          <div class="lp-viewer-panel-text">
+            <p class="lp-viewer-kicker">Live spatial viewer</p>
+            <h3 class="lp-viewer-title">Mitochondria</h3>
+            <p class="lp-viewer-paper">Cell Biology — Interactive Publication</p>
+          </div>
           <div class="lp-viewer-meta-grid">
             <div><span>Format</span><strong>GLB</strong></div>
             <div><span>AR</span><strong>Ready</strong></div>
@@ -79,13 +81,7 @@
             <div class="lp-viewer-qr-img">
               <img src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code">
             </div>
-            <div class="lp-viewer-qr-info">
-              <span>Scan to view in AR</span>
-              <div class="lp-viewer-qr-link">
-                <span>academicar.com/m/…</span>
-                <button type="button">Copy</button>
-              </div>
-            </div>
+            <span class="lp-viewer-qr-label">Scan to view in AR</span>
           </div>
         </div>
       </div>
