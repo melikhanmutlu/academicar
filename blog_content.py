@@ -13,22 +13,27 @@ logger = logging.getLogger(__name__)
 _RENDER_CACHE: dict[str, str] = {}
 
 
-def render_body(slug: str, body_md: str) -> str:
-    """Render a post body from Markdown to HTML (cached per slug)."""
-    if slug not in _RENDER_CACHE:
-        try:
-            import markdown
+def render_body(text: str, cache_key: str | None = None) -> str:
+    """Render a Markdown body to HTML.
 
-            _RENDER_CACHE[slug] = markdown.markdown(
-                body_md, extensions=["extra", "sane_lists", "smarty"]
-            )
-        except Exception:  # pragma: no cover - markdown should be installed
-            logger.warning("Markdown unavailable; serving escaped fallback for %s", slug)
-            from markupsafe import escape
+    When ``cache_key`` is given the result is cached under it (use an immutable
+    key like a slug for code posts, or ``db:<id>:<updated_at>`` for editable DB
+    posts so an edit busts the cache).
+    """
+    if cache_key is not None and cache_key in _RENDER_CACHE:
+        return _RENDER_CACHE[cache_key]
+    try:
+        import markdown
 
-            paras = "".join(f"<p>{escape(p.strip())}</p>" for p in body_md.split("\n\n") if p.strip())
-            _RENDER_CACHE[slug] = paras
-    return _RENDER_CACHE[slug]
+        html = markdown.markdown(text, extensions=["extra", "sane_lists", "smarty"])
+    except Exception:  # pragma: no cover - markdown should be installed
+        logger.warning("Markdown unavailable; serving escaped fallback")
+        from markupsafe import escape
+
+        html = "".join(f"<p>{escape(p.strip())}</p>" for p in text.split("\n\n") if p.strip())
+    if cache_key is not None:
+        _RENDER_CACHE[cache_key] = html
+    return html
 
 
 POSTS: list[dict] = [
@@ -363,7 +368,7 @@ code.*
 
 
 def get_all_posts() -> list[dict]:
-    """All posts, newest first."""
+    """All built-in (code) posts, newest first."""
     return sorted(POSTS, key=lambda p: p["date"], reverse=True)
 
 
@@ -372,3 +377,8 @@ def get_post(slug: str) -> dict | None:
         if post["slug"] == slug:
             return post
     return None
+
+
+def code_post_slugs() -> set[str]:
+    """Slugs reserved by the built-in code posts (avoid DB slug collisions)."""
+    return {p["slug"] for p in POSTS}

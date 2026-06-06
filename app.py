@@ -45,8 +45,8 @@ from licensing import (
     normalize_license_type,
 )
 from licensing import paper_is_expired as licensing_paper_is_expired
-from blog_content import get_all_posts, get_post, render_body
-from models import AuditLog, ConversionJob, Model3D, ModelAnnotation, ModelVersion, Paper, Payment, QRLink, User, db
+from blog_content import code_post_slugs, get_all_posts, get_post, render_body
+from models import AuditLog, BlogPost, ConversionJob, Model3D, ModelAnnotation, ModelVersion, Paper, Payment, QRLink, User, db
 from services.r2_mirror import mirror_file, mirror_directory, mirror_delete, ensure_local
 from payments import (
     PAID_PLAN_KEYS,
@@ -774,6 +774,62 @@ def make_slug(title: str) -> str:
             break
         slug = f"{base}-{counter}"
     return slug
+
+
+def make_blog_slug(title: str, exclude_id: int | None = None) -> str:
+    """Unique blog slug from a title, avoiding both DB and built-in code slugs."""
+    reserved = code_post_slugs()
+    base = slugify(title)[:200] or "post"
+    slug = base
+    counter = 1
+    while True:
+        existing = BlogPost.query.filter_by(slug=slug).first()
+        clashes = (existing is not None and existing.id != exclude_id) or slug in reserved
+        if not clashes:
+            return slug
+        counter += 1
+        if counter > 10000:
+            return f"{base}-{uuid.uuid4().hex[:8]}"
+        slug = f"{base}-{counter}"
+
+
+def _db_blogpost_to_view(bp: BlogPost) -> dict:
+    """Normalize a DB BlogPost to the dict shape the blog templates expect."""
+    created = bp.created_at or datetime.now(UTC)
+    return {
+        "slug": bp.slug,
+        "title": bp.title,
+        "description": bp.description or "",
+        "date": created.strftime("%Y-%m-%d"),
+        "author": bp.author or "AcademicAR Team",
+        "tags": [t.strip() for t in (bp.tags or "").split(",") if t.strip()],
+        "persona": bp.persona or "",
+        "read_minutes": bp.read_minutes or 4,
+        "body": bp.body,
+        "source": "db",
+        "id": bp.id,
+        "updated_at": bp.updated_at,
+    }
+
+
+def _code_blogpost_to_view(p: dict) -> dict:
+    return {**p, "tags": list(p.get("tags") or []), "source": "code"}
+
+
+def merged_blog_posts() -> list[dict]:
+    """Published DB posts + built-in code posts, newest first (DB wins on slug)."""
+    db_views = [_db_blogpost_to_view(b) for b in BlogPost.query.filter_by(is_published=True).all()]
+    db_slugs = {v["slug"] for v in db_views}
+    code_views = [_code_blogpost_to_view(p) for p in get_all_posts() if p["slug"] not in db_slugs]
+    return sorted(db_views + code_views, key=lambda v: v["date"], reverse=True)
+
+
+def find_blog_post(slug: str) -> dict | None:
+    bp = BlogPost.query.filter_by(slug=slug, is_published=True).first()
+    if bp is not None:
+        return _db_blogpost_to_view(bp)
+    code_post = get_post(slug)
+    return _code_blogpost_to_view(code_post) if code_post else None
 
 
 def validate_paper_form(form) -> tuple[dict, list[str]]:
@@ -1920,17 +1976,20 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/blog")
     def blog_index():
-        return render_template("blog_list.html", posts=get_all_posts())
+        return render_template("blog_list.html", posts=merged_blog_posts())
 
     @app.route("/blog/<slug>")
     def blog_post(slug):
-        post = get_post(slug)
+        post = find_blog_post(slug)
         if not post:
             abort(404)
+        cache_key = (
+            f"db:{post['id']}:{post['updated_at']}" if post.get("source") == "db" else post["slug"]
+        )
         return render_template(
             "blog_post.html",
             post=post,
-            body_html=render_body(post["slug"], post["body"]),
+            body_html=render_body(post["body"], cache_key=cache_key),
         )
 
     @app.route("/robots.txt")
@@ -1976,7 +2035,7 @@ def register_routes(app: Flask) -> None:
                 urls.append(public_url(endpoint))
             except Exception:
                 continue
-        for post in get_all_posts():
+        for post in merged_blog_posts():
             try:
                 urls.append(public_url("blog_post", slug=post["slug"]))
             except Exception:
@@ -2438,6 +2497,7 @@ def register_routes(app: Flask) -> None:
             "storage",
             "logs",
             "backups",
+            "blog",
         }
         if admin_page not in admin_pages:
             abort(404)
@@ -2779,6 +2839,14 @@ def register_routes(app: Flask) -> None:
         if admin_page == "backups":
             ensure_daily_backup(app, created_by_user_id=current_user.id)
         backups = list_backup_archives(app) if admin_page == "backups" else []
+        blog_posts = (
+            BlogPost.query.order_by(BlogPost.created_at.desc()).all() if admin_page == "blog" else []
+        )
+        editing_post = None
+        if admin_page == "blog":
+            edit_id = (request.args.get("edit") or "").strip()
+            if edit_id.isdigit():
+                editing_post = db.session.get(BlogPost, int(edit_id))
         return render_template(
             "admin_dashboard.html",
             users=users,
@@ -2811,6 +2879,8 @@ def register_routes(app: Flask) -> None:
             security_events=security_events,
             critical_alerts=critical_alerts,
             backups=backups,
+            blog_posts=blog_posts,
+            editing_post=editing_post,
             active_page=admin_page,
             filters={
                 "user_q": user_query_text,
@@ -3103,6 +3173,111 @@ def register_routes(app: Flask) -> None:
         )
         flash("Payment status updated.", "success")
         return redirect(url_for("admin_dashboard", admin_page="revenue"))
+
+    def _read_blog_form() -> dict:
+        rm = (request.form.get("read_minutes") or "").strip()
+        return {
+            "title": (request.form.get("title") or "").strip(),
+            "description": (request.form.get("description") or "").strip() or None,
+            "body": (request.form.get("body") or "").strip(),
+            "tags": (request.form.get("tags") or "").strip() or None,
+            "persona": (request.form.get("persona") or "").strip() or None,
+            "author": (request.form.get("author") or "").strip() or "AcademicAR Team",
+            "read_minutes": int(rm) if rm.isdigit() else None,
+            "is_published": (request.form.get("is_published") or "").lower() in {"on", "1", "true", "yes"},
+        }
+
+    @app.route("/admin/blog/create", methods=["POST"])
+    @login_required
+    def admin_blog_create():
+        require_admin()
+        data = _read_blog_form()
+        if not data["title"] or not data["body"]:
+            flash("Title and body are required.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="blog"))
+        post = BlogPost(
+            slug=make_blog_slug(data["title"]),
+            title=data["title"][:300],
+            description=(data["description"] or None) and data["description"][:500],
+            body=data["body"],
+            tags=data["tags"],
+            persona=data["persona"],
+            author=data["author"][:120],
+            read_minutes=data["read_minutes"],
+            is_published=data["is_published"],
+        )
+        db.session.add(post)
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not create the post. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="blog"))
+        log_audit("blog_post_created", user_id=current_user.id, resource_id=str(post.id), details={"slug": post.slug})
+        flash(f"Blog post '{post.title}' created.", "success")
+        return redirect(url_for("admin_dashboard", admin_page="blog"))
+
+    @app.route("/admin/blog/<int:post_id>/update", methods=["POST"])
+    @login_required
+    def admin_blog_update(post_id):
+        require_admin()
+        post = db.session.get(BlogPost, post_id)
+        if not post:
+            abort(404)
+        data = _read_blog_form()
+        if not data["title"] or not data["body"]:
+            flash("Title and body are required.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="blog", edit=post_id))
+        # Slug stays stable so existing links don't break.
+        post.title = data["title"][:300]
+        post.description = (data["description"] or None) and data["description"][:500]
+        post.body = data["body"]
+        post.tags = data["tags"]
+        post.persona = data["persona"]
+        post.author = data["author"][:120]
+        post.read_minutes = data["read_minutes"]
+        post.is_published = data["is_published"]
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not update the post. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="blog", edit=post_id))
+        log_audit("blog_post_updated", user_id=current_user.id, resource_id=str(post.id), details={"slug": post.slug})
+        flash("Blog post updated.", "success")
+        return redirect(url_for("admin_dashboard", admin_page="blog"))
+
+    @app.route("/admin/blog/<int:post_id>/publish", methods=["POST"])
+    @login_required
+    def admin_blog_publish(post_id):
+        require_admin()
+        post = db.session.get(BlogPost, post_id)
+        if not post:
+            abort(404)
+        post.is_published = not post.is_published
+        db.session.commit()
+        log_audit(
+            "blog_post_publish_toggled",
+            user_id=current_user.id,
+            resource_id=str(post.id),
+            details={"is_published": post.is_published},
+        )
+        flash("Post published." if post.is_published else "Post moved to drafts.", "success")
+        return redirect(url_for("admin_dashboard", admin_page="blog"))
+
+    @app.route("/admin/blog/<int:post_id>/delete", methods=["POST"])
+    @login_required
+    def admin_blog_delete(post_id):
+        require_admin()
+        post = db.session.get(BlogPost, post_id)
+        if not post:
+            abort(404)
+        slug = post.slug
+        db.session.delete(post)
+        db.session.commit()
+        log_audit("blog_post_deleted", user_id=current_user.id, resource_id=str(post_id), details={"slug": slug})
+        flash("Blog post deleted.", "success")
+        return redirect(url_for("admin_dashboard", admin_page="blog"))
 
     @app.route("/profile", methods=["GET", "POST"])
     @login_required

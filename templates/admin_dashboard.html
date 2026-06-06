@@ -58,6 +58,7 @@
     <a href="{{ url_for('admin_dashboard', admin_page='storage') }}" class="{% if active_page == 'storage' %}is-active{% endif %}">Storage</a>
     <a href="{{ url_for('admin_dashboard', admin_page='logs') }}" class="{% if active_page == 'logs' %}is-active{% endif %}">Logs</a>
     <a href="{{ url_for('admin_dashboard', admin_page='backups') }}" class="{% if active_page == 'backups' %}is-active{% endif %}">Backups</a>
+    <a href="{{ url_for('admin_dashboard', admin_page='blog') }}" class="{% if active_page == 'blog' %}is-active{% endif %}">Blog</a>
   </nav>
 
   {% if active_page == "overview" %}
@@ -974,6 +975,96 @@
             </tr>
           {% else %}
             <tr><td colspan="4">No backup archives yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if active_page == "blog" %}
+  <section id="blog" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Blog</h2>
+        <p>Create and manage blog posts. The body supports Markdown. The built-in launch articles are managed in code and always appear on the public blog.</p>
+      </div>
+      <span>{{ blog_posts|length }} posts</span>
+    </div>
+
+    <form method="POST"
+          action="{{ url_for('admin_blog_update', post_id=editing_post.id) if editing_post else url_for('admin_blog_create') }}"
+          class="admin-blog-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="admin-blog-field">
+        <span>Title</span>
+        <input name="title" required maxlength="300" value="{{ editing_post.title if editing_post else '' }}">
+      </label>
+      <label class="admin-blog-field">
+        <span>Description (used as the meta description &amp; list summary)</span>
+        <input name="description" maxlength="500" value="{{ editing_post.description if editing_post else '' }}">
+      </label>
+      <div class="admin-blog-row">
+        <label class="admin-blog-field">
+          <span>Tags (comma-separated)</span>
+          <input name="tags" maxlength="300" value="{{ editing_post.tags if editing_post else '' }}">
+        </label>
+        <label class="admin-blog-field">
+          <span>Persona</span>
+          <input name="persona" maxlength="120" value="{{ editing_post.persona if editing_post else '' }}">
+        </label>
+        <label class="admin-blog-field">
+          <span>Read minutes</span>
+          <input name="read_minutes" type="number" min="1" max="120" value="{{ editing_post.read_minutes if editing_post else 5 }}">
+        </label>
+      </div>
+      <label class="admin-blog-field">
+        <span>Author</span>
+        <input name="author" maxlength="120" value="{{ editing_post.author if editing_post else 'AcademicAR Team' }}">
+      </label>
+      <label class="admin-blog-field">
+        <span>Body (Markdown)</span>
+        <textarea name="body" rows="14" required>{{ editing_post.body if editing_post else '' }}</textarea>
+      </label>
+      <label class="admin-blog-checkbox">
+        <input type="checkbox" name="is_published" {% if (not editing_post) or editing_post.is_published %}checked{% endif %}>
+        <span>Published (uncheck to keep as a draft)</span>
+      </label>
+      <div class="admin-blog-actions">
+        <button type="submit" class="btn-primary compact">{{ "Update post" if editing_post else "Create post" }}</button>
+        {% if editing_post %}
+          <a href="{{ url_for('admin_dashboard', admin_page='blog') }}" class="btn-secondary compact">Cancel edit</a>
+        {% endif %}
+      </div>
+    </form>
+
+    <div class="table-wrap">
+      <table class="data-table admin-table">
+        <thead>
+          <tr><th>Title</th><th>Slug</th><th>Status</th><th>Created</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          {% for p in blog_posts %}
+            <tr>
+              <td>{{ p.title }}</td>
+              <td>{{ p.slug }}</td>
+              <td>{{ "Published" if p.is_published else "Draft" }}</td>
+              <td>{{ p.created_at.strftime("%Y-%m-%d") if p.created_at else "" }}</td>
+              <td class="admin-blog-row-actions">
+                <a href="{{ url_for('blog_post', slug=p.slug) }}" class="btn-secondary compact" target="_blank" rel="noopener">View</a>
+                <a href="{{ url_for('admin_dashboard', admin_page='blog', edit=p.id) }}" class="btn-secondary compact">Edit</a>
+                <form method="POST" action="{{ url_for('admin_blog_publish', post_id=p.id) }}" style="display:inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn-secondary compact">{{ "Unpublish" if p.is_published else "Publish" }}</button>
+                </form>
+                <form method="POST" action="{{ url_for('admin_blog_delete', post_id=p.id) }}" style="display:inline" onsubmit="return confirm('Delete this post permanently?')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn-danger compact">Delete</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5">No blog posts yet. Create one above.</td></tr>
           {% endfor %}
         </tbody>
       </table>

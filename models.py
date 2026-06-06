@@ -273,3 +273,29 @@ class AuditLog(db.Model):
 
     def __repr__(self) -> str:
         return f"<AuditLog {self.event_type} @ {self.timestamp}>"
+
+
+class BlogPost(db.Model):
+    """Admin-authored blog post (Markdown body), managed from the admin panel.
+
+    The built-in launch articles still live in ``blog_content.py``; the public
+    blog merges these DB rows (which take precedence by slug) with those.
+    """
+    __tablename__ = "blog_posts"
+
+    id = db.Column(db.Integer, primary_key=True)
+    slug = db.Column(db.String(250), unique=True, nullable=False, index=True)
+    title = db.Column(db.String(300), nullable=False)
+    description = db.Column(db.String(500), nullable=True)
+    body = db.Column(db.Text, nullable=False)  # Markdown source
+    tags = db.Column(db.String(300), nullable=True)  # comma-separated
+    persona = db.Column(db.String(120), nullable=True)
+    author = db.Column(db.String(120), nullable=True, default="AcademicAR Team")
+    read_minutes = db.Column(db.Integer, nullable=True)
+    is_published = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    created_at = db.Column(db.DateTime, default=utc_now, index=True)
+    updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
+
+    def __repr__(self) -> str:
+        return f"<BlogPost {self.slug}>"
+
