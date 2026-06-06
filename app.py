@@ -205,6 +205,10 @@ def create_app(test_config: dict | None = None) -> Flask:
 
 SUPPORTED_MODEL_EXTENSIONS = {"stl", "glb", "obj", "fbx"}
 COMPANION_FILE_EXTENSIONS = {".mtl", ".png", ".jpg", ".jpeg", ".webp"}
+# Blog post inline images (admin upload). SVG is excluded on purpose (it can
+# carry script). Raster formats only.
+ALLOWED_BLOG_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "gif"}
+MAX_BLOG_IMAGE_BYTES = 10 * 1024 * 1024
 APPEARANCE_BACKUP_SUFFIX = ".appearance_backup"
 ERROR_MESSAGE_MAX_LENGTH = 2000
 COLOR_COMMAND_PATTERN = re.compile(
@@ -1992,6 +1996,18 @@ def register_routes(app: Flask) -> None:
             body_html=render_body(post["body"], cache_key=cache_key),
         )
 
+    @app.route("/blog-images/<path:filename>")
+    def serve_blog_image(filename):
+        safe = os.path.basename(filename)
+        local = os.path.join(app.config["BLOG_IMAGE_FOLDER"], safe)
+        if not os.path.exists(local):
+            ensure_local(local, f"blog_images/{safe}")
+        if not os.path.exists(local):
+            abort(404)
+        response = send_from_directory(app.config["BLOG_IMAGE_FOLDER"], safe, conditional=True)
+        response.headers["Cache-Control"] = "public, max-age=86400"
+        return response
+
     @app.route("/robots.txt")
     def robots_txt():
         body = "\n".join(
@@ -3278,6 +3294,38 @@ def register_routes(app: Flask) -> None:
         log_audit("blog_post_deleted", user_id=current_user.id, resource_id=str(post_id), details={"slug": slug})
         flash("Blog post deleted.", "success")
         return redirect(url_for("admin_dashboard", admin_page="blog"))
+
+    @app.route("/admin/blog/upload-image", methods=["POST"])
+    @login_required
+    @limiter.limit("60 per hour", methods=["POST"])
+    def admin_blog_upload_image():
+        """Admin-only inline image upload for blog posts. Returns JSON with a
+        same-origin URL + a ready-to-paste Markdown snippet. Stored locally and
+        mirrored to R2 like every other asset."""
+        require_admin()
+        file = request.files.get("image")
+        if not file or not file.filename:
+            return jsonify({"error": "No image was provided."}), 400
+        ext = os.path.splitext(file.filename)[1].lower().lstrip(".")
+        if ext not in ALLOWED_BLOG_IMAGE_EXTENSIONS:
+            return jsonify({"error": "Unsupported type. Use PNG, JPG, WEBP, or GIF."}), 400
+        safe = secure_filename(file.filename) or f"image.{ext}"
+        filename = f"{uuid.uuid4().hex[:12]}_{safe}"
+        dest = os.path.join(app.config["BLOG_IMAGE_FOLDER"], filename)
+        try:
+            safe_save_file(file, dest)
+        except StorageError:
+            return jsonify({"error": "Could not save the image. Please try again."}), 500
+        try:
+            if os.path.getsize(dest) > MAX_BLOG_IMAGE_BYTES:
+                os.remove(dest)
+                return jsonify({"error": "Image is too large (max 10 MB)."}), 400
+        except OSError:
+            pass
+        mirror_file(dest, f"blog_images/{filename}")
+        url = url_for("serve_blog_image", filename=filename)
+        log_audit("blog_image_uploaded", user_id=current_user.id, details={"filename": filename})
+        return jsonify({"url": url, "markdown": f"![]({url})"})
 
     @app.route("/profile", methods=["GET", "POST"])
     @login_required

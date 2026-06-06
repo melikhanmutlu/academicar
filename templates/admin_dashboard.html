@@ -1022,10 +1022,37 @@
         <span>Author</span>
         <input name="author" maxlength="120" value="{{ editing_post.author if editing_post else 'AcademicAR Team' }}">
       </label>
+      <div class="admin-blog-field">
+        <span>Insert image (uploads, then pastes the Markdown at your cursor)</span>
+        <div class="admin-blog-uploader">
+          <input type="file" id="blog-image-file" accept="image/png,image/jpeg,image/webp,image/gif">
+          <button type="button" class="btn-secondary compact" id="blog-image-upload-btn">Upload &amp; insert</button>
+          <span id="blog-image-status" class="admin-blog-upload-status"></span>
+        </div>
+      </div>
       <label class="admin-blog-field">
-        <span>Body (Markdown)</span>
-        <textarea name="body" rows="14" required>{{ editing_post.body if editing_post else '' }}</textarea>
+        <span>Body (Markdown — supports headings, lists, links, images, and tables)</span>
+        <textarea name="body" id="blog-body-input" rows="14" required>{{ editing_post.body if editing_post else '' }}</textarea>
       </label>
+      <details class="admin-blog-help">
+        <summary>Markdown formatting help (images, tables, headings…)</summary>
+        <div class="admin-blog-help-body">
+<pre>## Heading    ### Smaller heading
+**bold**  *italic*  [link text](https://example.com)
+
+- bullet item
+1. numbered item
+
+![image description](paste-the-uploaded-url-here)
+
+| Column A | Column B |
+|----------|----------|
+| cell 1   | cell 2   |
+| cell 3   | cell 4   |
+
+&gt; A blockquote        `inline code`</pre>
+        </div>
+      </details>
       <label class="admin-blog-checkbox">
         <input type="checkbox" name="is_published" {% if (not editing_post) or editing_post.is_published %}checked{% endif %}>
         <span>Published (uncheck to keep as a draft)</span>
@@ -1037,6 +1064,44 @@
         {% endif %}
       </div>
     </form>
+
+    <script>
+    (function () {
+      var btn = document.getElementById('blog-image-upload-btn');
+      var fileInput = document.getElementById('blog-image-file');
+      var status = document.getElementById('blog-image-status');
+      var body = document.getElementById('blog-body-input');
+      var tokenEl = document.querySelector('.admin-blog-form input[name="csrf_token"]');
+      if (!btn || !fileInput || !body) return;
+      btn.addEventListener('click', function () {
+        var f = fileInput.files && fileInput.files[0];
+        if (!f) { status.textContent = 'Choose a file first.'; return; }
+        var fd = new FormData();
+        fd.append('image', f);
+        if (tokenEl) { fd.append('csrf_token', tokenEl.value); }
+        status.textContent = 'Uploading…';
+        btn.disabled = true;
+        fetch('{{ url_for("admin_blog_upload_image") }}', {
+          method: 'POST',
+          body: fd,
+          headers: { 'X-CSRFToken': tokenEl ? tokenEl.value : '' }
+        })
+          .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+          .then(function (res) {
+            btn.disabled = false;
+            if (!res.ok) { status.textContent = (res.j && res.j.error) || 'Upload failed.'; return; }
+            var snippet = res.j.markdown;
+            var start = body.selectionStart || 0, end = body.selectionEnd || 0;
+            body.value = body.value.slice(0, start) + snippet + body.value.slice(end);
+            body.focus();
+            body.selectionStart = body.selectionEnd = start + snippet.length;
+            status.textContent = 'Inserted ' + res.j.url;
+            fileInput.value = '';
+          })
+          .catch(function () { btn.disabled = false; status.textContent = 'Upload failed.'; });
+      });
+    })();
+    </script>
 
     <div class="table-wrap">
       <table class="data-table admin-table">

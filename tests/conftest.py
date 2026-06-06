@@ -16,6 +16,7 @@ def app():
     converted_dir = base_dir / "converted"
     qr_dir = base_dir / "qr_codes"
     pdf_dir = base_dir / "pdfs"
+    blog_image_dir = base_dir / "blog_images"
     instance_dir.mkdir(parents=True, exist_ok=True)
     db_path = (instance_dir / "test.db").resolve()
     flask_app = create_app(
@@ -27,6 +28,7 @@ def app():
             "CONVERTED_FOLDER": str(converted_dir.resolve()),
             "QR_FOLDER": str(qr_dir.resolve()),
             "PDF_FOLDER": str(pdf_dir.resolve()),
+            "BLOG_IMAGE_FOLDER": str(blog_image_dir.resolve()),
             "SECRET_KEY": "test-secret",
             "UPLOAD_RATE_LIMIT_COUNT": 1000,
         }

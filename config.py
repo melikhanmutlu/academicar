@@ -104,6 +104,7 @@ class Config:
     CONVERTED_FOLDER = runtime_folder("CONVERTED_FOLDER", "converted", _runtime_base)
     QR_FOLDER = runtime_folder("QR_FOLDER", "qr_codes", _runtime_base)
     PDF_FOLDER = runtime_folder("PDF_FOLDER", "pdfs", _runtime_base)
+    BLOG_IMAGE_FOLDER = runtime_folder("BLOG_IMAGE_FOLDER", "blog_images", _runtime_base)
 
     # Cloudflare R2 mirror (best-effort backup). Silently disabled if unset.
     R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID")
@@ -219,6 +220,7 @@ class Config:
             app.config["CONVERTED_FOLDER"],
             app.config["QR_FOLDER"],
             app.config["PDF_FOLDER"],
+            app.config["BLOG_IMAGE_FOLDER"],
             app.config["STORAGE_ROOT"],
         ):
             os.makedirs(folder, exist_ok=True)
