@@ -235,12 +235,23 @@
       font-weight: 700;
       text-align: center;
     }
+    /* Center the preview popup in the viewport (kept off the Tailwind hidden/flex
+       toggle so showing/hiding stays reliable across browsers). */
+    #shotModal:not(.hidden) {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
     .viewer-shot-modal-card {
-      max-height: calc(100vh - 4rem);
+      display: flex;
+      flex-direction: column;
+      max-height: calc(100vh - 2rem);
+      max-height: calc(100dvh - 2rem);
       overflow: hidden;
     }
+    /* The image area flexes; the header/footer (incl. Download) stay visible. */
     .viewer-shot-modal-card img {
-      max-height: min(72vh, 760px);
+      max-height: 100%;
       object-fit: contain;
     }
     /* iOS Safari counts the area behind the bottom toolbar in 100vh, which
@@ -553,7 +564,7 @@
     </div>
 
     <div id="shotModal" class="hidden fixed inset-0 z-50 bg-black/72 p-4 backdrop-blur-md" data-shot-modal>
-      <div class="viewer-shot-modal-card mx-auto mt-6 sm:mt-10 w-full max-w-5xl rounded-xl border border-white/12 bg-[#111111] p-4 text-white shadow-2xl">
+      <div class="viewer-shot-modal-card mx-auto w-full max-w-6xl rounded-xl border border-white/12 bg-[#111111] p-4 text-white shadow-2xl">
         <div class="mb-4 flex items-center justify-between gap-4">
           <div>
             <p class="text-xs uppercase tracking-[0.18em] text-white/45">Screenshot preview</p>
@@ -561,8 +572,8 @@
           </div>
           <button id="closeShotModal" class="rounded border border-white/10 px-3 py-2 text-sm text-white/70 hover:bg-white/10" type="button">Close</button>
         </div>
-        <div class="grid place-items-center rounded-lg bg-black/35">
-          <img id="shotModalImg" src="" alt="Selected screenshot preview" class="w-full rounded-lg">
+        <div class="flex-1 min-h-0 overflow-hidden grid place-items-center rounded-lg bg-black/35">
+          <img id="shotModalImg" src="" alt="Selected screenshot preview" class="max-w-full max-h-full rounded-lg object-contain">
         </div>
         <div class="mt-4 flex justify-end">
           <a id="shotModalDownload" href="#" download class="viewer-tool-btn primary" type="button">Download PNG</a>
