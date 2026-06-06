@@ -484,7 +484,7 @@
             <div class="viewer-shot-actions">
               <button type="button" data-current-shot>Current view</button>
               <button type="button" data-generate-shot-set>Generate 8 views</button>
-              <button type="button" data-share-card class="viewer-share-card-btn">Download share card (model + QR)</button>
+              <button type="button" data-share-card class="viewer-share-card-btn">Create share card (model + QR)</button>
             </div>
             <div class="viewer-shot-grid" data-shot-gallery aria-live="polite"></div>
           </div>
@@ -988,23 +988,31 @@
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, W, H);
         ctx.drawImage(shot, 0, 0, W, H);
-        // Subtle bottom scrim so the title + QR stay legible over any model.
-        const scrimH = Math.round(H * 0.28);
-        const grad = ctx.createLinearGradient(0, H - scrimH, 0, H);
-        grad.addColorStop(0, 'rgba(255,255,255,0)');
-        grad.addColorStop(1, 'rgba(255,255,255,0.94)');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, H - scrimH, W, scrimH);
-        // QR card, bottom-right.
         const margin = Math.round(W * 0.035);
-        const q = Math.max(120, Math.min(Math.round(Math.min(W, H) * 0.20), 260));
+        // Model title, top-left.
+        const titleSize = Math.round(W * 0.040);
+        let title = String(modelBaseName || 'Model');
+        const maxTitleW = Math.round(W * 0.72);
+        ctx.fillStyle = '#202020';
+        ctx.font = `600 ${titleSize}px Inter, sans-serif`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        if (ctx.measureText(title).width > maxTitleW) {
+          while (title.length > 4 && ctx.measureText(title + '…').width > maxTitleW) {
+            title = title.slice(0, -1);
+          }
+          title += '…';
+        }
+        ctx.fillText(title, margin, margin);
+        // Compact QR card, bottom-right.
+        const q = Math.max(110, Math.min(Math.round(Math.min(W, H) * 0.155), 200));
         const pad = Math.round(q * 0.12);
-        const capH = Math.round(q * 0.20);
+        const capH = Math.round(q * 0.22);
         const cardW = q + pad * 2;
         const cardH = q + pad * 2 + capH;
         const cardX = W - margin - cardW;
         const cardY = H - margin - cardH;
-        const radius = Math.round(q * 0.10);
+        const radius = Math.round(q * 0.12);
         ctx.save();
         ctx.shadowColor = 'rgba(0,0,0,0.18)';
         ctx.shadowBlur = Math.round(q * 0.14);
@@ -1019,34 +1027,25 @@
         ctx.stroke();
         if (qr) ctx.drawImage(qr, cardX + pad, cardY + pad, q, q);
         ctx.fillStyle = '#4d4d4d';
-        ctx.font = `700 ${Math.round(q * 0.115)}px Inter, sans-serif`;
+        ctx.font = `700 ${Math.round(q * 0.12)}px Inter, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('SCAN FOR 3D / AR', cardX + cardW / 2, cardY + pad + q + capH * 0.5);
-        // Title + caption, bottom-left.
-        const titleSize = Math.round(W * 0.040);
-        const subSize = Math.round(titleSize * 0.5);
-        const maxTitleW = Math.max(80, cardX - margin * 2);
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'alphabetic';
-        ctx.fillStyle = '#828282';
-        ctx.font = `600 ${subSize}px Inter, sans-serif`;
-        ctx.fillText('Interactive 3D · AR · academicar.com', margin, H - margin);
-        let title = String(modelBaseName || 'Model');
-        ctx.fillStyle = '#202020';
-        ctx.font = `600 ${titleSize}px Inter, sans-serif`;
-        if (ctx.measureText(title).width > maxTitleW) {
-          while (title.length > 4 && ctx.measureText(title + '…').width > maxTitleW) {
-            title = title.slice(0, -1);
-          }
-          title += '…';
+        // Preview in a popup; the user downloads from there (no auto-download).
+        const out = canvas.toDataURL('image/png');
+        if (shotModal && shotModalImg && shotModalDownload) {
+          if (shotModalTitle) shotModalTitle.textContent = 'Share card';
+          shotModalImg.src = out;
+          shotModalDownload.href = out;
+          shotModalDownload.download = `${safeName(modelBaseName)}-share-card.png`;
+          shotModal.classList.remove('hidden');
+        } else {
+          downloadDataUrl(out, 'share-card');
         }
-        ctx.fillText(title, margin, H - margin - subSize - Math.round(titleSize * 0.35));
-        downloadDataUrl(canvas.toDataURL('image/png'), 'share-card');
       } catch (error) {
         if (typeof window.showToast === 'function') window.showToast('Could not build the share card. Please try again.', 'danger');
       } finally {
-        if (shareCardButton) { shareCardButton.disabled = false; shareCardButton.textContent = 'Download share card (model + QR)'; }
+        if (shareCardButton) { shareCardButton.disabled = false; shareCardButton.textContent = 'Create share card (model + QR)'; }
       }
     };
     const renderShotGallery = () => {
