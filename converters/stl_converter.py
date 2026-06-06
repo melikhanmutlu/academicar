@@ -170,7 +170,19 @@ def enrich_glb_for_ar(
             if pos_idx is None:
                 continue
 
+            # Draco-compressed (or otherwise indirect) geometry keeps its vertex
+            # data inside a KHR_draco_mesh_compression extension, so the POSITION
+            # accessor has no bufferView to read raw floats from. Skip triplanar
+            # UV generation for such primitives — the PBR material/color assigned
+            # above still applies, which is what a recolor needs. Without this
+            # guard, gltf.bufferViews[None] raised
+            # "list indices must be integers or slices, not NoneType".
+            prim_exts = getattr(prim, "extensions", None) or {}
+            if "KHR_draco_mesh_compression" in prim_exts:
+                continue
             pos_acc = gltf.accessors[pos_idx]
+            if pos_acc.bufferView is None:
+                continue
             pos_bv = gltf.bufferViews[pos_acc.bufferView]
             pos_off = (pos_bv.byteOffset or 0) + (pos_acc.byteOffset or 0)
             pos_stride = pos_bv.byteStride or 12
@@ -184,13 +196,14 @@ def enrich_glb_for_ar(
             norm_idx = getattr(prim.attributes, "NORMAL", None)
             if norm_idx is not None:
                 n_acc = gltf.accessors[norm_idx]
-                n_bv = gltf.bufferViews[n_acc.bufferView]
-                n_off = (n_bv.byteOffset or 0) + (n_acc.byteOffset or 0)
-                n_stride = n_bv.byteStride or 12
-                normals = []
-                for v in range(n_acc.count):
-                    off = n_off + v * n_stride
-                    normals.append(struct.unpack_from("<3f", blob, off))
+                if n_acc.bufferView is not None:
+                    n_bv = gltf.bufferViews[n_acc.bufferView]
+                    n_off = (n_bv.byteOffset or 0) + (n_acc.byteOffset or 0)
+                    n_stride = n_bv.byteStride or 12
+                    normals = []
+                    for v in range(n_acc.count):
+                        off = n_off + v * n_stride
+                        normals.append(struct.unpack_from("<3f", blob, off))
 
             xs = [p[0] for p in positions]
             ys = [p[1] for p in positions]
