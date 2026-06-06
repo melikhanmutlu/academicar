@@ -192,6 +192,17 @@
       gap: 0.5rem;
       margin-top: 0.65rem;
     }
+    .viewer-share-card-btn {
+      grid-column: 1 / -1;
+      background: #ffffff;
+      color: #111111;
+      border-color: #ffffff;
+    }
+    .viewer-share-card-btn:hover {
+      background: rgba(255, 255, 255, 0.88);
+      color: #111111;
+      border-color: #ffffff;
+    }
     .viewer-shot-grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -473,6 +484,7 @@
             <div class="viewer-shot-actions">
               <button type="button" data-current-shot>Current view</button>
               <button type="button" data-generate-shot-set>Generate 8 views</button>
+              <button type="button" data-share-card class="viewer-share-card-btn">Download share card (model + QR)</button>
             </div>
             <div class="viewer-shot-grid" data-shot-gallery aria-live="polite"></div>
           </div>
@@ -586,6 +598,8 @@
     const shotModalImg = document.getElementById('shotModalImg');
     const shotModalDownload = document.getElementById('shotModalDownload');
     const modelBaseName = {{ (model.display_name or model.original_filename or 'model')|tojson }};
+    const shareCardButton = document.querySelector('[data-share-card]');
+    const shareCardQrUrl = {{ (url_for('demo_mitochondria_qr') if demo_mode is defined and demo_mode else url_for('qr_image', model_id=model.id))|tojson }};
     const shotViews = [
       { key: 'top', label: 'Top', orbit: '0deg 0deg auto' },
       { key: 'bottom', label: 'Bottom', orbit: '0deg 180deg auto' },
@@ -937,6 +951,104 @@
       if (shouldResumeAnimation && typeof viewer.play === 'function') viewer.play();
       return dataUrl;
     };
+    const loadImage = (src) => new Promise((resolve, reject) => {
+      const im = new Image();
+      im.onload = () => resolve(im);
+      im.onerror = reject;
+      im.src = src;
+    });
+    const roundRectPath = (ctx, x, y, w, h, r) => {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    };
+    // Compose a shareable card: the current model view on a clean canvas with a
+    // QR card in the bottom-right and the model title bottom-left. Purely
+    // additive — the plain screenshot/ZIP tools above are untouched.
+    const composeShareCard = async () => {
+      if (shareCardButton) { shareCardButton.disabled = true; shareCardButton.textContent = 'Preparing card...'; }
+      try {
+        const shotUrl = await captureShot(null);
+        if (!shotUrl) throw new Error('capture failed');
+        const [shot, qr] = await Promise.all([
+          loadImage(shotUrl),
+          loadImage(shareCardQrUrl).catch(() => null),
+        ]);
+        const W = shot.naturalWidth || 1280;
+        const H = shot.naturalHeight || 960;
+        const canvas = document.createElement('canvas');
+        canvas.width = W;
+        canvas.height = H;
+        const ctx = canvas.getContext('2d');
+        // Clean white canvas, then the model render (transparent areas -> white).
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, W, H);
+        ctx.drawImage(shot, 0, 0, W, H);
+        // Subtle bottom scrim so the title + QR stay legible over any model.
+        const scrimH = Math.round(H * 0.28);
+        const grad = ctx.createLinearGradient(0, H - scrimH, 0, H);
+        grad.addColorStop(0, 'rgba(255,255,255,0)');
+        grad.addColorStop(1, 'rgba(255,255,255,0.94)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, H - scrimH, W, scrimH);
+        // QR card, bottom-right.
+        const margin = Math.round(W * 0.035);
+        const q = Math.max(120, Math.min(Math.round(Math.min(W, H) * 0.20), 260));
+        const pad = Math.round(q * 0.12);
+        const capH = Math.round(q * 0.20);
+        const cardW = q + pad * 2;
+        const cardH = q + pad * 2 + capH;
+        const cardX = W - margin - cardW;
+        const cardY = H - margin - cardH;
+        const radius = Math.round(q * 0.10);
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.18)';
+        ctx.shadowBlur = Math.round(q * 0.14);
+        ctx.shadowOffsetY = Math.round(q * 0.05);
+        ctx.fillStyle = '#ffffff';
+        roundRectPath(ctx, cardX, cardY, cardW, cardH, radius);
+        ctx.fill();
+        ctx.restore();
+        ctx.strokeStyle = 'rgba(32,32,32,0.10)';
+        ctx.lineWidth = 1;
+        roundRectPath(ctx, cardX, cardY, cardW, cardH, radius);
+        ctx.stroke();
+        if (qr) ctx.drawImage(qr, cardX + pad, cardY + pad, q, q);
+        ctx.fillStyle = '#4d4d4d';
+        ctx.font = `700 ${Math.round(q * 0.115)}px Inter, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('SCAN FOR 3D / AR', cardX + cardW / 2, cardY + pad + q + capH * 0.5);
+        // Title + caption, bottom-left.
+        const titleSize = Math.round(W * 0.040);
+        const subSize = Math.round(titleSize * 0.5);
+        const maxTitleW = Math.max(80, cardX - margin * 2);
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillStyle = '#828282';
+        ctx.font = `600 ${subSize}px Inter, sans-serif`;
+        ctx.fillText('Interactive 3D · AR · academicar.com', margin, H - margin);
+        let title = String(modelBaseName || 'Model');
+        ctx.fillStyle = '#202020';
+        ctx.font = `600 ${titleSize}px Inter, sans-serif`;
+        if (ctx.measureText(title).width > maxTitleW) {
+          while (title.length > 4 && ctx.measureText(title + '…').width > maxTitleW) {
+            title = title.slice(0, -1);
+          }
+          title += '…';
+        }
+        ctx.fillText(title, margin, H - margin - subSize - Math.round(titleSize * 0.35));
+        downloadDataUrl(canvas.toDataURL('image/png'), 'share-card');
+      } catch (error) {
+        if (typeof window.showToast === 'function') window.showToast('Could not build the share card. Please try again.', 'danger');
+      } finally {
+        if (shareCardButton) { shareCardButton.disabled = false; shareCardButton.textContent = 'Download share card (model + QR)'; }
+      }
+    };
     const renderShotGallery = () => {
       if (!shotGalleryEl) return;
       shotGalleryEl.innerHTML = '';
@@ -1065,6 +1177,7 @@
     setAutoRotateState(false);
     currentShotButton?.addEventListener('click', downloadCurrentShot);
     generateShotSetButton?.addEventListener('click', generateShotSet);
+    shareCardButton?.addEventListener('click', composeShareCard);
     downloadZipButton?.addEventListener('click', downloadShotZip);
     closeShotModal?.addEventListener('click', closeShotPreview);
     shotModal?.addEventListener('click', (event) => {
