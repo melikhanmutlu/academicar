@@ -148,6 +148,12 @@ class Config:
     # invoicing are handled for you. See docs/MVP_ANALYSIS_AND_ROADMAP.md.
     PAYMENT_PROVIDER = os.environ.get("PAYMENT_PROVIDER", "")
     PAYMENT_CURRENCY = os.environ.get("PAYMENT_CURRENCY", "USD")
+    # PayTR (Turkish gateway). Set PAYMENT_PROVIDER=paytr and the PayTR panel's
+    # notification (Bildirim) URL to <SITE_URL>/payment/webhook/paytr.
+    PAYTR_MERCHANT_ID = os.environ.get("PAYTR_MERCHANT_ID", "")
+    PAYTR_MERCHANT_KEY = os.environ.get("PAYTR_MERCHANT_KEY", "")
+    PAYTR_MERCHANT_SALT = os.environ.get("PAYTR_MERCHANT_SALT", "")
+    PAYTR_TEST_MODE = os.environ.get("PAYTR_TEST_MODE", "0").lower() in {"1", "true", "yes", "on"}
     LEMONSQUEEZY_API_KEY = os.environ.get("LEMONSQUEEZY_API_KEY", "")
     LEMONSQUEEZY_STORE_ID = os.environ.get("LEMONSQUEEZY_STORE_ID", "")
     LEMONSQUEEZY_WEBHOOK_SECRET = os.environ.get("LEMONSQUEEZY_WEBHOOK_SECRET", "")

@@ -91,6 +91,15 @@ evolving to **freemium + annual + institutional** is recommended (§3.3, §7).
 | Gumroad | ✅ | Likely | 10% + $0.50 | Handled | Fees too high for these price points |
 
 ### 3.2 Recommendation
+
+> **Founder decision (June 2026):** start with **PayTR** (Turkish gateway). The
+> provider-agnostic skeleton now ships a working `PayTRProvider` (token checkout +
+> hash-verified callback that replies `OK`); it only needs PayTR merchant
+> credentials + a sandbox go-live test. **Trade-off to keep in mind:** PayTR is a
+> gateway, not a Merchant of Record, so **global VAT/sales-tax and invoicing remain
+> the seller's responsibility** (a MoR like LemonSqueezy/Paddle would offload that —
+> kept here as a documented fallback if international tax handling becomes a burden).
+
 Given the **global / English-first** decision, a **Merchant of Record** is the
 pragmatic choice: a small Turkey-based company should not register for and remit VAT
 in dozens of jurisdictions. **Primary: LemonSqueezy** (auto tax + invoices academics
@@ -315,24 +324,41 @@ and the Ventriloc design are preserved.
   idempotency, unpaid/unknown-provider) and `tests/test_seo.py` (robots, sitemap, canonical,
   JSON-LD, FAQ/About/Contact). Full suite green.
 
+### 11.C Pass 2 (PayTR + password reset + blog)
+- **PayTR gateway** (`payments.py` `PayTRProvider`): iFrame-token checkout +
+  hash-verified callback that replies `OK`; `Payment.plan_key` (migration
+  `e5f6a7b8c9d0` + SQLite ALTER) lets the callback recover the plan since PayTR
+  sends no custom data. Config: `PAYTR_MERCHANT_ID/KEY/SALT`, `PAYTR_TEST_MODE`.
+  The webhook route now honours a per-provider `webhook_ack`. Needs live merchant
+  credentials + sandbox test to go live.
+- **Password reset** (`auth.py`): `/auth/forgot-password` + `/auth/reset-password/<token>`
+  (itsdangerous signed token, 1h expiry, no email enumeration), reusing
+  `utils.email.send_email`; "Forgot password?" link on the login page.
+- **Blog** (`blog_content.py` + `/blog`, `/blog/<slug>`): in-repo Markdown posts
+  rendered to HTML (cached), BlogPosting + BreadcrumbList JSON-LD, `.blog-article`
+  typography, blog added to sitemap + footer. Ships with 6 launch articles across
+  pillars (how-to, comparison, anatomy, publishing thought-leadership, archaeology).
+- Tests: `tests/test_paytr.py`, `tests/test_password_reset.py`, `tests/test_blog.py`.
+  Full suite green (202 tests).
+
 ---
 
 ## 12. Prioritized Roadmap
 
 ### P0 — Launch blockers
 - [ ] S3/Cloudflare R2 storage backend + presigned serve (STOR-1)
-- [ ] Choose MoR (LemonSqueezy/Paddle) + implement `create_checkout` + sandbox test (PAY-1)
-- [x] Payment → license assignment via webhook + idempotency (skeleton, §11.B)
-- [ ] Password-reset flow (AUTH-2)
+- [~] **PayTR** chosen; adapter implemented (skeleton) — add merchant credentials + sandbox go-live (PAY-1)
+- [x] Payment → license assignment via webhook + idempotency (§11.B)
+- [x] Password-reset flow (AUTH-2, §11.C)
 - [ ] Email verification at registration + production SMTP (AUTH-1, MAIL-1)
 - [ ] Config hardening: SECRET_KEY, Redis rate limit, Sentry
 - [x] SEO foundation: robots.txt + sitemap.xml + canonical + JSON-LD (§11.A)
 
 ### P1 — Growth & maturity
-- [ ] Blog infrastructure (`/blog`, `/blog/<slug>`) + first 8–10 articles (§5)
+- [x] Blog infrastructure (`/blog`, `/blog/<slug>`) + 6 launch articles (§11.C); add more from §5
 - [x] FAQ + About + Contact pages (§11.A)
 - [ ] Discipline landing pages `/ar-for-*` (§9.2)
-- [ ] Pricing evolution: Free + annual Pro + Institutional (§3.3)
+- [~] Pricing: **founder kept free / academic / extended_archive** (3d / 3y / 10y); freemium+annual+institutional deferred (§3.3)
 - [ ] Analytics (GA4/Plausible) + cookie consent banner
 - [ ] Storage cleanup job (orphaned/expired)
 - [ ] Core Web Vitals (lazy-load, Tailwind build)

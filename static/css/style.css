@@ -1513,6 +1513,62 @@ body {
 .site-footer-links a:hover {
   color: #fff;
 }
+.blog-article {
+  font-family: var(--font-inter, 'Inter', sans-serif);
+  color: #2f2f2f;
+  font-size: 17px;
+  line-height: 1.7;
+}
+.blog-article h2 {
+  font-family: var(--font-montserrat, 'Montserrat', sans-serif);
+  font-size: 26px;
+  font-weight: 600;
+  color: #202020;
+  margin: 36px 0 12px;
+  letter-spacing: -0.4px;
+}
+.blog-article h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #202020;
+  margin: 28px 0 10px;
+}
+.blog-article p {
+  margin: 0 0 18px;
+}
+.blog-article ul,
+.blog-article ol {
+  margin: 0 0 18px;
+  padding-left: 24px;
+}
+.blog-article li {
+  margin-bottom: 8px;
+}
+.blog-article a {
+  color: #202020;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.blog-article a:hover {
+  color: #e85a22;
+}
+.blog-article strong {
+  color: #202020;
+  font-weight: 600;
+}
+.blog-article blockquote {
+  margin: 0 0 18px;
+  padding: 4px 0 4px 18px;
+  border-left: 3px solid #ff682c;
+  color: #4d4d4d;
+  font-style: italic;
+}
+.blog-article code {
+  background: #f5f5f5;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
 .btn-danger {
   color: #b91c1c;
   border: 1px solid #fecaca;

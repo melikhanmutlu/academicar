@@ -45,6 +45,7 @@ from licensing import (
     normalize_license_type,
 )
 from licensing import paper_is_expired as licensing_paper_is_expired
+from blog_content import get_all_posts, get_post, render_body
 from models import AuditLog, ConversionJob, Model3D, ModelAnnotation, ModelVersion, Paper, Payment, QRLink, User, db
 from payments import (
     PAID_PLAN_KEYS,
@@ -618,6 +619,8 @@ def ensure_sqlite_schema(app: Flask) -> None:
         payment_columns = {row[1] for row in connection.execute(text("PRAGMA table_info(payments)")).fetchall()}
         if payment_columns and "model_id" not in payment_columns:
             connection.execute(text("ALTER TABLE payments ADD COLUMN model_id VARCHAR(36)"))
+        if payment_columns and "plan_key" not in payment_columns:
+            connection.execute(text("ALTER TABLE payments ADD COLUMN plan_key VARCHAR(30)"))
 
 
 def _alembic_head_revision(app: Flask) -> str | None:
@@ -1908,6 +1911,21 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("contact"))
         return render_template("contact.html")
 
+    @app.route("/blog")
+    def blog_index():
+        return render_template("blog_list.html", posts=get_all_posts())
+
+    @app.route("/blog/<slug>")
+    def blog_post(slug):
+        post = get_post(slug)
+        if not post:
+            abort(404)
+        return render_template(
+            "blog_post.html",
+            post=post,
+            body_html=render_body(post["slug"], post["body"]),
+        )
+
     @app.route("/robots.txt")
     def robots_txt():
         body = "\n".join(
@@ -1941,6 +1959,7 @@ def register_routes(app: Flask) -> None:
             "faq",
             "about",
             "contact",
+            "blog_index",
             "terms",
             "privacy",
             "data_protection",
@@ -1948,6 +1967,11 @@ def register_routes(app: Flask) -> None:
         ):
             try:
                 urls.append(public_url(endpoint))
+            except Exception:
+                continue
+        for post in get_all_posts():
+            try:
+                urls.append(public_url("blog_post", slug=post["slug"]))
             except Exception:
                 continue
         # Public, non-deleted publication pages are indexable SEO assets.
@@ -1997,6 +2021,7 @@ def register_routes(app: Flask) -> None:
             user_id=current_user.id,
             paper_id=model.paper_id,
             model_id=model.id,
+            plan_key=plan_key,
             amount_kurus=plan_amount_minor_units(plan_key),
             currency=current_app.config.get("PAYMENT_CURRENCY", "USD"),
             provider=provider.name,
@@ -2054,9 +2079,17 @@ def register_routes(app: Flask) -> None:
             abort(404)
         if not provider.verify_webhook(request):
             abort(400)
+
+        # Some gateways (PayTR) require a literal "OK" acknowledgement; others
+        # accept JSON. Build the right ack for whichever resolved.
+        def ack(**payload):
+            if getattr(provider, "webhook_ack", None) is not None:
+                return current_app.response_class(provider.webhook_ack, mimetype="text/plain")
+            return jsonify({"ok": True, **payload}), 200
+
         event = provider.parse_event(request) or {}
         if (event.get("status") or "").lower() != "paid":
-            return jsonify({"ok": True, "ignored": True}), 200
+            return ack(ignored=True)
 
         provider_reference = event.get("provider_reference")
         plan_key = (event.get("plan_key") or "").strip().lower()
@@ -2073,7 +2106,7 @@ def register_routes(app: Flask) -> None:
         if payment is None and provider_reference:
             payment = Payment.query.filter_by(provider_reference=provider_reference).first()
         if payment is not None and payment.status == "paid":
-            return jsonify({"ok": True, "duplicate": True}), 200
+            return ack(duplicate=True)
 
         model = db.session.get(Model3D, model_id) if model_id else (payment.model if payment else None)
 
@@ -2082,6 +2115,7 @@ def register_routes(app: Flask) -> None:
                 user_id=(model.user_id if model else None),
                 paper_id=(model.paper_id if model else None),
                 model_id=(model.id if model else None),
+                plan_key=effective_plan,
                 amount_kurus=plan_amount_minor_units(effective_plan) if effective_plan else 0,
                 currency=current_app.config.get("PAYMENT_CURRENCY", "USD"),
                 provider=provider.name,
@@ -2094,6 +2128,11 @@ def register_routes(app: Flask) -> None:
                 payment.invoice_number = build_invoice_number(payment.id)
         elif provider_reference and not payment.provider_reference:
             payment.provider_reference = provider_reference
+
+        # Recover the plan from the stored Payment when the callback omits it
+        # (PayTR's notification carries no custom data).
+        if effective_plan is None and payment is not None and (payment.plan_key or "") in PAID_PLAN_KEYS:
+            effective_plan = payment.plan_key
 
         apply_successful_payment(payment, model, effective_plan)
         try:
@@ -2113,7 +2152,7 @@ def register_routes(app: Flask) -> None:
                 "provider_reference": provider_reference,
             },
         )
-        return jsonify({"ok": True}), 200
+        return ack()
 
     @app.route("/view/<model_id>")
     def view_model(model_id):

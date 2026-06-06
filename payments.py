@@ -22,9 +22,11 @@ handlers in ``app.py`` orchestrate the HTTP side.
 """
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
 import logging
+import uuid
 from datetime import UTC, datetime
 
 from flask import current_app
@@ -59,6 +61,9 @@ class PaymentProvider:
     """Interface every provider implements."""
 
     name = "base"
+    # Plain-text body a provider requires in the webhook acknowledgement (e.g.
+    # PayTR expects literally "OK"). None -> the route replies with JSON.
+    webhook_ack: str | None = None
 
     def create_checkout(self, *, payment, model, plan_key, user, success_url, cancel_url):
         """Return a URL to redirect the buyer to, or ``None`` if unavailable."""
@@ -70,7 +75,8 @@ class PaymentProvider:
 
     def parse_event(self, request) -> dict | None:
         """Normalize a webhook into a dict with keys: provider_reference,
-        status ('paid'/...), plan_key, model_id, payment_id."""
+        status ('paid'/...), plan_key, model_id, payment_id. Missing plan_key /
+        model_id are resolved from the stored Payment row by the route."""
         return None
 
 
@@ -149,8 +155,126 @@ class LemonSqueezyProvider(PaymentProvider):
         }
 
 
+class PayTRProvider(PaymentProvider):
+    """PayTR (Turkish payment gateway) integration.
+
+    create_checkout requests an iFrame token from PayTR and returns the hosted
+    payment URL. PayTR's server-to-server callback (configured as the
+    "Bildirim URL" in the PayTR panel, pointing at /payment/webhook/paytr) is a
+    form POST whose ``hash`` we verify; we must reply with the literal text
+    ``OK``. The callback does NOT echo custom data, so the plan and model are
+    recovered from the stored Payment row via ``merchant_oid`` (== provider_reference).
+
+    NOTE: PayTR is a payment gateway, not a Merchant of Record — global VAT/tax
+    and invoicing remain the seller's responsibility (see
+    docs/MVP_ANALYSIS_AND_ROADMAP.md). Requires PAYTR_MERCHANT_ID/KEY/SALT.
+    """
+
+    name = "paytr"
+    webhook_ack = "OK"
+
+    def _credentials(self):
+        cfg = current_app.config
+        return (
+            cfg.get("PAYTR_MERCHANT_ID"),
+            cfg.get("PAYTR_MERCHANT_KEY"),
+            cfg.get("PAYTR_MERCHANT_SALT"),
+        )
+
+    def create_checkout(self, *, payment, model, plan_key, user, success_url, cancel_url):
+        import json
+
+        from flask import request
+        import requests
+
+        merchant_id, merchant_key, merchant_salt = self._credentials()
+        if not (merchant_id and merchant_key and merchant_salt):
+            logger.warning("PayTR credentials are not configured; set PAYTR_MERCHANT_* env vars.")
+            return None
+
+        merchant_oid = f"AAR{payment.id}{uuid.uuid4().hex[:8]}"
+        payment.provider_reference = merchant_oid
+        amount = max(int(payment.amount_kurus), 1)  # already in minor units
+        forwarded = request.headers.get("X-Forwarded-For", "")
+        user_ip = (forwarded.split(",")[0].strip() if forwarded else None) or request.remote_addr or "127.0.0.1"
+        currency = (current_app.config.get("PAYMENT_CURRENCY") or "USD").upper()
+        paytr_currency = "TL" if currency in {"TRY", "TL"} else currency
+        test_mode = "1" if current_app.config.get("PAYTR_TEST_MODE") else "0"
+        no_installment, max_installment = "1", "0"
+        basket = base64.b64encode(
+            json.dumps([[get_license_plan(plan_key).label, f"{amount / 100:.2f}", 1]]).encode()
+        ).decode()
+
+        hash_str = (
+            f"{merchant_id}{user_ip}{merchant_oid}{user.email}{amount}{basket}"
+            f"{no_installment}{max_installment}{paytr_currency}{test_mode}"
+        )
+        paytr_token = base64.b64encode(
+            hmac.new(merchant_key.encode(), (hash_str + merchant_salt).encode(), hashlib.sha256).digest()
+        ).decode()
+
+        params = {
+            "merchant_id": merchant_id,
+            "user_ip": user_ip,
+            "merchant_oid": merchant_oid,
+            "email": user.email,
+            "payment_amount": amount,
+            "paytr_token": paytr_token,
+            "user_basket": basket,
+            "debug_on": test_mode,
+            "no_installment": no_installment,
+            "max_installment": max_installment,
+            "user_name": (user.username or user.email)[:60],
+            "user_address": "N/A",
+            "user_phone": "0000000000",
+            "merchant_ok_url": success_url,
+            "merchant_fail_url": cancel_url,
+            "timeout_limit": "30",
+            "currency": paytr_currency,
+            "test_mode": test_mode,
+            "lang": "en",
+        }
+        try:
+            resp = requests.post("https://www.paytr.com/odeme/api/get-token", data=params, timeout=20)
+            data = resp.json()
+        except Exception as exc:  # pragma: no cover - network dependent
+            logger.error("PayTR get-token request failed: %s", exc)
+            return None
+        if data.get("status") == "success":
+            return f"https://www.paytr.com/odeme/guvenli/{data['token']}"
+        logger.error("PayTR get-token error: %s", data.get("reason"))
+        return None
+
+    def verify_webhook(self, request) -> bool:
+        _, merchant_key, merchant_salt = self._credentials()
+        if not (merchant_key and merchant_salt):
+            return False
+        merchant_oid = request.form.get("merchant_oid", "")
+        status = request.form.get("status", "")
+        total_amount = request.form.get("total_amount", "")
+        provided = request.form.get("hash", "")
+        token = base64.b64encode(
+            hmac.new(
+                merchant_key.encode(),
+                (merchant_oid + merchant_salt + status + total_amount).encode(),
+                hashlib.sha256,
+            ).digest()
+        ).decode()
+        return bool(provided) and hmac.compare_digest(token, provided)
+
+    def parse_event(self, request) -> dict | None:
+        status = request.form.get("status", "")
+        return {
+            "provider_reference": request.form.get("merchant_oid") or None,
+            "status": "paid" if status == "success" else (status or "pending"),
+            "plan_key": None,  # recovered from the stored Payment.plan_key
+            "model_id": None,  # recovered from the stored Payment.model_id
+            "payment_id": None,
+        }
+
+
 _PROVIDERS: dict[str, PaymentProvider] = {
-    p.name: p for p in (DevProvider(), LemonSqueezyProvider())
+    p.name: p for p in (DevProvider(), LemonSqueezyProvider(), PayTRProvider())
 }
 
 
