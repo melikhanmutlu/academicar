@@ -5122,6 +5122,47 @@ input[type="file"]::-webkit-file-upload-button {
   color: var(--color-sunset-orange);
 }
 
+/* Model registry — two-up grid of model cards (reuses the current card design
+   language: white surface, light borders, dark primary action, outlined
+   secondary actions). Scoped so the public paper page keeps its own layout. */
+.model-registry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+.model-registry-grid .model-row-grid {
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 18px;
+}
+.model-registry-grid .model-preview {
+  height: 200px;
+}
+.model-registry-grid .model-meta-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.model-registry-grid .model-color-row {
+  display: flex;
+}
+.model-registry-grid .model-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.model-registry-grid .model-actions .detail-action {
+  width: 100%;
+}
+.model-registry-grid .model-action-wide {
+  grid-column: 1 / -1;
+}
+@media (max-width: 1024px) {
+  .model-registry-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .model-registry-grid .model-row-grid { grid-template-columns: 1fr; }
+  .model-registry-grid .model-preview { height: 180px; }
+}
+
 /* Model edit page */
 .model-edit-shell {
   padding-top: 32px;
