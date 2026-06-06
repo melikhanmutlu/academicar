@@ -47,7 +47,7 @@ from licensing import (
 from licensing import paper_is_expired as licensing_paper_is_expired
 from blog_content import get_all_posts, get_post, render_body
 from models import AuditLog, ConversionJob, Model3D, ModelAnnotation, ModelVersion, Paper, Payment, QRLink, User, db
-from services.r2_mirror import mirror_file, mirror_directory, mirror_delete
+from services.r2_mirror import mirror_file, mirror_directory, mirror_delete, ensure_local
 from payments import (
     PAID_PLAN_KEYS,
     apply_successful_payment,
@@ -2244,7 +2244,11 @@ def register_routes(app: Flask) -> None:
         if not _paper_visible_to_request(model.paper) or not model_is_accessible(model):
             abort(404)
         directory = os.path.join(app.config["CONVERTED_FOLDER"], unique_id)
-        if not os.path.exists(os.path.join(directory, filename)):
+        target = os.path.join(directory, filename)
+        if not os.path.exists(target):
+            # Local volume is ephemeral on Railway; restore from the R2 mirror.
+            ensure_local(target, f"converted/{unique_id}/{filename}")
+        if not os.path.exists(target):
             abort(404)
         mimetype = (
             "model/vnd.usdz+zip" if filename == "model.usdz" else "model/gltf-binary"
@@ -2272,7 +2276,10 @@ def register_routes(app: Flask) -> None:
         if not _paper_visible_to_request(model.paper) or not model_is_accessible(model):
             abort(404)
         directory = os.path.join(app.config["CONVERTED_FOLDER"], unique_id)
-        if not os.path.exists(os.path.join(directory, "poster.png")):
+        poster = os.path.join(directory, "poster.png")
+        if not os.path.exists(poster):
+            ensure_local(poster, f"converted/{unique_id}/poster.png")
+        if not os.path.exists(poster):
             abort(404)
         response = send_from_directory(directory, "poster.png", mimetype="image/png", conditional=True)
         response.headers["Cache-Control"] = "private, no-cache"
@@ -2289,7 +2296,9 @@ def register_routes(app: Flask) -> None:
             abort(404)
         if not _paper_visible_to_request(model.paper):
             abort(404)
-        return send_from_directory(app.config["QR_FOLDER"], os.path.basename(model.qr_code_path))
+        qr_name = os.path.basename(model.qr_code_path)
+        ensure_local(os.path.join(app.config["QR_FOLDER"], qr_name), f"qr_codes/{qr_name}")
+        return send_from_directory(app.config["QR_FOLDER"], qr_name)
 
     @app.route("/qr-print/<model_id>")
     @login_required
@@ -2313,7 +2322,9 @@ def register_routes(app: Flask) -> None:
             abort(404)
         if paper.user_id != current_user.id:
             abort(403)
-        return send_from_directory(app.config["PDF_FOLDER"], os.path.basename(paper.pdf_path))
+        pdf_name = os.path.basename(paper.pdf_path)
+        ensure_local(os.path.join(app.config["PDF_FOLDER"], pdf_name), f"pdfs/{pdf_name}")
+        return send_from_directory(app.config["PDF_FOLDER"], pdf_name)
 
     def _paper_visible_to_request(paper: Paper) -> bool:
         """A paper is visible if it is public, or if the current user is the owner."""
@@ -2375,9 +2386,11 @@ def register_routes(app: Flask) -> None:
             abort(404)
         if not paper.pdf_path:
             abort(404)
+        pdf_name = os.path.basename(paper.pdf_path)
+        ensure_local(os.path.join(app.config["PDF_FOLDER"], pdf_name), f"pdfs/{pdf_name}")
         response = send_from_directory(
             app.config["PDF_FOLDER"],
-            os.path.basename(paper.pdf_path),
+            pdf_name,
             mimetype="application/pdf",
         )
         # Inline so the iframe can render it; discourage indexing.
@@ -4036,6 +4049,8 @@ def register_routes(app: Flask) -> None:
         ar_placement = ar_placement_raw if ar_placement_raw in ("floor", "wall") else (model.ar_placement or "floor")
 
         glb_path = model.glb_path
+        # Restore the working GLB from the R2 mirror if the local copy is gone.
+        ensure_local(glb_path, f"converted/{model.id}/model.glb")
         backup_path = glb_path + APPEARANCE_BACKUP_SUFFIX
         try:
             if os.path.exists(glb_path):
@@ -4056,6 +4071,8 @@ def register_routes(app: Flask) -> None:
             model.appearance_metallic = metallic
             model.ar_placement = ar_placement
             db.session.commit()
+            # Re-mirror the rewritten GLB so R2 doesn't keep the pre-recolor copy.
+            mirror_file(glb_path, f"converted/{model.id}/model.glb")
             log_audit(
                 "model_appearance_updated",
                 user_id=current_user.id,
@@ -4095,6 +4112,7 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("model_edit", model_id=model.id))
 
         glb_path = model.glb_path
+        ensure_local(glb_path, f"converted/{model_id}/model.glb")
         backup_path = glb_path + ".rescale.bak"
         try:
             if os.path.exists(glb_path):
@@ -4129,6 +4147,10 @@ def register_routes(app: Flask) -> None:
             if generate_poster(glb_path, poster_png):
                 model.poster_path = poster_png
             db.session.commit()
+            # Re-mirror the rescaled GLB (and refreshed poster) to R2.
+            mirror_file(glb_path, f"converted/{model_id}/model.glb")
+            if model.poster_path:
+                mirror_file(poster_png, f"converted/{model_id}/poster.png")
             log_audit(
                 "model_rescaled",
                 user_id=current_user.id,

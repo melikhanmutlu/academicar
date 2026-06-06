@@ -82,3 +82,44 @@ def mirror_delete(r2_key: str) -> None:
 
     t = threading.Thread(target=_delete, daemon=True)
     t.start()
+
+
+def restore_file(local_path: str, r2_key: str) -> bool:
+    """Download ``r2_key`` from R2 to ``local_path`` (atomic via a temp file).
+
+    Synchronous on purpose: callers need the bytes present before serving.
+    Returns True on success, False if R2 is disabled or the object is missing.
+    """
+    if not _is_enabled():
+        return False
+    client = _get_client()
+    if client is None:
+        return False
+    tmp = f"{local_path}.r2restore"
+    try:
+        os.makedirs(os.path.dirname(local_path) or ".", exist_ok=True)
+        client.download_file(_bucket(), r2_key, tmp)
+        os.replace(tmp, local_path)
+        logger.info("R2 restore: %s <- %s", local_path, r2_key)
+        return True
+    except Exception:
+        logger.warning("R2 restore failed: %s", r2_key, exc_info=True)
+        try:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        except OSError:
+            pass
+        return False
+
+
+def ensure_local(local_path: str, r2_key: str) -> bool:
+    """Make sure ``local_path`` exists, restoring it from the R2 mirror when the
+    local copy is missing (e.g. after an ephemeral Railway volume is recycled).
+
+    Returns True if the file is present locally afterwards. A no-op that returns
+    True when the file already exists, and False when R2 is unavailable.
+    """
+    if os.path.isfile(local_path):
+        return True
+    return restore_file(local_path, r2_key)
+
