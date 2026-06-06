@@ -46,6 +46,7 @@ from licensing import (
 )
 from licensing import paper_is_expired as licensing_paper_is_expired
 from models import AuditLog, ConversionJob, Model3D, ModelAnnotation, ModelVersion, Paper, Payment, QRLink, User, db
+from services.r2_mirror import mirror_file, mirror_directory, mirror_delete
 from url_helpers import public_url
 from utils.security import require_model_ownership, require_paper_ownership
 from services.storage_service import StorageError, safe_move_file, safe_save_file, save_companion_files
@@ -569,6 +570,7 @@ def create_backup_archive(app: Flask, created_by_user_id: int | None = None, rea
         resource_id=filename,
         details={"reason": reason, "filename": filename},
     )
+    mirror_file(archive_path, f"admin_backups/{filename}")
     return filename
 
 
@@ -902,7 +904,9 @@ def generate_model_qr(model: Model3D, qr_folder: str) -> str:
     img = qr.make_image(fill_color="black", back_color="white")
     filename = f"qr_{model.id}.png"
     os.makedirs(qr_folder, exist_ok=True)
-    img.save(os.path.join(qr_folder, filename))
+    qr_path = os.path.join(qr_folder, filename)
+    img.save(qr_path)
+    mirror_file(qr_path, f"qr_codes/{filename}")
     return filename
 
 
@@ -925,6 +929,7 @@ def archive_source_file(model: Model3D, source_path: str, version: int, app: Fla
             ext = os.path.splitext(entry)[1].lower()
             if ext in COMPANION_FILE_EXTENSIONS:
                 shutil.copy2(full, os.path.join(archive_root, entry))
+    mirror_directory(str(archive_root), f"uploads/{model.id}/v{version}")
     return dest_path
 
 
@@ -1042,6 +1047,7 @@ def ensure_paper_qr(paper: Paper) -> str:
     qr.make(fit=True)
     img = qr.make_image(fill_color="black", back_color="white")
     img.save(full_path)
+    mirror_file(full_path, f"qr_codes/{filename}")
     return filename
 
 
@@ -1377,6 +1383,7 @@ def process_model_upload_job(
                 )
             )
             db.session.commit()
+            mirror_directory(os.path.join(app.config["CONVERTED_FOLDER"], model_id), f"converted/{model_id}")
         except Exception:
             db.session.rollback()
             logger.exception("Background model processing failed")
@@ -3405,12 +3412,13 @@ def register_routes(app: Flask) -> None:
             paper.pdf_path = pdf_filename
             db.session.commit()
             log_audit("paper_pdf_uploaded", user_id=current_user.id, resource_id=str(paper.id))
+            mirror_file(saved_pdf_path, f"pdfs/{pdf_filename}")
         except SQLAlchemyError:
             db.session.rollback()
             cleanup_file(saved_pdf_path)
             logger.exception("Ajax PDF upload failed")
             return jsonify({"success": False, "error": "Database error while updating publication"}), 500
-            
+
         cleanup_file(old_pdf_path)
         return jsonify({"success": True, "pdf_url": url_for("paper_public_pdf", slug=paper.slug)})
 
@@ -3908,6 +3916,10 @@ def register_routes(app: Flask) -> None:
             flash("The model could not be deleted. Please try again.", "danger")
             return redirect(url_for("paper_detail", slug=slug))
         cleanup_paths(file_paths)
+        mirror_delete(f"converted/{model_id}/model.glb")
+        mirror_delete(f"converted/{model_id}/model.usdz")
+        mirror_delete(f"converted/{model_id}/poster.png")
+        mirror_delete(f"qr_codes/qr_{model_id}.png")
         flash("Model deleted.", "info")
         return redirect(url_for("paper_detail", slug=slug))
 

@@ -105,6 +105,12 @@ class Config:
     QR_FOLDER = runtime_folder("QR_FOLDER", "qr_codes", _runtime_base)
     PDF_FOLDER = runtime_folder("PDF_FOLDER", "pdfs", _runtime_base)
 
+    # Cloudflare R2 mirror (best-effort backup). Silently disabled if unset.
+    R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID")
+    R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID")
+    R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY")
+    R2_BUCKET_NAME = os.environ.get("R2_BUCKET_NAME", "academicar-backup")
+
     # Upload limits.
     MAX_CONTENT_LENGTH = int(os.environ.get("MAX_CONTENT_LENGTH", 260 * 1024 * 1024))
     ALLOWED_STL_EXTENSIONS = {"stl"}
