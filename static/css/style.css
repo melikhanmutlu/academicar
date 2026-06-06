@@ -1499,6 +1499,20 @@ body {
   max-width: 1440px;
   margin: 0 auto;
 }
+.site-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 20px;
+  margin-bottom: 16px;
+}
+.site-footer-links a {
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+}
+.site-footer-links a:hover {
+  color: #fff;
+}
 .btn-danger {
   color: #b91c1c;
   border: 1px solid #fecaca;

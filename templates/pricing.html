@@ -1,5 +1,30 @@
 {% extends "base.html" %}
 {% block title %}Pricing & Plans - AcademicAR{% endblock %}
+{% block meta_description %}AcademicAR pricing: keep the publication workspace free, then choose a 3-year Academic or 10-year Extended Archive access window per 3D/AR model. Institutional licensing available.{% endblock %}
+
+{% block head %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "AcademicAR",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Web, iOS, Android",
+  "description": "Add interactive 3D models, augmented reality, and stable QR codes to academic publications, theses, and posters.",
+  "url": "{{ config.SITE_URL }}",
+  "offers": [
+    {% for key, plan in license_plans.items() if key in ('free', 'academic', 'extended_archive') %}
+    {
+      "@type": "Offer",
+      "name": "{{ plan.label }}",
+      "price": "{{ '%.2f'|format(plan.price_usd) }}",
+      "priceCurrency": "USD"
+    }{{ "," if not loop.last }}
+    {% endfor %}
+  ]
+}
+</script>
+{% endblock %}
 
 {% block content %}
 <section class="plans-hero">

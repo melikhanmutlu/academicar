@@ -141,6 +141,20 @@ class Config:
             "on",
         }
 
+    # Payment provider. The checkout/webhook routes are provider-agnostic
+    # (see payments.py). "development" settles instantly with no gateway and is
+    # the default when ALLOW_DEV_PAYMENTS is on; choose a Merchant-of-Record
+    # ("lemonsqueezy"/"paddle") for production so global VAT/sales tax and
+    # invoicing are handled for you. See docs/MVP_ANALYSIS_AND_ROADMAP.md.
+    PAYMENT_PROVIDER = os.environ.get("PAYMENT_PROVIDER", "")
+    PAYMENT_CURRENCY = os.environ.get("PAYMENT_CURRENCY", "USD")
+    LEMONSQUEEZY_API_KEY = os.environ.get("LEMONSQUEEZY_API_KEY", "")
+    LEMONSQUEEZY_STORE_ID = os.environ.get("LEMONSQUEEZY_STORE_ID", "")
+    LEMONSQUEEZY_WEBHOOK_SECRET = os.environ.get("LEMONSQUEEZY_WEBHOOK_SECRET", "")
+    # Map a license plan key to the provider's price/variant id (fill on go-live).
+    LEMONSQUEEZY_VARIANT_ACADEMIC = os.environ.get("LEMONSQUEEZY_VARIANT_ACADEMIC", "")
+    LEMONSQUEEZY_VARIANT_EXTENDED = os.environ.get("LEMONSQUEEZY_VARIANT_EXTENDED", "")
+
     # Content-Security-Policy. Enabled by default. Because the app currently
     # relies on CDN scripts (Tailwind play CDN needs 'unsafe-eval', model-viewer
     # from unpkg/ajax.googleapis) and lots of inline styles/scripts, the policy

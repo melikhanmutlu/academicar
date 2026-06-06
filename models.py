@@ -233,6 +233,12 @@ class Payment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     paper_id = db.Column(db.Integer, db.ForeignKey("papers.id", ondelete="SET NULL"), nullable=True, index=True)
+    # A payment buys a license window for a single Model3D. Kept nullable +
+    # ondelete=SET NULL so the payment/invoice record survives if the model is
+    # later deleted (financial audit trail must outlive the asset).
+    model_id = db.Column(db.String(36), db.ForeignKey("models.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Amount in the smallest currency unit (kurus for TRY, cents for USD/EUR).
+    # The column name is historical; treat it as generic minor units.
     amount_kurus = db.Column(db.Integer, nullable=False)
     currency = db.Column(db.String(3), nullable=False, default="TRY")
     provider = db.Column(db.String(50), nullable=False, default="manual")
@@ -244,6 +250,7 @@ class Payment(db.Model):
 
     user = db.relationship("User", backref=db.backref("payments", lazy=True))
     paper = db.relationship("Paper", backref=db.backref("payments", lazy=True))
+    model = db.relationship("Model3D", backref=db.backref("payments", lazy=True))
 
     def __repr__(self) -> str:
         return f"<Payment {self.status} {self.amount_kurus} {self.currency}>"

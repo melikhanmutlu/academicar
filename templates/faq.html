@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Frequently Asked Questions - AcademicAR{% endblock %}
+{% block meta_description %}Answers to common questions about AcademicAR: supported 3D formats (GLB, STL, OBJ, FBX), AR viewing, QR codes, how long models stay online, embedding, and data ownership.{% endblock %}
+
+{% block head %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {% for faq in faqs %}
+    {
+      "@type": "Question",
+      "name": {{ faq.q | tojson }},
+      "acceptedAnswer": { "@type": "Answer", "text": {{ faq.a | tojson }} }
+    }{{ "," if not loop.last }}
+    {% endfor %}
+  ]
+}
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+  <h1 class="font-serif text-4xl font-bold text-[#202020] mb-3">Frequently asked questions</h1>
+  <p class="text-[#4d4d4d] mb-10">
+    Everything you need to know about adding interactive 3D and AR to your research.
+    Still stuck? <a href="{{ url_for('contact') }}" class="underline">Get in touch</a>.
+  </p>
+
+  <div class="space-y-6">
+    {% for faq in faqs %}
+    <section class="border border-[#e8e8e8] rounded-lg p-6">
+      <h2 class="text-xl font-semibold text-[#202020] mb-2">{{ faq.q }}</h2>
+      <p class="text-[#4d4d4d] leading-relaxed">{{ faq.a }}</p>
+    </section>
+    {% endfor %}
+  </div>
+
+  <section class="mt-12 pt-8 border-t border-[#e8e8e8]">
+    <p class="text-[#4d4d4d]">
+      Ready to publish your first interactive model?
+      <a href="{{ url_for('auth.register') }}" class="underline font-semibold text-[#202020]">Create a free account</a>
+      or <a href="{{ url_for('pricing') }}" class="underline">see pricing</a>.
+    </p>
+  </section>
+</div>
+{% endblock %}
