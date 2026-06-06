@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}About AcademicAR{% endblock %}
+{% block meta_description %}AcademicAR helps researchers, educators, and museums turn 3D models into interactive web viewers with augmented reality and permanent QR codes for papers, theses, posters, and teaching.{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+  <h1 class="font-serif text-4xl font-bold text-[#202020] mb-8">About AcademicAR</h1>
+
+  <div class="prose prose-lg max-w-none space-y-8 text-[#374151]">
+    <section>
+      <h2 class="text-2xl font-bold text-[#202020] mb-4">Our mission</h2>
+      <p>
+        Research increasingly produces three-dimensional data — anatomical scans,
+        molecular structures, biological specimens, archaeological artifacts,
+        geological samples, and engineering parts. Yet most of it ends up flattened
+        into static figures or buried in supplementary files. AcademicAR exists to
+        make that 3D data explorable: one upload turns your model into an
+        interactive web viewer, an augmented-reality experience, and a permanent
+        QR code that you can place in a paper, thesis, poster, or lecture.
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#202020] mb-4">What we do</h2>
+      <ul class="list-disc pl-6 space-y-2">
+        <li><strong>Upload anything:</strong> GLB, STL, OBJ, and FBX files are automatically converted and optimized for the web.</li>
+        <li><strong>View anywhere:</strong> the viewer runs in any modern browser, with tap-to-place augmented reality on most phones and tablets — no app required.</li>
+        <li><strong>Share durably:</strong> every model gets a stable QR code and short link that keep working even after you replace, recolor, or upgrade the model.</li>
+        <li><strong>Stay compliant:</strong> uploading requires confirming anonymization and rights, because responsible sharing is core to academic work.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#202020] mb-4">Who it's for</h2>
+      <p>
+        Researchers and PhD students enriching publications and theses; professors
+        and educators making lectures and lab work interactive; museums and
+        heritage institutions opening their collections; and conference presenters
+        who want a poster that does more than sit on a wall.
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#202020] mb-4">Built on open standards</h2>
+      <p>
+        AcademicAR is built on glTF/GLB, USDZ, and WebXR — the same open 3D and AR
+        standards used across the web — so your models stay portable and your
+        readers never depend on proprietary software.
+      </p>
+    </section>
+
+    <section class="mt-8 pt-8 border-t border-[#e8e8e8]">
+      <p>
+        Questions or partnership ideas?
+        <a href="{{ url_for('contact') }}" class="underline font-semibold text-[#202020]">Contact us</a>
+        or <a href="{{ url_for('auth.register') }}" class="underline">create a free account</a> to get started.
+      </p>
+    </section>
+  </div>
+</div>
+{% endblock %}

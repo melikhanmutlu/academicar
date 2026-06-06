@@ -5,15 +5,37 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}AcademicAR{% endblock %}</title>
 
-  <meta name="description" content="Share 3D and AR models with academic papers, posters, and presentations. Upload STL or GLB, get a viewer link and a QR code.">
+  <meta name="description" content="{% block meta_description %}Share 3D and AR models with academic papers, posters, and presentations. Upload STL or GLB, get a viewer link and a QR code.{% endblock %}">
+  {% block canonical %}<link rel="canonical" href="{{ canonical_url() }}">{% endblock %}
   <meta property="og:title" content="AcademicAR - 3D and AR models for academic publications">
   <meta property="og:description" content="Share 3D and AR models with academic papers, posters, and presentations.">
   <meta property="og:type" content="website">
+  <meta property="og:url" content="{{ canonical_url() }}">
+  <meta property="og:site_name" content="AcademicAR">
   <meta property="og:image" content="{{ url_for('static', filename='images/clinical-spatial-hero.png', _external=True) }}">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="AcademicAR - 3D and AR models for academic publications">
   <meta name="twitter:description" content="Share 3D and AR models with academic papers, posters, and presentations.">
   <meta name="twitter:image" content="{{ url_for('static', filename='images/clinical-spatial-hero.png', _external=True) }}">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "AcademicAR",
+    "url": "{{ config.SITE_URL }}",
+    "logo": "{{ url_for('static', filename='images/clinical-spatial-hero.png', _external=True) }}",
+    "description": "Interactive 3D models, augmented reality, and QR codes for academic publications, theses, and posters."
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "AcademicAR",
+    "url": "{{ config.SITE_URL }}"
+  }
+  </script>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -108,7 +130,16 @@
 
   <footer class="site-footer">
     <div class="site-footer-inner">
-      &copy; {{ current_year }} AcademicAR - 3D and AR model sharing for academic publications
+      <nav class="site-footer-links" aria-label="Footer">
+        <a href="{{ url_for('about') }}" class="nav-link-muted">About</a>
+        <a href="{{ url_for('pricing') }}" class="nav-link-muted">Pricing</a>
+        <a href="{{ url_for('blog_index') }}" class="nav-link-muted">Blog</a>
+        <a href="{{ url_for('faq') }}" class="nav-link-muted">FAQ</a>
+        <a href="{{ url_for('contact') }}" class="nav-link-muted">Contact</a>
+        <a href="{{ url_for('terms') }}" class="nav-link-muted">Terms</a>
+        <a href="{{ url_for('privacy') }}" class="nav-link-muted">Privacy</a>
+      </nav>
+      <div>&copy; {{ current_year }} AcademicAR - 3D and AR model sharing for academic publications</div>
     </div>
   </footer>
 

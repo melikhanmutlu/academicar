@@ -45,8 +45,15 @@ from licensing import (
     normalize_license_type,
 )
 from licensing import paper_is_expired as licensing_paper_is_expired
+from blog_content import get_all_posts, get_post, render_body
 from models import AuditLog, ConversionJob, Model3D, ModelAnnotation, ModelVersion, Paper, Payment, QRLink, User, db
 from services.r2_mirror import mirror_file, mirror_directory, mirror_delete
+from payments import (
+    PAID_PLAN_KEYS,
+    apply_successful_payment,
+    get_payment_provider,
+    plan_amount_minor_units,
+)
 from url_helpers import public_url
 from utils.security import require_model_ownership, require_paper_ownership
 from services.storage_service import StorageError, safe_move_file, safe_save_file, save_companion_files
@@ -141,6 +148,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             "current_year": datetime.now(UTC).year,
             "format_file_size": format_file_size,
             "public_url": public_url,
+            "canonical_url": canonical_url,
             "license_plans": LICENSE_PLANS,
             "get_license_plan": get_license_plan,
             "model_resolver_url": model_resolver_url,
@@ -610,6 +618,11 @@ def ensure_sqlite_schema(app: Flask) -> None:
         model_columns = {row[1] for row in connection.execute(text("PRAGMA table_info(models)")).fetchall()}
         if model_columns and "dimensions_cm" not in model_columns:
             connection.execute(text("ALTER TABLE models ADD COLUMN dimensions_cm VARCHAR(50)"))
+        payment_columns = {row[1] for row in connection.execute(text("PRAGMA table_info(payments)")).fetchall()}
+        if payment_columns and "model_id" not in payment_columns:
+            connection.execute(text("ALTER TABLE payments ADD COLUMN model_id VARCHAR(36)"))
+        if payment_columns and "plan_key" not in payment_columns:
+            connection.execute(text("ALTER TABLE payments ADD COLUMN plan_key VARCHAR(30)"))
 
 
 def _alembic_head_revision(app: Flask) -> str | None:
@@ -1019,6 +1032,78 @@ def hex_to_rgba(hex_color: str | None) -> tuple[float, float, float, float] | No
 
 def build_invoice_number(payment_id: int) -> str:
     return f"AAR-{datetime.now(UTC).strftime('%Y%m')}-{payment_id:05d}"
+
+
+def canonical_url() -> str:
+    """Absolute canonical URL for the current request.
+
+    Built from SITE_URL (never the raw Host header) and the request path with
+    the query string dropped, so search engines see one canonical URL per page.
+    """
+    site_url = (current_app.config.get("SITE_URL") or "").strip().rstrip("/")
+    path = request.path or "/"
+    if site_url:
+        return f"{site_url}{path}"
+    return request.base_url
+
+
+# Single source of truth for the public FAQ: rendered as visible Q&A AND as
+# FAQPage JSON-LD (rich result) on /faq, so the two never drift apart.
+FAQ_ITEMS = (
+    {
+        "q": "What is AcademicAR?",
+        "a": "AcademicAR turns the 3D models behind your research into an "
+             "interactive web viewer with augmented reality and a permanent QR "
+             "code, so readers can explore your specimen, molecule, or artifact "
+             "from a paper, thesis, poster, or slide.",
+    },
+    {
+        "q": "Which 3D file formats can I upload?",
+        "a": "You can upload GLB, STL, OBJ, and FBX files. We automatically "
+             "convert and optimize them to web-friendly GLB (Draco-compressed "
+             "geometry and compressed textures) and generate an iOS-ready USDZ "
+             "for AR.",
+    },
+    {
+        "q": "Do my readers need to install an app to view the model?",
+        "a": "No. The viewer runs in any modern browser. On most phones and "
+             "tablets, readers can also tap to place the model in augmented "
+             "reality without installing anything.",
+    },
+    {
+        "q": "What is the QR code for, and does it keep working?",
+        "a": "Every model gets a stable QR code and short link. The QR resolves "
+             "to the same model even after you replace the file, change its "
+             "color, or upgrade its license, so printed posters and PDFs never "
+             "break.",
+    },
+    {
+        "q": "How long does the model stay online?",
+        "a": "Access depends on the model's plan: Free access lasts 3 days, "
+             "Academic gives 3 years, and Extended Archive keeps it online for "
+             "10 years. You can upgrade a model at any time without changing its "
+             "link or QR code.",
+    },
+    {
+        "q": "Can I embed the viewer in my website or institutional repository?",
+        "a": "Yes. Public model viewers can be embedded as a lightweight iframe "
+             "widget, so you can place the interactive 3D model on a lab page, "
+             "blog, or repository alongside your publication.",
+    },
+    {
+        "q": "Who owns the uploaded models and data?",
+        "a": "You retain ownership of everything you upload. Uploading requires "
+             "confirming that the content is anonymized where needed and that "
+             "you hold the rights to share it.",
+    },
+    {
+        "q": "Is AcademicAR suitable for anatomy, biology, chemistry, and archaeology?",
+        "a": "Yes. AcademicAR works across disciplines — anatomical and medical "
+             "models, molecular structures, biological specimens, archaeological "
+             "and paleontological scans, geological samples, and engineering "
+             "parts all render in the same interactive viewer.",
+    },
+)
 
 
 def paper_qr_filename(paper_id: int) -> str:
@@ -1801,6 +1886,280 @@ def register_routes(app: Flask) -> None:
     @app.route("/data-protection")
     def data_protection():
         return render_template("legal/data_protection.html")
+
+    @app.route("/faq")
+    def faq():
+        return render_template("faq.html", faqs=FAQ_ITEMS)
+
+    @app.route("/about")
+    def about():
+        return render_template("about.html")
+
+    @app.route("/contact", methods=["GET", "POST"])
+    @limiter.limit("5 per hour", methods=["POST"])
+    def contact():
+        if request.method == "POST":
+            name = (request.form.get("name") or "").strip()
+            email = (request.form.get("email") or "").strip()
+            message = (request.form.get("message") or "").strip()
+            if not name or not email or not message:
+                flash("Please fill in your name, email, and message.", "danger")
+                return redirect(url_for("contact"))
+            from utils.email import send_email
+
+            recipient = current_app.config.get("CONTACT_EMAIL") or "info@academicar.com"
+            send_email(
+                recipient,
+                "AcademicAR contact form",
+                f"From: {name} <{email}>\n\n{message}",
+            )
+            log_audit("contact_message_submitted", details={"from_email": email})
+            flash("Thanks — your message has been sent. We'll get back to you soon.", "success")
+            return redirect(url_for("contact"))
+        return render_template("contact.html")
+
+    @app.route("/blog")
+    def blog_index():
+        return render_template("blog_list.html", posts=get_all_posts())
+
+    @app.route("/blog/<slug>")
+    def blog_post(slug):
+        post = get_post(slug)
+        if not post:
+            abort(404)
+        return render_template(
+            "blog_post.html",
+            post=post,
+            body_html=render_body(post["slug"], post["body"]),
+        )
+
+    @app.route("/robots.txt")
+    def robots_txt():
+        body = "\n".join(
+            [
+                "User-agent: *",
+                "Allow: /",
+                "Disallow: /admin",
+                "Disallow: /dashboard",
+                "Disallow: /profile",
+                "Disallow: /account",
+                "Disallow: /auth",
+                "Disallow: /papers",
+                "Disallow: /models",
+                "Disallow: /qr-print",
+                "Disallow: /pdfs",
+                "Disallow: /payment",
+                f"Sitemap: {public_url('sitemap_xml')}",
+                "",
+            ]
+        )
+        return current_app.response_class(body, mimetype="text/plain")
+
+    @app.route("/sitemap.xml")
+    def sitemap_xml():
+        from xml.sax.saxutils import escape
+
+        urls: list[str] = []
+        for endpoint in (
+            "landing",
+            "pricing",
+            "faq",
+            "about",
+            "contact",
+            "blog_index",
+            "terms",
+            "privacy",
+            "data_protection",
+            "demo_mitochondria_ar",
+        ):
+            try:
+                urls.append(public_url(endpoint))
+            except Exception:
+                continue
+        for post in get_all_posts():
+            try:
+                urls.append(public_url("blog_post", slug=post["slug"]))
+            except Exception:
+                continue
+        # Public, non-deleted publication pages are indexable SEO assets.
+        public_papers = (
+            Paper.query.filter(Paper.is_public.is_(True))
+            .filter(db.or_(Paper.status.is_(None), Paper.status != "deleted"))
+            .order_by(Paper.created_at.desc())
+            .limit(5000)
+            .all()
+        )
+        for paper in public_papers:
+            try:
+                urls.append(public_url("paper_public", slug=paper.slug))
+            except Exception:
+                continue
+        items = "".join(f"<url><loc>{escape(u)}</loc></url>" for u in urls)
+        xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+            f"{items}</urlset>"
+        )
+        return current_app.response_class(xml, mimetype="application/xml")
+
+    @app.route("/models/<model_id>/upgrade/<plan>", methods=["POST"])
+    @login_required
+    @require_model_ownership
+    @limiter.limit("10 per hour", methods=["POST"])
+    def upgrade_model_license(model_id, plan):
+        """Start a paid upgrade of a single model to a longer access window.
+
+        Provider-agnostic: a pending Payment is created, then the configured
+        provider returns either an internal success URL (dev provider settles
+        instantly) or an external hosted-checkout URL. The license is granted in
+        :func:`apply_successful_payment` — here for the dev provider, or later
+        from the webhook for a real Merchant of Record.
+        """
+        model = db.session.get(Model3D, model_id)
+        if not model:
+            abort(404)
+        plan_key = (plan or "").strip().lower()
+        if plan_key not in PAID_PLAN_KEYS:
+            flash("Choose a valid paid plan to upgrade this model.", "danger")
+            return redirect(request.referrer or url_for("dashboard"))
+
+        provider = get_payment_provider()
+        payment = Payment(
+            user_id=current_user.id,
+            paper_id=model.paper_id,
+            model_id=model.id,
+            plan_key=plan_key,
+            amount_kurus=plan_amount_minor_units(plan_key),
+            currency=current_app.config.get("PAYMENT_CURRENCY", "USD"),
+            provider=provider.name,
+            provider_reference=f"{provider.name}-{uuid.uuid4().hex[:12]}",
+            status="pending",
+        )
+        db.session.add(payment)
+        try:
+            db.session.flush()
+            payment.invoice_number = build_invoice_number(payment.id)
+            success_url = public_url("view_model", model_id=model.id)
+            checkout_url = provider.create_checkout(
+                payment=payment,
+                model=model,
+                plan_key=plan_key,
+                user=current_user,
+                success_url=success_url,
+                cancel_url=success_url,
+            )
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not start the upgrade. Please try again.", "danger")
+            return redirect(request.referrer or url_for("dashboard"))
+
+        if not checkout_url:
+            flash(
+                "Online payment isn't configured yet. Please contact support to "
+                "upgrade this model.",
+                "warning",
+            )
+            return redirect(url_for("view_model", model_id=model.id))
+
+        log_audit(
+            "model_upgrade_initiated",
+            user_id=current_user.id,
+            resource_id=model.id,
+            details={"plan": plan_key, "provider": provider.name, "payment_id": payment.id},
+        )
+        if payment.status == "paid":
+            flash("Upgrade complete — this model's access window has been extended.", "success")
+        return redirect(checkout_url)
+
+    @app.route("/payment/webhook/<provider_name>", methods=["POST"])
+    @csrf.exempt
+    def payment_webhook(provider_name):
+        """Receive a provider's 'order paid' webhook and grant the license.
+
+        Idempotent: a duplicate event for an already-paid order is a no-op. The
+        plan is restricted to user-buyable paid plans so a forged webhook can
+        never grant the institutional tier.
+        """
+        provider = get_payment_provider()
+        if provider.name != (provider_name or "").strip().lower():
+            abort(404)
+        if not provider.verify_webhook(request):
+            abort(400)
+
+        # Some gateways (PayTR) require a literal "OK" acknowledgement; others
+        # accept JSON. Build the right ack for whichever resolved.
+        def ack(**payload):
+            if getattr(provider, "webhook_ack", None) is not None:
+                return current_app.response_class(provider.webhook_ack, mimetype="text/plain")
+            return jsonify({"ok": True, **payload}), 200
+
+        event = provider.parse_event(request) or {}
+        if (event.get("status") or "").lower() != "paid":
+            return ack(ignored=True)
+
+        provider_reference = event.get("provider_reference")
+        plan_key = (event.get("plan_key") or "").strip().lower()
+        effective_plan = plan_key if plan_key in PAID_PLAN_KEYS else None
+        model_id = event.get("model_id")
+
+        payment = None
+        payment_id = event.get("payment_id")
+        if payment_id is not None:
+            try:
+                payment = db.session.get(Payment, int(payment_id))
+            except (TypeError, ValueError):
+                payment = None
+        if payment is None and provider_reference:
+            payment = Payment.query.filter_by(provider_reference=provider_reference).first()
+        if payment is not None and payment.status == "paid":
+            return ack(duplicate=True)
+
+        model = db.session.get(Model3D, model_id) if model_id else (payment.model if payment else None)
+
+        if payment is None:
+            payment = Payment(
+                user_id=(model.user_id if model else None),
+                paper_id=(model.paper_id if model else None),
+                model_id=(model.id if model else None),
+                plan_key=effective_plan,
+                amount_kurus=plan_amount_minor_units(effective_plan) if effective_plan else 0,
+                currency=current_app.config.get("PAYMENT_CURRENCY", "USD"),
+                provider=provider.name,
+                provider_reference=provider_reference,
+                status="pending",
+            )
+            db.session.add(payment)
+            db.session.flush()
+            if not payment.invoice_number:
+                payment.invoice_number = build_invoice_number(payment.id)
+        elif provider_reference and not payment.provider_reference:
+            payment.provider_reference = provider_reference
+
+        # Recover the plan from the stored Payment when the callback omits it
+        # (PayTR's notification carries no custom data).
+        if effective_plan is None and payment is not None and (payment.plan_key or "") in PAID_PLAN_KEYS:
+            effective_plan = payment.plan_key
+
+        apply_successful_payment(payment, model, effective_plan)
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            return jsonify({"ok": False}), 500
+
+        log_audit(
+            "payment_completed",
+            user_id=(model.user_id if model else None),
+            resource_id=(model.id if model else None),
+            details={
+                "provider": provider.name,
+                "plan": effective_plan,
+                "payment_id": payment.id,
+                "provider_reference": provider_reference,
+            },
+        )
+        return ack()
 
     @app.route("/view/<model_id>")
     def view_model(model_id):
