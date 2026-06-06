@@ -43,7 +43,8 @@
           camera-orbit="35deg 65deg 9m"
           field-of-view="32deg"
           exposure="1.0"
-          shadow-intensity="0"
+          shadow-intensity="0.5"
+          shadow-softness="1.1"
           tone-mapping="neutral"
           environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
           reveal="auto"
@@ -339,57 +340,6 @@
   </div>
 </section>
 
-<!-- ============================= PROCESS STRIP ============================= -->
-<section class="lp-process-section">
-  <div class="lp-container">
-    <div class="lp-process reveal-up">
-      <div class="lp-process-item">
-        <div class="lp-process-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4 M7 9l5-5 5 5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>
-        </div>
-        <div class="lp-process-num">01</div>
-        <div class="lp-process-label">Upload</div>
-        <div class="lp-process-desc">GLB · STL · OBJ · FBX</div>
-      </div>
-      <div class="lp-process-connector" aria-hidden="true"></div>
-      <div class="lp-process-item">
-        <div class="lp-process-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4 M12 18v4 M4.93 4.93l2.83 2.83 M16.24 16.24l2.83 2.83 M2 12h4 M18 12h4 M4.93 19.07l2.83-2.83 M16.24 7.76l2.83-2.83"/></svg>
-        </div>
-        <div class="lp-process-num">02</div>
-        <div class="lp-process-label">Convert</div>
-        <div class="lp-process-desc">Optimized GLB output</div>
-      </div>
-      <div class="lp-process-connector" aria-hidden="true"></div>
-      <div class="lp-process-item">
-        <div class="lp-process-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z"/><path d="M15 15h2 M19 15v4 M15 19h4"/></svg>
-        </div>
-        <div class="lp-process-num">03</div>
-        <div class="lp-process-label">QR & Link</div>
-        <div class="lp-process-desc">Permanent identifiers</div>
-      </div>
-      <div class="lp-process-connector" aria-hidden="true"></div>
-      <div class="lp-process-item">
-        <div class="lp-process-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7L12 12l8.7-5 M12 22V12"/></svg>
-        </div>
-        <div class="lp-process-num">04</div>
-        <div class="lp-process-label">View & AR</div>
-        <div class="lp-process-desc">Browser + augmented reality</div>
-      </div>
-      <div class="lp-process-connector" aria-hidden="true"></div>
-      <div class="lp-process-item">
-        <div class="lp-process-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6 M9 13h6 M9 17h6"/></svg>
-        </div>
-        <div class="lp-process-num">05</div>
-        <div class="lp-process-label">Publish</div>
-        <div class="lp-process-desc">Paper + PDF + model</div>
-      </div>
-    </div>
-  </div>
-</section>
 {% endblock %}
 
 {% block scripts %}
