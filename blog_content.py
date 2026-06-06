@@ -31,6 +31,12 @@ def render_body(text: str, cache_key: str | None = None) -> str:
         from markupsafe import escape
 
         html = "".join(f"<p>{escape(p.strip())}</p>" for p in text.split("\n\n") if p.strip())
+    # Wrap tables so a wide one scrolls inside its own box instead of forcing
+    # the whole page to scroll horizontally on mobile.
+    if "<table>" in html:
+        html = html.replace("<table>", '<div class="blog-table-wrap"><table>').replace(
+            "</table>", "</table></div>"
+        )
     if cache_key is not None:
         _RENDER_CACHE[cache_key] = html
     return html

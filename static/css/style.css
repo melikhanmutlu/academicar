@@ -1676,6 +1676,14 @@ body {
   margin: 18px 0;
   font-size: 15px;
 }
+.blog-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 18px 0;
+}
+.blog-table-wrap table {
+  margin: 0;
+}
 .blog-article th,
 .blog-article td {
   border: 1px solid #e8e8e8;

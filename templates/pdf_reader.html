@@ -43,6 +43,7 @@
     border: 1px solid rgba(17, 24, 39, 0.08);
     background: #f5f5f3;
     height: calc(100vh - 240px);
+    height: calc(100dvh - 240px);
     min-height: 520px;
   }
   .pdf-frame {
@@ -52,7 +53,7 @@
     display: block;
   }
   @media (max-width: 640px) {
-    .pdf-frame-wrap { height: calc(100vh - 280px); min-height: 420px; }
+    .pdf-frame-wrap { height: calc(100vh - 280px); height: calc(100dvh - 280px); min-height: 420px; }
   }
 </style>
 {% endblock %}

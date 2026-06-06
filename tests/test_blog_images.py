@@ -72,4 +72,6 @@ def test_post_body_renders_table_and_image(client, app):
     html = client.get(f"/blog/{slug}").get_data(as_text=True)
     assert "<table>" in html
     assert "<th>Metric</th>" in html
+    # Tables are wrapped so they scroll inside their box on mobile.
+    assert 'class="blog-table-wrap"' in html
     assert '<img alt="diagram" src="/blog-images/example.png"' in html or 'src="/blog-images/example.png"' in html
