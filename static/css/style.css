@@ -5655,6 +5655,24 @@ input[type="file"]::-webkit-file-upload-button {
   font-size: 13px;
   color: var(--color-silver-ash);
 }
+.upload-summary-main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+.upload-summary-icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 200px;
+  background: var(--color-canvas-white);
+  border: 1px solid var(--color-light-pearl);
+  color: var(--color-midnight-graphite);
+  display: grid;
+  place-items: center;
+}
+.upload-summary-icon svg { display: block; }
 .upload-chevron {
   width: 32px;
   height: 32px;

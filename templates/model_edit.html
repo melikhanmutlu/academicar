@@ -51,7 +51,7 @@
           <div class="model-edit-preview">
             <model-viewer
               id="materialPreview"
-              src="{{ url_for('serve_glb', unique_id=model.id, filename='model.glb') }}"
+              src="{{ url_for('serve_glb', unique_id=model.id, filename='model.glb') }}?v={{ model_asset_token(model) }}"
               alt="Live material preview of {{ model.display_name or model.original_filename }}"
               camera-controls
               interaction-prompt="none"

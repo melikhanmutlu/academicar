@@ -1,4 +1,5 @@
 """AcademicAR Flask application entry point."""
+import hashlib
 import logging
 import os
 import re
@@ -149,6 +150,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             "format_file_size": format_file_size,
             "public_url": public_url,
             "canonical_url": canonical_url,
+            "model_asset_token": model_asset_token,
             "license_plans": LICENSE_PLANS,
             "get_license_plan": get_license_plan,
             "model_resolver_url": model_resolver_url,
@@ -1092,6 +1094,29 @@ def hex_to_rgba(hex_color: str | None) -> tuple[float, float, float, float] | No
 
 def build_invoice_number(payment_id: int) -> str:
     return f"AAR-{datetime.now(UTC).strftime('%Y%m')}-{payment_id:05d}"
+
+
+def model_asset_token(model) -> str:
+    """Short cache-busting token for a model's served GLB/USDZ.
+
+    <model-viewer> caches the model by its src URL, so recoloring or rescaling a
+    model (which rewrites the same /files/<id>/model.glb path) would otherwise
+    keep showing the stale version. Appending ?v=<token> makes the URL change
+    whenever the asset changes, forcing a re-fetch.
+    """
+    raw = "|".join(
+        str(getattr(model, attr, "") or "")
+        for attr in (
+            "appearance_color",
+            "appearance_roughness",
+            "appearance_metallic",
+            "dimensions_cm",
+            "version",
+            "replaced_at",
+            "file_size",
+        )
+    )
+    return hashlib.md5(raw.encode("utf-8")).hexdigest()[:10]
 
 
 def canonical_url() -> str:
@@ -4249,6 +4274,10 @@ def register_routes(app: Flask) -> None:
         model = db.session.get(Model3D, model_id)
         if not model:
             abort(404)
+        # Return to wherever the form was submitted from (e.g. the paper's model
+        # registry) when a safe same-site path is provided, else the model page.
+        next_url = request.form.get("next") or ""
+        dest = next_url if (next_url.startswith("/") and not next_url.startswith("//")) else url_for("model_edit", model_id=model.id)
         color_command = request.form.get("color_command")
         color_input = (request.form.get("color") or "").strip() or None
         # text command takes precedence so users can type "make it light gray".
@@ -4256,12 +4285,12 @@ def register_routes(app: Flask) -> None:
         new_color = parsed or color_input
         if not new_color or HEX_COLOR_PATTERN.fullmatch(new_color) is None:
             flash("Provide a valid hex color (#RRGGBB) or a known color name.", "danger")
-            return redirect(url_for("model_edit", model_id=model.id))
+            return redirect(dest)
 
         rgba = hex_to_rgba(new_color)
         if rgba is None:
             flash("Invalid color value.", "danger")
-            return redirect(url_for("model_edit", model_id=model.id))
+            return redirect(dest)
 
         roughness_raw = request.form.get("roughness")
         metallic_raw = request.form.get("metallic")
@@ -4287,12 +4316,16 @@ def register_routes(app: Flask) -> None:
                 glb_exists = os.path.exists(glb_path)
                 detail = f" (GLB {'found' if glb_exists else 'NOT found'} at {glb_path}; {type(exc).__name__}: {exc})"
                 flash(f"The model appearance could not be updated. The previous version is still active.{detail}", "warning")
-                return redirect(url_for("model_edit", model_id=model.id))
+                return redirect(dest)
 
             model.appearance_color = new_color
             model.appearance_roughness = roughness
             model.appearance_metallic = metallic
             model.ar_placement = ar_placement
+            try:
+                model.file_size = os.path.getsize(glb_path)
+            except OSError:
+                pass
             db.session.commit()
             # Re-mirror the rewritten GLB so R2 doesn't keep the pre-recolor copy.
             mirror_file(glb_path, f"converted/{model.id}/model.glb")
@@ -4314,7 +4347,7 @@ def register_routes(app: Flask) -> None:
         finally:
             if os.path.exists(backup_path):
                 cleanup_file(backup_path)
-        return redirect(url_for("model_edit", model_id=model.id))
+        return redirect(dest)
 
     @app.route("/models/<model_id>/rescale", methods=["POST"])
     @login_required

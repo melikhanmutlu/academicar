@@ -294,8 +294,8 @@
     <model-viewer
       id="viewer"
       class="absolute inset-0 z-10"
-      src="{% if demo_mode is defined and demo_mode %}{{ url_for('static', filename='models/model.compressed.glb') }}{% else %}{{ url_for('serve_glb', unique_id=model.id, filename='model.glb') }}{% endif %}"
-      {% if has_usdz %}ios-src="{{ url_for('serve_glb', unique_id=model.id, filename='model.usdz') }}"{% endif %}
+      src="{% if demo_mode is defined and demo_mode %}{{ url_for('static', filename='models/model.compressed.glb') }}{% else %}{{ url_for('serve_glb', unique_id=model.id, filename='model.glb') }}?v={{ model_asset_token(model) }}{% endif %}"
+      {% if has_usdz %}ios-src="{{ url_for('serve_glb', unique_id=model.id, filename='model.usdz') }}?v={{ model_asset_token(model) }}"{% endif %}
       {% if model.poster_path %}poster="{{ url_for('serve_poster', unique_id=model.id) }}"{% endif %}
       alt="3D model: {{ model.display_name or model.original_filename }}"
       shadow-intensity="0"
