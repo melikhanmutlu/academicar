@@ -106,8 +106,12 @@ class Config:
     PDF_FOLDER = runtime_folder("PDF_FOLDER", "pdfs", _runtime_base)
     BLOG_IMAGE_FOLDER = runtime_folder("BLOG_IMAGE_FOLDER", "blog_images", _runtime_base)
 
-    # Cloudflare R2 mirror (best-effort backup). Silently disabled if unset.
+    # S3-compatible mirror (best-effort backup). Silently disabled if unset.
+    # Works with Cloudflare R2 (set R2_ACCOUNT_ID) or any S3 provider such as
+    # Backblaze B2 (set R2_ENDPOINT_URL + R2_REGION instead).
     R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID")
+    R2_ENDPOINT_URL = os.environ.get("R2_ENDPOINT_URL")  # S3 endpoint override; empty = R2
+    R2_REGION = os.environ.get("R2_REGION", "auto")
     R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID")
     R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY")
     R2_BUCKET_NAME = os.environ.get("R2_BUCKET_NAME", "academicar-backup")

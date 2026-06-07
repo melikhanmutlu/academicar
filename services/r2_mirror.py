@@ -15,18 +15,26 @@ logger = logging.getLogger(__name__)
 
 @lru_cache(maxsize=1)
 def _get_client():
-    account_id = os.environ.get("R2_ACCOUNT_ID")
     access_key = os.environ.get("R2_ACCESS_KEY_ID")
     secret_key = os.environ.get("R2_SECRET_ACCESS_KEY")
-    if not all([account_id, access_key, secret_key]):
+    if not all([access_key, secret_key]):
         return None
+    # Endpoint override (Backblaze B2 or any S3-compatible provider). When unset,
+    # fall back to the Cloudflare R2 endpoint derived from the account id.
+    endpoint = os.environ.get("R2_ENDPOINT_URL")
+    if not endpoint:
+        account_id = os.environ.get("R2_ACCOUNT_ID")
+        if not account_id:
+            return None
+        endpoint = f"https://{account_id}.r2.cloudflarestorage.com"
+    region = os.environ.get("R2_REGION", "auto")
     import boto3
     return boto3.client(
         "s3",
-        endpoint_url=f"https://{account_id}.r2.cloudflarestorage.com",
+        endpoint_url=endpoint,
         aws_access_key_id=access_key,
         aws_secret_access_key=secret_key,
-        region_name="auto",
+        region_name=region,
     )
 
 

@@ -42,6 +42,40 @@ def test_ensure_local_restores_from_r2(tmp_path, monkeypatch):
     assert dest.read_bytes() == b"GLBDATA"
 
 
+def test_get_client_uses_endpoint_override(monkeypatch):
+    """An explicit R2_ENDPOINT_URL (e.g. Backblaze B2) is used verbatim."""
+    for var in ("R2_ACCOUNT_ID", "R2_ENDPOINT_URL", "R2_REGION"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("R2_ACCESS_KEY_ID", "key")
+    monkeypatch.setenv("R2_SECRET_ACCESS_KEY", "secret")
+    monkeypatch.setenv("R2_ENDPOINT_URL", "https://s3.us-west-004.backblazeb2.com")
+    monkeypatch.setenv("R2_REGION", "us-west-004")
+    r2_mirror._get_client.cache_clear()
+    try:
+        client = r2_mirror._get_client()
+        assert client is not None
+        assert client.meta.endpoint_url == "https://s3.us-west-004.backblazeb2.com"
+        assert client.meta.region_name == "us-west-004"
+    finally:
+        r2_mirror._get_client.cache_clear()
+
+
+def test_get_client_falls_back_to_r2_endpoint(monkeypatch):
+    """Without an endpoint override, the R2 endpoint is derived from the account id."""
+    for var in ("R2_ENDPOINT_URL", "R2_REGION"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("R2_ACCOUNT_ID", "acct123")
+    monkeypatch.setenv("R2_ACCESS_KEY_ID", "key")
+    monkeypatch.setenv("R2_SECRET_ACCESS_KEY", "secret")
+    r2_mirror._get_client.cache_clear()
+    try:
+        client = r2_mirror._get_client()
+        assert client is not None
+        assert client.meta.endpoint_url == "https://acct123.r2.cloudflarestorage.com"
+    finally:
+        r2_mirror._get_client.cache_clear()
+
+
 def test_restore_file_missing_object_cleans_up(tmp_path, monkeypatch):
     monkeypatch.setattr(r2_mirror, "_get_client", lambda: _FakeR2Client({}))
     monkeypatch.setattr(r2_mirror, "_bucket", lambda: "b")
