@@ -203,6 +203,11 @@ class Config:
     MAIL_USERNAME = os.environ.get("MAIL_USERNAME")
     MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD")
     MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER")
+    # Preferred on PaaS that block outbound SMTP (e.g. Railway): if set, email is
+    # delivered via the provider's HTTP API over port 443 instead of SMTP.
+    # Defaults target Brevo; override MAIL_API_URL for another provider.
+    MAIL_API_KEY = os.environ.get("MAIL_API_KEY")
+    MAIL_API_URL = os.environ.get("MAIL_API_URL", "https://api.brevo.com/v3/smtp/email")
 
     # Google OAuth.
     GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")

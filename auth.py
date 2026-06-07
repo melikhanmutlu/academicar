@@ -252,9 +252,10 @@ def forgot_password():
     if form.validate_on_submit():
         email = form.email.data.lower().strip()
         user = User.query.filter_by(email=email).first()
-        # Only password accounts can reset a password (Google-only accounts have
-        # no password_hash). We never reveal which case applies — see below.
-        if user and user.password_hash:
+        # Any existing account can reset (set) a password — including Google-only
+        # accounts, for whom this is how they add a password to enable email
+        # login. We never reveal which case applies — see below.
+        if user:
             token = generate_password_reset_token(user)
             reset_url = public_url("auth.reset_password", token=token)
             from utils.email import send_email
