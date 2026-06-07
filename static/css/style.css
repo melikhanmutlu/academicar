@@ -8283,9 +8283,7 @@ body.nav-menu-open {
   z-index: 1;
   background: #fff; border: 1px solid var(--color-light-pearl);
   border-radius: 16px; padding: 32px 28px; text-align: center;
-  transition: transform 200ms ease;
 }
-.lp-step:hover { transform: translateY(-2px); }
 .lp-step-badge {
   width: 30px; height: 30px; margin: 0 auto 18px;
   display: grid; place-items: center; border-radius: 50%;
@@ -8338,9 +8336,7 @@ body.nav-menu-open {
 .lp-usecase {
   background: #fff; border: 1px solid var(--color-light-pearl);
   border-radius: 16px; overflow: hidden;
-  transition: transform 200ms ease;
 }
-.lp-usecase:hover { transform: translateY(-2px); }
 .lp-usecase-thumb {
   background: var(--color-cloud-whisper);
   aspect-ratio: 16 / 11; display: grid; place-items: center;
