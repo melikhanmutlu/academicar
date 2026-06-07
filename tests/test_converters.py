@@ -7,7 +7,12 @@ import pytest
 import trimesh
 
 from converters.external_converter import FBXConverter, OBJConverter
-from converters.glb_quality import GLBQualityError, ensure_pbr_materials, validate_glb_quality
+from converters.glb_quality import (
+    GLBQualityError,
+    ensure_pbr_materials,
+    repair_transparent_base_color,
+    validate_glb_quality,
+)
 
 
 def temp_converter_dir() -> Path:
@@ -77,5 +82,58 @@ def test_glb_quality_adds_missing_pbr_materials():
         trimesh.creation.box().export(glb_path)
         ensure_pbr_materials(str(glb_path))
         validate_glb_quality(str(glb_path))
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+def test_repair_transparent_base_color_restores_invisible_textured_material():
+    """FBX2glTF can emit a textured material with baseColorFactor alpha 0.0
+    (fully transparent → invisible). The repair restores alpha to 1.0 so the
+    texture renders, e.g. tree foliage."""
+    from pygltflib import GLTF2, TextureInfo
+
+    tmp_dir = temp_converter_dir()
+    glb_path = tmp_dir / "leaf.glb"
+
+    try:
+        trimesh.creation.box().export(glb_path)
+        gltf = GLTF2.load(str(glb_path))
+        pbr = gltf.materials[0].pbrMetallicRoughness
+        # Simulate FBX2glTF's broken opacity mapping on a textured material.
+        pbr.baseColorTexture = TextureInfo(index=0)
+        pbr.baseColorFactor = [0.8, 0.8, 0.8, 0.0]
+        gltf.materials[0].alphaMode = "BLEND"
+        gltf.save(str(glb_path))
+
+        assert repair_transparent_base_color(str(glb_path)) is True
+
+        fixed = GLTF2.load(str(glb_path))
+        assert fixed.materials[0].pbrMetallicRoughness.baseColorFactor[3] == 1.0
+        # alphaMode is preserved so per-texel texture alpha still drives cutouts.
+        assert fixed.materials[0].alphaMode == "BLEND"
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+def test_repair_transparent_base_color_leaves_untextured_transparent_material():
+    """A transparent material with no baseColorTexture is left untouched: the
+    repair only targets textured-but-invisible materials."""
+    from pygltflib import GLTF2
+
+    tmp_dir = temp_converter_dir()
+    glb_path = tmp_dir / "glass.glb"
+
+    try:
+        trimesh.creation.box().export(glb_path)
+        gltf = GLTF2.load(str(glb_path))
+        gltf.materials[0].pbrMetallicRoughness.baseColorTexture = None
+        gltf.materials[0].pbrMetallicRoughness.baseColorFactor = [1.0, 1.0, 1.0, 0.0]
+        gltf.materials[0].alphaMode = "BLEND"
+        gltf.save(str(glb_path))
+
+        assert repair_transparent_base_color(str(glb_path)) is False
+
+        fixed = GLTF2.load(str(glb_path))
+        assert fixed.materials[0].pbrMetallicRoughness.baseColorFactor[3] == 0.0
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)

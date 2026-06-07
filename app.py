@@ -30,7 +30,13 @@ from auth import auth_bp, init_oauth
 from config import Config
 from extensions import csrf, limiter, rate_limit_key
 from converters import FBXConverter, OBJConverter, STLConverter
-from converters.glb_quality import GLBQualityError, embed_external_textures, ensure_pbr_materials, validate_glb_quality
+from converters.glb_quality import (
+    GLBQualityError,
+    embed_external_textures,
+    ensure_pbr_materials,
+    repair_transparent_base_color,
+    validate_glb_quality,
+)
 from converters.glb_optimize import normalize_specular_glossiness, optimize_glb
 from converters.poster import generate_poster
 from converters.stl_converter import convert_glb_to_usdz, enrich_glb_for_ar
@@ -1391,6 +1397,11 @@ def finalize_converted_glb(glb_path: str, *, source_dir: str) -> None:
     # their textures. Best-effort; runs before optimize so webp compression and
     # prune operate on the final material set.
     normalize_specular_glossiness(glb_path)
+    # Repair FBX2glTF's opacity-to-alpha mapping bug: materials that carried an
+    # FBX transparency channel can land with baseColorFactor alpha 0.0 (fully
+    # transparent → textured but invisible, e.g. tree foliage). Restore them so
+    # the texture renders. Runs before optimize so prune/webp see final alpha.
+    repair_transparent_base_color(glb_path)
     ensure_pbr_materials(glb_path)
     optimize_glb(glb_path)
     validate_glb_quality(glb_path)
