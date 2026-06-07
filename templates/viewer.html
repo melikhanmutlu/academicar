@@ -6,6 +6,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ model.display_name or model.original_filename }} — AcademicAR</title>
 
+  <!-- Apply the saved viewer background theme before paint to avoid a flash. -->
+  <script>
+    (function () {
+      var m = 'dark';
+      try {
+        var saved = localStorage.getItem('academicar:viewerBg');
+        if (saved === 'light' || saved === 'white' || saved === 'dark') m = saved;
+      } catch (e) {}
+      document.documentElement.setAttribute('data-viewer-bg', m);
+    })();
+  </script>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
@@ -26,14 +38,72 @@
       user-select: none;
       -webkit-user-drag: none;
       -webkit-touch-callout: none;
+      opacity: 0;
+      transform: none;
+      transition: opacity 700ms ease;
+    }
+    /* Viewer canvas background themes. Dark is the default; light/white help
+       dark-coloured models read better against a brighter backdrop. */
+    html[data-viewer-bg="dark"] model-viewer {
       background:
         linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px),
         linear-gradient(180deg, rgba(255,255,255,0.04) 1px, transparent 1px),
         radial-gradient(circle at 50% 48%, #2a2a2d 0, #111111 54%, #050505 100%);
       background-size: 42px 42px, 42px 42px, auto;
-      opacity: 0;
-      transform: none;
-      transition: opacity 700ms ease;
+    }
+    html[data-viewer-bg="light"] model-viewer {
+      background:
+        linear-gradient(90deg, rgba(15,23,42,0.045) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(15,23,42,0.045) 1px, transparent 1px),
+        radial-gradient(circle at 50% 42%, #ffffff 0, #eef1f4 56%, #d8dde3 100%);
+      background-size: 42px 42px, 42px 42px, auto;
+    }
+    html[data-viewer-bg="white"] model-viewer {
+      background: #ffffff;
+    }
+    /* Keep the page edges consistent with the chosen canvas theme and drop the
+       dark scan-grid overlay when the backdrop is bright. */
+    html[data-viewer-bg="light"] body,
+    html[data-viewer-bg="white"] body { background: #ffffff; }
+    html[data-viewer-bg="light"] .volumetric-grid,
+    html[data-viewer-bg="white"] .volumetric-grid { opacity: 0 !important; }
+    /* The top toolbar + brand pill use translucent-white chrome that would
+       vanish on a bright backdrop, so flip them to dark-on-light there. The
+       bottom control panel and info drawer stay dark glass (readable on any
+       backdrop). */
+    html[data-viewer-bg="light"] .viewer-tool-btn,
+    html[data-viewer-bg="white"] .viewer-tool-btn {
+      background: rgba(17,17,17,0.05);
+      border-color: rgba(17,17,17,0.14);
+      color: rgba(17,17,17,0.82);
+    }
+    html[data-viewer-bg="light"] .viewer-tool-btn:hover,
+    html[data-viewer-bg="white"] .viewer-tool-btn:hover {
+      background: rgba(17,17,17,0.10);
+      border-color: rgba(17,17,17,0.24);
+    }
+    html[data-viewer-bg="light"] .viewer-tool-btn.primary,
+    html[data-viewer-bg="white"] .viewer-tool-btn.primary {
+      background: #111111;
+      color: #ffffff;
+      border-color: #111111;
+    }
+    html[data-viewer-bg="light"] header a[href="/"],
+    html[data-viewer-bg="white"] header a[href="/"] {
+      background: rgba(17,17,17,0.05);
+      border-color: rgba(17,17,17,0.12);
+      color: #1a1a1a;
+    }
+    /* Background switcher (control panel) */
+    .viewer-bg-tools {
+      border-top: 1px solid rgba(255,255,255,0.10);
+      padding-top: 0.85rem;
+    }
+    .viewer-bg-tools [data-bg-options] { flex-wrap: wrap; }
+    .viewer-bg-tools button[aria-pressed="true"] {
+      background: #ffffff;
+      color: #111111;
+      border-color: #ffffff;
     }
     model-viewer.is-loaded {
       opacity: 1;
@@ -282,7 +352,7 @@
       }
       .viewer-control-panel .viewer-meta-grid > div { padding: 0.65rem; }
       .viewer-control-panel .viewer-tool-stack { gap: 0.65rem; margin-top: 0.75rem; }
-      .viewer-rotation-tools, .viewer-animation-tools, .viewer-shot-tools { padding-top: 0.65rem; }
+      .viewer-rotation-tools, .viewer-animation-tools, .viewer-shot-tools, .viewer-bg-tools { padding-top: 0.65rem; }
       .viewer-rotation-tools label {
         grid-template-columns: 1rem minmax(0, 1fr) 3rem;
         gap: 0.45rem;
@@ -476,6 +546,17 @@
             <label> X <input type="range" min="0" max="360" step="1" value="0" data-rotate-axis="x"><span data-rotate-value="x">0deg</span></label>
             <label> Y <input type="range" min="0" max="360" step="1" value="0" data-rotate-axis="y"><span data-rotate-value="y">0deg</span></label>
             <label> Z <input type="range" min="0" max="360" step="1" value="0" data-rotate-axis="z"><span data-rotate-value="z">0deg</span></label>
+          </div>
+
+          <div class="viewer-bg-tools" data-bg-tools>
+            <div class="viewer-tool-heading">
+              <span>Background</span>
+              <div class="flex items-center gap-2" data-bg-options>
+                <button type="button" data-bg="dark" aria-pressed="true">Dark</button>
+                <button type="button" data-bg="light" aria-pressed="false">Light</button>
+                <button type="button" data-bg="white" aria-pressed="false">White</button>
+              </div>
+            </div>
           </div>
 
           <div class="viewer-animation-tools" data-animation-tools hidden>
@@ -1185,6 +1266,28 @@
       setAnimationPlayback(!modelAnimationPlaying);
     });
     setAutoRotateState(false);
+
+    // --- Viewer background theme (dark / light / white) ---
+    const VIEWER_BG_KEY = 'academicar:viewerBg';
+    const bgOptions = document.querySelector('[data-bg-options]');
+    const applyViewerBg = (mode) => {
+      const m = ['dark', 'light', 'white'].includes(mode) ? mode : 'dark';
+      document.documentElement.setAttribute('data-viewer-bg', m);
+      if (bgOptions) {
+        bgOptions.querySelectorAll('button').forEach((b) => {
+          b.setAttribute('aria-pressed', b.dataset.bg === m ? 'true' : 'false');
+        });
+      }
+      try { localStorage.setItem(VIEWER_BG_KEY, m); } catch (e) {}
+    };
+    if (bgOptions) {
+      bgOptions.querySelectorAll('button').forEach((b) => {
+        b.addEventListener('click', () => applyViewerBg(b.dataset.bg));
+      });
+    }
+    // Sync the buttons with the theme already applied by the head script.
+    applyViewerBg(document.documentElement.getAttribute('data-viewer-bg') || 'dark');
+
     currentShotButton?.addEventListener('click', downloadCurrentShot);
     generateShotSetButton?.addEventListener('click', generateShotSet);
     shareCardButton?.addEventListener('click', composeShareCard);
