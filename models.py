@@ -74,7 +74,11 @@ class Paper(db.Model):
     deleted_by = db.relationship("User", foreign_keys=[deleted_by_user_id])
 
     models = db.relationship(
-        "Model3D", backref="paper", lazy=True, cascade="all, delete-orphan"
+        "Model3D",
+        backref="paper",
+        lazy=True,
+        cascade="all, delete-orphan",
+        order_by="Model3D.created_at",
     )
 
     def __repr__(self) -> str:
