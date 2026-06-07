@@ -31,7 +31,7 @@ from config import Config
 from extensions import csrf, limiter, rate_limit_key
 from converters import FBXConverter, OBJConverter, STLConverter
 from converters.glb_quality import GLBQualityError, embed_external_textures, ensure_pbr_materials, validate_glb_quality
-from converters.glb_optimize import optimize_glb
+from converters.glb_optimize import normalize_specular_glossiness, optimize_glb
 from converters.poster import generate_poster
 from converters.stl_converter import convert_glb_to_usdz, enrich_glb_for_ar
 from licensing import (
@@ -1386,6 +1386,11 @@ def _run_converter(converter, source_path: str, glb_path: str, *, color: str | N
 def finalize_converted_glb(glb_path: str, *, source_dir: str) -> None:
     """Pack texture references, ensure baseline PBR materials, optimize, and validate GLB output."""
     embed_external_textures(glb_path, search_dirs=[source_dir, os.path.dirname(glb_path)])
+    # Normalize any KHR_materials_pbrSpecularGlossiness materials (FBX-derived or
+    # legacy GLB uploads) to core metallic-roughness so model-viewer renders
+    # their textures. Best-effort; runs before optimize so webp compression and
+    # prune operate on the final material set.
+    normalize_specular_glossiness(glb_path)
     ensure_pbr_materials(glb_path)
     optimize_glb(glb_path)
     validate_glb_quality(glb_path)

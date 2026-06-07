@@ -155,11 +155,18 @@ class FBXConverter(ExternalConverter):
         if not self.validate(input_path):
             return False
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        # --pbr-metallic-roughness forces FBX2glTF to emit core glTF
+        # metallic-roughness materials (with baseColorTexture) instead of the
+        # default KHR_materials_pbrSpecularGlossiness extension. Modern
+        # model-viewer / three.js dropped spec-gloss support, so without this
+        # flag FBX textures are written into an extension the viewer ignores and
+        # the model renders untextured.
         command = self._command() + [
             "-i",
             input_path,
             "-o",
             output_path,
+            "--pbr-metallic-roughness",
             "-b",
         ]
         result = self._run(command, cwd=os.path.dirname(input_path))

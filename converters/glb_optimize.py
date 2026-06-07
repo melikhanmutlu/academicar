@@ -108,6 +108,54 @@ def optimize_glb(
     return True
 
 
+def normalize_specular_glossiness(glb_path: str) -> bool:
+    """Convert KHR_materials_pbrSpecularGlossiness materials to metal/rough.
+
+    FBX-derived assets (and some legacy GLBs) can carry the spec-gloss
+    extension, whose textures modern model-viewer / three.js no longer render.
+    gltf-transform's ``metalrough`` rewrites those materials into the core
+    metallic-roughness workflow (baseColorTexture), preserving the artwork.
+
+    Best-effort: returns False and leaves the original untouched if
+    gltf-transform is unavailable or the conversion fails.
+    """
+    if not os.path.exists(glb_path):
+        return False
+
+    tmp_output = glb_path + ".metalrough.glb"
+    cmd = _find_cli() + ["metalrough", glb_path, tmp_output]
+
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=_TIMEOUT,
+            cwd=os.path.dirname(glb_path),
+        )
+    except FileNotFoundError:
+        logger.info("gltf-transform not found; skipping spec-gloss normalization.")
+        _cleanup(tmp_output)
+        return False
+    except subprocess.TimeoutExpired:
+        logger.warning("gltf-transform metalrough timed out after %ds", _TIMEOUT)
+        _cleanup(tmp_output)
+        return False
+
+    if result.returncode != 0 or not os.path.exists(tmp_output) or os.path.getsize(tmp_output) < 20:
+        logger.warning(
+            "gltf-transform metalrough failed (exit %d): %s",
+            result.returncode,
+            (result.stderr or result.stdout or "")[:500],
+        )
+        _cleanup(tmp_output)
+        return False
+
+    shutil.move(tmp_output, glb_path)
+    logger.info("Normalized spec-gloss materials to metallic-roughness: %s", glb_path)
+    return True
+
+
 def _cleanup(path: str) -> None:
     try:
         if os.path.exists(path):
