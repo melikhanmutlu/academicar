@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}AR & 3D by Field — Use Cases | AcademicAR{% endblock %}
+{% block meta_description %}See how interactive 3D and AR work for anatomy, chemistry, biology, archaeology, geology, engineering, museums, and STEM teaching — with a QR code, no app.{% endblock %}
+{% block og_title %}Interactive 3D & AR for research and teaching, by field{% endblock %}
+{% block og_description %}How researchers, educators, and museums use AcademicAR to publish interactive 3D and AR models across disciplines.{% endblock %}
+
+{% block head %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Home", "item": {{ url_for('landing', _external=True) | tojson }} },
+    { "@type": "ListItem", "position": 2, "name": "Use cases", "item": {{ canonical_url() | tojson }} }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "itemListElement": [
+    {% for d in disciplines %}
+    { "@type": "ListItem", "position": {{ loop.index }}, "name": {{ ("AR for " ~ d.name) | tojson }}, "url": {{ url_for('ar_for', discipline=d.slug, _external=True) | tojson }} }{{ "," if not loop.last }}
+    {% endfor %}
+  ]
+}
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+
+  <nav class="text-sm text-[#828282] mb-8" aria-label="Breadcrumb">
+    <a href="{{ url_for('landing') }}" class="hover:text-[#202020]">Home</a>
+    <span class="mx-2">/</span>
+    <span class="text-[#4d4d4d]">Use cases</span>
+  </nav>
+
+  <header class="max-w-3xl">
+    <p class="text-sm font-semibold uppercase tracking-wide text-[#ff682c] mb-3">Use cases</p>
+    <h1 class="font-serif text-4xl sm:text-5xl font-bold text-[#202020] leading-tight mb-5">Interactive 3D &amp; AR for your field</h1>
+    <p class="text-lg text-[#4d4d4d] leading-relaxed">
+      The same workflow — upload a model, get a viewer with augmented reality and a permanent QR code —
+      serves very different work. Pick your field to see how researchers, educators, and curators put it to use.
+    </p>
+  </header>
+
+  <div class="grid gap-5 sm:grid-cols-2 mt-12">
+    {% for d in disciplines %}
+    <a href="{{ url_for('ar_for', discipline=d.slug) }}"
+       class="group block border border-[#e8e8e8] rounded-lg p-6 hover:border-[#202020] transition-colors">
+      <div class="flex items-baseline justify-between gap-3">
+        <h2 class="font-serif text-xl font-bold text-[#202020]">AR for {{ d.name }}</h2>
+        <span class="text-[#828282] group-hover:text-[#202020] transition-colors" aria-hidden="true">→</span>
+      </div>
+      <p class="text-[#4d4d4d] text-sm leading-relaxed mt-2">{{ d.subhead }}</p>
+    </a>
+    {% endfor %}
+  </div>
+
+  <section class="mt-16 border-t border-[#e8e8e8] pt-10 text-center">
+    <h2 class="font-serif text-2xl font-bold text-[#202020] mb-3">Don't see your field?</h2>
+    <p class="text-[#4d4d4d] mb-6 max-w-2xl mx-auto">
+      If your work produces 3D data, AcademicAR can publish it. Create a free account and try it with your own model.
+    </p>
+    <div class="flex flex-wrap gap-3 justify-center">
+      <a href="{{ url_for('auth.register') }}" class="inline-flex items-center justify-center rounded-md px-5 py-3 text-sm font-semibold text-white bg-[#202020] hover:bg-black transition-colors">Get started free</a>
+      <a href="{{ url_for('contact') }}" class="inline-flex items-center justify-center rounded-md px-5 py-3 text-sm font-semibold text-[#202020] border border-[#202020] hover:bg-[#f5f5f5] transition-colors">Talk to us</a>
+    </div>
+  </section>
+
+</div>
+{% endblock %}

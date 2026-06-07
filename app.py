@@ -47,6 +47,7 @@ from licensing import (
 )
 from licensing import paper_is_expired as licensing_paper_is_expired
 from blog_content import code_post_slugs, get_all_posts, get_post, render_body
+from discipline_content import all_disciplines, discipline_slugs, get_discipline, related_disciplines
 from models import AuditLog, BlogPost, ConversionJob, Model3D, ModelAnnotation, ModelVersion, Paper, Payment, QRLink, User, db
 from services.r2_mirror import mirror_file, mirror_directory, mirror_delete, ensure_local
 from payments import (
@@ -1980,6 +1981,23 @@ def register_routes(app: Flask) -> None:
     def about():
         return render_template("about.html")
 
+    @app.route("/ar-for")
+    def ar_for_index():
+        """Hub page linking every discipline landing page (topic-cluster center)."""
+        return render_template("disciplines_index.html", disciplines=all_disciplines())
+
+    @app.route("/ar-for-<discipline>")
+    def ar_for(discipline):
+        """Programmatic SEO landing page for one field, e.g. /ar-for-anatomy."""
+        data = get_discipline(discipline)
+        if not data:
+            abort(404)
+        return render_template(
+            "discipline.html",
+            discipline=data,
+            related=related_disciplines(data["slug"]),
+        )
+
     @app.route("/contact", methods=["GET", "POST"])
     @limiter.limit("5 per hour", methods=["POST"])
     def contact():
@@ -2065,6 +2083,7 @@ def register_routes(app: Flask) -> None:
             "pricing",
             "faq",
             "about",
+            "ar_for_index",
             "contact",
             "blog_index",
             "terms",
@@ -2074,6 +2093,11 @@ def register_routes(app: Flask) -> None:
         ):
             try:
                 urls.append(public_url(endpoint))
+            except Exception:
+                continue
+        for slug in discipline_slugs():
+            try:
+                urls.append(public_url("ar_for", discipline=slug))
             except Exception:
                 continue
         for post in merged_blog_posts():

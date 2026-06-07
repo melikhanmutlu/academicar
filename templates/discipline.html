@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}{{ discipline.title }}{% endblock %}
+{% block meta_description %}{{ discipline.meta_description }}{% endblock %}
+{% block og_title %}{{ discipline.h1 }}{% endblock %}
+{% block og_description %}{{ discipline.meta_description }}{% endblock %}
+
+{% block head %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {% for faq in discipline.faqs %}
+    {
+      "@type": "Question",
+      "name": {{ faq.q | tojson }},
+      "acceptedAnswer": { "@type": "Answer", "text": {{ faq.a | tojson }} }
+    }{{ "," if not loop.last }}
+    {% endfor %}
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Home", "item": {{ url_for('landing', _external=True) | tojson }} },
+    { "@type": "ListItem", "position": 2, "name": "Use cases", "item": {{ url_for('ar_for_index', _external=True) | tojson }} },
+    { "@type": "ListItem", "position": 3, "name": {{ discipline.name | tojson }}, "item": {{ canonical_url() | tojson }} }
+  ]
+}
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+
+  <!-- Breadcrumb -->
+  <nav class="text-sm text-[#828282] mb-8" aria-label="Breadcrumb">
+    <a href="{{ url_for('landing') }}" class="hover:text-[#202020]">Home</a>
+    <span class="mx-2">/</span>
+    <a href="{{ url_for('ar_for_index') }}" class="hover:text-[#202020]">Use cases</a>
+    <span class="mx-2">/</span>
+    <span class="text-[#4d4d4d]">{{ discipline.name }}</span>
+  </nav>
+
+  <!-- Hero -->
+  <header class="max-w-3xl">
+    <p class="text-sm font-semibold uppercase tracking-wide text-[#ff682c] mb-3">AR for {{ discipline.name }}</p>
+    <h1 class="font-serif text-4xl sm:text-5xl font-bold text-[#202020] leading-tight mb-5">{{ discipline.h1 }}</h1>
+    <p class="text-lg text-[#4d4d4d] leading-relaxed mb-8">{{ discipline.subhead }}</p>
+    <div class="flex flex-wrap gap-3">
+      <a href="{{ url_for('auth.register') }}" class="inline-flex items-center justify-center rounded-md px-5 py-3 text-sm font-semibold text-white bg-[#202020] hover:bg-black transition-colors">Create a free account</a>
+      <a href="{{ url_for('demo_mitochondria_ar') }}" class="inline-flex items-center justify-center rounded-md px-5 py-3 text-sm font-semibold text-[#202020] border border-[#202020] hover:bg-[#f5f5f5] transition-colors">See a live demo</a>
+    </div>
+  </header>
+
+  <!-- Intro -->
+  <div class="prose prose-lg max-w-none mt-14 space-y-5 text-[#374151]">
+    {% for para in discipline.intro %}
+    <p>{{ para }}</p>
+    {% endfor %}
+  </div>
+
+  <!-- Why -->
+  <section class="mt-16">
+    <h2 class="font-serif text-2xl font-bold text-[#202020] mb-6">Why {{ discipline.name | lower }} needs interactive 3D</h2>
+    <div class="grid gap-5 sm:grid-cols-3">
+      {% for point in discipline.why %}
+      <div class="border border-[#e8e8e8] rounded-lg p-6">
+        <p class="text-[#202020] font-semibold mb-2">{{ point.lead }}</p>
+        <p class="text-[#4d4d4d] text-sm leading-relaxed">{{ point.text }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- How it works (generic, shared workflow) -->
+  <section class="mt-16">
+    <h2 class="font-serif text-2xl font-bold text-[#202020] mb-6">How it works</h2>
+    <ol class="grid gap-5 sm:grid-cols-3">
+      <li class="border border-[#e8e8e8] rounded-lg p-6">
+        <span class="text-[#828282] text-sm font-semibold">01</span>
+        <p class="text-[#202020] font-semibold mt-1 mb-1">Upload your model</p>
+        <p class="text-[#4d4d4d] text-sm leading-relaxed">Drop in a GLB, STL, OBJ, or FBX file. It's converted and optimized for the web automatically.</p>
+      </li>
+      <li class="border border-[#e8e8e8] rounded-lg p-6">
+        <span class="text-[#828282] text-sm font-semibold">02</span>
+        <p class="text-[#202020] font-semibold mt-1 mb-1">Get a viewer & QR code</p>
+        <p class="text-[#4d4d4d] text-sm leading-relaxed">You get an interactive 3D viewer with tap-to-place AR, a short link, and a permanent QR code.</p>
+      </li>
+      <li class="border border-[#e8e8e8] rounded-lg p-6">
+        <span class="text-[#828282] text-sm font-semibold">03</span>
+        <p class="text-[#202020] font-semibold mt-1 mb-1">Share anywhere</p>
+        <p class="text-[#4d4d4d] text-sm leading-relaxed">Place the QR code on a slide, poster, handout, label, or paper — no app, no headset for your audience.</p>
+      </li>
+    </ol>
+  </section>
+
+  <!-- Use cases -->
+  <section class="mt-16">
+    <h2 class="font-serif text-2xl font-bold text-[#202020] mb-6">Ways {{ discipline.name | lower }} teams use it</h2>
+    <div class="grid gap-5 sm:grid-cols-3">
+      {% for uc in discipline.use_cases %}
+      <div class="border border-[#e8e8e8] rounded-lg p-6 bg-[#f5f5f5]">
+        <h3 class="text-[#202020] font-semibold mb-2">{{ uc.title }}</h3>
+        <p class="text-[#4d4d4d] text-sm leading-relaxed">{{ uc.body }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="mt-16">
+    <h2 class="font-serif text-2xl font-bold text-[#202020] mb-6">{{ discipline.name }} FAQ</h2>
+    <div class="space-y-4">
+      {% for faq in discipline.faqs %}
+      <div class="border border-[#e8e8e8] rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-[#202020] mb-2">{{ faq.q }}</h3>
+        <p class="text-[#4d4d4d] leading-relaxed">{{ faq.a }}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- Related disciplines -->
+  {% if related %}
+  <section class="mt-16">
+    <h2 class="font-serif text-2xl font-bold text-[#202020] mb-6">Explore other fields</h2>
+    <div class="flex flex-wrap gap-3">
+      {% for rel in related %}
+      <a href="{{ url_for('ar_for', discipline=rel.slug) }}" class="inline-flex items-center rounded-full border border-[#e8e8e8] px-4 py-2 text-sm text-[#4d4d4d] hover:border-[#202020] hover:text-[#202020] transition-colors">AR for {{ rel.name }}</a>
+      {% endfor %}
+      <a href="{{ url_for('ar_for_index') }}" class="inline-flex items-center rounded-full border border-[#e8e8e8] px-4 py-2 text-sm text-[#4d4d4d] hover:border-[#202020] hover:text-[#202020] transition-colors">All use cases →</a>
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- Final CTA -->
+  <section class="mt-16 border-t border-[#e8e8e8] pt-10 text-center">
+    <h2 class="font-serif text-2xl font-bold text-[#202020] mb-3">Publish your first {{ discipline.name | lower }} model</h2>
+    <p class="text-[#4d4d4d] mb-6 max-w-2xl mx-auto">Create a free account, upload a model, and share an interactive 3D &amp; AR figure in minutes.</p>
+    <div class="flex flex-wrap gap-3 justify-center">
+      <a href="{{ url_for('auth.register') }}" class="inline-flex items-center justify-center rounded-md px-5 py-3 text-sm font-semibold text-white bg-[#202020] hover:bg-black transition-colors">Get started free</a>
+      <a href="{{ url_for('pricing') }}" class="inline-flex items-center justify-center rounded-md px-5 py-3 text-sm font-semibold text-[#202020] border border-[#202020] hover:bg-[#f5f5f5] transition-colors">See pricing</a>
+    </div>
+  </section>
+
+</div>
+{% endblock %}
