@@ -119,13 +119,52 @@
     </div>
 
     {% if paper.models %}
+      {% if paper.models|length > 1 %}
+        {% set ns = namespace(processing=false, failed=false) %}
+        {% for m in paper.models %}
+          {% set st = m.processing_status or 'ready' %}
+          {% if st == 'failed' %}{% set ns.failed = true %}{% elif st != 'ready' %}{% set ns.processing = true %}{% endif %}
+        {% endfor %}
+        <div class="registry-toolbar" data-registry-toolbar>
+          <div class="registry-search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="search" placeholder="Search models by name" data-registry-search aria-label="Search models by name">
+          </div>
+          <div class="registry-controls">
+            {% if ns.processing or ns.failed %}
+            <label class="registry-select">
+              <span>Status</span>
+              <select data-registry-status aria-label="Filter models by status">
+                <option value="all">All</option>
+                <option value="ready">Ready</option>
+                {% if ns.processing %}<option value="processing">Processing</option>{% endif %}
+                {% if ns.failed %}<option value="failed">Failed</option>{% endif %}
+              </select>
+            </label>
+            {% endif %}
+            <label class="registry-select">
+              <span>Sort</span>
+              <select data-registry-sort aria-label="Sort models">
+                <option value="added">Date added</option>
+                <option value="name-asc">Name A–Z</option>
+                <option value="name-desc">Name Z–A</option>
+                <option value="size-desc">Largest first</option>
+                <option value="size-asc">Smallest first</option>
+              </select>
+            </label>
+            <span class="registry-count" data-registry-count aria-live="polite"></span>
+          </div>
+        </div>
+      {% endif %}
       <div class="model-registry-grid">
         {% for m in paper.models %}
           {% set model_status = m.processing_status or 'ready' %}
           {% set plan = license_plans.get(m.license_type or 'free') or license_plans.get('free') %}
           {% set conversion_label = (m.source_format or 'stl')|upper ~ ' -> GLB' %}
           {% set dimensions_label = format_model_dimensions_cm(m) %}
-          <div class="model-row surface rounded-xl p-4 group reveal-up" data-model-row data-status-url="{{ url_for('model_status', model_id=m.id) }}" data-status="{{ model_status }}">
+          <div class="model-row surface rounded-xl p-4 group reveal-up" data-model-row data-status-url="{{ url_for('model_status', model_id=m.id) }}" data-status="{{ model_status }}" data-name="{{ (m.display_name or m.original_filename or '')|lower }}" data-size="{{ m.file_size or 0 }}" data-order="{{ loop.index0 }}">
             <div class="model-row-grid">
               {% if model_status == 'ready' %}
                 <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-preview" aria-label="Open 3D viewer for {{ m.display_name or m.original_filename }}">
@@ -193,6 +232,12 @@
           </div>
         {% endfor %}
       </div>
+      {% if paper.models|length > 1 %}
+      <p class="registry-empty" data-registry-empty hidden>
+        No models match your filters.
+        <button type="button" data-registry-clear>Clear filters</button>
+      </p>
+      {% endif %}
     {% else %}
       <div class="surface rounded-xl border border-dashed border-[#111827]/20 p-12 text-center reveal-up">
         <h3 class="font-serif text-2xl font-semibold text-[#111827]">No models yet.</h3>
@@ -573,5 +618,63 @@
     };
     setTimeout(poll, 1200);
   }
+
+  // ----- Model registry: client-side filter + sort (no reload) -----
+  (() => {
+    const registry = document.querySelector('[data-model-registry]');
+    const toolbar = registry && registry.querySelector('[data-registry-toolbar]');
+    const grid = registry && registry.querySelector('.model-registry-grid');
+    if (!registry || !toolbar || !grid) return;
+
+    const rows = [...grid.querySelectorAll('[data-model-row]')];
+    const searchInput = toolbar.querySelector('[data-registry-search]');
+    const statusSelect = toolbar.querySelector('[data-registry-status]');
+    const sortSelect = toolbar.querySelector('[data-registry-sort]');
+    const countEl = toolbar.querySelector('[data-registry-count]');
+    const emptyEl = registry.querySelector('[data-registry-empty]');
+    const clearBtn = registry.querySelector('[data-registry-clear]');
+
+    const statusOf = (row) => row.dataset.status || 'ready';
+    const matchesStatus = (row, filter) => {
+      if (!filter || filter === 'all') return true;
+      const st = statusOf(row);
+      if (filter === 'processing') return st !== 'ready' && st !== 'failed';
+      return st === filter;
+    };
+    const num = (v) => Number(v) || 0;
+    const comparators = {
+      'added': (a, b) => num(a.dataset.order) - num(b.dataset.order),
+      'name-asc': (a, b) => (a.dataset.name || '').localeCompare(b.dataset.name || ''),
+      'name-desc': (a, b) => (b.dataset.name || '').localeCompare(a.dataset.name || ''),
+      'size-desc': (a, b) => num(b.dataset.size) - num(a.dataset.size),
+      'size-asc': (a, b) => num(a.dataset.size) - num(b.dataset.size),
+    };
+
+    const apply = () => {
+      const q = (searchInput ? searchInput.value : '').trim().toLowerCase();
+      const status = statusSelect ? statusSelect.value : 'all';
+      const sortKey = (sortSelect && sortSelect.value) || 'added';
+      let visible = 0;
+      rows.forEach((row) => {
+        const show = (!q || (row.dataset.name || '').includes(q)) && matchesStatus(row, status);
+        row.classList.toggle('is-filtered-out', !show);
+        if (show) visible += 1;
+      });
+      [...rows].sort(comparators[sortKey] || comparators.added).forEach((row) => grid.appendChild(row));
+      if (emptyEl) emptyEl.hidden = visible !== 0;
+      if (countEl) countEl.textContent = (visible !== rows.length) ? `Showing ${visible} of ${rows.length}` : '';
+    };
+
+    let debounce;
+    if (searchInput) searchInput.addEventListener('input', () => { clearTimeout(debounce); debounce = setTimeout(apply, 120); });
+    if (statusSelect) statusSelect.addEventListener('change', apply);
+    if (sortSelect) sortSelect.addEventListener('change', apply);
+    if (clearBtn) clearBtn.addEventListener('click', () => {
+      if (searchInput) searchInput.value = '';
+      if (statusSelect) statusSelect.value = 'all';
+      if (sortSelect) sortSelect.value = 'added';
+      apply();
+    });
+  })();
 </script>
 {% endblock %}
