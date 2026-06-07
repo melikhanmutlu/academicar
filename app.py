@@ -6,6 +6,8 @@ import re
 import secrets
 import shutil
 import struct
+import subprocess
+import tempfile
 import types
 import uuid
 import zipfile
@@ -550,6 +552,50 @@ def add_folder_to_zip(zip_file: zipfile.ZipFile, folder: str, archive_prefix: st
     return added
 
 
+def _dump_postgres_into_zip(zip_file: zipfile.ZipFile, db_uri: str) -> bool:
+    """Best-effort ``pg_dump`` of a PostgreSQL database into the backup archive.
+
+    Returns True only when a SQL dump was actually written. Never raises: a
+    non-PostgreSQL URI, a missing ``pg_dump`` binary, or a failed dump just logs
+    and returns False so the rest of the backup (files) still completes. The
+    dump is a plain-text ``pg_restore``/``psql``-loadable SQL script.
+    """
+    if "postgres" not in db_uri:
+        return False
+    # SQLAlchemy uses a driver-qualified scheme (postgresql+psycopg://); pg_dump
+    # needs a plain libpq URL.
+    libpq_url = re.sub(r"^postgres(?:ql)?\+\w+://", "postgresql://", db_uri)
+    pg_dump = shutil.which("pg_dump")
+    if not pg_dump:
+        logger.warning("pg_dump not found on PATH; database NOT included in backup")
+        return False
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".sql", delete=False) as tmp:
+            tmp_path = tmp.name
+        result = subprocess.run(
+            [pg_dump, "--no-owner", "--no-privileges", "--file", tmp_path, libpq_url],
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        if result.returncode != 0:
+            logger.warning("pg_dump failed (rc=%s): %s", result.returncode, result.stderr.strip())
+            return False
+        zip_file.write(tmp_path, "database/postgres_dump.sql")
+        logger.info("pg_dump included in backup archive")
+        return True
+    except Exception:
+        logger.warning("pg_dump errored; database NOT included in backup", exc_info=True)
+        return False
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+
+
 def create_backup_archive(app: Flask, created_by_user_id: int | None = None, reason: str = "manual") -> str:
     folder = backup_folder(app)
     timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
@@ -573,6 +619,11 @@ def create_backup_archive(app: Flask, created_by_user_id: int | None = None, rea
             db_path = db_uri.replace("sqlite:///", "", 1)
             if os.path.exists(db_path):
                 zip_file.write(db_path, "database/academic_ar.db")
+                manifest_lines.append("database=sqlite")
+        elif _dump_postgres_into_zip(zip_file, db_uri):
+            manifest_lines.append("database=postgres_dump")
+        else:
+            manifest_lines.append("database=unavailable")
         manifest_lines.append(f"uploads_files={add_folder_to_zip(zip_file, app.config['UPLOAD_FOLDER'], 'uploads')}")
         manifest_lines.append(f"converted_files={add_folder_to_zip(zip_file, app.config['CONVERTED_FOLDER'], 'converted')}")
         manifest_lines.append(f"qr_files={add_folder_to_zip(zip_file, app.config['QR_FOLDER'], 'qr_codes')}")

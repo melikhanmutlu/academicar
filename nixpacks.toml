@@ -1,5 +1,8 @@
 [phases.setup]
-nixPkgs = ["python312", "python312Packages.pip", "python312Packages.virtualenv", "nodejs-18_x"]
+# postgresql_16 provides pg_dump, used by the admin backup archive to dump the
+# Railway PostgreSQL database into the backup zip (then mirrored to B2). Keep the
+# major version aligned with the Railway Postgres server version.
+nixPkgs = ["python312", "python312Packages.pip", "python312Packages.virtualenv", "nodejs-18_x", "postgresql_16"]
 
 [phases.install]
 cmds = [
