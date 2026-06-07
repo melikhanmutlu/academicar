@@ -105,6 +105,90 @@
       color: #111111;
       border-color: #ffffff;
     }
+    /* Light/white themes: restyle the floating chrome (bottom control panel,
+       inline QR card, info drawer) as light surfaces with graphite text so they
+       suit the bright backdrop. Modals sit over a dimmed overlay and stay dark. */
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-control-panel,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-inline-qr,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) #infoPanel {
+      background: rgba(255, 255, 255, 0.86) !important;
+      border-color: rgba(15, 23, 42, 0.10) !important;
+      color: #1f2933;
+    }
+    /* Muted white text -> graphite; translucent white surfaces/borders -> light
+       equivalents. Solid bg-white (the QR holder) is intentionally left alone. */
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-control-panel [class*="text-white"],
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-inline-qr [class*="text-white"],
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) #infoPanel [class*="text-white"] {
+      color: #52606d !important;
+    }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-control-panel [class*="bg-white/"],
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) #infoPanel [class*="bg-white/"] {
+      background: rgba(15, 23, 42, 0.05) !important;
+    }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-control-panel [class*="border-white/"],
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-inline-qr [class*="border-white/"],
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) #infoPanel [class*="border-white/"] {
+      border-color: rgba(15, 23, 42, 0.12) !important;
+    }
+    /* Tool headings, slider labels + readouts. */
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-tool-heading,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-rotation-tools label {
+      color: #52606d;
+    }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-rotation-tools span[data-rotate-value] {
+      color: #364152;
+    }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-rotation-tools input[type="range"] {
+      accent-color: #1f2933;
+    }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-shot-card span {
+      color: #52606d;
+    }
+    /* Section dividers. */
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-rotation-tools,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-animation-tools,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-shot-tools,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-bg-tools {
+      border-top-color: rgba(15, 23, 42, 0.10);
+    }
+    /* Pill buttons + screenshot cards. */
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-tool-heading button,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-shot-actions button,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-shot-card,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-shot-card a {
+      background: rgba(15, 23, 42, 0.05);
+      border-color: rgba(15, 23, 42, 0.14);
+      color: #364152;
+    }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-tool-heading button:hover,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-shot-actions button:hover,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-shot-card:hover,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-shot-card a:hover {
+      background: rgba(15, 23, 42, 0.10);
+      border-color: rgba(15, 23, 42, 0.22);
+      color: #1f2933;
+    }
+    /* Active toggles + primary CTAs invert to graphite-on-light. */
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-auto-toggle[aria-pressed="true"],
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-animation-toggle[aria-pressed="true"],
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-bg-tools button[aria-pressed="true"],
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-share-card-btn {
+      background: #1f2933;
+      color: #ffffff;
+      border-color: #1f2933;
+    }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-share-card-btn:hover {
+      background: #111111;
+      border-color: #111111;
+      color: #ffffff;
+    }
+    /* Loading chip reads better as a light surface on a bright backdrop too. */
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) #viewerStatus {
+      background: rgba(255, 255, 255, 0.92) !important;
+      border-color: rgba(15, 23, 42, 0.10) !important;
+      color: #1f2933 !important;
+    }
     model-viewer.is-loaded {
       opacity: 1;
       transform: none;
