@@ -122,6 +122,42 @@ def has_base_color_textures(glb_path: str) -> bool:
     return False
 
 
+def repair_transparent_base_color(glb_path: str) -> bool:
+    """Repair FBX2glTF's broken opacity-to-alpha mapping.
+
+    FBX2glTF maps an FBX material's transparency onto baseColorFactor alpha and
+    switches alphaMode to BLEND. When it cannot translate an opacity/transparency
+    texture (it logs "Can't handle texture for TransparentColor; discarding") it
+    leaves baseColorFactor alpha at 0.0 — which multiplies the whole material to
+    fully transparent, so the surface is textured but invisible. This is the
+    classic "FBX uploads render untextured" symptom: foliage/leaf cards and any
+    material that carried an opacity channel vanish entirely.
+
+    When a baseColorTexture is present, the texture's own alpha channel already
+    provides any cutout, so a zero base-color factor alpha is never intended.
+    Restore it to 1.0 so the material becomes visible while keeping the existing
+    alphaMode (BLEND/MASK still honour per-texel texture alpha for cutouts).
+    """
+    try:
+        gltf = _load_glb(glb_path)
+    except GLBQualityError:
+        return False
+
+    changed = False
+    for material in gltf.materials or []:
+        pbr = material.pbrMetallicRoughness
+        if not pbr or pbr.baseColorTexture is None:
+            continue
+        bcf = pbr.baseColorFactor
+        if bcf and len(bcf) == 4 and bcf[3] == 0.0:
+            bcf[3] = 1.0
+            changed = True
+
+    if changed:
+        gltf.save(glb_path)
+    return changed
+
+
 def ensure_pbr_materials(glb_path: str) -> bool:
     """Ensure primitives have valid PBR materials without replacing artwork.
 
