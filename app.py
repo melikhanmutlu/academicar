@@ -1672,6 +1672,52 @@ def enqueue_conversion_job(
     return job
 
 
+def reclaim_stuck_conversion_jobs(app: Flask) -> int:
+    """Recover ConversionJob rows wedged in "processing".
+
+    A job is only ever set to "processing" by an active worker; if it stays
+    there past ``STUCK_JOB_TIMEOUT_SECONDS`` the worker that claimed it died
+    mid-conversion (e.g. OOM-killed on a huge mesh) without ever reaching
+    ``mark_model_failed``. Such jobs are reset to "pending" for another attempt,
+    or marked "failed" (and the model surfaced as failed) once they have already
+    burned through ``max_attempts``. Returns the number of jobs reclaimed.
+    """
+    timeout = int(app.config.get("STUCK_JOB_TIMEOUT_SECONDS", 900) or 0)
+    if timeout <= 0:
+        return 0
+    cutoff = datetime.now(UTC) - timedelta(seconds=timeout)
+    candidates = ConversionJob.query.filter(ConversionJob.status == "processing").all()
+    reclaimed = 0
+    for job in candidates:
+        started = job.started_at
+        if started is None:
+            # No start timestamp to age out against; stamp one so the next pass
+            # can reclaim it rather than leaving it wedged indefinitely.
+            job.started_at = datetime.now(UTC)
+            continue
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=UTC)
+        if started >= cutoff:
+            continue
+        if (job.attempts or 0) >= (job.max_attempts or 3):
+            mark_model_failed(
+                job.model_id,
+                "Conversion did not finish (worker stopped) and the retry limit was reached.",
+                job=job,
+            )
+        else:
+            job.status = "pending"
+            job.started_at = None
+        reclaimed += 1
+    if reclaimed:
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            return 0
+    return reclaimed
+
+
 def run_next_conversion_job(app: Flask) -> bool:
     """Pick up the oldest pending ConversionJob and run it.
 
@@ -1680,6 +1726,9 @@ def run_next_conversion_job(app: Flask) -> bool:
     the next job rather than sleeping.
     """
     with app.app_context():
+        # First recover any jobs a previously-crashed worker left wedged in
+        # "processing" so they re-enter the queue instead of getting stuck.
+        reclaim_stuck_conversion_jobs(app)
         # Claim the oldest pending job atomically. On PostgreSQL/MySQL we take a
         # row lock with SKIP LOCKED so multiple concurrent workers never grab the
         # same job. SQLite ignores FOR UPDATE (single-writer), which is fine for
@@ -1694,6 +1743,15 @@ def run_next_conversion_job(app: Flask) -> bool:
         job = query.first()
         if job is None:
             return False
+        # Stop retrying a job that has already exhausted its attempts so a
+        # deterministically-failing conversion cannot loop forever.
+        if (job.attempts or 0) >= (job.max_attempts or 3):
+            mark_model_failed(
+                job.model_id,
+                "Conversion failed repeatedly and reached the retry limit.",
+                job=job,
+            )
+            return True
         job.status = "processing"
         job.started_at = datetime.now(UTC)
         job.attempts = (job.attempts or 0) + 1
@@ -2302,9 +2360,34 @@ def register_routes(app: Flask) -> None:
             except (TypeError, ValueError):
                 payment = None
         if payment is None and provider_reference:
-            payment = Payment.query.filter_by(provider_reference=provider_reference).first()
+            # Lock the row on engines that support it so two concurrent,
+            # identical webhooks cannot both clear the paid-check below and
+            # double-process the same order.
+            ref_query = Payment.query.filter_by(provider_reference=provider_reference)
+            if db.engine.dialect.name in {"postgresql", "mysql"}:
+                ref_query = ref_query.with_for_update()
+            payment = ref_query.first()
         if payment is not None and payment.status == "paid":
             return ack(duplicate=True)
+
+        # Recover the plan from the stored Payment when the callback omits it
+        # (PayTR's notification carries no custom data) BEFORE we decide whether
+        # to act, so the recovery can rescue an otherwise unmappable event.
+        if effective_plan is None and payment is not None and (payment.plan_key or "") in PAID_PLAN_KEYS:
+            effective_plan = payment.plan_key
+
+        # A paid notification we cannot map to a buyable paid plan must NOT fall
+        # through to apply_successful_payment: that normalises None -> "free" and
+        # would silently downgrade the model's license (and create a bogus zero
+        # amount Payment row). Acknowledge so the gateway stops retrying, but
+        # leave any existing license untouched.
+        if effective_plan is None:
+            current_app.logger.warning(
+                "Paid webhook with no resolvable paid plan; ignoring (provider=%s, ref=%s)",
+                provider.name,
+                provider_reference,
+            )
+            return ack(ignored=True, reason="no_plan")
 
         model = db.session.get(Model3D, model_id) if model_id else (payment.model if payment else None)
 
@@ -2314,7 +2397,7 @@ def register_routes(app: Flask) -> None:
                 paper_id=(model.paper_id if model else None),
                 model_id=(model.id if model else None),
                 plan_key=effective_plan,
-                amount_kurus=plan_amount_minor_units(effective_plan) if effective_plan else 0,
+                amount_kurus=plan_amount_minor_units(effective_plan),
                 currency=current_app.config.get("PAYMENT_CURRENCY", "USD"),
                 provider=provider.name,
                 provider_reference=provider_reference,
@@ -2326,11 +2409,6 @@ def register_routes(app: Flask) -> None:
                 payment.invoice_number = build_invoice_number(payment.id)
         elif provider_reference and not payment.provider_reference:
             payment.provider_reference = provider_reference
-
-        # Recover the plan from the stored Payment when the callback omits it
-        # (PayTR's notification carries no custom data).
-        if effective_plan is None and payment is not None and (payment.plan_key or "") in PAID_PLAN_KEYS:
-            effective_plan = payment.plan_key
 
         apply_successful_payment(payment, model, effective_plan)
         try:

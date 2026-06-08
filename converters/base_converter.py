@@ -6,6 +6,17 @@ import os
 from typing import Dict, Optional
 
 
+# Hard cap on the source file accepted for conversion, checked before any
+# converter loads the mesh into memory. A structurally valid but enormous file
+# can OOM the worker during the load/validate step (which would leave the
+# ConversionJob wedged in "processing"); rejecting it up front fails fast with a
+# clear error instead. 0 disables the check. Kept in sync with the Flask
+# Config.MAX_MODEL_FILE_BYTES default.
+MAX_MODEL_FILE_BYTES = int(
+    os.environ.get("MAX_MODEL_FILE_BYTES", os.environ.get("MAX_CONTENT_LENGTH", 260 * 1024 * 1024))
+)
+
+
 class BaseConverter:
     def __init__(self):
         self.model_id: str = None
@@ -32,6 +43,25 @@ class BaseConverter:
         if not os.path.isfile(file_path):
             self.handle_error(f"Invalid file: {file_path}")
             return False
+
+        # Reject oversized files BEFORE a subclass loads the mesh into memory,
+        # so a pathologically large model cannot exhaust the worker's RAM during
+        # validation/conversion.
+        if MAX_MODEL_FILE_BYTES:
+            try:
+                size = os.path.getsize(file_path)
+            except OSError as exc:
+                self.handle_error(f"Could not read file size: {exc}")
+                return False
+            if size > MAX_MODEL_FILE_BYTES:
+                limit_mb = MAX_MODEL_FILE_BYTES / (1024 * 1024)
+                actual_mb = size / (1024 * 1024)
+                self.handle_error(
+                    f"File is too large to process ({actual_mb:.0f} MB). "
+                    f"The limit is {limit_mb:.0f} MB. Please decimate/simplify the "
+                    f"model and upload again."
+                )
+                return False
 
         return True
 

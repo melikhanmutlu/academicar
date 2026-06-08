@@ -59,7 +59,7 @@ class Paper(db.Model):
     institution = db.Column(db.String(300), nullable=True)
     pdf_path = db.Column(db.String(500), nullable=True)
     slug = db.Column(db.String(250), unique=True, nullable=False, index=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     package_type = db.Column(db.String(30), nullable=False, default="temporary")
     status = db.Column(db.String(30), nullable=False, default="active")
     is_public = db.Column(db.Boolean, nullable=False, default=False)
@@ -89,8 +89,8 @@ class Model3D(db.Model):
     __tablename__ = "models"
 
     id = db.Column(db.String(36), primary_key=True)  # UUID
-    paper_id = db.Column(db.Integer, db.ForeignKey("papers.id"), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    paper_id = db.Column(db.Integer, db.ForeignKey("papers.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     display_name = db.Column(db.String(255), nullable=True)
     description = db.Column(db.Text, nullable=True)
     original_filename = db.Column(db.String(255), nullable=True)
