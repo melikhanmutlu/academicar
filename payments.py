@@ -49,7 +49,14 @@ def apply_successful_payment(payment, model, plan_key: str) -> None:
 
     Idempotent: safe to call more than once for the same order (license fields
     are recomputed deterministically and ``paid_at`` is only set once).
+
+    ``plan_key`` must be a buyable paid plan. Guarding here (not just at the
+    webhook route) means every caller is protected: ``apply_model_license_defaults``
+    silently normalises an unknown/empty plan to "free", so without this check a
+    stray ``None`` would downgrade a paid model instead of failing loudly.
     """
+    if plan_key not in PAID_PLAN_KEYS:
+        raise ValueError(f"apply_successful_payment requires a paid plan, got {plan_key!r}")
     payment.status = "paid"
     if not payment.paid_at:
         payment.paid_at = datetime.now(UTC)

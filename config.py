@@ -126,13 +126,12 @@ class Config:
     # worker was OOM-killed mid-conversion) is reclaimed by the worker: reset to
     # "pending" for another attempt, or marked "failed" once max_attempts is
     # exhausted. Prevents jobs (and the user's model) from getting stuck forever.
-    STUCK_JOB_TIMEOUT_SECONDS = int(os.environ.get("STUCK_JOB_TIMEOUT_SECONDS", 900))
-    # Hard cap on a source model file accepted for conversion. Checked before the
-    # mesh is loaded into memory so a pathologically large STL/OBJ/FBX cannot OOM
-    # the worker during validation. Defaults to MAX_CONTENT_LENGTH.
-    MAX_MODEL_FILE_BYTES = int(
-        os.environ.get("MAX_MODEL_FILE_BYTES", os.environ.get("MAX_CONTENT_LENGTH", 260 * 1024 * 1024))
-    )
+    # The default is generous (1h) so a legitimately slow conversion of a large
+    # FBX (fbx2gltf + Draco + texture embedding + USDZ) is never reclaimed while
+    # still running. The hard per-file size cap lives in converters/base_converter
+    # (MAX_MODEL_FILE_BYTES, read from the MAX_MODEL_FILE_BYTES / MAX_CONTENT_LENGTH
+    # env vars) since the worker validates without importing the Flask config.
+    STUCK_JOB_TIMEOUT_SECONDS = int(os.environ.get("STUCK_JOB_TIMEOUT_SECONDS", 3600))
     if APP_ENV in {"production", "prod", "pilot"}:
         DEV_INLINE_JOBS = os.environ.get("ALLOW_PRODUCTION_INLINE_JOBS", "0").lower() in {
             "1",

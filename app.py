@@ -1682,11 +1682,19 @@ def reclaim_stuck_conversion_jobs(app: Flask) -> int:
     or marked "failed" (and the model surfaced as failed) once they have already
     burned through ``max_attempts``. Returns the number of jobs reclaimed.
     """
-    timeout = int(app.config.get("STUCK_JOB_TIMEOUT_SECONDS", 900) or 0)
+    timeout = int(app.config.get("STUCK_JOB_TIMEOUT_SECONDS", 3600) or 0)
     if timeout <= 0:
         return 0
     cutoff = datetime.now(UTC) - timedelta(seconds=timeout)
-    candidates = ConversionJob.query.filter(ConversionJob.status == "processing").all()
+    # Only fetch rows that could actually be stale: aged past the cutoff, or
+    # missing a start timestamp (so we can stamp one). Fresh, legitimately
+    # running jobs are left untouched without loading them.
+    candidates = (
+        ConversionJob.query
+        .filter(ConversionJob.status == "processing")
+        .filter(or_(ConversionJob.started_at < cutoff, ConversionJob.started_at.is_(None)))
+        .all()
+    )
     reclaimed = 0
     for job in candidates:
         started = job.started_at
@@ -1699,13 +1707,26 @@ def reclaim_stuck_conversion_jobs(app: Flask) -> int:
             started = started.replace(tzinfo=UTC)
         if started >= cutoff:
             continue
+        # model_replace jobs carry is_replacement so the model is surfaced as
+        # "replacement_failed" (the previous working GLB keeps being served)
+        # instead of a hard "failed" that would break the live viewer/QR.
+        is_replacement = bool((job.payload or {}).get("is_replacement"))
         if (job.attempts or 0) >= (job.max_attempts or 3):
+            app.logger.warning(
+                "Reaping stuck conversion job %s (model=%s, attempts=%s): retry limit reached, marking failed.",
+                job.id, job.model_id, job.attempts,
+            )
             mark_model_failed(
                 job.model_id,
                 "Conversion did not finish (worker stopped) and the retry limit was reached.",
+                is_replacement=is_replacement,
                 job=job,
             )
         else:
+            app.logger.warning(
+                "Reaping stuck conversion job %s (model=%s, attempts=%s): re-queuing for another attempt.",
+                job.id, job.model_id, job.attempts,
+            )
             job.status = "pending"
             job.started_at = None
         reclaimed += 1
@@ -1744,11 +1765,14 @@ def run_next_conversion_job(app: Flask) -> bool:
         if job is None:
             return False
         # Stop retrying a job that has already exhausted its attempts so a
-        # deterministically-failing conversion cannot loop forever.
+        # deterministically-failing conversion cannot loop forever. Preserve the
+        # replacement semantics so a failed model_replace keeps serving the old
+        # GLB instead of breaking the live viewer.
         if (job.attempts or 0) >= (job.max_attempts or 3):
             mark_model_failed(
                 job.model_id,
                 "Conversion failed repeatedly and reached the retry limit.",
+                is_replacement=bool((job.payload or {}).get("is_replacement")),
                 job=job,
             )
             return True
@@ -2352,19 +2376,23 @@ def register_routes(app: Flask) -> None:
         effective_plan = plan_key if plan_key in PAID_PLAN_KEYS else None
         model_id = event.get("model_id")
 
+        # Lock the Payment row on engines that support it so two concurrent,
+        # identical webhooks cannot both clear the paid-check below and
+        # double-process the same order. Applied to BOTH lookup paths
+        # (payment_id and provider_reference).
+        lockable = db.engine.dialect.name in {"postgresql", "mysql"}
         payment = None
         payment_id = event.get("payment_id")
         if payment_id is not None:
             try:
-                payment = db.session.get(Payment, int(payment_id))
+                payment = db.session.get(
+                    Payment, int(payment_id), with_for_update=lockable or None
+                )
             except (TypeError, ValueError):
                 payment = None
         if payment is None and provider_reference:
-            # Lock the row on engines that support it so two concurrent,
-            # identical webhooks cannot both clear the paid-check below and
-            # double-process the same order.
             ref_query = Payment.query.filter_by(provider_reference=provider_reference)
-            if db.engine.dialect.name in {"postgresql", "mysql"}:
+            if lockable:
                 ref_query = ref_query.with_for_update()
             payment = ref_query.first()
         if payment is not None and payment.status == "paid":
@@ -2386,6 +2414,20 @@ def register_routes(app: Flask) -> None:
                 "Paid webhook with no resolvable paid plan; ignoring (provider=%s, ref=%s)",
                 provider.name,
                 provider_reference,
+            )
+            # Leave a durable audit record so a real payment that cannot be
+            # mapped to a plan can be reconciled manually (app logs are not a
+            # reliable financial trail).
+            log_audit(
+                "payment_webhook_unmapped",
+                user_id=(payment.user_id if payment else None),
+                resource_id=(payment.model_id if payment else None),
+                details={
+                    "provider": provider.name,
+                    "provider_reference": provider_reference,
+                    "payment_id": (payment.id if payment else None),
+                    "event_plan_key": plan_key or None,
+                },
             )
             return ack(ignored=True, reason="no_plan")
 
