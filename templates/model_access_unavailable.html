@@ -88,7 +88,7 @@
             <form method="POST" action="{{ url_for('upgrade_model_license', model_id=model.id, plan=key) }}" style="display:inline-block">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="{% if key == 'academic' %}btn-primary{% else %}btn-secondary{% endif %}" title="{{ (p.duration_days // 365) }}-year AR &amp; QR access">
-                Renew · {{ p.label }} ${{ '%.2f'|format(p.price_usd) }}
+                Upgrade license · {{ p.label }} ${{ '%.2f'|format(p.price_usd) }}
               </button>
             </form>
           {% endfor %}

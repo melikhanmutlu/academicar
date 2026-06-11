@@ -228,10 +228,9 @@
                   {% endif %}
                 </div>
                 {% if model_status == 'ready' %}
-                  {% set is_expired = model_access_status(m) == 'expired' %}
                   <div class="model-upgrade mt-4">
                     <span class="block text-xs font-semibold uppercase tracking-wide text-[#64748b] mb-2">
-                      {{ 'Renew access' if is_expired else 'Upgrade or renew access' }}
+                      Upgrade license
                     </span>
                     <div class="flex flex-wrap gap-2">
                       {% for key, p in license_plans.items() if p.price_usd > 0 %}
