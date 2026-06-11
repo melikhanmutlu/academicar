@@ -183,7 +183,9 @@ def test_paper_create_can_include_first_model(client):
         paper = Paper.query.filter_by(title="Paper With First Model").one()
         model = Model3D.query.filter_by(paper_id=paper.id).one()
         assert model.display_name == "First model"
-        assert model.license_type == "academic"
+        # Self-serve uploads always start on free, even if a paid tier is posted;
+        # paid plans require the checkout flow.
+        assert model.license_type == "free"
         assert model.processing_status == "ready"
         assert model.qr_code_path
         assert ConversionJob.query.filter_by(model_id=model.id, status="completed").one()

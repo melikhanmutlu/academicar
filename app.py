@@ -1798,7 +1798,6 @@ def _create_model_for_paper(
     file,
     companion_files: list,
     *,
-    license_type: str | None,
     display_name: str | None,
     description: str | None,
     color: str | None,
@@ -1821,7 +1820,11 @@ def _create_model_for_paper(
             "You must confirm that the model is anonymized and that you have "
             "the right to share it."
         )
-    license_normalized = normalize_license_type(license_type)
+    # Self-serve uploads always start on the free (3-day) tier. Paid plans are
+    # granted only through the checkout flow (upgrade_model_license) or an admin
+    # override (admin_model_license_update); never trust a license picked on the
+    # upload form, or a model could get a paid window for free.
+    license_normalized = "free"
     display_name = (display_name or "").strip()[:255] or None
     description = (description or "").strip()[:5000] or None
     color = (color or "").strip() or None
@@ -4064,7 +4067,6 @@ def register_routes(app: Flask) -> None:
                     paper,
                     first_model_file,
                     request.files.getlist("model_companion_files"),
-                    license_type=request.form.get("license_type"),
                     display_name=request.form.get("model_display_name"),
                     description=request.form.get("model_description"),
                     color=request.form.get("color") if request.form.get("color_enabled") == "yes" else None,
@@ -4276,7 +4278,6 @@ def register_routes(app: Flask) -> None:
             paper,
             file,
             request.files.getlist("companion_files"),
-            license_type=request.form.get("license_type"),
             display_name=request.form.get("display_name"),
             description=request.form.get("description"),
             color=request.form.get("color") if request.form.get("color_enabled") == "yes" else None,

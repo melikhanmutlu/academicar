@@ -334,14 +334,9 @@
 
               <div class="upload-workflow-right">
                 <p class="upload-description">Upload an anonymized model file. The platform prepares a stable public viewer, managed QR code, and AR-ready GLB asset.</p>
-                <div>
-                  <label class="field-label">Model license</label>
-                  <select name="license_type" class="field-select">
-                    <option value="free">Free Access - $0, 3-day access, up to 100 MB</option>
-                    <option value="academic">Academic - $9.90 / model, 3-year access, up to 200 MB</option>
-                    <option value="extended_archive">Extended Archive - $24.90 / model, 10-year access, up to 200 MB</option>
-                  </select>
-                  <p class="text-xs text-[#5c6473] mt-2">The same QR and resolver link stay stable if this model is upgraded or replaced later.</p>
+                <div class="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4">
+                  <p class="text-sm font-semibold text-[#111827]">Starts on Free access</p>
+                  <p class="text-xs text-[#5c6473] mt-1">New models get a 3-day, watermarked viewer (up to 100 MB). Upgrade to Academic (3-year) or Extended Archive (10-year) any time from the model card below — the same QR and viewer link stay stable.</p>
                 </div>
                 <div class="grid sm:grid-cols-2 gap-4">
                   <input type="text" name="display_name" placeholder="Model name" aria-label="Model name" maxlength="255" class="field-input">
