@@ -84,14 +84,16 @@
     <div class="model-unavail-actions">
       {% if status == "expired" %}
         {% if is_owner %}
-          {% for key, p in license_plans.items() if p.price_usd > 0 %}
-            <form method="POST" action="{{ url_for('upgrade_model_license', model_id=model.id, plan=key) }}" style="display:inline-block">
+          {% set upgrade_options = model_upgrade_options(model) %}
+          {% for o in upgrade_options %}
+            <form method="POST" action="{{ url_for('upgrade_model_license', model_id=model.id, plan=o.key) }}" style="display:inline-block">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button type="submit" class="{% if key == 'academic' %}btn-primary{% else %}btn-secondary{% endif %}" title="{{ (p.duration_days // 365) }}-year AR &amp; QR access">
-                Upgrade license · {{ p.label }} ${{ '%.2f'|format(p.price_usd) }}
+              <button type="submit" class="{% if loop.first %}btn-primary{% else %}btn-secondary{% endif %}" title="{{ (o.plan.duration_days // 365) }}-year AR &amp; QR access">
+                {{ 'Upgrade license · ' if o.kind == 'upgrade' else 'Renew · ' }}{{ o.plan.label }} ${{ '%.2f'|format(o.plan.price_usd) }}
               </button>
             </form>
           {% endfor %}
+          <a href="{{ url_for('paper_public', slug=paper.slug) }}" class="btn-secondary">Go to publication page</a>
         {% else %}
           <a href="{{ url_for('pricing') }}" class="btn-primary">View upgrade options</a>
           <a href="{{ url_for('paper_public', slug=paper.slug) }}" class="btn-secondary">Go to publication page</a>

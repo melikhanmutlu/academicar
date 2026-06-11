@@ -174,3 +174,41 @@ def model_file_limit_error(file_size: int, license_type: str | None) -> str | No
             f"({limit_mb:.0f} MB limit)."
         )
     return None
+
+
+def model_upgrade_options(model, within_days: int = 30) -> list[dict]:
+    """Self-serve checkout options to show on a model's license CTA.
+
+    Returns a list of ``{"key", "plan", "kind"}`` dicts where ``kind`` is:
+
+    * ``"upgrade"`` — a strictly higher-priced paid plan; always offered.
+    * ``"renew"``   — the model's *current* paid plan; offered only when access
+      is already expired or lapses within ``within_days`` days.
+
+    A downgrade (a cheaper plan than the current one) is never offered, and an
+    Extended Archive model with years of access left returns ``[]`` so the
+    caller can hide the whole block. This keeps the card from advertising plans
+    the model already has (or worse, a downgrade) — the source of the
+    "I upgraded but it still shows upgrade options" UX bug.
+    """
+    if model is None:
+        return []
+    current = get_license_plan(getattr(model, "license_type", None))
+    options: list[dict] = []
+    # Upgrades: any user-selectable plan priced above the current one, in
+    # ascending price order (USER_SELECTABLE_PLAN_KEYS is free -> academic ->
+    # extended_archive).
+    for key in USER_SELECTABLE_PLAN_KEYS:
+        plan = LICENSE_PLANS[key]
+        if plan.price_usd > current.price_usd:
+            options.append({"key": key, "plan": plan, "kind": "upgrade"})
+    # Renew: only the current plan, only when it is paid and lapsing.
+    if current.price_usd > 0:
+        exp = getattr(model, "access_expires_at", None)
+        lapsing = exp is None or is_access_expired(exp)
+        if not lapsing and exp is not None:
+            e = exp if exp.tzinfo else exp.replace(tzinfo=UTC)
+            lapsing = e <= datetime.now(UTC) + timedelta(days=within_days)
+        if lapsing:
+            options.append({"key": current.key, "plan": current, "kind": "renew"})
+    return options

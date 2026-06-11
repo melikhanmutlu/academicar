@@ -51,6 +51,7 @@ from licensing import (
     model_access_status,
     model_file_limit_error,
     model_is_accessible,
+    model_upgrade_options,
     normalize_license_type,
 )
 from licensing import paper_is_expired as licensing_paper_is_expired
@@ -164,6 +165,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             "get_license_plan": get_license_plan,
             "model_resolver_url": model_resolver_url,
             "model_access_status": model_access_status,
+            "model_upgrade_options": model_upgrade_options,
             "format_model_dimensions_cm": format_model_dimensions_cm,
         }
 
@@ -2294,6 +2296,18 @@ def register_routes(app: Flask) -> None:
         plan_key = (plan or "").strip().lower()
         if plan_key not in PAID_PLAN_KEYS:
             flash("Choose a valid paid plan to upgrade this model.", "danger")
+            return redirect(request.referrer or url_for("dashboard"))
+
+        # Never let this paid route apply a downgrade (a plan cheaper than the
+        # model already has) — that would charge the user to *reduce* access.
+        # Renewing the same plan (equal price) and upgrading (higher price) are
+        # both fine. Downgrades are an admin-only action via /models/<id>/license.
+        if get_license_plan(plan_key).price_usd < get_license_plan(model.license_type).price_usd:
+            flash(
+                "This model already has a higher-tier license. You can renew it "
+                "or upgrade to a longer plan, but not switch to a cheaper one here.",
+                "info",
+            )
             return redirect(request.referrer or url_for("dashboard"))
 
         provider = get_payment_provider()

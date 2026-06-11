@@ -161,6 +161,7 @@
       <div class="model-registry-grid">
         {% for m in paper.models %}
           {% set model_status = m.processing_status or 'ready' %}
+          {% set access_state = model_access_status(m) %}
           {% set plan = license_plans.get(m.license_type or 'free') or license_plans.get('free') %}
           {% set conversion_label = (m.source_format or 'stl')|upper ~ ' -> GLB' %}
           {% set dimensions_label = format_model_dimensions_cm(m) %}
@@ -196,12 +197,17 @@
                 <div class="flex flex-wrap items-center gap-2">
                   <h3 class="font-serif text-2xl font-semibold text-[#111827] truncate" title="{{ m.display_name or m.original_filename }}">{{ m.display_name or m.original_filename }}</h3>
                   <span class="detail-chip dark">{{ plan.label }}</span>
-                  {% if model_status != 'ready' %}<span class="detail-chip status">{{ model_status|title }}</span>{% endif %}
+                  {% if model_status != 'ready' %}<span class="detail-chip status">{{ model_status|title }}</span>
+                  {% elif access_state == 'expired' %}<span class="detail-chip status">Expired</span>{% endif %}
                 </div>
                 {% if m.description %}<p class="text-sm text-[#64748b] mt-2 line-clamp-2">{{ m.description }}</p>{% endif %}
                 {% if model_status == 'failed' and m.processing_error %}<p class="text-sm text-red-600 mt-2">{{ m.processing_error }}</p>{% endif %}
                 <div class="model-meta-grid mt-4">
-                  <div><span>Access</span><strong>{{ 'Until ' ~ m.access_expires_at.strftime('%b %d, %Y') if m.access_expires_at else 'No expiry' }}</strong></div>
+                  <div><span>Access</span><strong>
+                    {%- if m.access_expires_at -%}
+                      {%- if access_state == 'expired' %}Expired {{ m.access_expires_at.strftime('%b %d, %Y') }}{% else %}Until {{ m.access_expires_at.strftime('%b %d, %Y') }}{% endif -%}
+                    {%- else -%}No expiry{%- endif -%}
+                  </strong></div>
                   <div><span>Conversion</span><strong>{{ conversion_label }}</strong></div>
                   <div><span>Size</span><strong>{{ format_file_size(m.file_size) }}</strong></div>
                   <div><span>W × H × D</span><strong title="{{ dimensions_label }}">{{ dimensions_label }}</strong></div>
@@ -228,23 +234,27 @@
                   {% endif %}
                 </div>
                 {% if model_status == 'ready' %}
-                  <div class="model-upgrade mt-4">
-                    <span class="block text-xs font-semibold uppercase tracking-wide text-[#64748b] mb-2">
-                      Upgrade license
-                    </span>
-                    <div class="flex flex-wrap gap-2">
-                      {% for key, p in license_plans.items() if p.price_usd > 0 %}
-                        <form method="POST" action="{{ url_for('upgrade_model_license', model_id=m.id, plan=key) }}">
-                          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                          <button type="submit"
-                                  class="detail-action{% if key == 'academic' %} detail-action-primary{% endif %}"
-                                  title="{{ p.label }} — ${{ '%.2f'|format(p.price_usd) }}, {{ (p.duration_days // 365) }}-year AR &amp; QR access">
-                            {{ p.label }} · ${{ '%.2f'|format(p.price_usd) }}
-                          </button>
-                        </form>
-                      {% endfor %}
+                  {% set upgrade_options = model_upgrade_options(m) %}
+                  {% if upgrade_options %}
+                    {% set kinds = upgrade_options|map(attribute='kind')|list %}
+                    <div class="model-upgrade mt-4">
+                      <span class="block text-xs font-semibold uppercase tracking-wide text-[#64748b] mb-2">
+                        {{ 'Upgrade license' if 'upgrade' in kinds else 'Renew license' }}
+                      </span>
+                      <div class="flex flex-wrap gap-2">
+                        {% for o in upgrade_options %}
+                          <form method="POST" action="{{ url_for('upgrade_model_license', model_id=m.id, plan=o.key) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit"
+                                    class="detail-action{% if loop.first %} detail-action-primary{% endif %}"
+                                    title="{{ o.plan.label }} — ${{ '%.2f'|format(o.plan.price_usd) }}, {{ (o.plan.duration_days // 365) }}-year AR &amp; QR access">
+                              {{ 'Upgrade to ' if o.kind == 'upgrade' else 'Renew ' }}{{ o.plan.label }} · ${{ '%.2f'|format(o.plan.price_usd) }}
+                            </button>
+                          </form>
+                        {% endfor %}
+                      </div>
                     </div>
-                  </div>
+                  {% endif %}
                 {% endif %}
               </div>
             </div>
