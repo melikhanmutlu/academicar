@@ -128,21 +128,23 @@
       {% endif %}
 
       <div class="model-edit-secondary-grid">
-        <form method="POST" action="{{ url_for('model_license_update', model_id=model.id) }}" class="surface model-edit-card">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="surface model-edit-card">
           <div class="model-edit-card-head">
             <h2>Access plan</h2>
-            <p>Changes access duration and upload limit while preserving QR and resolver URL.</p>
+            <p>A model's license is a paid upgrade and keeps the same QR and resolver URL. Upgrade or renew from the publication page.</p>
           </div>
-          <select name="license_type" class="field-select">
-            {% for key, plan in license_plans.items() if key in user_selectable_plan_keys or key == model.license_type %}
-              <option value="{{ key }}" {% if model.license_type == key %}selected{% endif %}>{{ plan.label }} - ${{ '%.2f'|format(plan.price_usd) }} / model, up to {{ format_file_size(plan.storage_limit_bytes) }}</option>
-            {% endfor %}
-          </select>
+          <div class="model-meta-grid">
+            <div><span>Current plan</span><strong>{{ get_license_plan(model.license_type).label }}</strong></div>
+            <div><span>Access</span><strong>
+              {%- if model.access_expires_at -%}
+                {%- if model_access_status(model) == 'expired' %}Expired {{ model.access_expires_at.strftime('%b %d, %Y') }}{% else %}Until {{ model.access_expires_at.strftime('%b %d, %Y') }}{% endif -%}
+              {%- else -%}No expiry{%- endif -%}
+            </strong></div>
+          </div>
           <div class="model-edit-actions">
-            <button type="submit" class="detail-action detail-action-primary">Apply License</button>
+            <a href="{{ url_for('paper_detail', slug=paper.slug) }}" class="detail-action detail-action-primary">Upgrade or renew</a>
           </div>
-        </form>
+        </div>
 
         {% if model_status == 'ready' %}
         <form method="POST" action="{{ url_for('model_rescale', model_id=model.id) }}" class="surface model-edit-card">

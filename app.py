@@ -4286,32 +4286,11 @@ def register_routes(app: Flask) -> None:
         flash(message, "success" if ok else "danger")
         return redirect(url_for("paper_detail", slug=slug))
 
-    @app.route("/models/<model_id>/license", methods=["POST"])
-    @login_required
-    @require_model_ownership
-    def model_license_update(model_id):
-        """Upgrade or change a model's license tier without breaking its
-        public_id, QR code, or resolver URL."""
-        model = db.session.get(Model3D, model_id)
-        if not model:
-            abort(404)
-        new_license = normalize_license_type(request.form.get("license_type"))
-        previous = model.license_type or "free"
-        try:
-            apply_model_license_defaults(model, new_license)
-            db.session.commit()
-            log_audit(
-                "model_license_changed",
-                user_id=current_user.id,
-                resource_id=model_id,
-                details={"from": previous, "to": new_license},
-            )
-            flash(f"License updated to {get_license_plan(new_license).label}.", "success")
-        except SQLAlchemyError:
-            db.session.rollback()
-            logger.exception("License upgrade failed")
-            flash("Could not update the model license. Please try again.", "danger")
-        return redirect(url_for("paper_detail", slug=model.paper.slug))
+    # NOTE: there is intentionally no owner-facing "change my model's license"
+    # route. Licenses are paid upgrades only (see upgrade_model_license ->
+    # provider checkout); an admin can still override a model's tier for free via
+    # admin_model_license_update (/admin/models/<id>/license). Re-adding a
+    # self-serve free license change here would bypass the payment flow.
 
     @app.route("/models/<model_id>/replace", methods=["POST"])
     @login_required

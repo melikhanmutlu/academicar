@@ -638,8 +638,7 @@ def test_model_license_upgrade_and_replace_keep_public_id(client):
         model_id = model.id
 
     upgrade = client.post(
-        f"/models/{model_id}/license",
-        data={"license_type": "academic"},
+        f"/models/{model_id}/upgrade/academic",
         follow_redirects=True,
     )
     assert upgrade.status_code == 200
@@ -717,8 +716,7 @@ def test_free_model_expires_after_three_days_but_keeps_qr_and_can_be_upgraded(cl
         assert QRLink.query.filter_by(model_id=model_id, public_id=public_id).one()
 
     upgrade = client.post(
-        f"/models/{model_id}/license",
-        data={"license_type": "academic"},
+        f"/models/{model_id}/upgrade/academic",
         follow_redirects=True,
     )
     assert upgrade.status_code == 200
@@ -728,7 +726,12 @@ def test_free_model_expires_after_three_days_but_keeps_qr_and_can_be_upgraded(cl
         assert model.license_type == "academic"
         assert model.public_id == public_id
         assert model.qr_code_path == qr_code_path
-        assert model.access_expires_at.replace(tzinfo=UTC) == starts_at.replace(tzinfo=UTC) + timedelta(days=365 * 3)
+        # A paid upgrade restores access with a fresh window measured from the
+        # payment time, so a previously-expired model is active again.
+        now = utc_now()
+        expires = model.access_expires_at.replace(tzinfo=UTC)
+        assert expires > now
+        assert abs((expires - now) - timedelta(days=365 * 3)) < timedelta(days=1)
 
     assert client.get(f"/m/{public_id}", follow_redirects=False).status_code == 302
     assert client.get(f"/view/{model_id}").status_code == 200
