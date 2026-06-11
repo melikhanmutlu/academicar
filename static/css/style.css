@@ -5243,21 +5243,121 @@ input[type="file"]::-webkit-file-upload-button {
 .model-registry-grid .model-color-row {
   display: flex;
 }
-.model-registry-grid .model-actions {
+/* ── Model card v2 ───────────────────────────────────────────────────────
+   Calm editorial card: body (preview + quiet key/value meta) over a hairline
+   footer strip holding one compact primary action, middot text links, and a
+   collapsed upgrade disclosure. Equal-height cards via flex column. */
+.model-registry-grid .model-card {
   display: flex;
   flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+.model-card-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr);
+  gap: 18px;
+  padding: 18px;
+}
+.model-registry-grid .model-card .model-preview {
+  height: 168px;
+  border-radius: 10px;
+}
+.model-card-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.model-card-title h3 {
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--color-midnight-graphite);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.model-card-desc {
+  margin-top: 5px;
+  font-family: var(--font-inter);
+  font-size: 13px;
+  color: #64748b;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* Quiet, borderless key/value rows replace the old boxed meta tiles. */
+.model-meta-list {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.model-meta-list > div {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: baseline;
   gap: 10px;
 }
-.model-registry-grid .model-actions .detail-action-primary,
-.model-registry-grid .model-actions .detail-action-muted {
-  width: 100%;
+.model-meta-list dt {
+  font-family: var(--font-inter);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-silver-ash);
 }
-.model-registry-grid .model-action-wide {
-  width: 100%;
+.model-meta-list dd {
+  font-family: var(--font-inter);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-midnight-graphite);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+.model-meta-list dd.is-expired { color: #b3411f; font-weight: 600; }
 
-/* Quiet secondary actions: small text links separated by middots, so the card
-   has a single primary action and a calm row beneath it. */
+/* Footer strip: hairline divider, compact primary, quiet links, upgrade. */
+.model-card-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--color-light-pearl);
+  background: #fcfcfc;
+  position: relative;
+}
+.model-card-cta {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 6px 16px;
+  border-radius: 8px;
+  background: var(--color-midnight-graphite);
+  border: 1px solid var(--color-midnight-graphite);
+  font-family: var(--font-inter);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #ffffff;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+.model-card-cta:hover { background: var(--color-dark-shale, #4d4d4d); }
+.model-card-cta.is-disabled {
+  background: transparent;
+  border-color: var(--color-light-pearl);
+  color: var(--color-silver-ash);
+  cursor: default;
+}
+.model-card-footer .model-actions-secondary { margin-right: auto; }
+
+/* Quiet secondary actions: small text links separated by middots. */
 .model-actions-secondary {
   display: flex;
   flex-wrap: wrap;
@@ -5287,8 +5387,8 @@ input[type="file"]::-webkit-file-upload-button {
   font-weight: 400;
 }
 
-/* Upgrade is collapsed by default so paid plans never crowd the card; the
-   summary is a quiet link that discloses the plan buttons on click. */
+/* Upgrade lives in the footer as a quiet disclosure; options reveal as a row
+   spanning the footer's full width beneath the strip. */
 .model-upgrade-disclosure > summary {
   list-style: none;
   display: inline-flex;
@@ -5312,6 +5412,10 @@ input[type="file"]::-webkit-file-upload-button {
 }
 .model-upgrade-disclosure[open] > summary::before { transform: rotate(90deg); }
 .model-upgrade-disclosure > summary:hover { color: var(--color-sunset-orange); }
+.model-upgrade-disclosure > summary.is-urgent { color: var(--color-sunset-orange); }
+.model-card-footer .model-upgrade-disclosure[open] {
+  flex-basis: 100%;
+}
 .model-upgrade-options {
   display: flex;
   flex-wrap: wrap;
@@ -5349,6 +5453,9 @@ input[type="file"]::-webkit-file-upload-button {
 @media (max-width: 560px) {
   .model-registry-grid .model-row-grid { grid-template-columns: 1fr; }
   .model-registry-grid .model-preview { height: 180px; }
+  .model-card-body { grid-template-columns: 1fr; }
+  .model-registry-grid .model-card .model-preview { height: 180px; }
+  .model-card-footer { padding: 12px 16px; }
 }
 
 /* Model edit page */

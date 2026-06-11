@@ -165,8 +165,8 @@
           {% set plan = license_plans.get(m.license_type or 'free') or license_plans.get('free') %}
           {% set conversion_label = (m.source_format or 'stl')|upper ~ ' -> GLB' %}
           {% set dimensions_label = format_model_dimensions_cm(m) %}
-          <div class="model-row surface rounded-xl p-4 group reveal-up" data-model-row data-status-url="{{ url_for('model_status', model_id=m.id) }}" data-status="{{ model_status }}" data-name="{{ (m.display_name or m.original_filename or '')|lower }}" data-size="{{ m.file_size or 0 }}" data-order="{{ loop.index0 }}">
-            <div class="model-row-grid">
+          <div class="model-row model-card surface rounded-xl group reveal-up" data-model-row data-status-url="{{ url_for('model_status', model_id=m.id) }}" data-status="{{ model_status }}" data-name="{{ (m.display_name or m.original_filename or '')|lower }}" data-size="{{ m.file_size or 0 }}" data-order="{{ loop.index0 }}">
+            <div class="model-card-body">
               {% if model_status == 'ready' %}
                 <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-preview" aria-label="Open 3D viewer for {{ m.display_name or m.original_filename }}">
                   <model-viewer
@@ -194,65 +194,66 @@
               {% endif %}
 
               <div class="model-info">
-                <div class="flex flex-wrap items-center gap-2">
-                  <h3 class="font-serif text-2xl font-semibold text-[#111827] truncate" title="{{ m.display_name or m.original_filename }}">{{ m.display_name or m.original_filename }}</h3>
+                <div class="model-card-title">
+                  <h3 class="font-serif" title="{{ m.display_name or m.original_filename }}">{{ m.display_name or m.original_filename }}</h3>
                   <span class="detail-chip dark">{{ plan.label }}</span>
                   {% if model_status != 'ready' %}<span class="detail-chip status">{{ model_status|title }}</span>
                   {% elif access_state == 'expired' %}<span class="detail-chip status">Expired</span>{% endif %}
                 </div>
-                {% if m.description %}<p class="text-sm text-[#64748b] mt-2 line-clamp-2">{{ m.description }}</p>{% endif %}
+                {% if m.description %}<p class="model-card-desc">{{ m.description }}</p>{% endif %}
                 {% if model_status == 'failed' and m.processing_error %}<p class="text-sm text-red-600 mt-2">{{ m.processing_error }}</p>{% endif %}
-                <div class="model-meta-grid mt-4">
-                  <div><span>Access</span><strong>
-                    {%- if m.access_expires_at -%}
-                      {%- if access_state == 'expired' %}Expired {{ m.access_expires_at.strftime('%b %d, %Y') }}{% else %}Until {{ m.access_expires_at.strftime('%b %d, %Y') }}{% endif -%}
-                    {%- else -%}No expiry{%- endif -%}
-                  </strong></div>
-                  <div><span>Conversion</span><strong>{{ conversion_label }}</strong></div>
-                  <div><span>Size</span><strong>{{ format_file_size(m.file_size) }}</strong></div>
-                  <div><span>W × H × D</span><strong title="{{ dimensions_label }}">{{ dimensions_label }}</strong></div>
-                </div>
-                <div class="model-actions mt-4">
-                  {% if model_status == 'ready' %}
-                    {% if access_state == 'active' %}
-                      <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action detail-action-primary model-action-wide">Open 3D / AR</a>
-                    {% else %}
-                      <button type="button" class="detail-action detail-action-muted model-action-wide" disabled title="Renew the license below to make this model viewable again">Expired — renew below</button>
-                    {% endif %}
-                    <div class="model-actions-secondary">
-                      <button type="button" class="model-link-action" data-copy-link="{{ model_resolver_url(m) }}" aria-label="Copy viewer link">Copy link</button>
-                      <a href="{{ url_for('qr_print', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-link-action">View QR</a>
-                      <a href="{{ url_for('model_edit', model_id=m.id) }}" class="model-link-action">Edit</a>
-                    </div>
-                  {% else %}
-                    <button type="button" class="detail-action detail-action-muted model-action-wide" disabled>{{ 'Processing' if model_status != 'failed' else 'Not ready' }}</button>
-                    <div class="model-actions-secondary">
-                      <a href="{{ url_for('model_edit', model_id=m.id) }}" class="model-link-action">Edit</a>
-                    </div>
-                  {% endif %}
-                </div>
-                {% if model_status == 'ready' %}
-                  {% set upgrade_options = model_upgrade_options(m) %}
-                  {% if upgrade_options %}
-                    {% set kinds = upgrade_options|map(attribute='kind')|list %}
-                    <details class="model-upgrade-disclosure mt-3">
-                      <summary>{{ 'Upgrade license' if 'upgrade' in kinds else 'Renew license' }}</summary>
-                      <div class="model-upgrade-options">
-                        {% for o in upgrade_options %}
-                          <form method="POST" action="{{ url_for('upgrade_model_license', model_id=m.id, plan=o.key) }}">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="model-upgrade-btn"
-                                    title="{{ o.plan.label }} — ${{ '%.2f'|format(o.plan.price_usd) }}, {{ (o.plan.duration_days // 365) }}-year AR &amp; QR access">
-                              {{ 'Upgrade to ' if o.kind == 'upgrade' else 'Renew ' }}{{ o.plan.label }}
-                              <span class="model-upgrade-price">${{ '%.2f'|format(o.plan.price_usd) }}</span>
-                            </button>
-                          </form>
-                        {% endfor %}
-                      </div>
-                    </details>
-                  {% endif %}
-                {% endif %}
+                <dl class="model-meta-list">
+                  <div>
+                    <dt>Access</dt>
+                    <dd{% if access_state == 'expired' %} class="is-expired"{% endif %}>
+                      {%- if m.access_expires_at -%}
+                        {%- if access_state == 'expired' %}Expired {{ m.access_expires_at.strftime('%b %d, %Y') }}{% else %}Until {{ m.access_expires_at.strftime('%b %d, %Y') }}{% endif -%}
+                      {%- else -%}No expiry{%- endif -%}
+                    </dd>
+                  </div>
+                  <div><dt>Format</dt><dd>{{ conversion_label }} · {{ format_file_size(m.file_size) }}</dd></div>
+                  <div><dt>Size</dt><dd title="{{ dimensions_label }}">{{ dimensions_label }}</dd></div>
+                </dl>
               </div>
+            </div>
+
+            <div class="model-card-footer">
+              {% if model_status == 'ready' %}
+                {% if access_state == 'active' %}
+                  <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-card-cta">Open 3D / AR</a>
+                {% else %}
+                  <span class="model-card-cta is-disabled" title="Renew the license to make this model viewable again">Expired</span>
+                {% endif %}
+                <div class="model-actions-secondary">
+                  <button type="button" class="model-link-action" data-copy-link="{{ model_resolver_url(m) }}" aria-label="Copy viewer link">Copy link</button>
+                  <a href="{{ url_for('qr_print', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-link-action">QR</a>
+                  <a href="{{ url_for('model_edit', model_id=m.id) }}" class="model-link-action">Edit</a>
+                </div>
+                {% set upgrade_options = model_upgrade_options(m) %}
+                {% if upgrade_options %}
+                  {% set kinds = upgrade_options|map(attribute='kind')|list %}
+                  <details class="model-upgrade-disclosure">
+                    <summary class="{% if access_state == 'expired' %}is-urgent{% endif %}">{{ 'Upgrade' if 'upgrade' in kinds else 'Renew' }}</summary>
+                    <div class="model-upgrade-options">
+                      {% for o in upgrade_options %}
+                        <form method="POST" action="{{ url_for('upgrade_model_license', model_id=m.id, plan=o.key) }}">
+                          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                          <button type="submit" class="model-upgrade-btn"
+                                  title="{{ o.plan.label }} — ${{ '%.2f'|format(o.plan.price_usd) }}, {{ (o.plan.duration_days // 365) }}-year AR &amp; QR access">
+                            {{ 'Upgrade to ' if o.kind == 'upgrade' else 'Renew ' }}{{ o.plan.label }}
+                            <span class="model-upgrade-price">${{ '%.2f'|format(o.plan.price_usd) }}</span>
+                          </button>
+                        </form>
+                      {% endfor %}
+                    </div>
+                  </details>
+                {% endif %}
+              {% else %}
+                <span class="model-card-cta is-disabled">{{ 'Processing' if model_status != 'failed' else 'Not ready' }}</span>
+                <div class="model-actions-secondary">
+                  <a href="{{ url_for('model_edit', model_id=m.id) }}" class="model-link-action">Edit</a>
+                </div>
+              {% endif %}
             </div>
           </div>
         {% endfor %}

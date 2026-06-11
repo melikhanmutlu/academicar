@@ -548,10 +548,11 @@ def test_valid_stl_upload_creates_model_and_qr(client, monkeypatch):
     )
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    assert "Conversion" in html
+    # Model card v2 meta rows: "Format" carries the conversion + file size,
+    # "Size" carries the physical dimensions.
+    assert "Format" in html
     assert "STL -&gt; GLB" in html
     assert "Size" in html
-    assert "W × H × D" in html
     assert "File limit" not in html
     assert "Version" not in html
 
