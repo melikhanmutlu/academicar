@@ -212,52 +212,44 @@
                   <div><span>Size</span><strong>{{ format_file_size(m.file_size) }}</strong></div>
                   <div><span>W × H × D</span><strong title="{{ dimensions_label }}">{{ dimensions_label }}</strong></div>
                 </div>
-                {% if model_status == 'ready' %}
-                  <div class="model-color-row mt-4">
-                    <form method="POST" action="{{ url_for('model_appearance_update', model_id=m.id) }}" class="model-color-form" title="Save viewer color without changing the viewer link or QR">
-                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                      <input type="hidden" name="next" value="{{ url_for('paper_detail', slug=paper.slug) }}">
-                      <input type="color" name="color" value="{{ m.appearance_color or '#cccccc' }}" aria-label="Model color">
-                      <button type="submit">Save color</button>
-                    </form>
-                  </div>
-                {% endif %}
                 <div class="model-actions mt-4">
                   {% if model_status == 'ready' %}
                     {% if access_state == 'active' %}
                       <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action detail-action-primary model-action-wide">Open 3D / AR</a>
                     {% else %}
-                      <button type="button" class="detail-action detail-action-muted model-action-wide" disabled title="Renew the license below to make this model viewable again">Expired — renew to view</button>
+                      <button type="button" class="detail-action detail-action-muted model-action-wide" disabled title="Renew the license below to make this model viewable again">Expired — renew below</button>
                     {% endif %}
-                    <button type="button" class="detail-action" data-copy-link="{{ model_resolver_url(m) }}" aria-label="Copy viewer link">Copy Link</button>
-                    <a href="{{ url_for('qr_print', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action">View QR</a>
-                    <a href="{{ url_for('model_edit', model_id=m.id) }}" class="detail-action model-action-wide">Edit Model</a>
+                    <div class="model-actions-secondary">
+                      <button type="button" class="model-link-action" data-copy-link="{{ model_resolver_url(m) }}" aria-label="Copy viewer link">Copy link</button>
+                      <a href="{{ url_for('qr_print', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-link-action">View QR</a>
+                      <a href="{{ url_for('model_edit', model_id=m.id) }}" class="model-link-action">Edit</a>
+                    </div>
                   {% else %}
                     <button type="button" class="detail-action detail-action-muted model-action-wide" disabled>{{ 'Processing' if model_status != 'failed' else 'Not ready' }}</button>
-                    <a href="{{ url_for('model_edit', model_id=m.id) }}" class="detail-action model-action-wide">Edit Model</a>
+                    <div class="model-actions-secondary">
+                      <a href="{{ url_for('model_edit', model_id=m.id) }}" class="model-link-action">Edit</a>
+                    </div>
                   {% endif %}
                 </div>
                 {% if model_status == 'ready' %}
                   {% set upgrade_options = model_upgrade_options(m) %}
                   {% if upgrade_options %}
                     {% set kinds = upgrade_options|map(attribute='kind')|list %}
-                    <div class="model-upgrade mt-4">
-                      <span class="block text-xs font-semibold uppercase tracking-wide text-[#64748b] mb-2">
-                        {{ 'Upgrade license' if 'upgrade' in kinds else 'Renew license' }}
-                      </span>
-                      <div class="flex flex-wrap gap-2">
+                    <details class="model-upgrade-disclosure mt-3">
+                      <summary>{{ 'Upgrade license' if 'upgrade' in kinds else 'Renew license' }}</summary>
+                      <div class="model-upgrade-options">
                         {% for o in upgrade_options %}
                           <form method="POST" action="{{ url_for('upgrade_model_license', model_id=m.id, plan=o.key) }}">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit"
-                                    class="detail-action{% if loop.first %} detail-action-primary{% endif %}"
+                            <button type="submit" class="model-upgrade-btn"
                                     title="{{ o.plan.label }} — ${{ '%.2f'|format(o.plan.price_usd) }}, {{ (o.plan.duration_days // 365) }}-year AR &amp; QR access">
-                              {{ 'Upgrade to ' if o.kind == 'upgrade' else 'Renew ' }}{{ o.plan.label }} · ${{ '%.2f'|format(o.plan.price_usd) }}
+                              {{ 'Upgrade to ' if o.kind == 'upgrade' else 'Renew ' }}{{ o.plan.label }}
+                              <span class="model-upgrade-price">${{ '%.2f'|format(o.plan.price_usd) }}</span>
                             </button>
                           </form>
                         {% endfor %}
                       </div>
-                    </div>
+                    </details>
                   {% endif %}
                 {% endif %}
               </div>

@@ -5244,15 +5244,104 @@ input[type="file"]::-webkit-file-upload-button {
   display: flex;
 }
 .model-registry-grid .model-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
-.model-registry-grid .model-actions .detail-action {
+.model-registry-grid .model-actions .detail-action-primary,
+.model-registry-grid .model-actions .detail-action-muted {
   width: 100%;
 }
 .model-registry-grid .model-action-wide {
-  grid-column: 1 / -1;
+  width: 100%;
+}
+
+/* Quiet secondary actions: small text links separated by middots, so the card
+   has a single primary action and a calm row beneath it. */
+.model-actions-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 0;
+}
+.model-link-action {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 2px 0;
+  font-family: var(--font-inter);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-dark-shale, #4d4d4d);
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+.model-link-action:hover {
+  color: var(--color-sunset-orange);
+}
+.model-actions-secondary > .model-link-action:not(:last-child)::after {
+  content: "·";
+  margin: 0 9px;
+  color: var(--color-silver-ash);
+  font-weight: 400;
+}
+
+/* Upgrade is collapsed by default so paid plans never crowd the card; the
+   summary is a quiet link that discloses the plan buttons on click. */
+.model-upgrade-disclosure > summary {
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-family: var(--font-inter);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-dark-shale, #4d4d4d);
+  user-select: none;
+}
+.model-upgrade-disclosure > summary::-webkit-details-marker { display: none; }
+.model-upgrade-disclosure > summary::before {
+  content: "›";
+  display: inline-block;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--color-silver-ash);
+  transition: transform 0.15s ease;
+}
+.model-upgrade-disclosure[open] > summary::before { transform: rotate(90deg); }
+.model-upgrade-disclosure > summary:hover { color: var(--color-sunset-orange); }
+.model-upgrade-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.model-upgrade-options form { margin: 0; }
+.model-upgrade-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-light-pearl);
+  border-radius: 8px;
+  background: var(--color-canvas-white);
+  font-family: var(--font-inter);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-midnight-graphite);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.model-upgrade-btn:hover {
+  border-color: var(--color-midnight-graphite);
+  background: var(--color-cloud-whisper, #f7f7f7);
+}
+.model-upgrade-price {
+  font-weight: 700;
+  color: var(--color-sunset-orange);
 }
 @media (max-width: 1024px) {
   .model-registry-grid { grid-template-columns: 1fr; }
