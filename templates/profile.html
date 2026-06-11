@@ -2,8 +2,6 @@
 {% block title %}Profile - AcademicAR{% endblock %}
 
 {% block content %}
-{% set is_academic = (user.plan == 'academic') %}
-{% set is_extended = (user.plan == 'extended_archive') %}
 <div class="app-shell profile-shell py-8 pb-12">
   <div class="dashboard-header reveal-up">
     <div>
@@ -26,7 +24,7 @@
         <h2>{{ user.username }}</h2>
         <p>{{ user.email }}</p>
         <div class="profile-chips">
-          <span>{{ 'Extended Archive plan' if is_extended else ('Academic plan' if is_academic else 'Free plan') }}</span>
+          <span>{{ academic_model_count + extended_model_count }} licensed model{{ '' if (academic_model_count + extended_model_count) == 1 else 's' }}</span>
           {% if not has_password %}<span>Google sign-in</span>{% endif %}
           <span>Member since {{ user.created_at.strftime('%b %Y') if user.created_at else '-' }}</span>
         </div>
@@ -81,82 +79,30 @@
 
   <section class="profile-section reveal-up">
     <div class="section-heading">
-      <h2>Plan</h2>
-      <p>Choose how long publication viewer links stay active.</p>
+      <h2>Licensing</h2>
+      <p>Each 3D model carries its own license and access window. Upgrade or renew a model from its publication page to extend AR &amp; QR access.</p>
     </div>
-    <div class="plan-grid">
-      <div class="profile-card plan-card{% if not is_academic and not is_extended %} is-current{% endif %}">
-        <div class="plan-card-head">
-          <h3>Temporary</h3>
-          {% if not is_academic and not is_extended %}<span>Current</span>{% endif %}
+    <div class="profile-card profile-licensing-card">
+      <div class="profile-stat-grid">
+        <div class="profile-stat-card">
+          <span>Free (3-day)</span>
+          <strong>{{ free_model_count }}</strong>
+          <small>Watermarked, temporary access</small>
         </div>
-        <p class="pricing-period">Free preview link</p>
-        <p class="plan-price">$0</p>
-        <ul>
-          <li>3-day active AR & QR access</li>
-          <li>1 interactive model</li>
-          <li>Up to 100 MB storage</li>
-          <li>Screenshot capture</li>
-          <li>Watermarked viewer</li>
-        </ul>
-        {% if is_academic or is_extended %}
-          <form method="POST" action="{{ url_for('profile') }}" class="mt-5">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="plan" value="free">
-            <button type="submit" class="btn-secondary w-full" onclick="return confirm('Switch to Free? Existing publications keep their current settings.');">Switch to Free</button>
-          </form>
-        {% else %}
-          <button class="btn-secondary w-full mt-5 opacity-50 cursor-not-allowed" disabled>Active plan</button>
-        {% endif %}
+        <div class="profile-stat-card">
+          <span>Academic (3-year)</span>
+          <strong>{{ academic_model_count }}</strong>
+          <small>No watermark, persistent URL</small>
+        </div>
+        <div class="profile-stat-card">
+          <span>Extended (10-year)</span>
+          <strong>{{ extended_model_count }}</strong>
+          <small>Priority archival storage</small>
+        </div>
       </div>
-
-      <div class="profile-card plan-card{% if is_academic %} is-current{% endif %}">
-        <div class="plan-card-head">
-          <h3>Academic</h3>
-          {% if is_academic %}<span>Current</span>{% endif %}
-        </div>
-        <p class="plan-price">$9.90</p>
-        <ul>
-          <li>3-year active AR & QR access</li>
-          <li>1 interactive model</li>
-          <li>Up to 200 MB storage</li>
-          <li>No watermark</li>
-          <li>Persistent QR & viewer URL</li>
-        </ul>
-        {% if not is_academic %}
-          <form method="POST" action="{{ url_for('profile') }}" class="mt-5">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="plan" value="academic">
-            <button type="submit" class="btn-primary w-full">Get package</button>
-          </form>
-        {% else %}
-          <button class="btn-primary w-full mt-5 opacity-60 cursor-not-allowed" disabled>Active plan</button>
-        {% endif %}
-      </div>
-
-      <div class="profile-card plan-card{% if is_extended %} is-current{% endif %}">
-        <div class="plan-card-head">
-          <h3>Extended Archive</h3>
-          {% if is_extended %}<span>Current</span>{% endif %}
-        </div>
-        <p class="plan-price">$24.90</p>
-        <ul>
-          <li>10-year active AR & QR access</li>
-          <li>Priority archival storage</li>
-          <li>Guided viewing</li>
-          <li>Saved camera views</li>
-          <li>Rich metadata fields</li>
-          <li>Persistent QR & viewer URL</li>
-        </ul>
-        {% if not is_extended %}
-          <form method="POST" action="{{ url_for('profile') }}" class="mt-5">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="plan" value="extended_archive">
-            <button type="submit" class="btn-primary w-full">Get package</button>
-          </form>
-        {% else %}
-          <button class="btn-primary w-full mt-5 opacity-60 cursor-not-allowed" disabled>Active plan</button>
-        {% endif %}
+      <div class="profile-licensing-actions">
+        <a href="{{ url_for('dashboard') }}" class="btn-primary">Manage models</a>
+        <a href="{{ url_for('pricing') }}" class="btn-secondary">See plans &amp; pricing</a>
       </div>
     </div>
   </section>
@@ -165,7 +111,7 @@
     <section class="profile-section reveal-up">
       <div class="section-heading">
         <h2>Billing records</h2>
-        <p>Development payment records created after plan upgrades.</p>
+        <p>Your most recent model upgrade and renewal payments.</p>
       </div>
       <div class="profile-card profile-billing-list">
         {% for payment in recent_payments %}

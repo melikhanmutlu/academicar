@@ -2480,6 +2480,7 @@ def register_routes(app: Flask) -> None:
         if not _paper_visible_to_request(model.paper):
             abort(404)
         status = model_access_status(model)
+        is_owner = current_user.is_authenticated and current_user.id == model.user_id
         if status != "active":
             return (
                 render_template(
@@ -2487,6 +2488,7 @@ def register_routes(app: Flask) -> None:
                     model=model,
                     paper=model.paper,
                     status=status,
+                    is_owner=is_owner,
                 ),
                 410,
             )
@@ -2502,7 +2504,6 @@ def register_routes(app: Flask) -> None:
         )
         annotations = ModelAnnotation.query.filter_by(model_id=model.id).order_by(ModelAnnotation.order_index).all()
         scale_ref = human_scale_reference(format_model_dimensions_cm(model))
-        is_owner = current_user.is_authenticated and current_user.id == model.user_id
         return render_template(
             "viewer.html", model=model, paper=model.paper, has_usdz=has_usdz,
             annotations=annotations, scale_reference=scale_ref,
@@ -2534,12 +2535,14 @@ def register_routes(app: Flask) -> None:
             abort(404)
         status = model_access_status(model)
         if status != "active":
+            is_owner = current_user.is_authenticated and current_user.id == model.user_id
             return (
                 render_template(
                     "model_access_unavailable.html",
                     model=model,
                     paper=model.paper,
                     status=status,
+                    is_owner=is_owner,
                 ),
                 410,
             )
@@ -3563,78 +3566,13 @@ def register_routes(app: Flask) -> None:
         log_audit("blog_image_uploaded", user_id=current_user.id, details={"filename": filename})
         return jsonify({"url": url, "markdown": f"![]({url})"})
 
-    @app.route("/profile", methods=["GET", "POST"])
+    @app.route("/profile")
     @login_required
     def profile():
-        if request.method == "POST":
-            new_plan = (request.form.get("plan") or "").strip().lower()
-            if not is_valid_user_plan(new_plan):
-                flash("Invalid plan choice.", "danger")
-                return redirect(url_for("profile"))
-            previous = current_user.plan or "free"
-            if new_plan == previous:
-                flash("You're already on this plan.", "info")
-                return redirect(url_for("profile"))
-
-            # Guard the development-only "instant paid upgrade". Without a real
-            # payment gateway we must never grant paid plans for free in
-            # production (see Config.ALLOW_DEV_PAYMENTS).
-            paid_plans = {"academic", "extended_archive"}
-            if new_plan in paid_plans and not current_app.config.get("ALLOW_DEV_PAYMENTS", False):
-                flash(
-                    "Paid plans are not available yet — online payment is not "
-                    "configured. Please contact support to upgrade your account.",
-                    "warning",
-                )
-                return redirect(url_for("profile"))
-
-            current_user.plan = new_plan
-            try:
-                payment = None
-                if new_plan in {"academic", "extended_archive"}:
-                    amount_kurus = 50000 if new_plan == "academic" else 125000
-                    payment = Payment(
-                        user_id=current_user.id,
-                        amount_kurus=amount_kurus,
-                        currency="TRY",
-                        provider="development",
-                        provider_reference=f"dev-{uuid.uuid4().hex[:10]}",
-                        status="paid",
-                        paid_at=datetime.now(UTC),
-                    )
-                    db.session.add(payment)
-                    db.session.flush()
-                    payment.invoice_number = build_invoice_number(payment.id)
-                db.session.commit()
-                log_audit(
-                    "plan_changed",
-                    user_id=current_user.id,
-                    details={
-                        "from": previous,
-                        "to": new_plan,
-                        "payment_id": payment.id if payment else None,
-                        "invoice_number": payment.invoice_number if payment else None,
-                    },
-                )
-                if new_plan == "academic":
-                    flash(
-                        "You're now on the Academic plan. New models you upload get 3-year AR & QR access, no watermark, and a persistent viewer URL. Existing models keep their current license until you upgrade them.",
-                        "success",
-                    )
-                elif new_plan == "extended_archive":
-                    flash(
-                        "You're now on the Extended Archive plan. New models you upload get 10-year AR & QR access, priority archival storage, and rich metadata fields. Existing models keep their current license until you upgrade them.",
-                        "success",
-                    )
-                else:
-                    flash(
-                        "Switched to the Free plan. New models you upload get 3-day AR & QR access (watermarked). Existing models keep their current license.",
-                        "info",
-                    )
-            except SQLAlchemyError:
-                db.session.rollback()
-                flash("Could not update plan. Please try again.", "danger")
-            return redirect(url_for("profile"))
+        # Licensing is per-model (each Model3D carries its own license_type and
+        # access window), so the profile no longer sells an account-level plan.
+        # Upgrades/renewals happen per model from the publication detail page and
+        # the expired-viewer CTA, which route through /models/<id>/upgrade/<plan>.
 
         # Profile statistics. PERF-2: eager-load models to avoid N+1 in the
         # Python aggregation loops below.

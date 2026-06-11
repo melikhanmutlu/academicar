@@ -83,8 +83,19 @@
     <!-- CTAs -->
     <div class="model-unavail-actions">
       {% if status == "expired" %}
-        <a href="{{ url_for('pricing') }}" class="btn-primary">View upgrade options</a>
-        <a href="{{ url_for('paper_public', slug=paper.slug) }}" class="btn-secondary">Go to publication page</a>
+        {% if is_owner %}
+          {% for key, p in license_plans.items() if p.price_usd > 0 %}
+            <form method="POST" action="{{ url_for('upgrade_model_license', model_id=model.id, plan=key) }}" style="display:inline-block">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="{% if key == 'academic' %}btn-primary{% else %}btn-secondary{% endif %}" title="{{ (p.duration_days // 365) }}-year AR &amp; QR access">
+                Renew · {{ p.label }} ${{ '%.2f'|format(p.price_usd) }}
+              </button>
+            </form>
+          {% endfor %}
+        {% else %}
+          <a href="{{ url_for('pricing') }}" class="btn-primary">View upgrade options</a>
+          <a href="{{ url_for('paper_public', slug=paper.slug) }}" class="btn-secondary">Go to publication page</a>
+        {% endif %}
       {% elif status == "queued" or status == "processing" %}
         <button onclick="location.reload()" class="btn-primary">Refresh page</button>
         <a href="{{ url_for('paper_public', slug=paper.slug) }}" class="btn-secondary">Go to publication page</a>

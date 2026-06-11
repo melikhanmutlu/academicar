@@ -61,6 +61,11 @@ def apply_successful_payment(payment, model, plan_key: str) -> None:
     if not payment.paid_at:
         payment.paid_at = datetime.now(UTC)
     if model is not None:
+        # A paid upgrade/renewal grants a fresh access window measured from the
+        # moment of payment. Reset the start so renewing an already-expired model
+        # actually restores access (apply_model_license_defaults preserves an
+        # existing access_starts_at, which would otherwise keep the model expired).
+        model.access_starts_at = datetime.now(UTC)
         apply_model_license_defaults(model, plan_key)
 
 
