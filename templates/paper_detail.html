@@ -232,21 +232,9 @@
                 {% set upgrade_options = model_upgrade_options(m) %}
                 {% if upgrade_options %}
                   {% set kinds = upgrade_options|map(attribute='kind')|list %}
-                  <details class="model-upgrade-disclosure">
-                    <summary class="{% if access_state == 'expired' %}is-urgent{% endif %}">{{ 'Upgrade' if 'upgrade' in kinds else 'Renew' }}</summary>
-                    <div class="model-upgrade-options">
-                      {% for o in upgrade_options %}
-                        <form method="POST" action="{{ url_for('upgrade_model_license', model_id=m.id, plan=o.key) }}">
-                          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                          <button type="submit" class="model-upgrade-btn"
-                                  title="{{ o.plan.label }} — ${{ '%.2f'|format(o.plan.price_usd) }}, {{ (o.plan.duration_days // 365) }}-year AR &amp; QR access">
-                            {{ 'Upgrade to ' if o.kind == 'upgrade' else 'Renew ' }}{{ o.plan.label }}
-                            <span class="model-upgrade-price">${{ '%.2f'|format(o.plan.price_usd) }}</span>
-                          </button>
-                        </form>
-                      {% endfor %}
-                    </div>
-                  </details>
+                  <a href="{{ url_for('model_upgrade_page', model_id=m.id) }}" class="model-card-upgrade{% if access_state == 'expired' %} is-urgent{% endif %}">
+                    {{ 'Upgrade' if 'upgrade' in kinds else 'Renew' }}
+                  </a>
                 {% endif %}
               {% else %}
                 <span class="model-card-cta is-disabled">{{ 'Processing' if model_status != 'failed' else 'Not ready' }}</span>

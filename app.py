@@ -2363,6 +2363,24 @@ def register_routes(app: Flask) -> None:
             flash("Upgrade complete — this model's access window has been extended.", "success")
         return redirect(checkout_url)
 
+    @app.route("/models/<model_id>/upgrade", methods=["GET"])
+    @login_required
+    @require_model_ownership
+    def model_upgrade_page(model_id):
+        """Per-model licensing page: pick a plan and continue to the payment
+        provider's checkout (the form posts to upgrade_model_license)."""
+        model = db.session.get(Model3D, model_id)
+        if not model:
+            abort(404)
+        return render_template(
+            "model_upgrade.html",
+            model=model,
+            paper=model.paper,
+            options=model_upgrade_options(model),
+            current_plan=get_license_plan(model.license_type),
+            access_state=model_access_status(model),
+        )
+
     @app.route("/payment/webhook/<provider_name>", methods=["POST"])
     @csrf.exempt
     def payment_webhook(provider_name):

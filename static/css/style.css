@@ -5387,66 +5387,166 @@ input[type="file"]::-webkit-file-upload-button {
   font-weight: 400;
 }
 
-/* Upgrade lives in the footer as a quiet disclosure; options reveal as a row
-   spanning the footer's full width beneath the strip. */
-.model-upgrade-disclosure > summary {
-  list-style: none;
+/* Footer "Upgrade" pill — the one warm accent on the card, in the brand
+   sunset-orange, links to the per-model licensing page. Turns a deeper
+   orange-red when access has expired to nudge a renewal. */
+.model-card-upgrade {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  font-family: var(--font-inter);
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--color-dark-shale, #4d4d4d);
-  user-select: none;
-}
-.model-upgrade-disclosure > summary::-webkit-details-marker { display: none; }
-.model-upgrade-disclosure > summary::before {
-  content: "›";
-  display: inline-block;
-  font-size: 14px;
-  line-height: 1;
-  color: var(--color-silver-ash);
-  transition: transform 0.15s ease;
-}
-.model-upgrade-disclosure[open] > summary::before { transform: rotate(90deg); }
-.model-upgrade-disclosure > summary:hover { color: var(--color-sunset-orange); }
-.model-upgrade-disclosure > summary.is-urgent { color: var(--color-sunset-orange); }
-.model-card-footer .model-upgrade-disclosure[open] {
-  flex-basis: 100%;
-}
-.model-upgrade-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
-}
-.model-upgrade-options form { margin: 0; }
-.model-upgrade-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
   min-height: 34px;
-  padding: 6px 12px;
-  border: 1px solid var(--color-light-pearl);
+  padding: 6px 16px;
   border-radius: 8px;
-  background: var(--color-canvas-white);
+  background: var(--color-sunset-orange);
+  border: 1px solid var(--color-sunset-orange);
   font-family: var(--font-inter);
   font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #ffffff;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.model-card-upgrade:hover { background: #e85518; border-color: #e85518; }
+.model-card-upgrade.is-urgent { background: #d6451a; border-color: #d6451a; }
+.model-card-upgrade.is-urgent:hover { background: #c43d14; border-color: #c43d14; }
+
+/* Per-model licensing / upgrade page */
+.upgrade-shell { max-width: 720px; }
+.upgrade-header { margin: 18px 0 22px; }
+.upgrade-eyebrow {
+  font-family: var(--font-inter);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-sunset-orange);
+}
+.upgrade-header h1 {
+  font-family: var(--font-serif, var(--font-inter));
+  font-size: 28px;
   font-weight: 600;
   color: var(--color-midnight-graphite);
+  margin-top: 6px;
+  line-height: 1.2;
+}
+.upgrade-subtitle {
+  margin-top: 10px;
+  font-family: var(--font-inter);
+  font-size: 14px;
+  color: #5c6473;
+  line-height: 1.5;
+}
+.upgrade-expired { color: #d6451a; font-weight: 600; }
+.upgrade-card {
+  border: 1px solid var(--color-light-pearl);
+  border-radius: 16px;
+  background: var(--color-canvas-white);
+  padding: 10px;
+}
+.upgrade-plan-list { display: flex; flex-direction: column; gap: 10px; }
+.upgrade-plan {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1.5px solid var(--color-light-pearl);
+  border-radius: 12px;
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
-.model-upgrade-btn:hover {
-  border-color: var(--color-midnight-graphite);
-  background: var(--color-cloud-whisper, #f7f7f7);
+.upgrade-plan:hover { border-color: var(--color-silver-ash); }
+.upgrade-plan.is-selected {
+  border-color: var(--color-sunset-orange);
+  background: #fff8f4;
 }
-.model-upgrade-price {
+.upgrade-plan > input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
+.upgrade-plan-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.upgrade-plan-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.upgrade-plan-name {
+  font-family: var(--font-inter);
+  font-size: 15.5px;
   font-weight: 700;
+  color: var(--color-midnight-graphite);
+}
+.upgrade-plan-tag {
+  margin-left: 7px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-sunset-orange);
+  border: 1px solid var(--color-sunset-orange);
+  border-radius: 999px;
+  padding: 1px 7px;
+  vertical-align: middle;
+}
+.upgrade-plan-price {
+  flex: 0 0 auto;
+  font-family: var(--font-inter);
+  font-size: 20px;
+  font-weight: 800;
   color: var(--color-sunset-orange);
 }
+.upgrade-plan-meta { font-family: var(--font-inter); font-size: 12.5px; color: #64748b; }
+.upgrade-plan-features { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 2px; }
+.upgrade-plan-features span {
+  position: relative;
+  font-family: var(--font-inter);
+  font-size: 12px;
+  color: #475569;
+  padding-left: 16px;
+}
+.upgrade-plan-features span::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--color-sunset-orange);
+  font-weight: 700;
+}
+.upgrade-plan-check {
+  flex: 0 0 auto;
+  width: 20px; height: 20px;
+  margin-top: 2px;
+  border-radius: 999px;
+  border: 2px solid var(--color-light-pearl);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.upgrade-plan.is-selected .upgrade-plan-check {
+  border-color: var(--color-sunset-orange);
+  background: var(--color-sunset-orange);
+  box-shadow: inset 0 0 0 3px #ffffff;
+}
+.upgrade-actions { padding: 14px 8px 8px; }
+.upgrade-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--color-sunset-orange);
+  color: #ffffff;
+  font-family: var(--font-inter);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+.upgrade-submit:hover { background: #e85518; }
+.upgrade-secure {
+  margin-top: 12px;
+  font-family: var(--font-inter);
+  font-size: 12.5px;
+  color: #64748b;
+  text-align: center;
+  line-height: 1.5;
+}
+.upgrade-empty { padding: 28px; text-align: center; }
+.upgrade-empty h2 { font-family: var(--font-serif, var(--font-inter)); font-size: 20px; font-weight: 600; color: var(--color-midnight-graphite); }
+.upgrade-empty p { margin: 8px 0 18px; font-family: var(--font-inter); font-size: 14px; color: #5c6473; }
+.upgrade-empty .upgrade-submit { width: auto; padding: 0 22px; }
 @media (max-width: 1024px) {
   .model-registry-grid { grid-template-columns: 1fr; }
 }

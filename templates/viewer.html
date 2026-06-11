@@ -984,25 +984,31 @@
     });
 
     if (fullscreenBtn) {
-      fullscreenBtn.addEventListener('click', async () => {
-        const target = document.documentElement;
-        try {
-          if (!document.fullscreenElement) {
-            await target.requestFullscreen();
-            fullscreenBtn.textContent = 'Exit full screen';
-          } else {
-            await document.exitFullscreen();
-            fullscreenBtn.textContent = 'Full screen';
+      const fsLabel = fullscreenBtn.querySelector('span');
+      const setFsLabel = (text) => { if (fsLabel) fsLabel.textContent = text; fullscreenBtn.setAttribute('aria-label', text); };
+      const fsTarget = viewer ? (viewer.closest('main') || document.documentElement) : document.documentElement;
+      const requestFs = fsTarget.requestFullscreen || fsTarget.webkitRequestFullscreen;
+      // iOS Safari does not support element/page fullscreen — hide the control
+      // there rather than showing a button that can't do anything.
+      if (!requestFs) {
+        fullscreenBtn.style.display = 'none';
+      } else {
+        fullscreenBtn.addEventListener('click', async () => {
+          try {
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+              await requestFs.call(fsTarget);
+            } else {
+              await (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+            }
+          } catch (error) {
+            setFsLabel('Unavailable');
+            setTimeout(() => setFsLabel('Full screen'), 1600);
           }
-        } catch (error) {
-          fullscreenBtn.textContent = 'Full screen unavailable';
-          setTimeout(() => { fullscreenBtn.textContent = 'Full screen'; }, 1600);
-        }
-      });
-
-      document.addEventListener('fullscreenchange', () => {
-        fullscreenBtn.textContent = document.fullscreenElement ? 'Exit full screen' : 'Full screen';
-      });
+        });
+        document.addEventListener('fullscreenchange', () => {
+          setFsLabel(document.fullscreenElement ? 'Exit full screen' : 'Full screen');
+        });
+      }
     }
 
     const isMobileLike = () => (
@@ -1015,25 +1021,18 @@
 
     if (arBtn) {
       arBtn.addEventListener('click', async () => {
-        if (!isMobileLike()) {
-          if (qrModal) qrModal.classList.remove('hidden');
-          return;
-        }
-        // iOS AR (Quick Look) needs a USDZ companion; without one, go straight
-        // to the QR/share modal instead of a no-op AR attempt.
-        if (isIOS && !hasUsdz) {
-          if (qrModal) qrModal.classList.remove('hidden');
-          return;
-        }
-        try {
-          if (typeof viewer.activateAR === 'function') {
+        // Prefer real on-device AR. model-viewer's own capability flag is true
+        // on AR-capable phones (Android Scene Viewer, or iOS Quick Look when a
+        // USDZ companion exists) and launches the camera directly.
+        if (viewer && viewer.canActivateAR) {
+          try {
             await viewer.activateAR();
-          } else {
-            if (qrModal) qrModal.classList.remove('hidden');
-          }
-        } catch (error) {
-          if (qrModal) qrModal.classList.remove('hidden');
+            return;
+          } catch (error) { /* fall back to QR below */ }
         }
+        // No on-device AR (desktop, or iOS without a USDZ file): offer the QR so
+        // the model can be opened on an AR-capable phone instead.
+        if (qrModal) qrModal.classList.remove('hidden');
       });
     }
 

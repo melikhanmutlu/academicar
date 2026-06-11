@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Upgrade license — {{ model.display_name or model.original_filename }} — AcademicAR{% endblock %}
+
+{% block content %}
+<div class="app-shell upgrade-shell py-8 pb-12">
+  <a href="{{ url_for('paper_detail', slug=paper.slug) }}" class="detail-back-button">&larr; Back to publication</a>
+
+  <div class="upgrade-header reveal-up">
+    <p class="upgrade-eyebrow">Model licensing</p>
+    <h1>Upgrade access for “{{ model.display_name or model.original_filename }}”</h1>
+    <p class="upgrade-subtitle">
+      Currently on <strong>{{ current_plan.label }}</strong>{% if access_state == 'expired' %} · <span class="upgrade-expired">access expired</span>{% elif model.access_expires_at %} · active until {{ model.access_expires_at.strftime('%b %d, %Y') }}{% endif %}.
+      The QR code and viewer link stay exactly the same after you upgrade.
+    </p>
+  </div>
+
+  {% if options %}
+    <form id="upgradeForm" method="POST"
+          action="{{ url_for('upgrade_model_license', model_id=model.id, plan=options[0].key) }}"
+          class="upgrade-card reveal-up">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="upgrade-plan-list">
+        {% for o in options %}
+          <label class="upgrade-plan{% if loop.first %} is-selected{% endif %}">
+            <input type="radio" name="plan" value="{{ o.key }}"
+                   data-action="{{ url_for('upgrade_model_license', model_id=model.id, plan=o.key) }}"
+                   {% if loop.first %}checked{% endif %}>
+            <span class="upgrade-plan-body">
+              <span class="upgrade-plan-head">
+                <span class="upgrade-plan-name">
+                  {{ 'Upgrade to ' if o.kind == 'upgrade' else 'Renew ' }}{{ o.plan.label }}
+                  {% if o.kind == 'renew' %}<span class="upgrade-plan-tag">Renew</span>{% endif %}
+                </span>
+                <span class="upgrade-plan-price">${{ '%.2f'|format(o.plan.price_usd) }}</span>
+              </span>
+              <span class="upgrade-plan-meta">{{ (o.plan.duration_days // 365) }}-year AR &amp; QR access · up to {{ format_file_size(o.plan.storage_limit_bytes) }}</span>
+              <span class="upgrade-plan-features">
+                {% for feat in o.plan.feature_summary[:4] %}<span>{{ feat }}</span>{% endfor %}
+              </span>
+            </span>
+            <span class="upgrade-plan-check" aria-hidden="true"></span>
+          </label>
+        {% endfor %}
+      </div>
+
+      <div class="upgrade-actions">
+        <button type="submit" class="upgrade-submit">Continue to payment</button>
+        <p class="upgrade-secure">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="vertical-align:-2px;opacity:.6"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          You'll be taken to a secure payment page. Access is granted automatically once payment completes.
+        </p>
+      </div>
+    </form>
+  {% else %}
+    <div class="upgrade-card upgrade-empty reveal-up">
+      <h2>You're on the top plan</h2>
+      <p>This model already has the longest available access window. There's nothing to upgrade right now — you'll be able to renew it as the access date approaches.</p>
+      <a href="{{ url_for('paper_detail', slug=paper.slug) }}" class="upgrade-submit">Back to publication</a>
+    </div>
+  {% endif %}
+</div>
+
+<script>
+  (function () {
+    var form = document.getElementById('upgradeForm');
+    if (!form) return;
+    var radios = form.querySelectorAll('input[name="plan"]');
+    function sync() {
+      var checked = form.querySelector('input[name="plan"]:checked');
+      if (checked) form.setAttribute('action', checked.dataset.action);
+      form.querySelectorAll('.upgrade-plan').forEach(function (el) {
+        el.classList.toggle('is-selected', el.contains(form.querySelector('input[name="plan"]:checked')));
+      });
+    }
+    radios.forEach(function (r) { r.addEventListener('change', sync); });
+    sync();
+  })();
+</script>
+{% endblock %}
