@@ -166,6 +166,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             "model_resolver_url": model_resolver_url,
             "model_access_status": model_access_status,
             "model_upgrade_options": model_upgrade_options,
+            "user_selectable_plan_keys": USER_SELECTABLE_PLAN_KEYS,
             "format_model_dimensions_cm": format_model_dimensions_cm,
         }
 
@@ -2834,10 +2835,16 @@ def register_routes(app: Flask) -> None:
         totals = {
             "users": User.query.count(),
             "admins": User.query.filter_by(is_admin=True).count(),
-            "papers": Paper.query.count(),
-            "public_papers": Paper.query.filter_by(is_public=True).count(),
-            "models": Model3D.query.count(),
+            # Exclude soft-deleted papers (and their models) from headline counts
+            # so the dashboard reflects live content, consistent with
+            # active_paper_query() used elsewhere.
+            "papers": active_paper_query().count(),
+            "public_papers": active_paper_query().filter_by(is_public=True).count(),
+            "models": Model3D.query.filter(
+                Model3D.paper.has(or_(Paper.status.is_(None), Paper.status != "deleted"))
+            ).count(),
             "active_models": Model3D.query.filter(
+                Model3D.paper.has(or_(Paper.status.is_(None), Paper.status != "deleted")),
                 Model3D.processing_status.notin_(["queued", "processing", "failed"]),
                 or_(Model3D.access_expires_at.is_(None), Model3D.access_expires_at >= now),
             ).count(),
@@ -2878,10 +2885,10 @@ def register_routes(app: Flask) -> None:
             .scalar()
             or 0
         )
-        papers_with_doi = Paper.query.filter(Paper.doi.isnot(None), Paper.doi != "").count()
-        papers_with_pmid = Paper.query.filter(Paper.pmid.isnot(None), Paper.pmid != "").count()
+        papers_with_doi = active_paper_query().filter(Paper.doi.isnot(None), Paper.doi != "").count()
+        papers_with_pmid = active_paper_query().filter(Paper.pmid.isnot(None), Paper.pmid != "").count()
         private_papers = max(totals["papers"] - totals["public_papers"], 0)
-        papers_with_pdf = Paper.query.filter(Paper.pdf_path.isnot(None), Paper.pdf_path != "").count()
+        papers_with_pdf = active_paper_query().filter(Paper.pdf_path.isnot(None), Paper.pdf_path != "").count()
         papers_without_pdf = max(totals["papers"] - papers_with_pdf, 0)
         resolved_qr_total = AuditLog.query.filter(AuditLog.event_type == "qr_resolved").count()
         viewer_access_total = AuditLog.query.filter(AuditLog.event_type == "public_model_viewed").count()

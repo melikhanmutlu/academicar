@@ -29,6 +29,39 @@
   <style>
     html, body { width: 100%; max-width: 100%; overflow: hidden; }
     body { font-family: 'Inter', sans-serif; }
+    /* Free-tier watermark: a small, persistent badge over the viewer so free
+       (3-day) models are visibly marked, matching the pricing promise. Works on
+       dark/light/white viewer backgrounds via a translucent dark pill. */
+    .viewer-free-watermark {
+      position: absolute;
+      top: 64px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      pointer-events: none;
+      user-select: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 11px;
+      border-radius: 999px;
+      background: rgba(17, 17, 17, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      font-size: 12px;
+      letter-spacing: 0.03em;
+      color: rgba(255, 255, 255, 0.92);
+      white-space: nowrap;
+    }
+    .viewer-free-watermark::before {
+      content: "";
+      width: 12px; height: 12px;
+      border-radius: 999px;
+      background: #ff682c;
+      flex: 0 0 auto;
+    }
+    @media (min-width: 640px) { .viewer-free-watermark { top: 84px; font-size: 13px; } }
     .font-serif { font-family: 'Inter', sans-serif; }
     model-viewer {
       width: 100%;
@@ -511,6 +544,10 @@
       {% endfor %}
     </model-viewer>
 
+    {% if (model.license_type or 'free') == 'free' %}
+    <div class="viewer-free-watermark" aria-hidden="true">AcademicAR · Free preview</div>
+    {% endif %}
+
     {% if is_owner %}
     <div id="annotateForm">
       <label>Label<input type="text" id="annLabelInput" maxlength="120" placeholder="e.g. Mitral valve"></label>
@@ -972,10 +1009,19 @@
       window.matchMedia('(pointer: coarse)').matches
       || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
     );
+    const hasUsdz = {{ 'true' if has_usdz else 'false' }};
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+      || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
     if (arBtn) {
       arBtn.addEventListener('click', async () => {
         if (!isMobileLike()) {
+          if (qrModal) qrModal.classList.remove('hidden');
+          return;
+        }
+        // iOS AR (Quick Look) needs a USDZ companion; without one, go straight
+        // to the QR/share modal instead of a no-op AR attempt.
+        if (isIOS && !hasUsdz) {
           if (qrModal) qrModal.classList.remove('hidden');
           return;
         }

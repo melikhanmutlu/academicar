@@ -6,6 +6,7 @@
 {% endblock %}
 
 {% block content %}
+{% set model_status = model.processing_status or 'ready' %}
 <div class="app-shell model-edit-shell py-10 pb-10">
   <a href="{{ url_for('paper_detail', slug=paper.slug) }}" class="detail-back-button">&larr; Publication</a>
 
@@ -14,7 +15,11 @@
       <h1>Edit model</h1>
       <p>Update the model card, access plan, appearance, or replacement file without changing the stable viewer link and QR.</p>
     </div>
-    <a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action detail-action-primary">Open 3D / AR</a>
+    {% if model_access_status(model) == 'active' %}
+      <a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action detail-action-primary">Open 3D / AR</a>
+    {% else %}
+      <span class="detail-action detail-action-muted" title="The viewer is unavailable while this model is {{ model_access_status(model) }}">Viewer {{ model_access_status(model) }}</span>
+    {% endif %}
   </div>
 
   <div class="model-edit-layout">
@@ -41,6 +46,7 @@
         </div>
       </form>
 
+      {% if model_status == 'ready' %}
       <form method="POST" action="{{ url_for('model_appearance_update', model_id=model.id) }}" class="surface model-edit-card model-edit-material-card">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="model-edit-card-head">
@@ -112,6 +118,14 @@
           <button type="submit" class="detail-action detail-action-primary">Update Appearance</button>
         </div>
       </form>
+      {% else %}
+      <div class="surface model-edit-card">
+        <div class="model-edit-card-head">
+          <h2>Material &amp; appearance</h2>
+          <p>Available once the model finishes processing{{ ' — this conversion failed, upload a replacement below.' if model_status == 'failed' else '.' }}</p>
+        </div>
+      </div>
+      {% endif %}
 
       <div class="model-edit-secondary-grid">
         <form method="POST" action="{{ url_for('model_license_update', model_id=model.id) }}" class="surface model-edit-card">
@@ -121,7 +135,7 @@
             <p>Changes access duration and upload limit while preserving QR and resolver URL.</p>
           </div>
           <select name="license_type" class="field-select">
-            {% for key, plan in license_plans.items() %}
+            {% for key, plan in license_plans.items() if key in user_selectable_plan_keys or key == model.license_type %}
               <option value="{{ key }}" {% if model.license_type == key %}selected{% endif %}>{{ plan.label }} - ${{ '%.2f'|format(plan.price_usd) }} / model, up to {{ format_file_size(plan.storage_limit_bytes) }}</option>
             {% endfor %}
           </select>
@@ -130,6 +144,7 @@
           </div>
         </form>
 
+        {% if model_status == 'ready' %}
         <form method="POST" action="{{ url_for('model_rescale', model_id=model.id) }}" class="surface model-edit-card">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="model-edit-card-head">
@@ -144,6 +159,14 @@
             <button type="submit" class="detail-action detail-action-primary">Rescale Model</button>
           </div>
         </form>
+        {% else %}
+        <div class="surface model-edit-card">
+          <div class="model-edit-card-head">
+            <h2>Resize model</h2>
+            <p>Available once the model finishes processing.</p>
+          </div>
+        </div>
+        {% endif %}
       </div>
 
       <div class="surface model-edit-card" id="annotationSection">
@@ -167,7 +190,11 @@
         <p class="text-sm text-[#64748b]">No annotations yet.</p>
         {% endif %}
         <div class="model-edit-actions mt-4">
-          <a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action detail-action-primary">Open Viewer to Annotate</a>
+          {% if model_access_status(model) == 'active' %}
+            <a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action detail-action-primary">Open Viewer to Annotate</a>
+          {% else %}
+            <span class="detail-action detail-action-muted" title="The viewer must be active to place annotations">Viewer unavailable</span>
+          {% endif %}
         </div>
       </div>
 

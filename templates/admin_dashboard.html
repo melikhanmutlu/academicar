@@ -38,7 +38,7 @@
     <div class="admin-metric">
       <span>Payments</span>
       <strong>{{ totals.payments }}</strong>
-      <small>{{ "%.2f"|format(totals.paid_revenue / 100) }} TRY paid</small>
+      <small>{{ "%.2f"|format(totals.paid_revenue / 100) }} {{ config.PAYMENT_CURRENCY }} paid</small>
     </div>
     <div class="admin-metric">
       <span>Jobs</span>
@@ -94,7 +94,7 @@
       <div class="admin-insight-card">
         <span>Revenue</span>
         <strong>{{ "%.2f"|format(stats.revenue_30_days / 100) }}</strong>
-        <small>TRY paid in the last 30 days</small>
+        <small>{{ config.PAYMENT_CURRENCY }} paid in the last 30 days</small>
       </div>
       <div class="admin-insight-card">
         <span>Security</span>
@@ -383,7 +383,7 @@
         {% for status in ["pending", "paid", "failed", "refunded"] %}
           <div><span>{{ status|title }}</span><strong>{{ payment_counts.get(status, 0) }}</strong></div>
         {% endfor %}
-        <div><span>Total paid revenue</span><strong>{{ "%.2f"|format(totals.paid_revenue / 100) }} TRY</strong></div>
+        <div><span>Total paid revenue</span><strong>{{ "%.2f"|format(totals.paid_revenue / 100) }} {{ config.PAYMENT_CURRENCY }}</strong></div>
       </div>
     </div>
     <div class="admin-section-subtable">
@@ -518,6 +518,7 @@
         <option value="all" {% if filters.user_plan == "all" %}selected{% endif %}>All plans</option>
         <option value="free" {% if filters.user_plan == "free" %}selected{% endif %}>Free</option>
         <option value="academic" {% if filters.user_plan == "academic" %}selected{% endif %}>Academic</option>
+        <option value="extended_archive" {% if filters.user_plan == "extended_archive" %}selected{% endif %}>Extended Archive</option>
       </select>
       <select name="user_role" class="field-select compact-select">
         <option value="all" {% if filters.user_role == "all" %}selected{% endif %}>All roles</option>
@@ -555,6 +556,7 @@
                     <select name="plan" class="field-select compact-select">
                       <option value="free" {% if user.plan == "free" %}selected{% endif %}>Free</option>
                       <option value="academic" {% if user.plan == "academic" %}selected{% endif %}>Academic</option>
+                      <option value="extended_archive" {% if user.plan == "extended_archive" %}selected{% endif %}>Extended Archive</option>
                     </select>
                     <button type="submit" class="btn-secondary compact">Save plan</button>
                   </form>
@@ -709,7 +711,7 @@
                   <form method="POST" action="{{ url_for('admin_model_license_update', model_id=model.id) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <select name="license_type" class="field-select compact-select">
-                      {% for key, plan in license_plans.items() %}
+                      {% for key, plan in license_plans.items() if key in user_selectable_plan_keys or key == model.license_type %}
                         <option value="{{ key }}" {% if model.license_type == key %}selected{% endif %}>{{ plan.label }}</option>
                       {% endfor %}
                     </select>

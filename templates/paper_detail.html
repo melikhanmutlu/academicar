@@ -224,7 +224,11 @@
                 {% endif %}
                 <div class="model-actions mt-4">
                   {% if model_status == 'ready' %}
-                    <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action detail-action-primary model-action-wide">Open 3D / AR</a>
+                    {% if access_state == 'active' %}
+                      <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action detail-action-primary model-action-wide">Open 3D / AR</a>
+                    {% else %}
+                      <button type="button" class="detail-action detail-action-muted model-action-wide" disabled title="Renew the license below to make this model viewable again">Expired — renew to view</button>
+                    {% endif %}
                     <button type="button" class="detail-action" data-copy-link="{{ model_resolver_url(m) }}" aria-label="Copy viewer link">Copy Link</button>
                     <a href="{{ url_for('qr_print', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action">View QR</a>
                     <a href="{{ url_for('model_edit', model_id=m.id) }}" class="detail-action model-action-wide">Edit Model</a>

@@ -73,9 +73,13 @@
       <h2 class="font-serif text-3xl font-semibold text-[#111827]">3D / AR models</h2>
     </div>
 
-    {% if paper.models %}
+    {% set ns = namespace(active=[]) %}
+    {% for m in paper.models %}
+      {% if model_access_status(m) == 'active' %}{% set ns.active = ns.active + [m] %}{% endif %}
+    {% endfor %}
+    {% if ns.active %}
       <div class="space-y-3">
-        {% for m in paper.models %}
+        {% for m in ns.active %}
           <div class="model-row surface rounded-xl p-4 group reveal-up">
             <div class="model-row-grid">
               <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-preview" aria-label="Open 3D viewer for {{ m.display_name or m.original_filename }}">

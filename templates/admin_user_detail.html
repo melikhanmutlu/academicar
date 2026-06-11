@@ -50,6 +50,7 @@
         <select name="plan" class="field-select compact-select">
           <option value="free" {% if user.plan == "free" %}selected{% endif %}>Free</option>
           <option value="academic" {% if user.plan == "academic" %}selected{% endif %}>Academic</option>
+          <option value="extended_archive" {% if user.plan == "extended_archive" %}selected{% endif %}>Extended Archive</option>
         </select>
         <button type="submit" class="btn-secondary compact">Save plan</button>
       </form>

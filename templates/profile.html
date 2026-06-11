@@ -24,7 +24,7 @@
         <h2>{{ user.username }}</h2>
         <p>{{ user.email }}</p>
         <div class="profile-chips">
-          <span>{{ academic_model_count + extended_model_count }} licensed model{{ '' if (academic_model_count + extended_model_count) == 1 else 's' }}</span>
+          <span>{{ academic_model_count + extended_model_count }} paid model{{ '' if (academic_model_count + extended_model_count) == 1 else 's' }}</span>
           {% if not has_password %}<span>Google sign-in</span>{% endif %}
           <span>Member since {{ user.created_at.strftime('%b %Y') if user.created_at else '-' }}</span>
         </div>
