@@ -134,6 +134,21 @@ class TestViewerCollapsiblePanel:
         assert 'id="panelChevron"' in content
 
 
+class TestViewerMobileAr:
+    """Mobile AR button should try native AR before showing desktop QR fallback."""
+
+    def test_quick_look_allows_chrome_ios(self):
+        content = (TEMPLATES_DIR / "viewer.html").read_text()
+        assert 'quick-look-browsers="safari chrome"' in content
+
+    def test_ios_chrome_can_try_ar_when_capability_flag_is_false(self):
+        content = (TEMPLATES_DIR / "viewer.html").read_text()
+        assert "const shouldTryNativeAr = viewer && (" in content
+        assert "viewer.canActivateAR" in content
+        assert "isIOS && hasUsdz && isMobileLike()" in content
+        assert "await viewer.activateAR();" in content
+
+
 class TestMigrationExists:
     """Migration for material/AR columns."""
 

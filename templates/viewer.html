@@ -1075,11 +1075,13 @@
 
     if (arBtn) {
       arBtn.addEventListener('click', async () => {
-        // Prefer real on-device AR. model-viewer's own capability flag is true
-        // on AR-capable phones (Android Scene Viewer, or iOS Quick Look — now
-        // that we ship a real USDZ companion, that covers both Safari and
-        // Chrome on iOS) and launches the camera directly.
-        if (viewer && viewer.canActivateAR) {
+        // Prefer real on-device AR, but account for iOS Chrome reporting
+        // canActivateAR=false even when Quick Look can launch from a real USDZ.
+        const shouldTryNativeAr = viewer && (
+          viewer.canActivateAR
+          || (isIOS && hasUsdz && isMobileLike() && typeof viewer.activateAR === 'function')
+        );
+        if (shouldTryNativeAr) {
           try {
             await viewer.activateAR();
             return;
