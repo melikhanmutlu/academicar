@@ -257,6 +257,48 @@
     .annotation-delete-btn:hover { color: #ff4444; }
     .owner-mode .annotation-delete-btn { display: inline; }
     .annotate-mode model-viewer { cursor: crosshair; }
+    #annotateBtn.is-active {
+      background: #ff682c !important;
+      border-color: #ff682c !important;
+      color: #fff !important;
+    }
+    .annotate-hint {
+      position: absolute;
+      left: 50%;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+      transform: translateX(-50%);
+      z-index: 45;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(17, 17, 17, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+      color: #fff;
+      font-size: 13px;
+      white-space: nowrap;
+      max-width: calc(100vw - 32px);
+    }
+    .annotate-hint[hidden] { display: none; }
+    .annotate-hint-dot {
+      width: 9px; height: 9px; border-radius: 999px; background: #ff682c;
+      animation: pulseDot 1.4s ease-in-out infinite;
+    }
+    .annotate-hint-done {
+      border: 0;
+      background: rgba(255, 255, 255, 0.14);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+    .annotate-hint-done:hover { background: rgba(255, 255, 255, 0.24); }
     #annotateForm {
       position: absolute;
       z-index: 50;
@@ -513,7 +555,7 @@
       tone-mapping="neutral"
       environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
       ar
-      ar-modes="webxr scene-viewer quick-look"
+      ar-modes="scene-viewer webxr quick-look"
       ar-scale="auto"
       ar-placement="{{ model.ar_placement or 'floor' }}"
       xr-environment
@@ -549,6 +591,11 @@
     {% endif %}
 
     {% if is_owner %}
+    <div id="annotateHint" class="annotate-hint" hidden>
+      <span class="annotate-hint-dot" aria-hidden="true"></span>
+      <span class="annotate-hint-text">Tap the model to place a label</span>
+      <button type="button" id="annotateHintDone" class="annotate-hint-done">Done</button>
+    </div>
     <div id="annotateForm">
       <label>Label<input type="text" id="annLabelInput" maxlength="120" placeholder="e.g. Mitral valve"></label>
       <label>Description<textarea id="annDescInput" rows="2" maxlength="200" placeholder="Brief explanation (optional)"></textarea></label>
@@ -909,18 +956,25 @@
       const container = viewer.closest('.relative') || viewer.parentElement;
       if (container) container.classList.add('owner-mode');
 
-      annotateBtn.addEventListener('click', () => {
-        annotateMode = !annotateMode;
+      const annotateHint = document.getElementById('annotateHint');
+      const setAnnotateMode = (on) => {
+        annotateMode = on;
         const annSpan = annotateBtn.querySelector('span');
-        if (annSpan) annSpan.textContent = annotateMode ? 'Cancel' : 'Annotate';
-        annotateBtn.setAttribute('aria-label', annotateMode ? 'Cancel annotate' : 'Annotate');
-        if (annotateMode) {
+        if (annSpan) annSpan.textContent = on ? 'Cancel' : 'Annotate';
+        annotateBtn.setAttribute('aria-label', on ? 'Cancel annotate' : 'Annotate');
+        annotateBtn.classList.toggle('is-active', on);
+        if (on) {
           container.classList.add('annotate-mode');
+          if (annotateHint) annotateHint.hidden = false;
         } else {
           container.classList.remove('annotate-mode');
+          if (annotateHint) annotateHint.hidden = true;
           annotateForm.style.display = 'none';
         }
-      });
+      };
+      annotateBtn.addEventListener('click', () => setAnnotateMode(!annotateMode));
+      const annotateHintDone = document.getElementById('annotateHintDone');
+      if (annotateHintDone) annotateHintDone.addEventListener('click', () => setAnnotateMode(false));
 
       viewer.addEventListener('click', (e) => {
         if (!annotateMode) return;
@@ -1020,19 +1074,19 @@
       || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
     if (arBtn) {
-      arBtn.addEventListener('click', async () => {
-        // Prefer real on-device AR. model-viewer's own capability flag is true
-        // on AR-capable phones (Android Scene Viewer, or iOS Quick Look when a
-        // USDZ companion exists) and launches the camera directly.
-        if (viewer && viewer.canActivateAR) {
-          try {
-            await viewer.activateAR();
-            return;
-          } catch (error) { /* fall back to QR below */ }
+      arBtn.addEventListener('click', () => {
+        // Mirror model-viewer's own AR button: trigger native AR directly —
+        // Android Scene Viewer opens the GLB, iOS Quick Look opens the USDZ.
+        // Don't pre-gate on canActivateAR (it can read false spuriously before
+        // the model settles); just attempt it and fall back to the QR modal
+        // only if AR genuinely cannot start on this device.
+        if (viewer && typeof viewer.activateAR === 'function') {
+          viewer.activateAR().catch(() => {
+            if (qrModal) qrModal.classList.remove('hidden');
+          });
+        } else if (qrModal) {
+          qrModal.classList.remove('hidden');
         }
-        // No on-device AR (desktop, or iOS without a USDZ file): offer the QR so
-        // the model can be opened on an AR-capable phone instead.
-        if (qrModal) qrModal.classList.remove('hidden');
       });
     }
 
