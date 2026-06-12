@@ -2,7 +2,11 @@
 # postgresql_16 provides pg_dump, used by the admin backup archive to dump the
 # Railway PostgreSQL database into the backup zip (then mirrored to B2). Keep the
 # major version aligned with the Railway Postgres server version.
-nixPkgs = ["python312", "python312Packages.pip", "python312Packages.virtualenv", "nodejs-18_x", "postgresql_16"]
+# blender provides a headless USD/USDZ exporter, used by
+# converters.stl_converter.convert_glb_to_usdz to generate the iOS AR Quick Look
+# companion (model.usdz served as ios-src). A real ios-src USDZ is what makes AR
+# launch in both Safari and Chrome on iOS, with correct real-world scale.
+nixPkgs = ["python312", "python312Packages.pip", "python312Packages.virtualenv", "nodejs-18_x", "postgresql_16", "blender"]
 
 [phases.install]
 cmds = [

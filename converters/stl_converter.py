@@ -68,33 +68,74 @@ def _srgb_to_linear(c: float) -> float:
 
 
 def convert_glb_to_usdz(glb_path: str, usdz_path: str) -> bool:
-    """Convert a GLB to USDZ so iOS Quick Look can render it without Apple's
-    lossy auto-conversion (which strips normals and produces a smooth blob).
+    """Convert a GLB to USDZ for iOS AR Quick Look using headless Blender.
 
-    Tries the optional ``aspose-3d`` package. If it isn't installed (it is
-    proprietary and large), returns False — the caller should treat USDZ as
-    optional and continue with GLB only. Users can also upload a hand-made
-    USDZ via the model upload form as a fallback.
+    iOS Quick Look needs a real ``.usdz`` served as ``ios-src`` — it launches
+    AR in both Safari *and* Chrome on iOS, whereas model-viewer's client-side
+    blob auto-generation only works in Safari (and not at all in in-app
+    browsers or cross-origin iframes). Blender's USD exporter also writes the
+    correct ``metersPerUnit`` so the model appears at a sane real-world scale
+    instead of giant.
+
+    Runs ``blender --background --python tools/blender_usdz_export.py``. If the
+    ``blender`` binary isn't on PATH (e.g. local dev without it), returns False
+    and the caller treats USDZ as optional, continuing with GLB only.
     """
-    try:
-        import aspose.threed as a3d  # type: ignore
-    except ImportError:
+    import shutil
+    import subprocess
+
+    blender_exec = shutil.which("blender") or "blender"
+    if shutil.which("blender") is None:
         logger.info(
-            "aspose-3d not installed; skipping GLB->USDZ. "
-            "Install with `pip install aspose-3d` to enable automatic iOS USDZ generation."
+            "blender not found on PATH; skipping GLB->USDZ. iOS AR will fall "
+            "back to GLB-only. Install Blender (it is provided via nixpacks in "
+            "production) to enable automatic iOS USDZ generation."
         )
         return False
 
+    # tools/ lives at the repository root, one level up from converters/.
+    blender_script = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "tools",
+        "blender_usdz_export.py",
+    )
+
+    cmd = [
+        blender_exec,
+        "--background",
+        "--python",
+        blender_script,
+        "--",
+        glb_path,
+        usdz_path,
+    ]
+
     try:
-        scene = a3d.Scene.from_file(glb_path)
-        scene.save(usdz_path)
-        ok = os.path.exists(usdz_path) and os.path.getsize(usdz_path) > 0
-        if ok:
-            logger.info("Converted GLB -> USDZ: %s", usdz_path)
-        return ok
-    except Exception as e:
-        logger.warning("GLB -> USDZ conversion failed (%s); USDZ will be unavailable", e)
+        proc = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=300,  # 5 min — large meshes can be slow to import/export
+        )
+    except FileNotFoundError:
+        logger.info("blender binary not runnable; skipping GLB->USDZ.")
         return False
+    except subprocess.TimeoutExpired:
+        logger.warning("Blender USDZ conversion timed out after 300s; USDZ unavailable")
+        return False
+
+    ok = proc.returncode == 0 and os.path.exists(usdz_path) and os.path.getsize(usdz_path) > 0
+    if ok:
+        logger.info("Converted GLB -> USDZ via Blender: %s", usdz_path)
+    else:
+        logger.warning(
+            "GLB -> USDZ conversion failed (exit %s); USDZ will be unavailable. "
+            "stderr: %s",
+            proc.returncode,
+            (proc.stderr or proc.stdout or "")[:500],
+        )
+    return ok
 
 
 def enrich_glb_for_ar(
