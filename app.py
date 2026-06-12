@@ -3231,6 +3231,75 @@ def register_routes(app: Flask) -> None:
             viewed_user=user,
         )
 
+    @app.route("/admin/ar-doctor")
+    @login_required
+    def admin_ar_doctor():
+        """Diagnose iOS USDZ generation: is Blender on PATH and can it convert?
+
+        Visit /admin/ar-doctor as an admin. Reports whether the `blender` binary
+        is present, its version, and the result of a live GLB->USDZ conversion on
+        the most recent ready model. This is how we tell, without shell access,
+        whether the production container can produce the `.usdz` iOS AR needs.
+        """
+        require_admin()
+        import shutil as _shutil
+        import subprocess as _subprocess
+        import tempfile as _tempfile
+
+        report = {
+            "blender_on_path": _shutil.which("blender"),
+            "blender_version": None,
+            "test_model_id": None,
+            "glb_found": False,
+            "conversion_ok": None,
+            "conversion_stderr": None,
+        }
+
+        if report["blender_on_path"]:
+            try:
+                vproc = _subprocess.run(
+                    ["blender", "--version"],
+                    stdout=_subprocess.PIPE, stderr=_subprocess.PIPE,
+                    text=True, timeout=60,
+                )
+                report["blender_version"] = (vproc.stdout or vproc.stderr or "").strip().splitlines()[:2]
+            except Exception as exc:  # noqa: BLE001
+                report["blender_version"] = f"error running blender --version: {exc}"
+
+        model = (
+            Model3D.query.filter(Model3D.processing_status == "ready")
+            .order_by(Model3D.created_at.desc())
+            .first()
+        )
+        if model is not None:
+            report["test_model_id"] = model.id
+            glb_path = os.path.join(app.config["CONVERTED_FOLDER"], model.id, "model.glb")
+            if not os.path.exists(glb_path):
+                ensure_local(glb_path, f"converted/{model.id}/model.glb")
+            report["glb_found"] = os.path.exists(glb_path)
+            if report["glb_found"] and report["blender_on_path"]:
+                blender_script = os.path.join(
+                    os.path.dirname(os.path.abspath(__file__)),
+                    "tools", "blender_usdz_export.py",
+                )
+                with _tempfile.TemporaryDirectory() as tmp:
+                    out_usdz = os.path.join(tmp, "test.usdz")
+                    try:
+                        cproc = _subprocess.run(
+                            ["blender", "--background", "--python", blender_script,
+                             "--", glb_path, out_usdz],
+                            stdout=_subprocess.PIPE, stderr=_subprocess.PIPE,
+                            text=True, timeout=300,
+                        )
+                        produced = os.path.exists(out_usdz) and os.path.getsize(out_usdz) > 0
+                        report["conversion_ok"] = bool(cproc.returncode == 0 and produced)
+                        report["conversion_stderr"] = (cproc.stderr or cproc.stdout or "")[-1500:]
+                    except Exception as exc:  # noqa: BLE001
+                        report["conversion_ok"] = False
+                        report["conversion_stderr"] = f"exception: {exc}"
+
+        return jsonify(report)
+
     @app.route("/admin/backups/create", methods=["POST"])
     @login_required
     def admin_backup_create():
