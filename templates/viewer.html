@@ -555,10 +555,9 @@
       tone-mapping="neutral"
       environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
       ar
-      ar-modes="scene-viewer webxr quick-look"
+      ar-modes="scene-viewer quick-look"
       ar-scale="auto"
       ar-placement="{{ model.ar_placement or 'floor' }}"
-      xr-environment
       quick-look-browsers="safari chrome"
       camera-controls
       touch-action="pan-y"
@@ -1073,25 +1072,40 @@
     const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
       || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
+    const showQrFallback = () => {
+      if (qrModal) qrModal.classList.remove('hidden');
+    };
+
     if (arBtn) {
-      arBtn.addEventListener('click', async () => {
+      arBtn.addEventListener('click', () => {
         // Prefer real on-device AR. model-viewer's own capability flag is true
         // on AR-capable phones (Android Scene Viewer, or iOS Quick Look — now
         // that we ship a real USDZ companion, that covers both Safari and
         // Chrome on iOS) and launches the camera directly.
+        //
+        // IMPORTANT: activateAR() must be invoked *synchronously* inside this
+        // user-gesture handler. Awaiting anything before it (or marking the
+        // handler async) breaks the browser's user-activation check and the
+        // launch is silently ignored — the button then looks dead. So we call
+        // it directly and only handle rejection on the returned promise.
         if (viewer && viewer.canActivateAR) {
-          try {
-            await viewer.activateAR();
-            return;
-          } catch (error) { /* fall back to QR below */ }
+          viewer.activateAR().catch(showQrFallback);
+          return;
         }
         // No on-device AR (desktop, or a phone where AR can't start): offer the
         // QR so the model can be opened on an AR-capable phone instead. Without
         // this gate, model-viewer's activateAR() resolves silently on desktop
         // (it does not reject), so the button would appear dead.
-        if (qrModal) qrModal.classList.remove('hidden');
+        showQrFallback();
       });
     }
+
+    // If AR was launched but the session genuinely failed to start on the
+    // device (Scene Viewer missing/erroring, Quick Look refused), fall back to
+    // the QR so the visitor still has a path onto an AR-capable phone.
+    viewer.addEventListener('ar-status', (event) => {
+      if (event.detail && event.detail.status === 'failed') showQrFallback();
+    });
 
     viewer.addEventListener('load', () => {
       viewer.classList.add('is-loaded');
