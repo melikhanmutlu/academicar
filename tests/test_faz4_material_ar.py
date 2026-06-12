@@ -148,6 +148,7 @@ class TestViewerMobileAr:
         assert 'id="iosQuickLookLink"' in content
         assert "data-ios-ar-btn" in content
         assert "data-ar-btn" in content
+        assert 'type="model/vnd.usdz+zip"' in content
         assert 'rel="ar"' in content
 
     def test_ios_uses_usdz_without_qr_fallback(self):

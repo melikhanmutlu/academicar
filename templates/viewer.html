@@ -629,7 +629,7 @@
           <span class="sm:hidden">AR</span>
         </button>
         {% if has_usdz %}
-        <a data-ios-ar-btn hidden class="viewer-tool-btn primary !py-1.5 !px-4 !text-xs" href="{{ url_for('serve_glb', unique_id=model.id, filename='model.usdz') }}?v={{ model_asset_token(model) }}" rel="ar" aria-label="View in AR">
+        <a data-ios-ar-btn hidden class="viewer-tool-btn primary !py-1.5 !px-4 !text-xs" href="{{ url_for('serve_glb', unique_id=model.id, filename='model.usdz') }}?v={{ model_asset_token(model) }}" type="model/vnd.usdz+zip" aria-label="View in AR">
           <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
           <span class="hidden sm:inline">View in AR</span>
           <span class="sm:hidden">AR</span>
@@ -665,7 +665,7 @@
           <span class="hidden sm:inline">View in AR</span>
         </button>
         {% if has_usdz %}
-        <a data-ios-ar-btn hidden class="viewer-tool-btn primary" href="{{ url_for('serve_glb', unique_id=model.id, filename='model.usdz') }}?v={{ model_asset_token(model) }}" rel="ar" aria-label="View in AR">
+        <a data-ios-ar-btn hidden class="viewer-tool-btn primary" href="{{ url_for('serve_glb', unique_id=model.id, filename='model.usdz') }}?v={{ model_asset_token(model) }}" type="model/vnd.usdz+zip" aria-label="View in AR">
           <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
           <svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1L14 4.5v7L8 15L2 11.5v-7z"/><path d="M8 1v6.5M8 7.5L14 4.5M8 7.5L2 4.5"/></svg>
           <span class="hidden sm:inline">View in AR</span>
