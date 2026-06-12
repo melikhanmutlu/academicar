@@ -2531,6 +2531,8 @@ def register_routes(app: Flask) -> None:
         usdz_path = os.path.join(
             app.config["CONVERTED_FOLDER"], model.id, "model.usdz"
         )
+        if not os.path.exists(usdz_path):
+            ensure_local(usdz_path, f"converted/{model.id}/model.usdz")
         has_usdz = os.path.exists(usdz_path)
         log_audit(
             "public_model_viewed",

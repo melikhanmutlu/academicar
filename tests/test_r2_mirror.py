@@ -124,6 +124,51 @@ def test_serve_glb_restores_from_r2_after_volume_wipe(client, app, monkeypatch):
     assert os.path.exists(glb_local)  # restored to the local volume
 
 
+def test_viewer_restores_usdz_from_r2_before_rendering_ios_ar(client, app, monkeypatch):
+    """The viewer must know about mirrored USDZ before rendering iOS AR links."""
+    from licensing import apply_model_license_defaults
+    from models import Model3D, Paper, User, db
+
+    model_id = str(uuid.uuid4())
+    with app.app_context():
+        user = User(email="r2usdz@example.com", username="R2 USDZ")
+        user.set_password("password123")
+        db.session.add(user)
+        db.session.flush()
+        paper = Paper(title="T", slug=f"r2u-{uuid.uuid4().hex[:6]}", user_id=user.id, is_public=True)
+        db.session.add(paper)
+        db.session.flush()
+        model_dir = os.path.join(app.config["CONVERTED_FOLDER"], model_id)
+        os.makedirs(model_dir, exist_ok=True)
+        glb_local = os.path.join(model_dir, "model.glb")
+        with open(glb_local, "wb") as fh:
+            fh.write(b"glTF-local")
+        usdz_local = os.path.join(model_dir, "model.usdz")
+        model = Model3D(
+            id=model_id,
+            paper_id=paper.id,
+            user_id=user.id,
+            glb_path=glb_local,
+            processing_status="ready",
+        )
+        apply_model_license_defaults(model, "academic")
+        db.session.add(model)
+        db.session.commit()
+
+    store = {f"converted/{model_id}/model.usdz": b"USDZ-from-r2"}
+    monkeypatch.setattr(r2_mirror, "_get_client", lambda: _FakeR2Client(store))
+    monkeypatch.setattr(r2_mirror, "_bucket", lambda: "test-bucket")
+
+    assert not os.path.exists(usdz_local)
+    resp = client.get(f"/view/{model_id}")
+    html = resp.get_data(as_text=True)
+    assert resp.status_code == 200
+    assert os.path.exists(usdz_local)
+    assert "ios-src=" in html
+    assert "data-ios-ar-btn" in html
+    assert "model.usdz" in html
+
+
 def test_serve_glb_404_when_missing_and_no_r2(client, app, monkeypatch):
     """With R2 disabled and no local file, the route still 404s cleanly."""
     from licensing import apply_model_license_defaults
