@@ -1074,19 +1074,22 @@
       || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
     if (arBtn) {
-      arBtn.addEventListener('click', () => {
-        // Mirror model-viewer's own AR button: trigger native AR directly —
-        // Android Scene Viewer opens the GLB, iOS Quick Look opens the USDZ.
-        // Don't pre-gate on canActivateAR (it can read false spuriously before
-        // the model settles); just attempt it and fall back to the QR modal
-        // only if AR genuinely cannot start on this device.
-        if (viewer && typeof viewer.activateAR === 'function') {
-          viewer.activateAR().catch(() => {
-            if (qrModal) qrModal.classList.remove('hidden');
-          });
-        } else if (qrModal) {
-          qrModal.classList.remove('hidden');
+      arBtn.addEventListener('click', async () => {
+        // Prefer real on-device AR. model-viewer's own capability flag is true
+        // on AR-capable phones (Android Scene Viewer, or iOS Quick Look — now
+        // that we ship a real USDZ companion, that covers both Safari and
+        // Chrome on iOS) and launches the camera directly.
+        if (viewer && viewer.canActivateAR) {
+          try {
+            await viewer.activateAR();
+            return;
+          } catch (error) { /* fall back to QR below */ }
         }
+        // No on-device AR (desktop, or a phone where AR can't start): offer the
+        // QR so the model can be opened on an AR-capable phone instead. Without
+        // this gate, model-viewer's activateAR() resolves silently on desktop
+        // (it does not reject), so the button would appear dead.
+        if (qrModal) qrModal.classList.remove('hidden');
       });
     }
 
