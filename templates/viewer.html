@@ -562,10 +562,9 @@
       tone-mapping="neutral"
       environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
       ar
-      ar-modes="scene-viewer webxr quick-look"
+      ar-modes="scene-viewer quick-look"
       ar-scale="auto"
       ar-placement="{{ model.ar_placement or 'floor' }}"
-      xr-environment
       quick-look-browsers="safari chrome"
       camera-controls
       touch-action="pan-y"
@@ -1122,29 +1121,73 @@
       iosArButtons.forEach((button) => { button.hidden = true; });
     }
 
+    const showQrFallback = () => {
+      if (qrModal) qrModal.classList.remove('hidden');
+    };
+
     if (arBtn && !useNativeIOSArButton) {
-      arBtn.addEventListener('click', async () => {
+      arBtn.addEventListener('click', () => {
+        // iOS (Safari or Chrome): hand the USDZ straight to Quick Look.
         if (isIOS && hasUsdz) {
           window.location.assign(usdzUrl);
           return;
         }
-        // Prefer real on-device AR after the iOS Chrome Quick Look path.
-        const shouldTryNativeAr = viewer && (
-          viewer.canActivateAR
-          || (isIOS && hasUsdz && isMobileLike() && typeof viewer.activateAR === 'function')
-        );
-        if (shouldTryNativeAr) {
-          try {
-            await viewer.activateAR();
-            return;
-          } catch (error) { /* fall back to QR below */ }
+        // Android / desktop: prefer real on-device AR (Scene Viewer).
+        //
+        // IMPORTANT: activateAR() must be invoked *synchronously* inside this
+        // user-gesture handler. Awaiting anything before it (or marking the
+        // handler async) breaks the browser's user-activation check and the
+        // launch is silently ignored — the button then looks dead. So we call
+        // it directly and only handle rejection on the returned promise.
+        if (viewer && viewer.canActivateAR) {
+          viewer.activateAR().catch(showQrFallback);
+          return;
         }
         // No on-device AR (desktop, or a phone where AR can't start): offer the
         // QR so the model can be opened on an AR-capable phone instead. Without
         // this gate, model-viewer's activateAR() resolves silently on desktop
         // (it does not reject), so the button would appear dead.
-        if (!isIOS && qrModal) qrModal.classList.remove('hidden');
+        if (!isIOS) showQrFallback();
       });
+    }
+
+    // If AR was launched but the session genuinely failed to start on the
+    // device (Scene Viewer missing/erroring, Quick Look refused), fall back to
+    // the QR so the visitor still has a path onto an AR-capable phone.
+    viewer.addEventListener('ar-status', (event) => {
+      if (event.detail && event.detail.status === 'failed') showQrFallback();
+    });
+
+    // Lightweight on-screen AR diagnostics. Load the viewer with ?ardebug=1 to
+    // surface why the AR button behaves the way it does on a real device.
+    if (new URLSearchParams(location.search).has('ardebug')) {
+      const dbg = document.createElement('div');
+      dbg.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:9999;max-width:92vw;'
+        + 'font:11px/1.4 monospace;color:#fff;background:rgba(0,0,0,.82);padding:8px 10px;'
+        + 'border:1px solid rgba(255,255,255,.25);border-radius:8px;white-space:pre-wrap;';
+      document.body.appendChild(dbg);
+      const render = (extra) => {
+        dbg.textContent = [
+          'UA: ' + navigator.userAgent,
+          'secureContext: ' + window.isSecureContext,
+          'canActivateAR: ' + (viewer && viewer.canActivateAR),
+          'ar attr: ' + viewer.hasAttribute('ar'),
+          'ar-modes: ' + viewer.getAttribute('ar-modes'),
+          'loaded: ' + viewer.loaded,
+          extra || ''
+        ].join('\n');
+      };
+      render('(tap AR button)');
+      viewer.addEventListener('load', () => render('model loaded'));
+      viewer.addEventListener('ar-status', (e) => render('ar-status: ' + e.detail.status));
+      if (arBtn) arBtn.addEventListener('click', () => {
+        let r = 'clicked; canActivateAR=' + (viewer && viewer.canActivateAR);
+        if (viewer && viewer.canActivateAR) {
+          try { viewer.activateAR().catch((err) => render('activateAR rejected: ' + err)); }
+          catch (err) { r += ' | threw: ' + err; }
+        }
+        render(r);
+      }, true);
     }
 
     viewer.addEventListener('load', () => {
