@@ -140,9 +140,15 @@ class TestViewerMobileAr:
     def test_quick_look_allows_chrome_ios(self):
         content = (TEMPLATES_DIR / "viewer.html").read_text()
         assert 'quick-look-browsers="safari chrome"' in content
+        assert 'id="iosQuickLookLink"' in content
+        assert 'rel="ar"' in content
 
     def test_ios_chrome_can_try_ar_when_capability_flag_is_false(self):
         content = (TEMPLATES_DIR / "viewer.html").read_text()
+        ar_handler = content.split("if (arBtn) {", 1)[1].split("viewer.addEventListener('load'", 1)[0]
+        assert "const isIOSChrome = isIOS && /CriOS/i.test(navigator.userAgent);" in content
+        assert "isIOSChrome && hasUsdz && iosQuickLookLink" in ar_handler
+        assert "iosQuickLookLink.click();" in ar_handler
         assert "const shouldTryNativeAr = viewer && (" in content
         assert "viewer.canActivateAR" in content
         assert "isIOS && hasUsdz && isMobileLike()" in content

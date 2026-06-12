@@ -585,6 +585,17 @@
       </button>
       {% endfor %}
     </model-viewer>
+    {% if has_usdz %}
+    <a
+      id="iosQuickLookLink"
+      style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none;"
+      href="{{ url_for('serve_glb', unique_id=model.id, filename='model.usdz') }}?v={{ model_asset_token(model) }}"
+      rel="ar"
+      aria-hidden="true"
+      tabindex="-1">
+      <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="">
+    </a>
+    {% endif %}
 
     {% if (model.license_type or 'free') == 'free' %}
     <div class="viewer-free-watermark" aria-hidden="true">AcademicAR · Free preview</div>
@@ -841,6 +852,7 @@
     const fullscreenBtn = document.getElementById('fullscreenBtn');
     const qrBtn = document.getElementById('qrBtn');
     const arBtn = document.getElementById('arBtn');
+    const iosQuickLookLink = document.getElementById('iosQuickLookLink');
     const qrModal = document.getElementById('qrModal');
     const closeQr = document.getElementById('closeQr');
     const rotateInputs = [...document.querySelectorAll('[data-rotate-axis]')];
@@ -1072,11 +1084,15 @@
     const hasUsdz = {{ 'true' if has_usdz else 'false' }};
     const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
       || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isIOSChrome = isIOS && /CriOS/i.test(navigator.userAgent);
 
     if (arBtn) {
       arBtn.addEventListener('click', async () => {
-        // Prefer real on-device AR, but account for iOS Chrome reporting
-        // canActivateAR=false even when Quick Look can launch from a real USDZ.
+        if (isIOSChrome && hasUsdz && iosQuickLookLink) {
+          iosQuickLookLink.click();
+          return;
+        }
+        // Prefer real on-device AR after the iOS Chrome Quick Look path.
         const shouldTryNativeAr = viewer && (
           viewer.canActivateAR
           || (isIOS && hasUsdz && isMobileLike() && typeof viewer.activateAR === 'function')
