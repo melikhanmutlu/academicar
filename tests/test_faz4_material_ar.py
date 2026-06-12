@@ -137,16 +137,26 @@ class TestViewerCollapsiblePanel:
 class TestViewerMobileAr:
     """Mobile AR button should try native AR before showing desktop QR fallback."""
 
+    def test_owner_annotate_button_keeps_mobile_icon(self):
+        content = (TEMPLATES_DIR / "viewer.html").read_text()
+        assert '{% if is_owner %}<button id="annotateBtn"' in content
+        assert "viewer-icon-annotate" in content
+
     def test_quick_look_allows_chrome_ios(self):
         content = (TEMPLATES_DIR / "viewer.html").read_text()
         assert 'quick-look-browsers="safari chrome"' in content
         assert 'id="iosQuickLookLink"' in content
+        assert "data-ios-ar-btn" in content
+        assert "data-ar-btn" in content
         assert 'rel="ar"' in content
 
     def test_ios_chrome_can_try_ar_when_capability_flag_is_false(self):
         content = (TEMPLATES_DIR / "viewer.html").read_text()
         ar_handler = content.split("if (arBtn) {", 1)[1].split("viewer.addEventListener('load'", 1)[0]
         assert "const isIOSChrome = isIOS && /CriOS/i.test(navigator.userAgent);" in content
+        assert "const useIOSQuickLookButtons = isIOS && hasUsdz && iosArButtons.length > 0;" in content
+        assert "arButtons.forEach((button) => { button.hidden = true; });" in content
+        assert "iosArButtons.forEach((button) => { button.hidden = false; });" in content
         assert "isIOSChrome && hasUsdz && iosQuickLookLink" in ar_handler
         assert "iosQuickLookLink.click();" in ar_handler
         assert "const shouldTryNativeAr = viewer && (" in content
