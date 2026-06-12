@@ -150,15 +150,17 @@ class TestViewerMobileAr:
         assert "data-ar-btn" in content
         assert 'rel="ar"' in content
 
-    def test_ios_chrome_can_try_ar_when_capability_flag_is_false(self):
+    def test_ios_uses_usdz_without_qr_fallback(self):
         content = (TEMPLATES_DIR / "viewer.html").read_text()
         ar_handler = content.split("if (arBtn) {", 1)[1].split("viewer.addEventListener('load'", 1)[0]
         assert "const isIOSChrome = isIOS && /CriOS/i.test(navigator.userAgent);" in content
+        assert "const usdzUrl =" in content
         assert "const useIOSQuickLookButtons = isIOS && hasUsdz && iosArButtons.length > 0;" in content
         assert "arButtons.forEach((button) => { button.hidden = true; });" in content
         assert "iosArButtons.forEach((button) => { button.hidden = false; });" in content
-        assert "isIOSChrome && hasUsdz && iosQuickLookLink" in ar_handler
-        assert "iosQuickLookLink.click();" in ar_handler
+        assert "if (isIOS && hasUsdz)" in ar_handler
+        assert "window.location.assign(usdzUrl);" in ar_handler
+        assert "if (!isIOS && qrModal) qrModal.classList.remove('hidden');" in ar_handler
         assert "const shouldTryNativeAr = viewer && (" in content
         assert "viewer.canActivateAR" in content
         assert "isIOS && hasUsdz && isMobileLike()" in content

@@ -1098,6 +1098,7 @@
       || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
     );
     const hasUsdz = {{ 'true' if has_usdz else 'false' }};
+    const usdzUrl = {{ (url_for('serve_glb', unique_id=model.id, filename='model.usdz') + '?v=' + model_asset_token(model))|tojson }};
     const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
       || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     const isIOSChrome = isIOS && /CriOS/i.test(navigator.userAgent);
@@ -1109,8 +1110,8 @@
 
     if (arBtn) {
       arBtn.addEventListener('click', async () => {
-        if (isIOSChrome && hasUsdz && iosQuickLookLink) {
-          iosQuickLookLink.click();
+        if (isIOS && hasUsdz) {
+          window.location.assign(usdzUrl);
           return;
         }
         // Prefer real on-device AR after the iOS Chrome Quick Look path.
@@ -1128,7 +1129,7 @@
         // QR so the model can be opened on an AR-capable phone instead. Without
         // this gate, model-viewer's activateAR() resolves silently on desktop
         // (it does not reject), so the button would appear dead.
-        if (qrModal) qrModal.classList.remove('hidden');
+        if (!isIOS && qrModal) qrModal.classList.remove('hidden');
       });
     }
 
