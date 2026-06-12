@@ -145,27 +145,28 @@ class TestViewerMobileAr:
     def test_quick_look_allows_chrome_ios(self):
         content = (TEMPLATES_DIR / "viewer.html").read_text()
         assert 'quick-look-browsers="safari chrome"' in content
+        assert 'id="nativeArBtn"' in content
+        assert 'slot="ar-button"' in content
+        assert "native-ar-button" in content
         assert 'id="iosQuickLookLink"' in content
         assert "data-ios-ar-btn" in content
         assert "data-ar-btn" in content
         assert 'type="model/vnd.usdz+zip"' in content
         assert 'rel="ar"' in content
 
-    def test_ios_uses_usdz_without_qr_fallback(self):
+    def test_ios_uses_native_model_viewer_ar_button(self):
         content = (TEMPLATES_DIR / "viewer.html").read_text()
-        ar_handler = content.split("if (arBtn) {", 1)[1].split("viewer.addEventListener('load'", 1)[0]
+        ar_handler = content.split("if (arBtn && !useNativeIOSArButton) {", 1)[1].split("viewer.addEventListener('load'", 1)[0]
         assert "const isIOSChrome = isIOS && /CriOS/i.test(navigator.userAgent);" in content
         assert "const usdzUrl =" in content
-        assert "const useIOSQuickLookButtons = isIOS && hasUsdz && iosArButtons.length > 0;" in content
+        assert "const nativeArBtn = document.getElementById('nativeArBtn');" in content
+        assert "const useNativeIOSArButton = isIOS && hasUsdz && nativeArBtn;" in content
         assert "arButtons.forEach((button) => { button.hidden = true; });" in content
-        assert "iosArButtons.forEach((button) => { button.hidden = false; });" in content
+        assert "iosArButtons.forEach((button) => { button.hidden = true; });" in content
+        assert "if (arBtn && !useNativeIOSArButton) {" in content
         assert "if (isIOS && hasUsdz)" in ar_handler
         assert "window.location.assign(usdzUrl);" in ar_handler
         assert "if (!isIOS && qrModal) qrModal.classList.remove('hidden');" in ar_handler
-        assert "const shouldTryNativeAr = viewer && (" in content
-        assert "viewer.canActivateAR" in content
-        assert "isIOS && hasUsdz && isMobileLike()" in content
-        assert "await viewer.activateAR();" in content
 
 
 class TestMigrationExists:
