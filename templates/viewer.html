@@ -1115,7 +1115,13 @@
     const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
       || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     const isIOSChrome = isIOS && /CriOS/i.test(navigator.userAgent);
-    const useNativeIOSArButton = isIOS && hasUsdz && nativeArBtn;
+    // iOS Quick Look (AR) only fires natively for model-viewer in *Safari*
+    // (where canActivateAR is true). In iOS Chrome canActivateAR is always
+    // false, so model-viewer hides its native ar-button — if we also hid the
+    // toolbar button there, iOS Chrome would have no AR button at all. So only
+    // defer to the native button on iOS Safari; iOS Chrome uses the toolbar
+    // button + the rel="ar" launcher below.
+    const useNativeIOSArButton = isIOS && !isIOSChrome && hasUsdz && nativeArBtn;
     if (useNativeIOSArButton) {
       arButtons.forEach((button) => { button.hidden = true; });
       iosArButtons.forEach((button) => { button.hidden = true; });
@@ -1125,11 +1131,26 @@
       if (qrModal) qrModal.classList.remove('hidden');
     };
 
+    // Apple's documented way to trigger Quick Look AR. A plain
+    // window.location to a .usdz often just downloads the file; an <a rel="ar">
+    // that contains a single <img> is what the iOS system intercepts and opens
+    // in AR Quick Look — and it works in iOS Chrome too (it shares WebKit).
+    const launchIOSQuickLook = (url) => {
+      const anchor = document.createElement('a');
+      anchor.setAttribute('rel', 'ar');
+      anchor.setAttribute('href', url);
+      anchor.appendChild(document.createElement('img'));
+      anchor.style.display = 'none';
+      document.body.appendChild(anchor);
+      anchor.click();
+      setTimeout(() => anchor.remove(), 1500);
+    };
+
     if (arBtn && !useNativeIOSArButton) {
       arBtn.addEventListener('click', () => {
-        // iOS (Safari or Chrome): hand the USDZ straight to Quick Look.
+        // iOS (Safari or Chrome): hand the USDZ to Quick Look via rel="ar".
         if (isIOS && hasUsdz) {
-          window.location.assign(usdzUrl);
+          launchIOSQuickLook(usdzUrl);
           return;
         }
         // Android / desktop: prefer real on-device AR (Scene Viewer).
@@ -1171,7 +1192,9 @@
           'UA: ' + navigator.userAgent,
           'secureContext: ' + window.isSecureContext,
           'canActivateAR: ' + (viewer && viewer.canActivateAR),
-          'ar attr: ' + viewer.hasAttribute('ar'),
+          'hasUsdz: ' + hasUsdz,
+          'isIOS / isIOSChrome: ' + isIOS + ' / ' + isIOSChrome,
+          'useNativeIOSArButton: ' + useNativeIOSArButton,
           'ar-modes: ' + viewer.getAttribute('ar-modes'),
           'loaded: ' + viewer.loaded,
           extra || ''
