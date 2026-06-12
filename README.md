@@ -148,6 +148,9 @@ deploys. Production ignores `DEV_INLINE_JOBS` unless
   real-world scale. Blender is installed via `nixpacks.toml` in production; if
   the `blender` binary is absent (e.g. local dev), USDZ is skipped and the
   viewer falls back to GLB-only / model-viewer's on-device generation.
+  Models uploaded before this was enabled can be backfilled in the
+  production/worker container: `python scripts/backfill_usdz.py`
+  (`--force` to regenerate, `--model <id>` for one, `--dry-run` to preview).
 - **Mesh complexity caps (SEC-6/PERF-3):** Uploads above `MAX_MESH_FACES` /
   `MAX_MESH_VERTICES` (default 2,000,000 each) are rejected with a clear error
   to protect the worker from out-of-memory crashes. Tune via env.
