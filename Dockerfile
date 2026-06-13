@@ -6,8 +6,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# blender provides the headless USD/USDZ exporter used by
+# converters.stl_converter.convert_glb_to_usdz to generate the iOS AR Quick Look
+# companion (model.usdz served as ios-src). A real ios-src USDZ is what makes AR
+# launch in both Safari and Chrome on iOS, with correct real-world scale. This
+# mirrors the `blender` nixPkg in nixpacks.toml so AR works regardless of which
+# builder Railway selects. Run as `blender --background` (no display required).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl ca-certificates nodejs npm postgresql-client \
+    && apt-get install -y --no-install-recommends curl ca-certificates nodejs npm postgresql-client blender \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt package.json ./
