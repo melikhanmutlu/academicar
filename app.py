@@ -1579,6 +1579,12 @@ def process_model_upload_job(
             if is_replacement and target_glb != glb_path:
                 os.replace(target_glb, glb_path)
 
+            # On a replacement the GLB was just swapped for new geometry, so a
+            # USDZ left from the previous version is stale — drop it so the iOS
+            # AR companion is regenerated from the new GLB (otherwise Quick Look
+            # keeps serving the old model).
+            if is_replacement and os.path.exists(usdz_path):
+                cleanup_file(usdz_path)
             if os.path.exists(glb_path) and not os.path.exists(usdz_path):
                 try:
                     convert_glb_to_usdz(glb_path, usdz_path)
@@ -4664,8 +4670,12 @@ def register_routes(app: Flask) -> None:
 
         roughness_raw = request.form.get("roughness")
         metallic_raw = request.form.get("metallic")
-        roughness = max(0.0, min(1.0, float(roughness_raw))) if roughness_raw else (model.appearance_roughness or 0.35)
-        metallic = max(0.0, min(1.0, float(metallic_raw))) if metallic_raw else (model.appearance_metallic or 0.05)
+        try:
+            roughness = max(0.0, min(1.0, float(roughness_raw))) if roughness_raw else (model.appearance_roughness or 0.35)
+            metallic = max(0.0, min(1.0, float(metallic_raw))) if metallic_raw else (model.appearance_metallic or 0.05)
+        except (ValueError, TypeError):
+            flash("Provide valid roughness and metallic values (0–1).", "danger")
+            return redirect(dest)
 
         ar_placement_raw = request.form.get("ar_placement")
         ar_placement = ar_placement_raw if ar_placement_raw in ("floor", "wall") else (model.ar_placement or "floor")

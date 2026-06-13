@@ -38,6 +38,44 @@ def test_active_qr_link_resolves_to_viewer(client):
     assert f"/view/{mid}" in r.headers["Location"]
 
 
+def test_worker_claim_increments_attempts_once(app, monkeypatch):
+    """The production worker path (run_next_conversion_job) claims a pending job
+    exactly once — status->processing, attempts->1, started_at stamped — without
+    the historical double-increment. Conversion itself is stubbed."""
+    import app as app_module
+    from models import ConversionJob
+
+    _, mid = _public_model(app, license="free")
+    with app.app_context():
+        m = db.session.get(Model3D, mid)
+        job = ConversionJob(
+            job_type="model_upload", status="pending", model_id=m.id, user_id=m.user_id,
+            payload={"model_id": m.id}, attempts=0,
+        )
+        db.session.add(job)
+        db.session.commit()
+        jid = job.id
+
+    seen = {}
+
+    def _fake_process(application, **payload):
+        with application.app_context():
+            j = db.session.get(ConversionJob, jid)
+            seen["status_at_entry"] = j.status
+            seen["attempts_at_entry"] = j.attempts
+
+    monkeypatch.setattr(app_module, "process_model_upload_job", _fake_process)
+    assert app_module.run_next_conversion_job(app) is True
+    with app.app_context():
+        j = db.session.get(ConversionJob, jid)
+        assert j.status == "processing"
+        assert j.attempts == 1
+        assert j.started_at is not None
+    # process saw the job already claimed (so it would skip its own increment).
+    assert seen["status_at_entry"] == "processing"
+    assert seen["attempts_at_entry"] == 1
+
+
 def test_admin_paid_grants_and_refund_revokes_license(client):
     from tests.conftest import login
 

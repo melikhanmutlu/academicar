@@ -344,6 +344,9 @@ def reset_password(token):
 @login_required
 def logout():
     logout_user()
+    # Drop any remaining session contents (not just the Flask-Login keys) so
+    # nothing carries over to the next user on a shared device.
+    _rotate_session()
     flash("Logged out.", "info")
     return redirect(url_for("landing"))
 

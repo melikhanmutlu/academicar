@@ -49,7 +49,13 @@ class LocalStorageProvider(StorageProvider):
 
     def path_for(self, key: str) -> str:
         safe_key = key.replace("\\", "/").lstrip("/")
-        return str((self.root / safe_key).resolve())
+        resolved = (self.root / safe_key).resolve()
+        # Defense in depth: never let a key (e.g. one containing '..') resolve
+        # outside the storage root and become an arbitrary read/write/delete.
+        root = self.root.resolve()
+        if resolved != root and root not in resolved.parents:
+            raise ValueError(f"Unsafe storage key escapes root: {key!r}")
+        return str(resolved)
 
     def save_file(self, source_path: str, key: str) -> StoredFile:
         target = Path(self.path_for(key))
