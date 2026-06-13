@@ -346,6 +346,11 @@
       right: 5.6rem;
       z-index: 35;
     }
+    /* model-viewer reveals its slotted ar-button whenever canActivateAR is true
+       (Android, and iOS Chrome now that a USDZ exists). When we instead drive AR
+       from the toolbar button we suppress the native one to avoid a duplicate.
+       Needs !important to win over model-viewer's own visibility toggling. */
+    .native-ar-button.is-suppressed { display: none !important; }
     .viewer-tool-heading {
       display: flex;
       align-items: center;
@@ -1123,8 +1128,14 @@
     // button + the rel="ar" launcher below.
     const useNativeIOSArButton = isIOS && !isIOSChrome && hasUsdz && nativeArBtn;
     if (useNativeIOSArButton) {
+      // iOS Safari: use model-viewer's native Quick Look button, hide ours.
       arButtons.forEach((button) => { button.hidden = true; });
       iosArButtons.forEach((button) => { button.hidden = true; });
+    } else if (nativeArBtn) {
+      // Everywhere else (iOS Chrome, Android, desktop) we drive AR from the
+      // toolbar button, so suppress model-viewer's native button — otherwise it
+      // shows alongside ours (a visible duplicate) wherever canActivateAR=true.
+      nativeArBtn.classList.add('is-suppressed');
     }
 
     const showQrFallback = () => {
