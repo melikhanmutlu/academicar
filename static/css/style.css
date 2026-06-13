@@ -5390,6 +5390,9 @@ input[type="file"]::-webkit-file-upload-button {
   color: var(--color-silver-ash);
   font-weight: 400;
 }
+/* Responsive action labels: full text on desktop, short on mobile (set below). */
+.model-card-cta .label-short,
+.model-link-action .label-short { display: none; }
 
 /* Footer "Upgrade" pill — the one warm accent on the card, in the brand
    sunset-orange, links to the per-model licensing page. Turns a deeper
@@ -5566,8 +5569,7 @@ input[type="file"]::-webkit-file-upload-button {
     padding: 12px 14px;
     flex-wrap: nowrap;
     gap: 8px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    overflow-x: visible;
   }
   .model-card-footer .model-actions-secondary { margin-right: 0; }
   .model-actions-secondary { flex-wrap: nowrap; }
@@ -5575,13 +5577,18 @@ input[type="file"]::-webkit-file-upload-button {
   .model-card-cta,
   .model-card-upgrade,
   .model-link-action { flex: 0 0 auto; white-space: nowrap; }
-  /* Compact the pills so the whole row fits a phone width without clipping. */
+  /* Compact pills + short labels ("Open AR", "Copy") so the whole row fits a
+     phone width with no horizontal crop or scroll. */
   .model-card-cta,
   .model-card-upgrade {
     padding: 6px 11px;
     font-size: 12px;
     min-height: 32px;
   }
+  .model-card-cta .label-full,
+  .model-link-action .label-full { display: none; }
+  .model-card-cta .label-short,
+  .model-link-action .label-short { display: inline; }
 }
 
 /* Model edit page */
