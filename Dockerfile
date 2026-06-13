@@ -12,8 +12,11 @@ WORKDIR /app
 # launch in both Safari and Chrome on iOS, with correct real-world scale. This
 # mirrors the `blender` nixPkg in nixpacks.toml so AR works regardless of which
 # builder Railway selects. Run as `blender --background` (no display required).
+# python3-numpy: Debian's blender uses the system python and ships without a
+# bundled numpy; its glTF importer fails with "No module named 'numpy'" unless
+# the system numpy is present.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl ca-certificates nodejs npm postgresql-client blender \
+    && apt-get install -y --no-install-recommends curl ca-certificates nodejs npm postgresql-client blender python3-numpy \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt package.json ./
