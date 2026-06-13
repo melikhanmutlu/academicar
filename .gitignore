@@ -32,7 +32,9 @@ tests_runtime/
 .pytest_cache/
 .test_tmp*/
 pytest-cache-files-*/
-.claude/
+# Ignore local Claude config, but track shared project skills.
+.claude/*
+!.claude/skills/
 
 # Distribution
 *.egg-info/
