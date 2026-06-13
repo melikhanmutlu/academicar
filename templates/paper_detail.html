@@ -220,7 +220,7 @@
             <div class="model-card-footer">
               {% if model_status == 'ready' %}
                 {% if access_state == 'active' %}
-                  <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-card-cta"><span class="label-full">Open 3D / AR</span><span class="label-short">Open AR</span></a>
+                  <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-card-cta"><span class="label-full">Open 3D / AR</span><span class="label-short">Open 3D &amp; AR</span></a>
                 {% else %}
                   <span class="model-card-cta is-disabled" title="Renew the license to make this model viewable again">Expired</span>
                 {% endif %}
