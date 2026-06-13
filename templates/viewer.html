@@ -1190,40 +1190,6 @@
       if (event.detail && event.detail.status === 'failed') showQrFallback();
     });
 
-    // Lightweight on-screen AR diagnostics. Load the viewer with ?ardebug=1 to
-    // surface why the AR button behaves the way it does on a real device.
-    if (new URLSearchParams(location.search).has('ardebug')) {
-      const dbg = document.createElement('div');
-      dbg.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:9999;max-width:92vw;'
-        + 'font:11px/1.4 monospace;color:#fff;background:rgba(0,0,0,.82);padding:8px 10px;'
-        + 'border:1px solid rgba(255,255,255,.25);border-radius:8px;white-space:pre-wrap;';
-      document.body.appendChild(dbg);
-      const render = (extra) => {
-        dbg.textContent = [
-          'UA: ' + navigator.userAgent,
-          'secureContext: ' + window.isSecureContext,
-          'canActivateAR: ' + (viewer && viewer.canActivateAR),
-          'hasUsdz: ' + hasUsdz,
-          'isIOS / isIOSChrome: ' + isIOS + ' / ' + isIOSChrome,
-          'useNativeIOSArButton: ' + useNativeIOSArButton,
-          'ar-modes: ' + viewer.getAttribute('ar-modes'),
-          'loaded: ' + viewer.loaded,
-          extra || ''
-        ].join('\n');
-      };
-      render('(tap AR button)');
-      viewer.addEventListener('load', () => render('model loaded'));
-      viewer.addEventListener('ar-status', (e) => render('ar-status: ' + e.detail.status));
-      if (arBtn) arBtn.addEventListener('click', () => {
-        let r = 'clicked; canActivateAR=' + (viewer && viewer.canActivateAR);
-        if (viewer && viewer.canActivateAR) {
-          try { viewer.activateAR().catch((err) => render('activateAR rejected: ' + err)); }
-          catch (err) { r += ' | threw: ' + err; }
-        }
-        render(r);
-      }, true);
-    }
-
     viewer.addEventListener('load', () => {
       viewer.classList.add('is-loaded');
       viewerStatus.classList.add('hidden');
