@@ -1443,7 +1443,12 @@ def process_model_upload_job(
 
         job = db.session.get(ConversionJob, job_id) if job_id is not None else None
         version = db.session.get(ModelVersion, version_id) if version_id is not None else None
-        if job is not None:
+        if job is not None and job.status != "processing":
+            # The worker path (run_next_conversion_job) already claimed the job
+            # (status/started_at/attempts) under the row lock. Only the inline
+            # path (tests / DEV_INLINE_JOBS) reaches here still 'pending', so
+            # claim once here — incrementing again would double-count attempts
+            # and halve the production retry budget.
             job.status = "processing"
             job.started_at = datetime.now(UTC)
             job.attempts = (job.attempts or 0) + 1
@@ -2621,6 +2626,10 @@ def register_routes(app: Flask) -> None:
         model = qr_link.model if qr_link else Model3D.query.filter_by(public_id=public_id).first()
         if not model:
             abort(404)
+        # An admin-disabled QR link must stop resolving (takedown/abuse control);
+        # otherwise the disable action is a no-op.
+        if qr_link is not None and qr_link.status != "active":
+            abort(404)
         if qr_link is not None:
             qr_link.last_resolved_at = datetime.now(UTC)
             try:
@@ -3629,6 +3638,15 @@ def register_routes(app: Flask) -> None:
         payment.status = new_status
         if new_status == "paid" and not payment.paid_at:
             payment.paid_at = datetime.now(UTC)
+        # Keep model license state consistent with the payment state, so a manual
+        # reconciliation actually grants access and a refund/fail actually revokes
+        # it (previously this route moved money state without touching the license).
+        if new_status == "paid" and payment.model is not None and (payment.plan_key or "") in PAID_PLAN_KEYS:
+            payment.model.access_starts_at = datetime.now(UTC)
+            apply_model_license_defaults(payment.model, payment.plan_key)
+        elif previous == "paid" and new_status in {"refunded", "failed"} and payment.model is not None:
+            apply_model_license_defaults(payment.model, "free")
+            payment.model.access_expires_at = datetime.now(UTC)  # revoke access now
         try:
             db.session.commit()
         except SQLAlchemyError:

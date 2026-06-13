@@ -136,7 +136,9 @@ def restore_file(local_path: str, r2_key: str) -> bool:
     client = _get_client()
     if client is None:
         return False
-    tmp = f"{local_path}.r2restore"
+    # Per-process+thread temp name so concurrent restores of the same key never
+    # download into a shared file and corrupt/truncate each other before os.replace.
+    tmp = f"{local_path}.r2restore.{os.getpid()}.{threading.get_ident()}"
     try:
         os.makedirs(os.path.dirname(local_path) or ".", exist_ok=True)
         client.download_file(_bucket(), r2_key, tmp)

@@ -12,6 +12,7 @@ import os
 import shlex
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -172,17 +173,30 @@ class FBXConverter(ExternalConverter):
             "--pbr-metallic-roughness",
             "-b",
         ]
+        run_started = time.time()
         result = self._run(command, cwd=os.path.dirname(input_path))
         produced = Path(output_path)
-        if not produced.exists():
+        # Only adopt a fallback GLB when the converter actually SUCCEEDED and it
+        # wrote to an unexpected filename. Gate on returncode first (never promote
+        # a stray file from a failed run) and on mtime (only files THIS run
+        # produced, never a stale leftover like the previous model.glb during a
+        # replacement), then pick the newest rather than the lexicographically-first.
+        if result.returncode == 0 and not produced.exists():
             out_stem = produced.stem
+            input_stem = Path(input_path).stem
             out_dir = Path(os.path.dirname(output_path))
-            candidates = [
-                p for p in sorted(out_dir.glob("*.glb"))
-                if p.stem.startswith(out_stem) or p.stem.startswith(Path(input_path).stem)
-            ]
+            candidates = []
+            for p in out_dir.glob("*.glb"):
+                if not (p.stem.startswith(out_stem) or p.stem.startswith(input_stem)):
+                    continue
+                try:
+                    if p.stat().st_mtime >= run_started - 1:  # 1s mtime-granularity slack
+                        candidates.append(p)
+                except OSError:
+                    continue
             if candidates:
-                shutil.move(str(candidates[0]), output_path)
+                newest = max(candidates, key=lambda p: p.stat().st_mtime)
+                shutil.move(str(newest), output_path)
         if result.returncode != 0 or not os.path.exists(output_path):
             self.handle_error(result.stderr or result.stdout or "FBX to GLB conversion failed.")
             return False
