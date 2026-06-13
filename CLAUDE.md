@@ -2,6 +2,41 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Behavioral Guidelines
+
+Karpathy's coding guardrails (github.com/multica-ai/andrej-karpathy-skills), adapted to
+this repo. They bias toward caution over speed; use judgment on trivial tasks. The
+project-specific rules in the rest of this file always take precedence.
+
+### 1. Think Before Coding
+State assumptions explicitly; if uncertain, ask. Surface tradeoffs and simpler
+alternatives instead of silently picking one. For anything touching auth, payments/
+webhooks, the conversion pipeline, licensing/QR, or compliance, confirm intent first —
+these carry non-obvious invariants documented below.
+
+### 2. Simplicity First
+Write the minimum code that solves the task; nothing speculative (no unrequested
+features, abstractions, or config). Reuse what exists before adding new code:
+`url_helpers.public_url()`, `licensing.py` helpers (`model_access_status`,
+`apply_model_license_defaults`), `services/r2_mirror`, the existing converters. If a
+senior engineer would call it overcomplicated, rewrite it smaller.
+
+### 3. Surgical Changes
+Every changed line should trace to the request. Don't refactor or restyle adjacent
+code, and match the surrounding style. NEVER redesign screens into a different visual
+system — preserve the AcademicAR/Ventriloc language in `DESIGN.md` — and don't break
+working flows (auth, publication management, PDF/model upload, processing states,
+public viewer, QR pages, screenshot capture, consent). Remove only the orphans YOUR
+change creates; flag pre-existing dead code rather than deleting it.
+
+### 4. Goal-Driven Execution
+Turn tasks into verifiable goals and loop until met. For a bugfix, first write a
+regression test that reproduces it, then make it pass. Keep CPU/RAM-heavy work in the
+worker, never inline in a web request. Before claiming work is done, run the
+verification commands and read the output — evidence before claims:
+- `python -m pytest tests -p no:cacheprovider`
+- `python -m py_compile app.py auth.py models.py config.py licensing.py worker.py converters/*.py`
+
 ## Current Production Boundary
 
 - Web requests must enqueue `ConversionJob` rows only; production conversion work belongs to `worker.py`, not the Flask web process.
