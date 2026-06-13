@@ -3249,6 +3249,7 @@ def register_routes(app: Flask) -> None:
         report = {
             "blender_on_path": _shutil.which("blender"),
             "blender_version": None,
+            "blender_python": None,
             "test_model_id": None,
             "glb_found": False,
             "conversion_ok": None,
@@ -3265,6 +3266,35 @@ def register_routes(app: Flask) -> None:
                 report["blender_version"] = (vproc.stdout or vproc.stderr or "").strip().splitlines()[:2]
             except Exception as exc:  # noqa: BLE001
                 report["blender_version"] = f"error running blender --version: {exc}"
+
+            # Probe the python environment Blender actually uses, so we know
+            # exactly where numpy must live (Blender's bundled python vs system).
+            probe = (
+                "import sys,os\n"
+                "print('PREFIX', sys.prefix)\n"
+                "print('PYVER', '%d.%d' % sys.version_info[:2])\n"
+                "print('EXEC', sys.executable)\n"
+                "bindir = os.path.join(sys.prefix, 'bin')\n"
+                "print('BINDIR_EXISTS', os.path.isdir(bindir))\n"
+                "print('BIN', sorted(f for f in (os.listdir(bindir) if os.path.isdir(bindir) else []) if f.startswith('python')))\n"
+                "try:\n"
+                "    import numpy; print('NUMPY_OK', numpy.__version__, numpy.__file__)\n"
+                "except Exception as e:\n"
+                "    print('NUMPY_FAIL', repr(e))\n"
+            )
+            try:
+                pproc = _subprocess.run(
+                    ["blender", "--background", "--factory-startup", "--python-expr", probe],
+                    stdout=_subprocess.PIPE, stderr=_subprocess.PIPE,
+                    text=True, timeout=120,
+                )
+                combined = (pproc.stdout or "") + "\n" + (pproc.stderr or "")
+                report["blender_python"] = [
+                    ln for ln in combined.splitlines()
+                    if ln.startswith(("PREFIX", "PYVER", "EXEC", "BINDIR_EXISTS", "BIN", "NUMPY_"))
+                ]
+            except Exception as exc:  # noqa: BLE001
+                report["blender_python"] = f"probe error: {exc}"
 
         model = (
             Model3D.query.filter(Model3D.processing_status == "ready")
