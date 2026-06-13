@@ -91,6 +91,23 @@ def mirror_directory(local_dir: str, r2_prefix: str) -> None:
             mirror_file(file_path, r2_key)
 
 
+def mirror_directory_sync(local_dir: str, r2_prefix: str) -> bool:
+    """Synchronous directory mirror for batch/worker contexts that must not
+    leave uploads in flight when the process exits. Returns True when every file
+    reached R2 (or the mirror is disabled), False if an enabled upload failed."""
+    if not _is_enabled() or not os.path.isdir(local_dir):
+        return True
+    ok = True
+    for root, _, files in os.walk(local_dir):
+        for fname in files:
+            file_path = os.path.join(root, fname)
+            rel = os.path.relpath(file_path, local_dir)
+            r2_key = f"{r2_prefix}/{rel}".replace("\\", "/")
+            if not _upload_sync(file_path, r2_key):
+                ok = False
+    return ok
+
+
 def mirror_delete(r2_key: str) -> None:
     if not _is_enabled():
         return

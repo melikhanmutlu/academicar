@@ -128,6 +128,38 @@ def test_webhook_ignores_unpaid_event(client, app):
         assert db.session.get(Model3D, model_id).license_type == "free"
 
 
+def test_webhook_rejects_event_model_id_mismatch(client, app):
+    """A webhook resolved to a stored Payment must not license a different model
+    than the one the Payment is bound to (IDOR guard)."""
+    from tests.conftest import login, register
+
+    register(client)
+    login(client)
+    model_a = _make_model(app)
+    model_b = _make_model(app)
+    with app.app_context():
+        a = db.session.get(Model3D, model_a)
+        pay = Payment(
+            user_id=a.user_id, paper_id=a.paper_id, model_id=a.id,
+            plan_key="academic", amount_kurus=990, currency="USD",
+            provider="development", provider_reference="dev-mismatch-1", status="pending",
+        )
+        db.session.add(pay)
+        db.session.commit()
+
+    # Event names model_b while the Payment is bound to model_a.
+    resp = client.post(
+        "/payment/webhook/development",
+        json={"provider_reference": "dev-mismatch-1", "status": "paid",
+              "plan_key": "academic", "model_id": model_b},
+    )
+    assert resp.status_code == 400
+    with app.app_context():
+        assert db.session.get(Model3D, model_a).license_type == "free"
+        assert db.session.get(Model3D, model_b).license_type == "free"
+        assert Payment.query.filter_by(provider_reference="dev-mismatch-1").first().status == "pending"
+
+
 def test_webhook_unknown_provider_404(client):
     resp = client.post("/payment/webhook/stripe", json={"status": "paid"})
     assert resp.status_code == 404

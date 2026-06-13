@@ -12,6 +12,48 @@ logger = logging.getLogger(__name__)
 
 _RENDER_CACHE: dict[str, str] = {}
 
+# Allowlist for sanitizing rendered Markdown. Bodies can come from admin-editable
+# DB posts and are emitted with |safe, so raw inline HTML (markdown passes it
+# through) must be filtered to block stored XSS.
+_ALLOWED_TAGS = [
+    "p", "br", "hr", "h1", "h2", "h3", "h4", "h5", "h6",
+    "strong", "b", "em", "i", "del", "s", "sup", "sub", "blockquote",
+    "ul", "ol", "li", "a", "code", "pre", "span", "div",
+    "table", "thead", "tbody", "tr", "th", "td", "img",
+]
+_ALLOWED_ATTRS = {
+    "a": ["href", "title", "rel", "id"],
+    "img": ["src", "alt", "title"],
+    "th": ["align"],
+    "td": ["align"],
+    "ol": ["start"],
+    "li": ["id"],
+    "sup": ["id"],
+    "div": ["class"],
+    "span": ["class"],
+    "code": ["class"],
+}
+_ALLOWED_PROTOCOLS = ["http", "https", "mailto"]
+
+
+def _sanitize_html(html: str) -> str:
+    """Strip script/handlers and disallowed tags from rendered HTML."""
+    try:
+        import bleach
+    except Exception:  # pragma: no cover - bleach should be installed
+        # Fail closed: without a sanitizer, escape everything rather than emit
+        # untrusted HTML through |safe.
+        from markupsafe import escape
+
+        return str(escape(html))
+    return bleach.clean(
+        html,
+        tags=_ALLOWED_TAGS,
+        attributes=_ALLOWED_ATTRS,
+        protocols=_ALLOWED_PROTOCOLS,
+        strip=True,
+    )
+
 
 def render_body(text: str, cache_key: str | None = None) -> str:
     """Render a Markdown body to HTML.
@@ -31,6 +73,8 @@ def render_body(text: str, cache_key: str | None = None) -> str:
         from markupsafe import escape
 
         html = "".join(f"<p>{escape(p.strip())}</p>" for p in text.split("\n\n") if p.strip())
+    # Sanitize BEFORE the table-wrap below so the wrapper div we add is kept.
+    html = _sanitize_html(html)
     # Wrap tables so a wide one scrolls inside its own box instead of forcing
     # the whole page to scroll horizontally on mobile.
     if "<table>" in html:

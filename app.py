@@ -58,7 +58,7 @@ from licensing import paper_is_expired as licensing_paper_is_expired
 from blog_content import code_post_slugs, get_all_posts, get_post, render_body
 from discipline_content import all_disciplines, discipline_slugs, get_discipline, related_disciplines
 from models import AuditLog, BlogPost, ConversionJob, Model3D, ModelAnnotation, ModelVersion, Paper, Payment, QRLink, User, db
-from services.r2_mirror import mirror_file, mirror_directory, mirror_delete, ensure_local
+from services.r2_mirror import mirror_file, mirror_directory, mirror_directory_sync, mirror_delete, ensure_local
 from payments import (
     PAID_PLAN_KEYS,
     apply_successful_payment,
@@ -1624,7 +1624,19 @@ def process_model_upload_job(
                 )
             )
             db.session.commit()
-            mirror_directory(os.path.join(app.config["CONVERTED_FOLDER"], model_id), f"converted/{model_id}")
+            # Mirror synchronously in the worker: the previous fire-and-forget
+            # daemon threads could be killed when the worker exits/redeploys,
+            # leaving a model marked "ready" whose files never reached R2 (then
+            # lost on the next ephemeral-volume recycle).
+            if not mirror_directory_sync(
+                os.path.join(app.config["CONVERTED_FOLDER"], model_id),
+                f"converted/{model_id}",
+            ):
+                logger.error(
+                    "R2 mirror incomplete for model %s; converted files may be "
+                    "lost if the local volume is recycled.",
+                    model_id,
+                )
         except Exception:
             db.session.rollback()
             logger.exception("Background model processing failed")
@@ -2472,7 +2484,28 @@ def register_routes(app: Flask) -> None:
             )
             return ack(ignored=True, reason="no_plan")
 
-        model = db.session.get(Model3D, model_id) if model_id else (payment.model if payment else None)
+        # Which model gets the license is decided by the stored Payment, never by
+        # an unverified event field. If the event also names a model_id it must
+        # match the Payment's, otherwise a (replayed/crafted) callback could grant
+        # the paid license to a model the payer never bought (IDOR).
+        if payment is not None and payment.model_id:
+            if model_id and str(model_id) != str(payment.model_id):
+                log_audit(
+                    "payment_model_mismatch",
+                    user_id=payment.user_id,
+                    resource_id=payment.model_id,
+                    details={
+                        "provider": provider.name,
+                        "payment_id": payment.id,
+                        "event_model_id": str(model_id),
+                        "provider_reference": provider_reference,
+                    },
+                )
+                db.session.rollback()
+                return jsonify({"ok": False, "error": "model_mismatch"}), 400
+            model = payment.model
+        else:
+            model = db.session.get(Model3D, model_id) if model_id else (payment.model if payment else None)
 
         if payment is None:
             payment = Payment(
