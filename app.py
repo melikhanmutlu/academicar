@@ -2912,10 +2912,21 @@ def register_routes(app: Flask) -> None:
             )
 
         users = users_query.order_by(User.created_at.desc()).limit(100).all()
-        papers = Paper.query.order_by(Paper.created_at.desc()).limit(100).all()
-        models = models_query.order_by(Model3D.created_at.desc()).limit(100).all()
+        # Eager-load relationships the admin templates touch per row, to avoid an
+        # N+1 query storm (each model row reads paper+author; each QR row reads model).
+        papers = (
+            Paper.query.options(selectinload(Paper.author))
+            .order_by(Paper.created_at.desc()).limit(100).all()
+        )
+        models = (
+            models_query.options(selectinload(Model3D.paper).selectinload(Paper.author))
+            .order_by(Model3D.created_at.desc()).limit(100).all()
+        )
         payments = Payment.query.order_by(Payment.created_at.desc()).limit(50).all()
-        qr_links = QRLink.query.order_by(QRLink.created_at.desc()).limit(100).all()
+        qr_links = (
+            QRLink.query.options(selectinload(QRLink.model))
+            .order_by(QRLink.created_at.desc()).limit(100).all()
+        )
         audit_logs = audit_query.order_by(AuditLog.timestamp.desc()).limit(50).all()
         jobs = jobs_query.order_by(ConversionJob.created_at.desc()).limit(50).all()
         now = datetime.now(UTC)

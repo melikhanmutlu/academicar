@@ -23,12 +23,12 @@
       <form method="POST" class="space-y-5">
         {{ form.hidden_tag() }}
         <div>
-          <label class="field-label">{{ form.email.label.text }}</label>
+          {{ form.email.label(class="field-label") }}
           {{ form.email(class="field-input", placeholder="name@university.edu") }}
           {% for e in form.email.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
         </div>
         <div>
-          <label class="field-label">{{ form.password.label.text }}</label>
+          {{ form.password.label(class="field-label") }}
           {{ form.password(class="field-input") }}
           {% for e in form.password.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
           <p class="text-sm text-right mt-2"><a href="{{ url_for('auth.forgot_password') }}" class="text-[#5c6473] underline underline-offset-4">Forgot password?</a></p>

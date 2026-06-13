@@ -157,7 +157,10 @@ class LemonSqueezyProvider(PaymentProvider):
         attrs = data.get("attributes", {}) or {}
         event = (meta.get("event_name") or "").lower()
         raw_status = (attrs.get("status") or "").lower()
-        paid = event in {"order_created", "order_completed"} or raw_status in {"paid", "completed", "active"}
+        # Gate on the order's ACTUAL status, not the event name: order_created can
+        # fire with status 'pending'/'failed', so trusting the event name alone
+        # would grant a multi-year license before the payment has settled.
+        paid = raw_status in {"paid", "completed", "active"}
         return {
             "provider_reference": str(data.get("id") or "") or None,
             "status": "paid" if paid else (raw_status or "pending"),

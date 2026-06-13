@@ -8,9 +8,26 @@ Mirror failures never block the caller.
 import logging
 import os
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 
 logger = logging.getLogger(__name__)
+
+# Bounded pool for async ("best-effort") mirrors so a many-file model can no
+# longer spawn dozens of unbounded daemon threads against R2. The executor also
+# joins its workers at interpreter exit, so a clean shutdown waits for in-flight
+# uploads instead of silently dropping them the way bare daemon threads did.
+_executor: ThreadPoolExecutor | None = None
+_executor_lock = threading.Lock()
+
+
+def _get_executor() -> ThreadPoolExecutor:
+    global _executor
+    if _executor is None:
+        with _executor_lock:
+            if _executor is None:
+                _executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="r2-mirror")
+    return _executor
 
 
 @lru_cache(maxsize=1)
@@ -64,8 +81,7 @@ def mirror_file(local_path: str, r2_key: str) -> None:
     """Async best-effort mirror for request paths (never blocks the caller)."""
     if not _is_enabled() or not os.path.isfile(local_path):
         return
-    t = threading.Thread(target=_upload_sync, args=(local_path, r2_key), daemon=True)
-    t.start()
+    _get_executor().submit(_upload_sync, local_path, r2_key)
 
 
 def mirror_file_sync(local_path: str, r2_key: str) -> bool:
