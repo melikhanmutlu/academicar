@@ -105,7 +105,7 @@ class OBJConverter(ExternalConverter):
             return ["node", str(obj2gltf_js)]
         return super()._command()
 
-    def convert(self, input_path: str, output_path: str, color: str | None = None, **_: object) -> bool:
+    def convert(self, input_path: str, output_path: str, color: str | None = None, source_unit: str = "auto", **_: object) -> bool:
         if not self.validate(input_path):
             return False
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -121,6 +121,9 @@ class OBJConverter(ExternalConverter):
         if result.returncode != 0 or not os.path.exists(output_path):
             self.handle_error(result.stderr or result.stdout or "OBJ to GLB conversion failed.")
             return False
+        # OBJ is unitless, like STL — auto-guess the unit from the raw extent.
+        from .glb_scale import normalize_converted_glb
+        normalize_converted_glb(output_path, source_unit, auto_heuristic=True)
         self._post_process_glb(output_path, color, search_dirs=[os.path.dirname(input_path), os.path.dirname(output_path)])
         return True
 
@@ -151,7 +154,7 @@ class FBXConverter(ExternalConverter):
                 return [str(precompiled)]
         return super()._command()
 
-    def convert(self, input_path: str, output_path: str, color: str | None = None, **_: object) -> bool:
+    def convert(self, input_path: str, output_path: str, color: str | None = None, source_unit: str = "auto", **_: object) -> bool:
         if not self.validate(input_path):
             return False
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -183,5 +186,10 @@ class FBXConverter(ExternalConverter):
         if result.returncode != 0 or not os.path.exists(output_path):
             self.handle_error(result.stderr or result.stdout or "FBX to GLB conversion failed.")
             return False
+        # FBX2glTF already bakes the FBX's embedded unit to meters, so for "auto"
+        # we trust the output and only clamp absurd sizes (no unit heuristic).
+        # An explicit mm/cm/m stays available as a manual override.
+        from .glb_scale import normalize_converted_glb
+        normalize_converted_glb(output_path, source_unit, auto_heuristic=False)
         self._post_process_glb(output_path, color, search_dirs=[os.path.dirname(input_path), os.path.dirname(output_path)])
         return True

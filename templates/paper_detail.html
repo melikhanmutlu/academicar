@@ -323,6 +323,16 @@
                   <input type="text" name="display_name" placeholder="Model name" aria-label="Model name" maxlength="255" class="field-input">
                   <input type="text" name="description" placeholder="Short model note" aria-label="Short model note" maxlength="5000" class="field-input">
                 </div>
+                <div>
+                  <label class="field-label" for="source_unit">Source unit</label>
+                  <select name="source_unit" id="source_unit" class="field-input">
+                    <option value="auto" selected>Auto-detect (recommended)</option>
+                    <option value="mm">Millimeters (mm)</option>
+                    <option value="cm">Centimeters (cm)</option>
+                    <option value="m">Meters (m)</option>
+                  </select>
+                  <p class="text-xs text-[#5c6473] mt-1">STL and OBJ files carry no unit, so AR size is a guess. If your model looks too big or small in AR, pick the unit it was modeled in. You can also fine-tune the exact size later with “Resize model”.</p>
+                </div>
                 <label class="flex items-start gap-3 rounded-xl border border-[#e2e8f0] bg-white p-4 text-sm text-[#475569]">
                   <input type="checkbox" name="compliance_confirm" value="yes" required class="mt-1">
                   <span>I confirm that this model has been anonymized, that I have the right to share/publish it, and that I am responsible for all required ethical approval and consent processes.</span>

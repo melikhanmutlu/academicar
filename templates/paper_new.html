@@ -163,6 +163,17 @@
             <input type="text" name="model_description" placeholder="Short model note" class="field-input" maxlength="5000" aria-label="Model description">
           </div>
 
+          <div>
+            <label class="field-label" for="source_unit">Source unit</label>
+            <select name="source_unit" id="source_unit" class="field-input">
+              <option value="auto" selected>Auto-detect (recommended)</option>
+              <option value="mm">Millimeters (mm)</option>
+              <option value="cm">Centimeters (cm)</option>
+              <option value="m">Meters (m)</option>
+            </select>
+            <p class="text-xs text-[#5c6473] mt-1">STL and OBJ files carry no unit, so AR size is a guess. If your model looks too big or small in AR, pick the unit it was modeled in. You can also fine-tune the exact size later with “Resize model”.</p>
+          </div>
+
           <div class="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4">
             <p class="text-sm font-semibold text-[#111827]">Starts on Free access</p>
             <p class="text-xs text-[#5c6473] mt-1">New models get a 3-day, watermarked viewer (up to 100 MB). Upgrade to Academic or Extended Archive any time after upload — the QR and viewer link stay the same.</p>

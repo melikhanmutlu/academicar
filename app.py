@@ -1830,11 +1830,13 @@ def _create_model_for_paper(
     color = (color or "").strip() or None
     if color and HEX_COLOR_PATTERN.fullmatch(color) is None:
         color = None
-    # Source-unit controls are intentionally disabled in the UI. STL files are
-    # unitless, so we auto-detect the scale from the raw mesh extents (µm/mm/cm/m
-    # bands + safety clamp in STLConverter) instead of assuming meters — that
-    # assumption made cm-authored models render ~100x too large.
-    source_unit_norm = "auto"
+    # Source unit: STL/OBJ are unitless and FBX units are sometimes wrong, so the
+    # upload form lets the user declare mm/cm/m. "auto" (the default) auto-detects
+    # from the raw extents for STL/OBJ and trusts FBX2glTF's meters for FBX, with
+    # a safety clamp on absurd sizes. Anything unrecognized falls back to auto.
+    source_unit_norm = (source_unit or "auto").strip().lower()
+    if source_unit_norm not in {"auto", "mm", "cm", "m"}:
+        source_unit_norm = "auto"
 
     unique_id = str(uuid.uuid4())
     original_name = secure_filename(file.filename)
@@ -4652,23 +4654,30 @@ def register_routes(app: Flask) -> None:
             if os.path.exists(glb_path):
                 shutil.copy2(glb_path, backup_path)
             try:
-                from pygltflib import GLTF2
-                import numpy as _np
-                gltf = GLTF2.load(glb_path)
-                import trimesh as _trimesh
-                loaded = _trimesh.load(glb_path, force="scene")
-                bounds = loaded.bounds
-                current_extent_m = float(_np.ptp(bounds, axis=0).max())
-                if current_extent_m <= 0:
-                    raise ValueError("Cannot measure model extent")
-                target_m = target_cm / 100.0
-                scale_factor = target_m / current_extent_m
-                for node in gltf.nodes or []:
-                    if node.scale:
-                        node.scale = [s * scale_factor for s in node.scale]
-                    else:
-                        node.scale = [scale_factor, scale_factor, scale_factor]
-                gltf.save(glb_path)
+                import re as _re
+
+                from converters.glb_scale import apply_uniform_scale
+
+                # The stored GLB is Draco-compressed (trimesh can't read its
+                # geometry), so derive the current longest dimension from the
+                # cached dimensions_cm — set at upload from the uncompressed mesh
+                # and kept current after each rescale. Accessor min/max would
+                # ignore the existing scale node, so it is only a last resort.
+                current_vals = [float(v) for v in _re.findall(r"[\d.]+", model.dimensions_cm or "")]
+                if not current_vals:
+                    measured = compute_glb_dimensions_cm(glb_path)
+                    current_vals = [float(v) for v in _re.findall(r"[\d.]+", measured or "")]
+                current_longest_cm = max(current_vals) if current_vals else 0.0
+                if current_longest_cm <= 0:
+                    raise ValueError("Cannot determine current model size")
+                scale_factor = target_cm / current_longest_cm
+                if not apply_uniform_scale(glb_path, scale_factor):
+                    raise ValueError("Could not apply scale to GLB")
+                # Scale the cached dimensions to match (avoids re-measuring the
+                # Draco geometry, which trimesh cannot read).
+                model.dimensions_cm = (
+                    " x ".join(f"{v * scale_factor:.1f}" for v in current_vals) + " cm"
+                )
             except Exception:
                 logger.exception("Rescale failed; restoring backup")
                 if os.path.exists(backup_path):
@@ -4676,13 +4685,23 @@ def register_routes(app: Flask) -> None:
                 flash("Rescale failed. The previous model is still active.", "warning")
                 return redirect(url_for("model_edit", model_id=model.id))
 
-            model.dimensions_cm = compute_glb_dimensions_cm(glb_path)
+            # Regenerate the iOS USDZ from the rescaled GLB so AR Quick Look
+            # matches the new size — otherwise iOS keeps the old (giant) scale.
+            usdz_path = os.path.join(os.path.dirname(glb_path), "model.usdz")
+            usdz_ok = False
+            try:
+                usdz_ok = convert_glb_to_usdz(glb_path, usdz_path)
+            except Exception:
+                logger.exception("USDZ regeneration after rescale failed; iOS AR may keep old scale")
+
             poster_png = os.path.join(os.path.dirname(glb_path), "poster.png")
             if generate_poster(glb_path, poster_png):
                 model.poster_path = poster_png
             db.session.commit()
-            # Re-mirror the rescaled GLB (and refreshed poster) to R2.
+            # Re-mirror the rescaled GLB, USDZ, and refreshed poster to R2.
             mirror_file(glb_path, f"converted/{model_id}/model.glb")
+            if usdz_ok and os.path.exists(usdz_path):
+                mirror_file(usdz_path, f"converted/{model_id}/model.usdz")
             if model.poster_path:
                 mirror_file(poster_png, f"converted/{model_id}/poster.png")
             log_audit(

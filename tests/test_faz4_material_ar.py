@@ -160,13 +160,15 @@ class TestViewerMobileAr:
         assert "const isIOSChrome = isIOS && /CriOS/i.test(navigator.userAgent);" in content
         assert "const usdzUrl =" in content
         assert "const nativeArBtn = document.getElementById('nativeArBtn');" in content
-        assert "const useNativeIOSArButton = isIOS && hasUsdz && nativeArBtn;" in content
+        # iOS Safari uses model-viewer's native Quick Look button; iOS Chrome
+        # (CriOS) drives AR from the toolbar button + rel="ar" launcher instead.
+        assert "const useNativeIOSArButton = isIOS && !isIOSChrome && hasUsdz && nativeArBtn;" in content
         assert "arButtons.forEach((button) => { button.hidden = true; });" in content
         assert "iosArButtons.forEach((button) => { button.hidden = true; });" in content
         assert "if (arBtn && !useNativeIOSArButton) {" in content
         assert "if (isIOS && hasUsdz)" in ar_handler
-        assert "window.location.assign(usdzUrl);" in ar_handler
-        assert "if (!isIOS && qrModal) qrModal.classList.remove('hidden');" in ar_handler
+        assert "launchIOSQuickLook(usdzUrl);" in ar_handler
+        assert "if (!isIOS) showQrFallback();" in ar_handler
 
 
 class TestMigrationExists:
