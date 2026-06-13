@@ -276,12 +276,19 @@ class PayTRProvider(PaymentProvider):
 
     def parse_event(self, request) -> dict | None:
         status = request.form.get("status", "")
+        try:
+            amount_minor = int(request.form.get("total_amount", ""))
+        except (TypeError, ValueError):
+            amount_minor = None
         return {
             "provider_reference": request.form.get("merchant_oid") or None,
             "status": "paid" if status == "success" else (status or "pending"),
             "plan_key": None,  # recovered from the stored Payment.plan_key
             "model_id": None,  # recovered from the stored Payment.model_id
             "payment_id": None,
+            # Captured amount in minor units (kuruş). Verified against the stored
+            # Payment.amount_kurus so an underpaid callback cannot grant a plan.
+            "amount_minor": amount_minor,
         }
 
 
@@ -295,9 +302,12 @@ def get_payment_provider() -> PaymentProvider:
 
     Falls back to the dev provider when ``ALLOW_DEV_PAYMENTS`` is on (local/test)
     and to LemonSqueezy otherwise so production never silently grants free
-    upgrades.
+    upgrades. Critically, an *unrecognized* provider name (e.g. a typo like
+    "lemonsqeezy") is treated the same as unset — it must NOT fall through to the
+    dev provider, whose webhook verification accepts anything, which would let a
+    forged "paid" callback grant free licenses in production.
     """
     name = (current_app.config.get("PAYMENT_PROVIDER") or "").strip().lower()
-    if not name:
+    if name not in _PROVIDERS:
         name = "development" if current_app.config.get("ALLOW_DEV_PAYMENTS") else "lemonsqueezy"
-    return _PROVIDERS.get(name, _PROVIDERS["development"])
+    return _PROVIDERS[name]

@@ -111,16 +111,20 @@ def convert_glb_to_usdz(glb_path: str, usdz_path: str) -> bool:
 
     input_glb = glb_path
     tmp_plain_glb = None
+    fd, candidate = tempfile.mkstemp(suffix=".glb")
+    os.close(fd)
     try:
-        fd, candidate = tempfile.mkstemp(suffix=".glb")
-        os.close(fd)
-        if decompress_glb(glb_path, candidate):
-            input_glb = candidate
-            tmp_plain_glb = candidate
-        else:
-            os.remove(candidate)
+        decompressed = decompress_glb(glb_path, candidate)
     except Exception:  # noqa: BLE001
         logger.exception("Draco decompress step errored; passing original GLB to Blender")
+        decompressed = False
+    if decompressed:
+        input_glb = candidate
+        tmp_plain_glb = candidate
+    elif os.path.exists(candidate):
+        # decompress failed or raised: never leak the empty mkstemp file (the
+        # subprocess finally-block only cleans tmp_plain_glb, which stays None).
+        os.remove(candidate)
 
     cmd = [
         blender_exec,

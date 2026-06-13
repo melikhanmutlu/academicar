@@ -1139,7 +1139,20 @@
     }
 
     const showQrFallback = () => {
-      if (qrModal) qrModal.classList.remove('hidden');
+      if (qrModal) {
+        qrModal.classList.remove('hidden');
+        return;
+      }
+      // Embedded viewer (?embed=true) renders no QR modal. Rather than leave a
+      // failed AR launch with no fallback, open the standalone viewer — which
+      // has the QR + AR affordances — in a new tab.
+      try {
+        const standalone = new URL(window.location.href);
+        standalone.searchParams.delete('embed');
+        window.open(standalone.toString(), '_blank', 'noopener');
+      } catch (e) {
+        /* no-op: window.open blocked or URL unavailable */
+      }
     };
 
     // Apple's documented way to trigger Quick Look AR. A plain

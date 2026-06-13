@@ -1703,8 +1703,11 @@ def reclaim_stuck_conversion_jobs(app: Flask) -> int:
         started = job.started_at
         if started is None:
             # No start timestamp to age out against; stamp one so the next pass
-            # can reclaim it rather than leaving it wedged indefinitely.
+            # can reclaim it rather than leaving it wedged indefinitely. This
+            # counts as a reclaim so the commit below actually runs — otherwise
+            # the stamp is discarded and the job stays NULL/processing forever.
             job.started_at = datetime.now(UTC)
+            reclaimed += 1
             continue
         if started.tzinfo is None:
             started = started.replace(tzinfo=UTC)
@@ -2489,6 +2492,31 @@ def register_routes(app: Flask) -> None:
                 payment.invoice_number = build_invoice_number(payment.id)
         elif provider_reference and not payment.provider_reference:
             payment.provider_reference = provider_reference
+
+        # Defense-in-depth: the signature only proves the callback is authentic,
+        # not that the correct amount was captured. Reject a "paid" event that
+        # reports less than what we asked the gateway to charge (both in the same
+        # minor units, set together at checkout) before granting the license.
+        paid_minor = event.get("amount_minor")
+        if (
+            paid_minor is not None
+            and payment is not None
+            and payment.amount_kurus
+            and int(paid_minor) < int(payment.amount_kurus)
+        ):
+            log_audit(
+                "payment_amount_mismatch",
+                user_id=(payment.user_id or (model.user_id if model else None)),
+                resource_id=(model.id if model else None),
+                details={
+                    "provider": provider.name,
+                    "expected_minor": int(payment.amount_kurus),
+                    "paid_minor": int(paid_minor),
+                    "provider_reference": provider_reference,
+                },
+            )
+            db.session.rollback()
+            return jsonify({"ok": False, "error": "amount_mismatch"}), 400
 
         apply_successful_payment(payment, model, effective_plan)
         try:

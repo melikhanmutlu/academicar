@@ -111,6 +111,24 @@ def test_paytr_callback_applies_license_and_acks_ok(paytr_client, paytr_app):
         assert payment.status == "paid"
 
 
+def test_paytr_callback_rejects_underpayment(paytr_client, paytr_app):
+    """A signed 'success' callback paying less than the stored amount must not
+    grant the license (the signature proves authenticity, not the amount)."""
+    model_id, merchant_oid = _make_pending_payment(paytr_app)  # amount_kurus=990
+    total_amount = "1"  # 1 kuruş instead of 990
+    data = {
+        "merchant_oid": merchant_oid,
+        "status": "success",
+        "total_amount": total_amount,
+        "hash": _paytr_hash(merchant_oid, "success", total_amount),
+    }
+    resp = paytr_client.post("/payment/webhook/paytr", data=data)
+    assert resp.status_code == 400
+    with paytr_app.app_context():
+        assert db.session.get(Model3D, model_id).license_type == "free"
+        assert Payment.query.filter_by(provider_reference=merchant_oid).first().status == "pending"
+
+
 def test_paytr_callback_rejects_bad_hash(paytr_client, paytr_app):
     model_id, merchant_oid = _make_pending_payment(paytr_app)
     resp = paytr_client.post(

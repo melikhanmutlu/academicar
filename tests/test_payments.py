@@ -131,3 +131,30 @@ def test_webhook_ignores_unpaid_event(client, app):
 def test_webhook_unknown_provider_404(client):
     resp = client.post("/payment/webhook/stripe", json={"status": "paid"})
     assert resp.status_code == 404
+
+
+def test_unknown_provider_name_does_not_fall_back_to_dev_in_prod():
+    """A typo'd PAYMENT_PROVIDER must resolve to a secure provider, never the dev
+    provider whose webhook verification accepts forged 'paid' events."""
+    from app import create_app
+    from payments import get_payment_provider
+
+    app = create_app(
+        {
+            "TESTING": True,
+            "WTF_CSRF_ENABLED": False,
+            "SQLALCHEMY_DATABASE_URI": "sqlite://",
+            "SECRET_KEY": "x",
+            "PAYMENT_PROVIDER": "lemonsqeezy",  # deliberate typo (unrecognized)
+            "ALLOW_DEV_PAYMENTS": False,
+        }
+    )
+    with app.app_context():
+        assert get_payment_provider().name == "lemonsqueezy"
+
+    # The forged dev webhook path must 404 (provider no longer resolves to dev).
+    resp = app.test_client().post(
+        "/payment/webhook/development",
+        json={"status": "paid", "plan_key": "extended_archive", "model_id": "x"},
+    )
+    assert resp.status_code == 404

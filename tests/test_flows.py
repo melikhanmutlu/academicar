@@ -156,7 +156,6 @@ def test_paper_detail_uses_clear_actions_without_publication_expiry(client):
     assert "View Paper QR" in html
     assert "Availability" not in html
     assert "Active until" not in html
-    assert "Source unit" not in html
 
 
 def test_paper_create_can_include_first_model(client):

@@ -30,7 +30,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app import create_app  # noqa: E402
 from converters.stl_converter import convert_glb_to_usdz  # noqa: E402
 from models import Model3D  # noqa: E402
-from services.r2_mirror import ensure_local, mirror_file  # noqa: E402
+from services.r2_mirror import ensure_local, mirror_file_sync  # noqa: E402
 
 
 def main() -> int:
@@ -101,7 +101,11 @@ def main() -> int:
                 print(f"  [error] {model.id} — {exc}")
 
             if ok:
-                mirror_file(usdz_path, r2_usdz)
+                # Synchronous upload: a fire-and-forget daemon thread would be
+                # killed when this script exits right after the loop, silently
+                # losing the last few USDZ files it was supposed to back up.
+                if not mirror_file_sync(usdz_path, r2_usdz):
+                    print(f"  [mirror-failed] {model.id} — USDZ generated but not uploaded to R2")
                 print(f"  [generated] {model.id}")
                 generated += 1
             else:

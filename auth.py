@@ -1,4 +1,6 @@
 """Authentication blueprint: email/password login, registration, and Google OAuth."""
+import hashlib
+import hmac
 import os
 from urllib.parse import urljoin, urlparse
 
@@ -125,20 +127,44 @@ def _password_reset_serializer():
     return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="password-reset")
 
 
+def _password_reset_fingerprint(user) -> str:
+    """Short digest of the current password hash, embedded in reset tokens so a
+    token stops verifying the moment the password changes. This makes reset
+    links single-use: once a password is set, every outstanding token for that
+    account (including the one just consumed) is invalidated."""
+    raw = f"{user.id}|{user.password_hash or ''}".encode()
+    return hashlib.sha256(raw).hexdigest()[:16]
+
+
 def generate_password_reset_token(user) -> str:
     """Signed, time-limited token carrying the user id (exported for tests)."""
-    return _password_reset_serializer().dumps({"uid": user.id})
+    return _password_reset_serializer().dumps(
+        {"uid": user.id, "fp": _password_reset_fingerprint(user)}
+    )
 
 
 def verify_password_reset_token(token: str, max_age: int = 3600):
-    """Return the user id for a valid token, or None if invalid/expired."""
+    """Return the user id for a valid token, or None if invalid/expired/consumed.
+
+    A token is rejected once its embedded fingerprint no longer matches the
+    user's current password hash, so a link cannot be replayed after the
+    password has already been reset."""
     from itsdangerous import BadSignature, SignatureExpired
 
     try:
         data = _password_reset_serializer().loads(token, max_age=max_age)
     except (BadSignature, SignatureExpired):
         return None
-    return data.get("uid")
+    uid = data.get("uid")
+    fingerprint = data.get("fp")
+    if uid is None or not fingerprint:
+        return None
+    user = db.session.get(User, uid)
+    if user is None:
+        return None
+    if not hmac.compare_digest(fingerprint, _password_reset_fingerprint(user)):
+        return None
+    return uid
 
 
 def _rotate_session():

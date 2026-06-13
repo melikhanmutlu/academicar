@@ -25,7 +25,8 @@ RUN apt-get update \
         curl ca-certificates xz-utils nodejs npm postgresql-client \
         libgl1 libegl1 libxi6 libxxf86vm1 libxfixes3 libxrender1 libxkbcommon0 \
         libsm6 libx11-6 libxext6 libgomp1 \
-    && curl -fsSL "https://download.blender.org/release/Blender${BLENDER_MAJOR}/blender-${BLENDER_VERSION}-linux-x64.tar.xz" -o /tmp/blender.tar.xz \
+    && ( curl -fsSL "https://download.blender.org/release/Blender${BLENDER_MAJOR}/blender-${BLENDER_VERSION}-linux-x64.tar.xz" -o /tmp/blender.tar.xz \
+        || curl -fsSL "https://mirrors.ocf.berkeley.edu/blender/release/Blender${BLENDER_MAJOR}/blender-${BLENDER_VERSION}-linux-x64.tar.xz" -o /tmp/blender.tar.xz ) \
     && mkdir -p /opt/blender \
     && tar -xJf /tmp/blender.tar.xz -C /opt/blender --strip-components=1 \
     && ln -s /opt/blender/blender /usr/local/bin/blender \

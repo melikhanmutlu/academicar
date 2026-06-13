@@ -46,22 +46,38 @@ def _bucket() -> str:
     return os.environ.get("R2_BUCKET_NAME", "academicar-backup")
 
 
-def _upload_sync(local_path: str, r2_key: str) -> None:
+def _upload_sync(local_path: str, r2_key: str) -> bool:
+    """Upload one file. Returns True on success, False if disabled or it failed."""
     try:
         client = _get_client()
         if client is None:
-            return
+            return False
         client.upload_file(local_path, _bucket(), r2_key)
         logger.info("R2 mirror: %s -> %s", r2_key, _bucket())
+        return True
     except Exception:
         logger.warning("R2 mirror failed: %s", r2_key, exc_info=True)
+        return False
 
 
 def mirror_file(local_path: str, r2_key: str) -> None:
+    """Async best-effort mirror for request paths (never blocks the caller)."""
     if not _is_enabled() or not os.path.isfile(local_path):
         return
     t = threading.Thread(target=_upload_sync, args=(local_path, r2_key), daemon=True)
     t.start()
+
+
+def mirror_file_sync(local_path: str, r2_key: str) -> bool:
+    """Synchronous mirror for batch jobs / scripts that exit right after.
+
+    Returns True when the file is on R2 (or there is nothing to do because the
+    mirror is disabled or the file is absent), False only when an enabled mirror
+    failed to upload an existing file. Use this instead of ``mirror_file`` when
+    the process may terminate before a daemon upload thread finishes."""
+    if not _is_enabled() or not os.path.isfile(local_path):
+        return True
+    return _upload_sync(local_path, r2_key)
 
 
 def mirror_directory(local_dir: str, r2_prefix: str) -> None:
