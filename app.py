@@ -3314,10 +3314,19 @@ def register_routes(app: Flask) -> None:
                 )
                 with _tempfile.TemporaryDirectory() as tmp:
                     out_usdz = os.path.join(tmp, "test.usdz")
+                    # Mirror convert_glb_to_usdz: feed Blender a Draco-free copy,
+                    # since stored GLBs are Draco-compressed and Debian's Blender
+                    # importer cannot decode Draco.
+                    from converters.glb_optimize import decompress_glb
+                    input_glb = glb_path
+                    plain = os.path.join(tmp, "plain.glb")
+                    report["decompressed"] = bool(decompress_glb(glb_path, plain))
+                    if report["decompressed"]:
+                        input_glb = plain
                     try:
                         cproc = _subprocess.run(
                             ["blender", "--background", "--python", blender_script,
-                             "--", glb_path, out_usdz],
+                             "--", input_glb, out_usdz],
                             stdout=_subprocess.PIPE, stderr=_subprocess.PIPE,
                             text=True, timeout=300,
                         )

@@ -108,6 +108,52 @@ def optimize_glb(
     return True
 
 
+def decompress_glb(src_path: str, dst_path: str) -> bool:
+    """Write a Draco-free copy of ``src_path`` to ``dst_path``.
+
+    Our pipeline Draco-compresses the stored GLB (see ``optimize_glb``), but
+    some downstream tools cannot decode Draco geometry — notably Debian's
+    Blender package, whose glTF importer ships without ``libextern_draco.so``
+    and dies with "cannot open shared object file". gltf-transform's ``copy``
+    round-trips the asset: it decodes Draco on read and re-serializes without
+    compression, yielding a plain GLB any importer can read.
+
+    Returns True if ``dst_path`` was written, False otherwise (callers should
+    fall back to the original file).
+    """
+    if not os.path.exists(src_path):
+        logger.warning("decompress_glb: file not found: %s", src_path)
+        return False
+
+    cmd = _find_cli() + ["copy", src_path, dst_path]
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=_TIMEOUT,
+            cwd=os.path.dirname(src_path) or None,
+        )
+    except FileNotFoundError:
+        logger.info("gltf-transform not found; cannot decompress GLB for Blender.")
+        return False
+    except subprocess.TimeoutExpired:
+        logger.warning("gltf-transform copy timed out after %ds", _TIMEOUT)
+        _cleanup(dst_path)
+        return False
+
+    if result.returncode != 0 or not os.path.exists(dst_path) or os.path.getsize(dst_path) < 20:
+        logger.warning(
+            "gltf-transform copy (Draco decompress) failed (exit %d): %s",
+            result.returncode,
+            (result.stderr or result.stdout or "")[:500],
+        )
+        _cleanup(dst_path)
+        return False
+
+    return True
+
+
 def normalize_specular_glossiness(glb_path: str) -> bool:
     """Convert KHR_materials_pbrSpecularGlossiness materials to metal/rough.
 

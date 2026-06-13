@@ -100,13 +100,35 @@ def convert_glb_to_usdz(glb_path: str, usdz_path: str) -> bool:
         "blender_usdz_export.py",
     )
 
+    # Our stored GLBs are Draco-compressed by optimize_glb(). Some Blender
+    # builds (notably Debian's package) ship a glTF importer without the Draco
+    # decoder (libextern_draco.so), so importing a Draco GLB fails. Hand Blender
+    # a decompressed copy when we can produce one; fall back to the original if
+    # the decompress step is unavailable (e.g. gltf-transform missing locally).
+    import tempfile
+
+    from .glb_optimize import decompress_glb
+
+    input_glb = glb_path
+    tmp_plain_glb = None
+    try:
+        fd, candidate = tempfile.mkstemp(suffix=".glb")
+        os.close(fd)
+        if decompress_glb(glb_path, candidate):
+            input_glb = candidate
+            tmp_plain_glb = candidate
+        else:
+            os.remove(candidate)
+    except Exception:  # noqa: BLE001
+        logger.exception("Draco decompress step errored; passing original GLB to Blender")
+
     cmd = [
         blender_exec,
         "--background",
         "--python",
         blender_script,
         "--",
-        glb_path,
+        input_glb,
         usdz_path,
     ]
 
@@ -124,6 +146,12 @@ def convert_glb_to_usdz(glb_path: str, usdz_path: str) -> bool:
     except subprocess.TimeoutExpired:
         logger.warning("Blender USDZ conversion timed out after 300s; USDZ unavailable")
         return False
+    finally:
+        if tmp_plain_glb and os.path.exists(tmp_plain_glb):
+            try:
+                os.remove(tmp_plain_glb)
+            except OSError:
+                pass
 
     ok = proc.returncode == 0 and os.path.exists(usdz_path) and os.path.getsize(usdz_path) > 0
     if ok:
