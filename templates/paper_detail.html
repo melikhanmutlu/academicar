@@ -196,7 +196,7 @@
               <div class="model-info">
                 <div class="model-card-title">
                   <h3 class="font-serif" title="{{ m.display_name or m.original_filename }}">{{ m.display_name or m.original_filename }}</h3>
-                  <span class="detail-chip dark">{{ plan.label }}</span>
+                  <span class="detail-chip plan-{{ plan.key }}">{{ plan.label }}</span>
                   {% if model_status != 'ready' %}<span class="detail-chip status">{{ model_status|title }}</span>
                   {% elif access_state == 'expired' %}<span class="detail-chip status">Expired</span>{% endif %}
                 </div>

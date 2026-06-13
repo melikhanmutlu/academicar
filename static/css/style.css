@@ -4792,6 +4792,30 @@ input[type="file"]::-webkit-file-upload-button {
   color: var(--color-canvas-white);
 }
 
+/* Per-plan license chips on the model card — each tier reads distinctly.
+   Free: quiet neutral outline. Academic: solid graphite (the standard paid
+   tier). Extended Archive: gold-tinted (premium/long-term archival). */
+.detail-chip.plan-free {
+  background: var(--color-cloud-whisper);
+  color: var(--color-silver-ash);
+  border: 1px solid var(--color-light-pearl);
+}
+.detail-chip.plan-academic {
+  background: var(--color-midnight-graphite);
+  color: var(--color-canvas-white);
+  border: 1px solid var(--color-midnight-graphite);
+}
+.detail-chip.plan-extended_archive {
+  background: rgba(129, 103, 41, 0.12);
+  color: var(--color-data-gold);
+  border: 1px solid rgba(129, 103, 41, 0.45);
+}
+.detail-chip.plan-institutional {
+  background: transparent;
+  color: var(--color-midnight-graphite);
+  border: 1px solid var(--color-midnight-graphite);
+}
+
 /* Abstract */
 .abstract-block {
   border-top: 1px solid var(--color-light-pearl) !important;
@@ -5535,7 +5559,29 @@ input[type="file"]::-webkit-file-upload-button {
   .model-registry-grid .model-preview { height: 180px; }
   .model-card-body { grid-template-columns: 1fr; }
   .model-registry-grid .model-card .model-preview { height: 180px; }
-  .model-card-footer { padding: 12px 16px; }
+  /* Keep the footer actions on a single row so "Upgrade" no longer drops to a
+     second line; pack them left (drop the auto-margin) and scroll horizontally
+     only if a very narrow screen truly can't fit them. */
+  .model-card-footer {
+    padding: 12px 14px;
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .model-card-footer .model-actions-secondary { margin-right: 0; }
+  .model-actions-secondary { flex-wrap: nowrap; }
+  .model-actions-secondary > .model-link-action:not(:last-child)::after { margin: 0 5px; }
+  .model-card-cta,
+  .model-card-upgrade,
+  .model-link-action { flex: 0 0 auto; white-space: nowrap; }
+  /* Compact the pills so the whole row fits a phone width without clipping. */
+  .model-card-cta,
+  .model-card-upgrade {
+    padding: 6px 11px;
+    font-size: 12px;
+    min-height: 32px;
+  }
 }
 
 /* Model edit page */
