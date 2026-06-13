@@ -26,6 +26,27 @@ def _public_model(app, *, license="academic", qr_status="active"):
         return m.public_id, m.id
 
 
+def test_fk_ondelete_rules_enforced_in_schema():
+    """I6/I8: child FKs cascade and payments.model_id is SET NULL at the DB level,
+    so a bulk/raw delete can't orphan rows (or leave a resolvable QR)."""
+    md = db.metadata
+
+    def ondelete(table, col):
+        for fk in md.tables[table].foreign_keys:
+            if fk.parent.name == col:
+                return fk.ondelete
+        return "MISSING"
+
+    assert ondelete("papers", "user_id") == "CASCADE"
+    assert ondelete("models", "paper_id") == "CASCADE"
+    assert ondelete("models", "user_id") == "CASCADE"
+    assert ondelete("qr_links", "model_id") == "CASCADE"
+    assert ondelete("model_annotations", "model_id") == "CASCADE"
+    assert ondelete("model_versions", "model_id") == "CASCADE"
+    assert ondelete("conversion_jobs", "model_id") == "CASCADE"
+    assert ondelete("payments", "model_id") == "SET NULL"
+
+
 def test_disabled_qr_link_does_not_resolve(client):
     pub, _ = _public_model(client.application, qr_status="disabled")
     assert client.get(f"/m/{pub}", follow_redirects=False).status_code == 404

@@ -59,7 +59,7 @@ class Paper(db.Model):
     institution = db.Column(db.String(300), nullable=True)
     pdf_path = db.Column(db.String(500), nullable=True)
     slug = db.Column(db.String(250), unique=True, nullable=False, index=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     package_type = db.Column(db.String(30), nullable=False, default="temporary")
     status = db.Column(db.String(30), nullable=False, default="active")
     is_public = db.Column(db.Boolean, nullable=False, default=False)
@@ -89,8 +89,8 @@ class Model3D(db.Model):
     __tablename__ = "models"
 
     id = db.Column(db.String(36), primary_key=True)  # UUID
-    paper_id = db.Column(db.Integer, db.ForeignKey("papers.id"), nullable=False, index=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    paper_id = db.Column(db.Integer, db.ForeignKey("papers.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     display_name = db.Column(db.String(255), nullable=True)
     description = db.Column(db.Text, nullable=True)
     original_filename = db.Column(db.String(255), nullable=True)
@@ -139,7 +139,7 @@ class ModelAnnotation(db.Model):
     __tablename__ = "model_annotations"
 
     id = db.Column(db.Integer, primary_key=True)
-    model_id = db.Column(db.String(36), db.ForeignKey("models.id"), nullable=False, index=True)
+    model_id = db.Column(db.String(36), db.ForeignKey("models.id", ondelete="CASCADE"), nullable=False, index=True)
     position_x = db.Column(db.Float, nullable=False)
     position_y = db.Column(db.Float, nullable=False)
     position_z = db.Column(db.Float, nullable=False)
@@ -173,7 +173,7 @@ class QRLink(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     public_id = db.Column(db.String(40), unique=True, nullable=False, index=True)
-    model_id = db.Column(db.String(36), db.ForeignKey("models.id"), nullable=False, index=True)
+    model_id = db.Column(db.String(36), db.ForeignKey("models.id", ondelete="CASCADE"), nullable=False, index=True)
     status = db.Column(db.String(30), nullable=False, default="active", index=True)
     target_type = db.Column(db.String(30), nullable=False, default="model_viewer")
     created_at = db.Column(db.DateTime, default=utc_now)
@@ -189,7 +189,7 @@ class ModelVersion(db.Model):
     __tablename__ = "model_versions"
 
     id = db.Column(db.Integer, primary_key=True)
-    model_id = db.Column(db.String(36), db.ForeignKey("models.id"), nullable=False, index=True)
+    model_id = db.Column(db.String(36), db.ForeignKey("models.id", ondelete="CASCADE"), nullable=False, index=True)
     version_number = db.Column(db.Integer, nullable=False)
     source_path = db.Column(db.String(500), nullable=True)
     glb_path = db.Column(db.String(500), nullable=True)
@@ -214,7 +214,7 @@ class ConversionJob(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     job_type = db.Column(db.String(40), nullable=False, default="model_upload", index=True)
     status = db.Column(db.String(30), nullable=False, default="pending", index=True)
-    model_id = db.Column(db.String(36), db.ForeignKey("models.id"), nullable=False, index=True)
+    model_id = db.Column(db.String(36), db.ForeignKey("models.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     payload = db.Column(db.JSON, nullable=False, default=dict)
     attempts = db.Column(db.Integer, nullable=False, default=0)
