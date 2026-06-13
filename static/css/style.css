@@ -3896,22 +3896,7 @@ input[type="file"]::-webkit-file-upload-button {
   transition: border-color 200ms ease, transform 200ms ease, box-shadow 200ms ease;
   overflow: hidden;
 }
-.metric-card:hover {
-  border-color: var(--color-midnight-graphite);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(32, 32, 32, 0.06);
-}
-.metric-card::after {
-  content: '';
-  position: absolute;
-  inset: auto 0 0 0;
-  height: 2px;
-  background: var(--color-sunset-orange);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 280ms ease;
-}
-.metric-card:hover::after { transform: scaleX(1); }
+/* Dashboard metric cards are static — no hover lift/border/underline. */
 
 .metric-card-head {
   display: flex;
@@ -4012,10 +3997,6 @@ input[type="file"]::-webkit-file-upload-button {
 }
 .metric-card.metric-card-feature .metric-sub {
   color: rgba(255, 255, 255, 0.55);
-}
-.metric-card.metric-card-feature:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 32px rgba(32, 32, 32, 0.18);
 }
 
 @media (max-width: 1100px) {
@@ -4279,7 +4260,6 @@ input[type="file"]::-webkit-file-upload-button {
   background: var(--color-canvas-white);
   border-color: var(--color-light-pearl);
   color: var(--color-midnight-graphite);
-  box-shadow: inset 4px 0 0 var(--color-midnight-graphite);
 }
 .metric-card.metric-card-feature .metric-icon {
   background: var(--color-midnight-graphite);
