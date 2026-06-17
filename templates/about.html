@@ -52,8 +52,8 @@
     <section class="mt-8 pt-8 border-t border-[#e8e8e8]">
       <p>
         Questions or partnership ideas?
-        <a href="{{ url_for('contact') }}" class="underline font-semibold text-[#202020]">Contact us</a>
-        or <a href="{{ url_for('auth.register') }}" class="underline">create a free account</a> to get started.
+        {% if config.CONTACT_ENABLED %}<a href="{{ url_for('contact') }}" class="underline font-semibold text-[#202020]">Contact us</a>
+        or {% endif %}<a href="{{ url_for('auth.register') }}" class="underline">create a free account</a> to get started.
       </p>
     </section>
   </div>

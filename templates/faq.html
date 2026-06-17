@@ -25,7 +25,7 @@
   <h1 class="font-serif text-4xl font-bold text-[#202020] mb-3">Frequently asked questions</h1>
   <p class="text-[#4d4d4d] mb-10">
     Everything you need to know about adding interactive 3D and AR to your research.
-    Still stuck? <a href="{{ url_for('contact') }}" class="underline">Get in touch</a>.
+    {% if config.CONTACT_ENABLED %}Still stuck? <a href="{{ url_for('contact') }}" class="underline">Get in touch</a>.{% endif %}
   </p>
 
   <div class="space-y-6">

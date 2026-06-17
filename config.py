@@ -204,6 +204,10 @@ class Config:
     # pool" etiquette) via the outbound User-Agent header. Override in prod.
     CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "info@academicar.com")
 
+    # Contact page/form. Hidden for now (no inbox to receive messages). Set
+    # CONTACT_ENABLED=1 to re-expose the /contact route, its links, and sitemap entry.
+    CONTACT_ENABLED = os.environ.get("CONTACT_ENABLED", "0").lower() in {"1", "true", "yes", "on"}
+
     # SEC-5: transactional email (e.g. email-change confirmation). If
     # MAIL_SERVER is unset the sender logs the message instead of delivering it
     # so local development still works without an SMTP provider.

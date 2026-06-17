@@ -70,7 +70,14 @@ def test_about_page(client):
     assert "About AcademicAR" in resp.get_data(as_text=True)
 
 
-def test_contact_page_and_submission(client):
+def test_contact_hidden_by_default(client):
+    # CONTACT_ENABLED defaults off — the page is hidden so we don't collect mail.
+    assert client.get("/contact").status_code == 404
+    assert client.post("/contact", data={"name": "Ada", "email": "a@e.com", "message": "hi"}).status_code == 404
+
+
+def test_contact_page_and_submission_when_enabled(client):
+    client.application.config["CONTACT_ENABLED"] = True
     assert client.get("/contact").status_code == 200
     resp = client.post(
         "/contact",
@@ -80,6 +87,7 @@ def test_contact_page_and_submission(client):
     assert resp.status_code == 200
 
 
-def test_contact_requires_fields(client):
+def test_contact_requires_fields_when_enabled(client):
+    client.application.config["CONTACT_ENABLED"] = True
     resp = client.post("/contact", data={"name": "", "email": "", "message": ""}, follow_redirects=True)
     assert resp.status_code == 200

@@ -2184,6 +2184,9 @@ def register_routes(app: Flask) -> None:
     @app.route("/contact", methods=["GET", "POST"])
     @limiter.limit("5 per hour", methods=["POST"])
     def contact():
+        # Hidden for now (no inbox). Re-enable with CONTACT_ENABLED=1.
+        if not current_app.config.get("CONTACT_ENABLED"):
+            abort(404)
         if request.method == "POST":
             name = (request.form.get("name") or "").strip()
             email = (request.form.get("email") or "").strip()
@@ -2267,7 +2270,6 @@ def register_routes(app: Flask) -> None:
             "faq",
             "about",
             "ar_for_index",
-            "contact",
             "blog_index",
             "terms",
             "privacy",
@@ -2278,6 +2280,11 @@ def register_routes(app: Flask) -> None:
                 urls.append(public_url(endpoint))
             except Exception:
                 continue
+        if current_app.config.get("CONTACT_ENABLED"):
+            try:
+                urls.append(public_url("contact"))
+            except Exception:
+                pass
         for slug in discipline_slugs():
             try:
                 urls.append(public_url("ar_for", discipline=slug))
