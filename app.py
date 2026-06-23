@@ -5023,7 +5023,9 @@ def register_routes(app: Flask) -> None:
                 flash("Model details could not be saved.", "danger")
                 return render_template("model_edit.html", model=model, paper=model.paper)
             flash("Model details updated.", "success")
-            return redirect(url_for("paper_detail", slug=model.paper.slug))
+            # Stay on the edit page so the user can keep tweaking the model
+            # instead of being bounced back to the publication page.
+            return redirect(url_for("model_edit", model_id=model.id))
         return render_template("model_edit.html", model=model, paper=model.paper)
 
     @app.route("/models/<model_id>/delete", methods=["POST"])
