@@ -205,16 +205,10 @@
     /* Active toggles + primary CTAs invert to graphite-on-light. */
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-auto-toggle[aria-pressed="true"],
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-animation-toggle[aria-pressed="true"],
-    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-bg-tools button[aria-pressed="true"],
-    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-share-card-btn {
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-bg-tools button[aria-pressed="true"] {
       background: #1f2933;
       color: #ffffff;
       border-color: #1f2933;
-    }
-    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-share-card-btn:hover {
-      background: #111111;
-      border-color: #111111;
-      color: #ffffff;
     }
     /* Loading chip reads better as a light surface on a bright backdrop too. */
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) #viewerStatus {
@@ -432,16 +426,25 @@
       gap: 0.5rem;
       margin-top: 0.65rem;
     }
-    .viewer-share-card-btn {
-      grid-column: 1 / -1;
-      background: #ffffff;
-      color: #111111;
-      border-color: #ffffff;
+    .viewer-shot-qr-toggle {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.6rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.8);
+      cursor: pointer;
+      user-select: none;
     }
-    .viewer-share-card-btn:hover {
-      background: rgba(255, 255, 255, 0.88);
-      color: #111111;
-      border-color: #ffffff;
+    .viewer-shot-qr-toggle input {
+      width: 15px;
+      height: 15px;
+      accent-color: #ff682c;
+      cursor: pointer;
+    }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-shot-qr-toggle {
+      color: #4d4d4d;
     }
     .viewer-shot-grid {
       display: grid;
@@ -786,8 +789,11 @@
             <div class="viewer-shot-actions">
               <button type="button" data-current-shot>Current view</button>
               <button type="button" data-generate-shot-set>Generate 8 views</button>
-              <button type="button" data-share-card class="viewer-share-card-btn">Create share card (model + QR)</button>
             </div>
+            <label class="viewer-shot-qr-toggle">
+              <input type="checkbox" data-qr-overlay checked>
+              <span>Include QR code on screenshots</span>
+            </label>
             <div class="viewer-shot-grid" data-shot-gallery aria-live="polite"></div>
           </div>
         </div>
@@ -904,7 +910,7 @@
     const shotModalImg = document.getElementById('shotModalImg');
     const shotModalDownload = document.getElementById('shotModalDownload');
     const modelBaseName = {{ (model.display_name or model.original_filename or 'model')|tojson }};
-    const shareCardButton = document.querySelector('[data-share-card]');
+    const qrOverlayToggle = document.querySelector('[data-qr-overlay]');
     const shareCardQrUrl = {{ (url_for('demo_mitochondria_qr') if demo_mode is defined and demo_mode else url_for('qr_image', model_id=model.id))|tojson }};
     const shotViews = [
       { key: 'top', label: 'Top', orbit: '0deg 0deg auto' },
@@ -1354,18 +1360,19 @@
       ctx.arcTo(x, y, x + w, y, r);
       ctx.closePath();
     };
-    // Compose a shareable card: the current model view on a clean canvas with a
-    // QR card in the bottom-right and the model title bottom-left. Purely
-    // additive — the plain screenshot/ZIP tools above are untouched.
-    const composeShareCard = async () => {
-      if (shareCardButton) { shareCardButton.disabled = true; shareCardButton.textContent = 'Preparing card...'; }
-      try {
-        const shotUrl = await captureShot(null);
-        if (!shotUrl) throw new Error('capture failed');
-        const [shot, qr] = await Promise.all([
-          loadImage(shotUrl),
-          loadImage(shareCardQrUrl).catch(() => null),
-        ]);
+    // QR overlay compositing — the model view on a clean white canvas with the
+    // model title top-left and a QR card bottom-right. Reused by the "Include QR
+    // code" toggle so the Current view and all 8 generated views can be produced
+    // with the QR automatically. The live viewer (manual screenshots) is untouched.
+    let qrImageCache;
+    const getQrImage = () => (qrImageCache ??= loadImage(shareCardQrUrl).catch(() => null));
+    const qrEnabled = () => !!(qrOverlayToggle && qrOverlayToggle.checked);
+    const composeQrCard = async (shotUrl) => {
+      if (!shotUrl) return null;
+      const [shot, qr] = await Promise.all([
+        loadImage(shotUrl),
+        getQrImage(),
+      ]);
         const W = shot.naturalWidth || 1280;
         const H = shot.naturalHeight || 960;
         const canvas = document.createElement('canvas');
@@ -1420,21 +1427,13 @@
         ctx.textBaseline = 'middle';
         ctx.fillText('SCAN FOR 3D / AR', cardX + cardW / 2, cardY + pad + q + capH * 0.5);
         // Preview in a popup; the user downloads from there (no auto-download).
-        const out = canvas.toDataURL('image/png');
-        if (shotModal && shotModalImg && shotModalDownload) {
-          if (shotModalTitle) shotModalTitle.textContent = 'Share card';
-          shotModalImg.src = out;
-          shotModalDownload.href = out;
-          shotModalDownload.download = `${safeName(modelBaseName)}-share-card.png`;
-          shotModal.classList.remove('hidden');
-        } else {
-          downloadDataUrl(out, 'share-card');
-        }
-      } catch (error) {
-        if (typeof window.showToast === 'function') window.showToast('Could not build the share card. Please try again.', 'danger');
-      } finally {
-        if (shareCardButton) { shareCardButton.disabled = false; shareCardButton.textContent = 'Create share card (model + QR)'; }
-      }
+        return canvas.toDataURL('image/png');
+    };
+    // Apply the QR overlay when the toggle is on; otherwise return the raw shot.
+    const processShot = async (rawUrl) => {
+      if (!rawUrl || !qrEnabled()) return rawUrl;
+      try { return (await composeQrCard(rawUrl)) || rawUrl; }
+      catch (error) { return rawUrl; }
     };
     const renderShotGallery = () => {
       if (!shotGalleryEl) return;
@@ -1463,7 +1462,7 @@
       shotModalTitle.textContent = shot.label;
       shotModalImg.src = shot.dataUrl;
       shotModalDownload.href = shot.dataUrl;
-      shotModalDownload.download = `${safeName(modelBaseName)}-${shot.key || 'current-view'}.png`;
+      shotModalDownload.download = `${safeName(modelBaseName)}-${shot.key || 'current-view'}${shot.qr ? '-qr' : ''}.png`;
       shotModal.classList.remove('hidden');
     };
     const closeShotPreview = () => {
@@ -1472,8 +1471,10 @@
       shotModalImg.src = '';
     };
     const downloadCurrentShot = async () => {
-      const dataUrl = await captureShot(null);
-      if (dataUrl) downloadDataUrl(dataUrl, 'current-view');
+      const raw = await captureShot(null);
+      if (!raw) return;
+      const out = await processShot(raw);
+      downloadDataUrl(out, qrEnabled() ? 'current-view-qr' : 'current-view');
     };
     const generateShotSet = async () => {
       const state = cameraState();
@@ -1483,9 +1484,11 @@
         generateShotSetButton.textContent = 'Generating...';
       }
       for (const view of shotViews) {
-        const dataUrl = await captureShot(view);
-        if (dataUrl) {
-          shotGallery.push({ ...view, dataUrl });
+        const raw = await captureShot(view);
+        if (raw) {
+          // Store the raw shot too, so toggling QR re-composites instantly
+          // (no re-capture / camera moves).
+          shotGallery.push({ ...view, rawDataUrl: raw, dataUrl: await processShot(raw), qr: qrEnabled() });
           renderShotGallery();
         }
       }
@@ -1511,7 +1514,7 @@
       try {
         const zip = new ZipLibrary();
         for (const shot of shotGallery) {
-          zip.file(`${safeName(modelBaseName)}-${shot.key}.png`, dataUrlToUint8Array(shot.dataUrl));
+          zip.file(`${safeName(modelBaseName)}-${shot.key}${shot.qr ? '-qr' : ''}.png`, dataUrlToUint8Array(shot.dataUrl));
         }
         const blob = await zip.generateAsync({ type: 'blob' });
         const link = document.createElement('a');
@@ -1586,7 +1589,17 @@
 
     currentShotButton?.addEventListener('click', downloadCurrentShot);
     generateShotSetButton?.addEventListener('click', generateShotSet);
-    shareCardButton?.addEventListener('click', composeShareCard);
+    // Toggling QR re-composites the already-generated gallery from stored raw
+    // shots (instant; no re-capture) so the user sees QR'd vs plain immediately.
+    const refreshGalleryOverlay = async () => {
+      if (!shotGallery.length) return;
+      for (const shot of shotGallery) {
+        shot.dataUrl = await processShot(shot.rawDataUrl);
+        shot.qr = qrEnabled();
+      }
+      renderShotGallery();
+    };
+    qrOverlayToggle?.addEventListener('change', refreshGalleryOverlay);
     downloadZipButton?.addEventListener('click', downloadShotZip);
     closeShotModal?.addEventListener('click', closeShotPreview);
     shotModal?.addEventListener('click', (event) => {
