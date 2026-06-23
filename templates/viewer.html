@@ -1545,6 +1545,9 @@
       });
     });
     resetRotation?.addEventListener('click', async () => {
+      // Stop auto-rotate first — otherwise model-viewer keeps spinning the camera
+      // (auto-rotate-delay=0) right after we set it, so "reset" never sticks.
+      setAutoRotateState(false);
       rotateInputs.forEach((input) => {
         input.value = 0;
         const valueEl = document.querySelector(`[data-rotate-value="${input.dataset.rotateAxis}"]`);
