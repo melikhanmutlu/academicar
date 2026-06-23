@@ -446,6 +446,48 @@
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-shot-qr-toggle {
       color: #4d4d4d;
     }
+    .viewer-shot-bg {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.8);
+    }
+    .viewer-shot-bg-opts {
+      display: inline-flex;
+      gap: 0.3rem;
+    }
+    .viewer-shot-bg-opts button {
+      padding: 0.2rem 0.6rem;
+      border-radius: 0.45rem;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .viewer-shot-bg-opts button[aria-pressed="true"] {
+      background: #ff682c;
+      border-color: #ff682c;
+      color: #ffffff;
+    }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-shot-bg {
+      color: #4d4d4d;
+    }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-shot-bg-opts button {
+      border-color: rgba(15, 23, 42, 0.18);
+      background: rgba(15, 23, 42, 0.04);
+      color: #4d4d4d;
+    }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-shot-bg-opts button[aria-pressed="true"] {
+      background: #ff682c;
+      border-color: #ff682c;
+      color: #ffffff;
+    }
     .viewer-shot-grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -576,12 +618,12 @@
       quick-look-browsers="safari chrome"
       camera-controls
       touch-action="pan-y"
-      camera-orbit="35deg 70deg auto"
+      camera-orbit="0deg 90deg auto"
       field-of-view="28deg"
       min-field-of-view="10deg"
       max-field-of-view="60deg"
       bounds="tight"
-      interaction-prompt="auto"
+      interaction-prompt="none"
       autoplay
       animation-crossfade-duration="300"
       reveal="auto">
@@ -794,6 +836,13 @@
               <input type="checkbox" data-qr-overlay checked>
               <span>Include QR code on screenshots</span>
             </label>
+            <div class="viewer-shot-bg" data-shot-bg>
+              <span>Background</span>
+              <div class="viewer-shot-bg-opts">
+                <button type="button" data-shot-bg-opt="white" aria-pressed="true">Light</button>
+                <button type="button" data-shot-bg-opt="dark" aria-pressed="false">Dark</button>
+              </div>
+            </div>
             <div class="viewer-shot-grid" data-shot-gallery aria-live="polite"></div>
           </div>
         </div>
@@ -922,7 +971,7 @@
       { key: 'left-perspective', label: 'Left perspective', orbit: '-35deg 65deg auto' },
       { key: 'right-perspective', label: 'Right perspective', orbit: '35deg 65deg auto' }
     ];
-    const defaultCameraOrbit = '35deg 70deg auto';
+    const defaultCameraOrbit = '0deg 90deg auto';
     const defaultFieldOfView = '28deg';
     const defaultOrientation = '0deg 0deg 0deg';
     let shotGallery = [];
@@ -1360,35 +1409,41 @@
       ctx.arcTo(x, y, x + w, y, r);
       ctx.closePath();
     };
-    // QR overlay compositing — the model view on a clean white canvas with the
-    // model title top-left and a QR card bottom-right. Reused by the "Include QR
-    // code" toggle so the Current view and all 8 generated views can be produced
-    // with the QR automatically. The live viewer (manual screenshots) is untouched.
+    // Screenshot compositing — render the model view on a solid background
+    // (light or dark, user-selectable so light and dark models both read well)
+    // and, when the "Include QR code" toggle is on, add the model title (top-left)
+    // and a QR card (bottom-right). Used for the Current view and all 8 generated
+    // views. The live viewer (manual screenshots) is untouched.
     let qrImageCache;
     const getQrImage = () => (qrImageCache ??= loadImage(shareCardQrUrl).catch(() => null));
     const qrEnabled = () => !!(qrOverlayToggle && qrOverlayToggle.checked);
-    const composeQrCard = async (shotUrl) => {
-      if (!shotUrl) return null;
+    let shotBgMode = 'white';  // 'white' | 'dark'
+    const shotBgColor = () => (shotBgMode === 'dark' ? '#202020' : '#ffffff');
+    const composeShot = async (shotUrl) => {
+      if (!shotUrl) return shotUrl;
+      const withQr = qrEnabled();
+      const dark = shotBgMode === 'dark';
       const [shot, qr] = await Promise.all([
         loadImage(shotUrl),
-        getQrImage(),
+        withQr ? getQrImage() : Promise.resolve(null),
       ]);
-        const W = shot.naturalWidth || 1280;
-        const H = shot.naturalHeight || 960;
-        const canvas = document.createElement('canvas');
-        canvas.width = W;
-        canvas.height = H;
-        const ctx = canvas.getContext('2d');
-        // Clean white canvas, then the model render (transparent areas -> white).
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, W, H);
-        ctx.drawImage(shot, 0, 0, W, H);
+      const W = shot.naturalWidth || 1280;
+      const H = shot.naturalHeight || 960;
+      const canvas = document.createElement('canvas');
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext('2d');
+      // Solid background (model's transparent areas -> chosen colour), then model.
+      ctx.fillStyle = shotBgColor();
+      ctx.fillRect(0, 0, W, H);
+      ctx.drawImage(shot, 0, 0, W, H);
+      if (withQr) {
         const margin = Math.round(W * 0.035);
-        // Model title, top-left.
+        // Model title, top-left — light text on a dark background, else graphite.
         const titleSize = Math.round(W * 0.040);
         let title = String(modelBaseName || 'Model');
         const maxTitleW = Math.round(W * 0.72);
-        ctx.fillStyle = '#202020';
+        ctx.fillStyle = dark ? '#ffffff' : '#202020';
         ctx.font = `600 ${titleSize}px Inter, sans-serif`;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
@@ -1399,7 +1454,7 @@
           title += '…';
         }
         ctx.fillText(title, margin, margin);
-        // Compact QR card, bottom-right.
+        // Compact QR card, bottom-right (white card reads on either background).
         const q = Math.max(110, Math.min(Math.round(Math.min(W, H) * 0.155), 200));
         const pad = Math.round(q * 0.12);
         const capH = Math.round(q * 0.22);
@@ -1426,13 +1481,14 @@
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('SCAN FOR 3D / AR', cardX + cardW / 2, cardY + pad + q + capH * 0.5);
-        // Preview in a popup; the user downloads from there (no auto-download).
-        return canvas.toDataURL('image/png');
+      }
+      return canvas.toDataURL('image/png');
     };
-    // Apply the QR overlay when the toggle is on; otherwise return the raw shot.
+    // Composite every shot onto the chosen background (plus QR when enabled);
+    // fall back to the raw shot if compositing fails.
     const processShot = async (rawUrl) => {
-      if (!rawUrl || !qrEnabled()) return rawUrl;
-      try { return (await composeQrCard(rawUrl)) || rawUrl; }
+      if (!rawUrl) return rawUrl;
+      try { return (await composeShot(rawUrl)) || rawUrl; }
       catch (error) { return rawUrl; }
     };
     const renderShotGallery = () => {
@@ -1603,6 +1659,19 @@
       renderShotGallery();
     };
     qrOverlayToggle?.addEventListener('change', refreshGalleryOverlay);
+    // Screenshot background (light/dark) selector — re-composites the gallery too.
+    const shotBgSelector = document.querySelector('[data-shot-bg]');
+    if (shotBgSelector) {
+      shotBgSelector.querySelectorAll('[data-shot-bg-opt]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          shotBgMode = btn.dataset.shotBgOpt === 'dark' ? 'dark' : 'white';
+          shotBgSelector.querySelectorAll('[data-shot-bg-opt]').forEach((b) => {
+            b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+          });
+          refreshGalleryOverlay();
+        });
+      });
+    }
     downloadZipButton?.addEventListener('click', downloadShotZip);
     closeShotModal?.addEventListener('click', closeShotPreview);
     shotModal?.addEventListener('click', (event) => {
