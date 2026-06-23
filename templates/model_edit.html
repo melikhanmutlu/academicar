@@ -24,6 +24,7 @@
 
   <div class="model-edit-layout">
     <main class="model-edit-main">
+      {% if model_status != 'ready' %}
       <form method="POST" class="surface model-edit-card model-edit-card-primary">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="model-edit-card-head">
@@ -45,10 +46,23 @@
           <button type="submit" class="detail-action detail-action-primary">Save Changes</button>
         </div>
       </form>
+      {% endif %}
 
       {% if model_status == 'ready' %}
       <form method="POST" action="{{ url_for('model_appearance_update', model_id=model.id) }}" class="surface model-edit-card model-edit-material-card">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="model-edit-card-head">
+          <h2>Viewer card</h2>
+          <p>The model name and note appear on the publication detail page and public viewer surfaces. Saved together with the appearance below.</p>
+        </div>
+        <div class="model-edit-field-grid">
+          <label class="field-label">Model name</label>
+          <input type="text" name="display_name" value="{{ model.display_name or '' }}" class="field-input" placeholder="Example: Femur reconstruction" maxlength="255" aria-label="Model name">
+        </div>
+        <div class="model-edit-field-grid">
+          <label class="field-label">Model note</label>
+          <textarea name="description" rows="6" class="field-textarea" maxlength="5000" aria-label="Model note" placeholder="Describe the model context within the publication">{{ model.description or '' }}</textarea>
+        </div>
         <div class="model-edit-card-head">
           <h2>Material &amp; appearance</h2>
           <p>Adjust the color and surface finish. The preview updates live as you drag the sliders — click "Update Appearance" to save it onto the model. The viewer link and QR stay the same.</p>
@@ -115,7 +129,8 @@
           </div>
         </div>
         <div class="model-edit-actions">
-          <button type="submit" class="detail-action detail-action-primary">Update Appearance</button>
+          <a href="{{ url_for('paper_detail', slug=paper.slug) }}" class="detail-action">Cancel</a>
+          <button type="submit" class="detail-action detail-action-primary">Save Changes</button>
         </div>
       </form>
       {% else %}

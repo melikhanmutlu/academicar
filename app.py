@@ -4714,6 +4714,13 @@ def register_routes(app: Flask) -> None:
             model.appearance_roughness = roughness
             model.appearance_metallic = metallic
             model.ar_placement = ar_placement
+            # The edit page saves the model name/note in this same form (one
+            # "Save Changes"). Only touch them when the fields are present so the
+            # inline registry color form (which omits them) can't wipe them.
+            if "display_name" in request.form:
+                model.display_name = (request.form.get("display_name") or "").strip()[:255] or None
+            if "description" in request.form:
+                model.description = (request.form.get("description") or "").strip()[:5000] or None
             try:
                 model.file_size = os.path.getsize(glb_path)
             except OSError:
@@ -4727,7 +4734,7 @@ def register_routes(app: Flask) -> None:
                 resource_id=model_id,
                 details={"color": new_color, "roughness": roughness, "metallic": metallic, "ar_placement": ar_placement},
             )
-            flash(f"Model color updated to {new_color}.", "success")
+            flash("Changes saved.", "success")
         except SQLAlchemyError:
             db.session.rollback()
             if os.path.exists(backup_path):
