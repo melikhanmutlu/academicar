@@ -121,6 +121,9 @@ class Model3D(db.Model):
     replacement_status = db.Column(db.String(30), nullable=True)
     replacement_error = db.Column(db.Text, nullable=True)
     source_format = db.Column(db.String(10), nullable=False, default="stl")
+    # Declared source unit for unitless formats (mm/cm/m), or "embedded" for
+    # FBX/GLB. Stored so the edit page can re-interpret the unit (rescale by ratio).
+    source_unit = db.Column(db.String(12), nullable=True)
     processing_status = db.Column(db.String(30), nullable=False, default="ready")
     processing_error = db.Column(db.Text, nullable=True)
     anonymization_confirmed = db.Column(db.Boolean, nullable=False, default=False)

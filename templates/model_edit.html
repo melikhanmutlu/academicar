@@ -147,6 +147,26 @@
         </div>
 
         {% if model_status == 'ready' %}
+        {% if model.source_unit in ['mm', 'cm', 'm'] %}
+        <form method="POST" action="{{ url_for('model_change_unit', model_id=model.id) }}" class="surface model-edit-card">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="model-edit-card-head">
+            <h2>Source unit</h2>
+            <p>Picked the wrong unit on upload? Change it and the model is rescaled accordingly. Current: <strong>{{ model.source_unit }}</strong>.</p>
+          </div>
+          <div class="model-edit-field-grid">
+            <label class="field-label">Unit the model was made in</label>
+            <select name="source_unit" class="field-input">
+              <option value="mm"{% if model.source_unit == 'mm' %} selected{% endif %}>Millimeters (mm)</option>
+              <option value="cm"{% if model.source_unit == 'cm' %} selected{% endif %}>Centimeters (cm)</option>
+              <option value="m"{% if model.source_unit == 'm' %} selected{% endif %}>Meters (m)</option>
+            </select>
+          </div>
+          <div class="model-edit-actions">
+            <button type="submit" class="detail-action detail-action-primary">Change unit</button>
+          </div>
+        </form>
+        {% endif %}
         <form method="POST" action="{{ url_for('model_rescale', model_id=model.id) }}" class="surface model-edit-card">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="model-edit-card-head">
@@ -155,7 +175,7 @@
           </div>
           <div class="model-edit-field-grid">
             <label class="field-label">Longest dimension (cm)</label>
-            <input type="number" name="target_longest_cm" min="0.1" max="500" step="0.1" class="field-input" placeholder="e.g. 15.0" required>
+            <input type="number" name="target_longest_cm" min="0.1" step="0.1" class="field-input" placeholder="e.g. 15.0" required>
           </div>
           <div class="model-edit-actions">
             <button type="submit" class="detail-action detail-action-primary">Rescale Model</button>

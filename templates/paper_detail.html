@@ -324,14 +324,15 @@
                   <input type="text" name="description" placeholder="Short model note" aria-label="Short model note" maxlength="5000" class="field-input">
                 </div>
                 <div>
-                  <label class="field-label" for="source_unit">Source unit</label>
-                  <select name="source_unit" id="source_unit" class="field-input">
-                    <option value="auto" selected>Auto-detect (recommended)</option>
+                  <label class="field-label" for="source_unit">Source unit <span class="text-[#ff682c]">*</span></label>
+                  <select name="source_unit" id="source_unit" class="field-input" required>
+                    <option value="" selected disabled>Select unit…</option>
                     <option value="mm">Millimeters (mm)</option>
                     <option value="cm">Centimeters (cm)</option>
                     <option value="m">Meters (m)</option>
+                    <option value="embedded">Embedded units (FBX / GLB)</option>
                   </select>
-                  <p class="text-xs text-[#5c6473] mt-1">STL and OBJ files carry no unit, so AR size is a guess. If your model looks too big or small in AR, pick the unit it was modeled in. You can also fine-tune the exact size later with “Resize model”.</p>
+                  <p class="text-xs text-[#5c6473] mt-1">STL and OBJ files carry no unit — choose the unit your model was made in (e.g. cm in 3ds Max / SketchUp). FBX/GLB already include real units, so pick “Embedded”. You can change this later on the model’s edit page.</p>
                 </div>
                 <label class="flex items-start gap-3 rounded-xl border border-[#e2e8f0] bg-white p-4 text-sm text-[#475569]">
                   <input type="checkbox" name="compliance_confirm" value="yes" required class="mt-1">

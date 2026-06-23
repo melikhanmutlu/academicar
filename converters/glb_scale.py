@@ -105,44 +105,18 @@ def normalize_converted_glb(
     *,
     auto_heuristic: bool,
 ) -> None:
-    """Scale a freshly converted GLB to a sane real-world size.
+    """Scale a freshly converted GLB by the user-declared source unit.
 
-    ``source_unit`` is the user's declared source unit (mm/cm/m) or "auto".
-    ``auto_heuristic`` selects the "auto" behaviour:
-      * True  (OBJ, unitless): guess the unit from the raw extent magnitude.
-      * False (FBX, already meters): trust the converter output as-is.
-    A safety clamp always caps the longest axis at DEFAULT_MAX_EXTENT_M.
+    ``source_unit`` is mm/cm/m (applied as a metres scale) or anything else
+    (e.g. "embedded"/"auto" for FBX/GLB which already carry real units, or a
+    legacy job) which is left as-authored. No magnitude guessing and no size
+    clamp — large models keep their real size. ``auto_heuristic`` is retained
+    for call-site compatibility but no longer changes behaviour.
     """
-    unit = (source_unit or "auto").strip().lower()
-    extent_m = measure_glb_max_extent_m(glb_path)
-
-    # 1) Unit scale.
-    if unit in _EXPLICIT_UNITS:
-        unit_scale = _EXPLICIT_UNITS[unit]
-    elif auto_heuristic and extent_m is not None:
-        # Same bands as STLConverter: >1000 µm, >100 mm, >1 cm, else meters.
-        if extent_m > 1000.0:
-            unit_scale = 0.000001
-        elif extent_m > 100.0:
-            unit_scale = 0.001
-        elif extent_m > 1.0:
-            unit_scale = 0.01
-        else:
-            unit_scale = 1.0
-    else:
-        unit_scale = 1.0
-
-    scaled_max = (extent_m or 0.0) * unit_scale
-
-    # 2) Safety clamp.
-    clamp = 1.0
-    if scaled_max > DEFAULT_MAX_EXTENT_M:
-        clamp = DEFAULT_MAX_EXTENT_M / scaled_max
-
-    total = unit_scale * clamp
-    if abs(total - 1.0) > 1e-9:
-        if apply_uniform_scale(glb_path, total):
-            logger.info(
-                "Scaled converted GLB %s by %.6g (unit=%s, clamp=%.4g) -> ~%.1f cm longest",
-                glb_path, total, unit, clamp, (scaled_max * clamp) * 100,
-            )
+    unit = (source_unit or "").strip().lower()
+    if unit not in _EXPLICIT_UNITS:
+        return
+    unit_scale = _EXPLICIT_UNITS[unit]
+    if abs(unit_scale - 1.0) > 1e-9:
+        if apply_uniform_scale(glb_path, unit_scale):
+            logger.info("Scaled converted GLB %s by %.6g (unit=%s)", glb_path, unit_scale, unit)

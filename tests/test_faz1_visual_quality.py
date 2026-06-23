@@ -88,11 +88,11 @@ class TestConsistentRenderAttributes:
         for val in matches:
             assert float(val) <= 0.5, f'{template} shadow-intensity should be subtle, got {val}'
 
-    def test_viewer_interaction_prompt_disabled(self):
-        # The initial interaction-prompt camera wiggle is intentionally disabled
-        # so the model loads steady, facing front.
+    def test_viewer_interaction_prompt_auto(self):
+        # The one-time interaction-prompt camera nudge hints the model is
+        # interactive on first load.
         content = (TEMPLATES_DIR / "viewer.html").read_text()
-        assert 'interaction-prompt="none"' in content
+        assert 'interaction-prompt="auto"' in content
 
 
 class TestMakeStudioEnvScript:

@@ -545,44 +545,21 @@ class STLConverter(BaseConverter):
                 f"y={raw_extents[1]:.3f}, z={raw_extents[2]:.3f}"
             )
 
-            # Explicit user override beats heuristic. The form sends mm/cm/m;
-            # anything else (including "auto") falls back to the heuristic.
-            #
-            # Heuristic bands (based on real-world model survey):
-            #   >1000  → likely microns (µm), e.g. microscopy data
-            #   >100   → likely mm, e.g. anatomical models (skull ~200mm)
-            #   >1     → likely cm, e.g. tabletop objects (box ~30cm)
-            #   ≤1     → likely already meters
-            # Target: the final mesh should be in meters for glTF/AR.
+            # Source unit is explicit — the upload form requires mm/cm/m for the
+            # unitless STL/OBJ formats (no magnitude guessing). Map it to a metres
+            # scale; if it's missing/unknown (legacy jobs) leave the mesh
+            # as-authored rather than guessing. No size clamp: large models keep
+            # their real size.
             explicit_units = {"mm": 0.001, "cm": 0.01, "m": 1.0}
             if source_unit in explicit_units:
                 unit_scale = explicit_units[source_unit]
                 unit_label = f"{source_unit} (user-specified)"
-            elif max_extent_raw > 1000.0:
-                unit_scale, unit_label = 0.000001, "µm (auto-detected)"
-            elif max_extent_raw > 100.0:
-                unit_scale, unit_label = 0.001, "mm (auto-detected)"
-            elif max_extent_raw > 1.0:
-                unit_scale, unit_label = 0.01, "cm (auto-detected)"
             else:
-                unit_scale, unit_label = 1.0, "m (auto-detected)"
+                unit_scale = 1.0
+                unit_label = "as-authored (no unit scaling)"
 
             mesh.apply_scale(unit_scale)
             scaled_max = max_extent_raw * unit_scale
-
-            # Safety clamp: if the scaled model is still unreasonably large
-            # (>10m in any dimension), scale it down to fit 2m — prevents
-            # absurdly large models from breaking AR placement.
-            AR_MAX_EXTENT_M = float(os.environ.get("AR_MAX_EXTENT_M", "2.0"))
-            if scaled_max > AR_MAX_EXTENT_M:
-                clamp_factor = AR_MAX_EXTENT_M / scaled_max
-                mesh.apply_scale(clamp_factor)
-                self.log_operation(
-                    f"Safety clamp: scaled model ({scaled_max:.2f}m) exceeded "
-                    f"{AR_MAX_EXTENT_M}m; applied additional {clamp_factor:.4f}x"
-                )
-                scaled_max = AR_MAX_EXTENT_M
-
             self.log_operation(
                 f"Source unit: {unit_label} (raw max extent {max_extent_raw:.2f}); "
                 f"applied scale {unit_scale} -> {scaled_max * 100:.1f} cm in AR"

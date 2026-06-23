@@ -1856,17 +1856,21 @@ def _create_model_for_paper(
     color = (color or "").strip() or None
     if color and HEX_COLOR_PATTERN.fullmatch(color) is None:
         color = None
-    # Source unit: STL/OBJ are unitless and FBX units are sometimes wrong, so the
-    # upload form lets the user declare mm/cm/m. "auto" (the default) auto-detects
-    # from the raw extents for STL/OBJ and trusts FBX2glTF's meters for FBX, with
-    # a safety clamp on absurd sizes. Anything unrecognized falls back to auto.
-    source_unit_norm = (source_unit or "auto").strip().lower()
-    if source_unit_norm not in {"auto", "mm", "cm", "m"}:
-        source_unit_norm = "auto"
+    raw_source_unit = (source_unit or "").strip().lower()
 
     unique_id = str(uuid.uuid4())
     original_name = secure_filename(file.filename)
     source_format = original_name.rsplit(".", 1)[1].lower()
+
+    # Source unit. STL/OBJ are unitless, so the user must explicitly declare
+    # mm/cm/m (no magnitude guessing). FBX/GLB already carry real units, so they
+    # are kept as authored ("embedded"). Validated before any files are written.
+    if source_format in {"stl", "obj"}:
+        if raw_source_unit not in {"mm", "cm", "m"}:
+            return False, "Please choose the source unit (mm, cm, or m) for STL/OBJ files."
+        source_unit_norm = raw_source_unit
+    else:
+        source_unit_norm = "embedded"
 
     upload_dir = os.path.join(current_app.config["UPLOAD_FOLDER"], unique_id)
     converted_dir = os.path.join(current_app.config["CONVERTED_FOLDER"], unique_id)
@@ -1940,6 +1944,7 @@ def _create_model_for_paper(
         qr_code_path=None,
         file_size=file_size,
         source_format=source_format,
+        source_unit=source_unit_norm,
         appearance_color=color,
         version=1,
         processing_status="queued",
@@ -4629,7 +4634,7 @@ def register_routes(app: Flask) -> None:
             "usdz_path": usdz_path,
             "source_format": source_format,
             "color": model.appearance_color,
-            "source_unit": "auto",
+            "source_unit": model.source_unit or "embedded",
             "is_replacement": True,
             "version_id": version_row.id,
         }
@@ -4750,8 +4755,8 @@ def register_routes(app: Flask) -> None:
         except (ValueError, TypeError):
             flash("Enter a valid number for the target dimension.", "danger")
             return redirect(url_for("model_edit", model_id=model.id))
-        if target_cm <= 0 or target_cm > 500:
-            flash("Target dimension must be between 0 and 500 cm.", "danger")
+        if target_cm <= 0:
+            flash("Target dimension must be greater than 0 cm.", "danger")
             return redirect(url_for("model_edit", model_id=model.id))
 
         glb_path = model.glb_path
@@ -4826,6 +4831,89 @@ def register_routes(app: Flask) -> None:
                 except OSError:
                     logger.exception("Failed to restore rescale backup after DB error")
             flash("Rescale could not be saved.", "danger")
+        finally:
+            if os.path.exists(backup_path):
+                cleanup_file(backup_path)
+        return redirect(url_for("model_edit", model_id=model.id))
+
+    @app.route("/models/<model_id>/change-unit", methods=["POST"])
+    @login_required
+    @require_model_ownership
+    def model_change_unit(model_id):
+        """Re-interpret the model's source unit (mm/cm/m), rescaling the GLB by
+        the ratio between the old and new unit. For STL/OBJ models that declared
+        a unit at upload — the user can fix a wrong choice here."""
+        model = db.session.get(Model3D, model_id)
+        if not model:
+            abort(404)
+        units = {"mm": 0.001, "cm": 0.01, "m": 1.0}
+        new_unit = (request.form.get("source_unit") or "").strip().lower()
+        old_unit = (model.source_unit or "").strip().lower()
+        if new_unit not in units:
+            flash("Choose a valid unit (mm, cm, or m).", "danger")
+            return redirect(url_for("model_edit", model_id=model.id))
+        if old_unit not in units:
+            flash("Unit change is only available for STL/OBJ models that declared a unit. Use “Resize model” to set the exact size instead.", "warning")
+            return redirect(url_for("model_edit", model_id=model.id))
+        if new_unit == old_unit:
+            flash(f"The model is already in {new_unit}.", "info")
+            return redirect(url_for("model_edit", model_id=model.id))
+
+        factor = units[new_unit] / units[old_unit]
+        glb_path = model.glb_path
+        ensure_local(glb_path, f"converted/{model_id}/model.glb")
+        backup_path = glb_path + ".unit.bak"
+        try:
+            if os.path.exists(glb_path):
+                shutil.copy2(glb_path, backup_path)
+            try:
+                import re as _re
+
+                from converters.glb_scale import apply_uniform_scale
+
+                if not apply_uniform_scale(glb_path, factor):
+                    raise ValueError("Could not apply scale to GLB")
+                vals = [float(v) for v in _re.findall(r"[\d.]+", model.dimensions_cm or "")]
+                if vals:
+                    model.dimensions_cm = " x ".join(f"{v * factor:.1f}" for v in vals) + " cm"
+                model.source_unit = new_unit
+            except Exception:
+                logger.exception("Unit change failed; restoring backup")
+                if os.path.exists(backup_path):
+                    shutil.copy2(backup_path, glb_path)
+                flash("Unit change failed. The previous model is still active.", "warning")
+                return redirect(url_for("model_edit", model_id=model.id))
+
+            usdz_path = os.path.join(os.path.dirname(glb_path), "model.usdz")
+            usdz_ok = False
+            try:
+                usdz_ok = convert_glb_to_usdz(glb_path, usdz_path)
+            except Exception:
+                logger.exception("USDZ regeneration after unit change failed")
+            poster_png = os.path.join(os.path.dirname(glb_path), "poster.png")
+            if generate_poster(glb_path, poster_png):
+                model.poster_path = poster_png
+            db.session.commit()
+            mirror_file(glb_path, f"converted/{model_id}/model.glb")
+            if usdz_ok and os.path.exists(usdz_path):
+                mirror_file(usdz_path, f"converted/{model_id}/model.usdz")
+            if model.poster_path:
+                mirror_file(poster_png, f"converted/{model_id}/poster.png")
+            log_audit(
+                "model_unit_changed",
+                user_id=current_user.id,
+                resource_id=model_id,
+                details={"from": old_unit, "to": new_unit},
+            )
+            flash(f"Source unit changed to {new_unit}.", "success")
+        except SQLAlchemyError:
+            db.session.rollback()
+            if os.path.exists(backup_path):
+                try:
+                    shutil.copy2(backup_path, glb_path)
+                except OSError:
+                    logger.exception("Failed to restore unit-change backup after DB error")
+            flash("Could not change the unit.", "danger")
         finally:
             if os.path.exists(backup_path):
                 cleanup_file(backup_path)

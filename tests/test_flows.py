@@ -172,6 +172,7 @@ def test_paper_create_can_include_first_model(client):
             "model_display_name": "First model",
             "license_type": "academic",
             "compliance_confirm": "yes",
+            "source_unit": "cm",
         },
         content_type="multipart/form-data",
         follow_redirects=True,
@@ -371,7 +372,7 @@ def test_invalid_stl_upload_leaves_no_model(client):
 
     response = client.post(
         f"/papers/{slug}/upload-model",
-        data={"file": upload_file_bytes(b"bad", "bad.stl"), "compliance_confirm": "yes"},
+        data={"file": upload_file_bytes(b"bad", "bad.stl"), "compliance_confirm": "yes", "source_unit": "cm"},
         content_type="multipart/form-data",
         follow_redirects=True,
     )
@@ -541,6 +542,7 @@ def test_valid_stl_upload_creates_model_and_qr(client, monkeypatch):
             "description": "Pilot fixture",
             "file": upload_file_bytes(valid_ascii_stl_bytes(), "model.stl"),
             "compliance_confirm": "yes",
+            "source_unit": "cm",
         },
         content_type="multipart/form-data",
         follow_redirects=True,
@@ -576,7 +578,7 @@ def test_real_stl_upload_creates_glb_qr_and_public_viewer(client):
 
     response = client.post(
         f"/papers/{slug}/upload-model",
-        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "real.stl"), "compliance_confirm": "yes"},
+        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "real.stl"), "compliance_confirm": "yes", "source_unit": "cm"},
         content_type="multipart/form-data",
         follow_redirects=True,
     )
@@ -604,7 +606,7 @@ def test_managed_qr_resolver_uses_stable_public_id(client):
 
     response = client.post(
         f"/papers/{slug}/upload-model",
-        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "resolver.stl"), "compliance_confirm": "yes"},
+        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "resolver.stl"), "compliance_confirm": "yes", "source_unit": "cm"},
         content_type="multipart/form-data",
         follow_redirects=True,
     )
@@ -630,7 +632,7 @@ def test_model_license_upgrade_and_replace_keep_public_id(client):
 
     client.post(
         f"/papers/{slug}/upload-model",
-        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "first.stl"), "compliance_confirm": "yes"},
+        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "first.stl"), "compliance_confirm": "yes", "source_unit": "cm"},
         content_type="multipart/form-data",
         follow_redirects=True,
     )
@@ -647,7 +649,7 @@ def test_model_license_upgrade_and_replace_keep_public_id(client):
 
     replace = client.post(
         f"/models/{model_id}/replace",
-        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "second.stl"), "compliance_confirm": "yes"},
+        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "second.stl"), "compliance_confirm": "yes", "source_unit": "cm"},
         content_type="multipart/form-data",
         follow_redirects=True,
     )
@@ -677,6 +679,7 @@ def test_free_model_expires_after_three_days_but_keeps_qr_and_can_be_upgraded(cl
             "file": upload_file_bytes(valid_ascii_stl_bytes(), "free.stl"),
             "license_type": "free",
             "compliance_confirm": "yes",
+            "source_unit": "cm",
         },
         content_type="multipart/form-data",
         follow_redirects=True,
@@ -753,7 +756,7 @@ def test_model_appearance_update_keeps_public_id(client, monkeypatch):
 
     client.post(
         f"/papers/{slug}/upload-model",
-        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "color.stl"), "compliance_confirm": "yes"},
+        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "color.stl"), "compliance_confirm": "yes", "source_unit": "cm"},
         content_type="multipart/form-data",
         follow_redirects=True,
     )
@@ -799,7 +802,7 @@ def test_failed_replacement_preserves_previous_working_glb(client, monkeypatch):
     initial_glb = valid_glb_bytes()
     client.post(
         f"/papers/{slug}/upload-model",
-        data={"file": upload_file_bytes(initial_glb, "initial.glb"), "compliance_confirm": "yes"},
+        data={"file": upload_file_bytes(initial_glb, "initial.glb"), "compliance_confirm": "yes", "source_unit": "cm"},
         content_type="multipart/form-data",
         follow_redirects=True,
     )
@@ -820,7 +823,7 @@ def test_failed_replacement_preserves_previous_working_glb(client, monkeypatch):
 
     response = client.post(
         f"/models/{model_id}/replace",
-        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "replacement.stl"), "compliance_confirm": "yes"},
+        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "replacement.stl"), "compliance_confirm": "yes", "source_unit": "cm"},
         content_type="multipart/form-data",
         follow_redirects=True,
     )
@@ -849,7 +852,7 @@ def test_glb_upload_creates_model_without_conversion(client):
     glb = valid_glb_bytes()
     response = client.post(
         f"/papers/{slug}/upload-model",
-        data={"file": upload_file_bytes(glb, "direct.glb"), "compliance_confirm": "yes"},
+        data={"file": upload_file_bytes(glb, "direct.glb"), "compliance_confirm": "yes", "source_unit": "cm"},
         content_type="multipart/form-data",
         follow_redirects=True,
     )
@@ -894,13 +897,13 @@ def test_upload_rate_limit_blocks_repeated_attempts(client):
 
     first = client.post(
         f"/papers/{slug}/upload-model",
-        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "first.stl"), "compliance_confirm": "yes"},
+        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "first.stl"), "compliance_confirm": "yes", "source_unit": "cm"},
         content_type="multipart/form-data",
         follow_redirects=True,
     )
     second = client.post(
         f"/papers/{slug}/upload-model",
-        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "second.stl"), "compliance_confirm": "yes"},
+        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "second.stl"), "compliance_confirm": "yes", "source_unit": "cm"},
         content_type="multipart/form-data",
         follow_redirects=True,
     )
@@ -1200,6 +1203,7 @@ def test_obj_upload_with_companion_files_archives_mtl_and_textures(client, monke
                 upload_file_bytes(texture_content, "texture.png"),
             ],
             "compliance_confirm": "yes",
+            "source_unit": "cm",
         },
         content_type="multipart/form-data",
         follow_redirects=True,
@@ -1239,7 +1243,7 @@ def test_appearance_update_failure_preserves_previous_glb(client, monkeypatch):
     initial_glb = valid_glb_bytes()
     client.post(
         f"/papers/{slug}/upload-model",
-        data={"file": upload_file_bytes(initial_glb, "safe.glb"), "compliance_confirm": "yes"},
+        data={"file": upload_file_bytes(initial_glb, "safe.glb"), "compliance_confirm": "yes", "source_unit": "cm"},
         content_type="multipart/form-data",
         follow_redirects=True,
     )
@@ -1310,6 +1314,7 @@ def test_obj_without_textures_can_receive_color(client, monkeypatch):
             "color_enabled": "yes",
             "color": "#ff0000",
             "compliance_confirm": "yes",
+            "source_unit": "cm",
         },
         content_type="multipart/form-data",
         follow_redirects=True,
@@ -1354,6 +1359,7 @@ def test_fbx_upload_converts_to_glb(client, monkeypatch):
         data={
             "file": upload_file_bytes(fbx_content, "mesh.fbx"),
             "compliance_confirm": "yes",
+            "source_unit": "cm",
         },
         content_type="multipart/form-data",
         follow_redirects=True,
@@ -1390,6 +1396,7 @@ def test_missing_fbx2gltf_produces_clear_error(client, monkeypatch):
         data={
             "file": upload_file_bytes(fbx_content, "mesh.fbx"),
             "compliance_confirm": "yes",
+            "source_unit": "cm",
         },
         content_type="multipart/form-data",
         follow_redirects=True,
@@ -1422,7 +1429,7 @@ def test_production_upload_only_enqueues_conversion_job(client, monkeypatch):
 
     response = client.post(
         f"/papers/{slug}/upload-model",
-        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "queued.stl"), "compliance_confirm": "yes"},
+        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "queued.stl"), "compliance_confirm": "yes", "source_unit": "cm"},
         content_type="multipart/form-data",
         follow_redirects=True,
     )
@@ -1449,7 +1456,7 @@ def test_upload_rate_limit_is_enforced_across_requests(client):
 
     first = client.post(
         f"/papers/{slug_one}/upload-model",
-        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "one.stl"), "compliance_confirm": "yes"},
+        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "one.stl"), "compliance_confirm": "yes", "source_unit": "cm"},
         content_type="multipart/form-data",
         follow_redirects=True,
     )
@@ -1457,7 +1464,7 @@ def test_upload_rate_limit_is_enforced_across_requests(client):
 
     second = client.post(
         f"/papers/{slug_two}/upload-model",
-        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "two.stl"), "compliance_confirm": "yes"},
+        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "two.stl"), "compliance_confirm": "yes", "source_unit": "cm"},
         content_type="multipart/form-data",
         follow_redirects=True,
     )

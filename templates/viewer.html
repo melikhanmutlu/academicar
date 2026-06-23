@@ -623,7 +623,7 @@
       min-field-of-view="10deg"
       max-field-of-view="60deg"
       bounds="tight"
-      interaction-prompt="none"
+      interaction-prompt="auto"
       autoplay
       animation-crossfade-duration="300"
       reveal="auto">
@@ -1610,11 +1610,20 @@
         if (valueEl) valueEl.textContent = '0deg';
       });
       await applyModelOrientation({ x: 0, y: 0, z: 0 });
-      viewer.cameraOrbit = defaultCameraOrbit;
-      viewer.fieldOfView = defaultFieldOfView;
-      viewer.cameraTarget = 'auto auto auto';
-      if (typeof viewer.jumpCameraToGoal === 'function') viewer.jumpCameraToGoal();
+      // Snap the camera home. Set both the attribute and the property and jump to
+      // the goal; then re-assert on the next frame so any in-flight auto-rotate /
+      // camera interpolation can't leave the view off its starting position.
+      const applyHome = () => {
+        viewer.setAttribute('camera-orbit', defaultCameraOrbit);
+        viewer.setAttribute('field-of-view', defaultFieldOfView);
+        viewer.cameraOrbit = defaultCameraOrbit;
+        viewer.fieldOfView = defaultFieldOfView;
+        viewer.cameraTarget = 'auto auto auto';
+        if (typeof viewer.jumpCameraToGoal === 'function') viewer.jumpCameraToGoal();
+      };
+      applyHome();
       if (viewer.updateComplete) await viewer.updateComplete;
+      requestAnimationFrame(applyHome);
     });
     viewer.setAttribute('orientation', defaultOrientation);
     autoRotateToggle?.addEventListener('click', () => {

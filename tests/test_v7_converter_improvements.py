@@ -85,96 +85,50 @@ class TestOptimizeGlb:
         assert optimize_glb("/nonexistent/path.glb") is False
 
 
-class TestUnitScaleHeuristic:
-    """Improved unit detection bands."""
+class TestExplicitUnitScale:
+    """Source unit is explicit (mm/cm/m) — no magnitude guessing, no size clamp."""
 
-    def test_micron_scale_detected(self):
-        """Raw extent >1000 should be treated as microns when auto-detecting."""
+    def _convert(self, tmp, scale, unit):
+        stl_path = _make_stl(tmp, scale=scale)
+        glb_path = str(tmp / "output.glb")
+        assert STLConverter().convert(stl_path, glb_path, source_unit=unit) is True
+        mesh = trimesh.load(glb_path, force="mesh")
+        return float(np.ptp(mesh.bounds, axis=0).max())
+
+    def test_mm_unit_scales_to_meters(self):
         tmp = _tmp_dir()
         try:
-            stl_path = _make_stl(tmp, scale=5000.0)
-            glb_path = str(tmp / "output.glb")
-            converter = STLConverter()
-            assert converter.convert(stl_path, glb_path, source_unit="auto") is True
-            mesh = trimesh.load(glb_path, force="mesh")
-            max_extent = float(np.ptp(mesh.bounds, axis=0).max())
-            assert max_extent < 1.0, f"µm model should be <1m, got {max_extent}m"
+            assert abs(self._convert(tmp, 200.0, "mm") - 0.2) < 0.05  # 200mm -> 0.2m
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
-    def test_mm_scale_detected(self):
-        """Raw extent 100-1000 should be treated as mm when auto-detecting."""
+    def test_cm_unit_scales_to_meters(self):
         tmp = _tmp_dir()
         try:
-            stl_path = _make_stl(tmp, scale=200.0)
-            glb_path = str(tmp / "output.glb")
-            converter = STLConverter()
-            assert converter.convert(stl_path, glb_path, source_unit="auto") is True
-            mesh = trimesh.load(glb_path, force="mesh")
-            max_extent = float(np.ptp(mesh.bounds, axis=0).max())
-            assert max_extent < 1.0, f"mm model should be <1m, got {max_extent}m"
+            assert abs(self._convert(tmp, 30.0, "cm") - 0.3) < 0.05  # 30cm -> 0.3m
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
-    def test_cm_scale_detected(self):
-        """Raw extent 1-100 should be treated as cm when auto-detecting."""
+    def test_m_unit_preserved(self):
         tmp = _tmp_dir()
         try:
-            stl_path = _make_stl(tmp, scale=30.0)
-            glb_path = str(tmp / "output.glb")
-            converter = STLConverter()
-            assert converter.convert(stl_path, glb_path, source_unit="auto") is True
-            mesh = trimesh.load(glb_path, force="mesh")
-            max_extent = float(np.ptp(mesh.bounds, axis=0).max())
-            assert max_extent < 1.0, f"cm model should be <1m, got {max_extent}m"
+            assert abs(self._convert(tmp, 0.5, "m") - 0.5) < 0.05  # 0.5m stays 0.5m
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
-    def test_meter_scale_preserved(self):
-        """Raw extent ≤1 should be treated as meters when auto-detecting."""
+    def test_no_size_clamp_for_large_models(self):
+        """The 2m safety clamp is gone — a 300cm model stays ~3m."""
         tmp = _tmp_dir()
         try:
-            stl_path = _make_stl(tmp, scale=0.5)
-            glb_path = str(tmp / "output.glb")
-            converter = STLConverter()
-            assert converter.convert(stl_path, glb_path, source_unit="auto") is True
-            mesh = trimesh.load(glb_path, force="mesh")
-            max_extent = float(np.ptp(mesh.bounds, axis=0).max())
-            assert 0.3 < max_extent < 1.0, f"m model should stay ~0.5m, got {max_extent}m"
+            assert self._convert(tmp, 300.0, "cm") > 2.5  # 300cm -> ~3m, not clamped
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
-    def test_default_source_unit_autodetects_cm(self):
-        """Regression: the converter default (no source_unit passed) must
-        auto-detect, so cm-authored STLs don't render ~100x too large.
-
-        The production upload path relies on this default, so a 30cm object
-        (raw extent 30) must come out <1m, not 30m."""
+    def test_unknown_unit_left_as_authored(self):
+        """No unit / unknown unit no longer guesses — mesh is left as-authored."""
         tmp = _tmp_dir()
         try:
-            stl_path = _make_stl(tmp, scale=30.0)
-            glb_path = str(tmp / "output.glb")
-            converter = STLConverter()
-            # No source_unit -> uses the default, which must be auto-detect.
-            assert converter.convert(stl_path, glb_path) is True
-            mesh = trimesh.load(glb_path, force="mesh")
-            max_extent = float(np.ptp(mesh.bounds, axis=0).max())
-            assert max_extent < 1.0, f"cm default should be <1m, got {max_extent}m"
-        finally:
-            shutil.rmtree(tmp, ignore_errors=True)
-
-    def test_safety_clamp_prevents_absurd_size(self):
-        """Even if heuristic miscategorizes, safety clamp caps at AR_MAX_EXTENT_M."""
-        tmp = _tmp_dir()
-        try:
-            stl_path = _make_stl(tmp, scale=0.8)
-            glb_path = str(tmp / "output.glb")
-            converter = STLConverter()
-            with patch.dict(os.environ, {"AR_MAX_EXTENT_M": "0.3"}):
-                assert converter.convert(stl_path, glb_path) is True
-            mesh = trimesh.load(glb_path, force="mesh")
-            max_extent = float(np.ptp(mesh.bounds, axis=0).max())
-            assert max_extent <= 0.35, f"Safety clamp should limit to 0.3m, got {max_extent}m"
+            assert abs(self._convert(tmp, 0.4, "embedded") - 0.4) < 0.05
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
