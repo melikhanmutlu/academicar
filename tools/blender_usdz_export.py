@@ -55,6 +55,15 @@ def export_usdz(input_path, output_path):
     if not meshes:
         print("No meshes imported — aborting USDZ so a wrong/empty model isn't served.")
         sys.exit(1)
+    # Material/texture diagnostics: if a material references an image texture but
+    # that texture isn't packaged into the .usdz, iOS Quick Look renders it
+    # magenta. export_textures=True (below) packages them.
+    mats = list(bpy.data.materials)
+    textured = sum(
+        1 for m in mats
+        if m.use_nodes and any(n.type == "TEX_IMAGE" for n in m.node_tree.nodes)
+    )
+    print(f"USDZ materials: {len(mats)} total, {textured} with image textures")
 
     if not output_path.lower().endswith(".usdz"):
         output_path += ".usdz"
@@ -63,7 +72,9 @@ def export_usdz(input_path, output_path):
 
     bpy.ops.object.select_all(action="SELECT")
 
-    # Blender 3.5+ writes .usdz directly from usd_export.
+    # Blender 3.5+ writes .usdz directly from usd_export. export_textures packages
+    # the material textures INTO the .usdz — without it, iOS Quick Look can't bind
+    # them and renders the model magenta.
     bpy.ops.wm.usd_export(
         filepath=output_path,
         selected_objects_only=False,
@@ -72,6 +83,8 @@ def export_usdz(input_path, output_path):
         export_uvmaps=True,
         export_normals=True,
         export_materials=True,
+        export_textures=True,
+        overwrite_textures=True,
     )
 
     print("Export successful.")
