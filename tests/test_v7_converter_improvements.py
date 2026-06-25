@@ -163,6 +163,35 @@ class TestGlbHasDraco:
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+class TestClampOversizedGlb:
+    """Absurdly large models (unit errors) are scaled down; reasonable ones aren't."""
+
+    def _glb(self, tmp, longest):
+        path = str(tmp / "m.glb")
+        trimesh.Scene([trimesh.creation.box(extents=[longest, 1, 1])]).export(path)
+        return path
+
+    def test_absurd_size_clamped(self):
+        from converters.glb_scale import clamp_oversized_glb, measure_glb_max_extent_m
+        tmp = _tmp_dir()
+        try:
+            path = self._glb(tmp, 100.0)  # 100 m, way over the 50 m threshold
+            assert clamp_oversized_glb(path) is True
+            assert 1.5 < measure_glb_max_extent_m(path) < 2.5
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_reasonable_large_not_clamped(self):
+        from converters.glb_scale import clamp_oversized_glb, measure_glb_max_extent_m
+        tmp = _tmp_dir()
+        try:
+            path = self._glb(tmp, 3.0)  # 3 m, under threshold -> untouched
+            assert clamp_oversized_glb(path) is False
+            assert abs(measure_glb_max_extent_m(path) - 3.0) < 0.15
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 class TestInjectPbrMaterial:
     """inject_pbr_material now uses pygltflib, not raw bytes."""
 

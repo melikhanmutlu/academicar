@@ -30,6 +30,14 @@ DEFAULT_MAX_EXTENT_M = float(os.environ.get("AR_MAX_EXTENT_M", "2.0"))
 
 _EXPLICIT_UNITS = {"mm": 0.001, "cm": 0.01, "m": 1.0}
 
+# A model whose longest axis exceeds this (metres) is almost certainly a unit
+# error — e.g. an FBX whose units fbx2gltf mis-converted to ~150 m — not an
+# intentionally huge model. Such models are scaled down to AR_CLAMP_TARGET_M so
+# AR doesn't place a giant object you end up standing inside. The threshold is
+# deliberately HIGH so legitimately large models (a 5–30 m statue) pass untouched.
+AR_MAX_PLAUSIBLE_EXTENT_M = float(os.environ.get("AR_MAX_PLAUSIBLE_EXTENT_M", "50.0"))
+AR_CLAMP_TARGET_M = float(os.environ.get("AR_CLAMP_TARGET_M", "2.0"))
+
 
 def measure_glb_max_extent_m(glb_path: str) -> float | None:
     """Return the largest bounding-box dimension of a GLB in meters, or None.
@@ -97,6 +105,27 @@ def apply_uniform_scale(glb_path: str, factor: float) -> bool:
     except Exception:
         logger.exception("Failed to apply uniform scale %s to %s", factor, glb_path)
         return False
+
+
+def clamp_oversized_glb(glb_path: str) -> bool:
+    """Scale down a GLB whose longest axis is implausibly large (a unit error).
+
+    Returns True if a clamp scale was applied; models within
+    AR_MAX_PLAUSIBLE_EXTENT_M are left untouched. Must run on the uncompressed
+    GLB (before Draco optimization, which trimesh cannot measure).
+    """
+    extent_m = measure_glb_max_extent_m(glb_path)
+    if not extent_m or extent_m <= AR_MAX_PLAUSIBLE_EXTENT_M:
+        return False
+    factor = AR_CLAMP_TARGET_M / extent_m
+    if apply_uniform_scale(glb_path, factor):
+        logger.warning(
+            "Clamped oversized GLB %s: %.1f m longest axis (likely a unit error) "
+            "scaled by %.6g -> ~%.1f m",
+            glb_path, extent_m, factor, AR_CLAMP_TARGET_M,
+        )
+        return True
+    return False
 
 
 def normalize_converted_glb(

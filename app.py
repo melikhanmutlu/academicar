@@ -38,6 +38,7 @@ from converters.glb_quality import (
     validate_glb_quality,
 )
 from converters.glb_optimize import normalize_specular_glossiness, optimize_glb
+from converters.glb_scale import clamp_oversized_glb
 from converters.poster import generate_poster
 from converters.stl_converter import convert_glb_to_usdz, enrich_glb_for_ar
 from licensing import (
@@ -1406,6 +1407,11 @@ def finalize_converted_glb(glb_path: str, *, source_dir: str) -> None:
     # the texture renders. Runs before optimize so prune/webp see final alpha.
     repair_transparent_base_color(glb_path)
     ensure_pbr_materials(glb_path)
+    # Tame absurd sizes (almost always a unit error, e.g. an FBX mis-converted to
+    # ~150 m) so AR doesn't place a giant model you stand inside. Runs before
+    # optimize_glb because Draco-compressed geometry can't be measured. Legitimate
+    # large models (under AR_MAX_PLAUSIBLE_EXTENT_M) are left untouched.
+    clamp_oversized_glb(glb_path)
     optimize_glb(glb_path)
     validate_glb_quality(glb_path)
 
