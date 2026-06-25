@@ -46,6 +46,16 @@ def export_usdz(input_path, output_path):
         print(f"Unsupported file extension: {ext}")
         sys.exit(1)
 
+    # Diagnostic: what did the importer actually bring in? A mismatch here vs the
+    # source GLB (e.g. 0 meshes from a Draco GLB on a Draco-less build) explains a
+    # USDZ that differs from the model-viewer render.
+    objs = list(bpy.context.scene.objects)
+    meshes = [o for o in objs if o.type == "MESH"]
+    print(f"USDZ import: {len(objs)} objects, {len(meshes)} meshes from {os.path.basename(input_path)}")
+    if not meshes:
+        print("No meshes imported — aborting USDZ so a wrong/empty model isn't served.")
+        sys.exit(1)
+
     if not output_path.lower().endswith(".usdz"):
         output_path += ".usdz"
 

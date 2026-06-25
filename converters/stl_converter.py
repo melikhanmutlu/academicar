@@ -107,24 +107,35 @@ def convert_glb_to_usdz(glb_path: str, usdz_path: str) -> bool:
     # the decompress step is unavailable (e.g. gltf-transform missing locally).
     import tempfile
 
-    from .glb_optimize import decompress_glb
+    from .glb_optimize import decompress_glb, glb_has_draco
 
+    # Our stored GLB is Draco-compressed. Blender's glTF importer may lack the
+    # Draco decoder (Nix/Debian builds), so hand it a decompressed copy. Write
+    # into a FRESH temp dir so gltf-transform never has to overwrite a pre-created
+    # file (which can silently no-op and leave the plain copy empty).
     input_glb = glb_path
-    tmp_plain_glb = None
-    fd, candidate = tempfile.mkstemp(suffix=".glb")
-    os.close(fd)
+    tmp_dir = tempfile.mkdtemp(prefix="usdz_")
+    plain_glb = os.path.join(tmp_dir, "plain.glb")
+    decompressed = False
     try:
-        decompressed = decompress_glb(glb_path, candidate)
+        decompressed = decompress_glb(glb_path, plain_glb)
     except Exception:  # noqa: BLE001
-        logger.exception("Draco decompress step errored; passing original GLB to Blender")
-        decompressed = False
-    if decompressed:
-        input_glb = candidate
-        tmp_plain_glb = candidate
-    elif os.path.exists(candidate):
-        # decompress failed or raised: never leak the empty mkstemp file (the
-        # subprocess finally-block only cleans tmp_plain_glb, which stays None).
-        os.remove(candidate)
+        logger.exception("Draco decompress step errored")
+    if decompressed and os.path.exists(plain_glb) and os.path.getsize(plain_glb) > 20:
+        input_glb = plain_glb
+    elif glb_has_draco(glb_path):
+        # Decompression failed AND the GLB is Draco-compressed. Feeding Draco to a
+        # Draco-less Blender produces a *wrong* model in the USDZ while the GLB
+        # (model-viewer) stays correct. Skip the USDZ so iOS AR falls back to the
+        # GLB rather than showing a different model.
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        logger.error(
+            "USDZ skipped: GLB is Draco-compressed but decompression failed; "
+            "refusing to hand Draco geometry to Blender for %s",
+            glb_path,
+        )
+        return False
+    # else: not Draco-compressed → safe to pass the original GLB to Blender.
 
     cmd = [
         blender_exec,
@@ -151,12 +162,16 @@ def convert_glb_to_usdz(glb_path: str, usdz_path: str) -> bool:
         logger.warning("Blender USDZ conversion timed out after 300s; USDZ unavailable")
         return False
     finally:
-        if tmp_plain_glb and os.path.exists(tmp_plain_glb):
-            try:
-                os.remove(tmp_plain_glb)
-            except OSError:
-                pass
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
+    # Always log Blender's output — its "USDZ import: N objects, M meshes" line
+    # and any importer error make GLB-vs-USDZ divergences diagnosable from logs.
+    logger.info(
+        "Blender USDZ run (exit %s) for %s: %s",
+        proc.returncode,
+        usdz_path,
+        ((proc.stdout or "") + (proc.stderr or "")).strip()[:800],
+    )
     ok = proc.returncode == 0 and os.path.exists(usdz_path) and os.path.getsize(usdz_path) > 0
     if ok:
         logger.info("Converted GLB -> USDZ via Blender: %s", usdz_path)

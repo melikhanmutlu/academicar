@@ -133,6 +133,36 @@ class TestExplicitUnitScale:
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+class TestGlbHasDraco:
+    """glb_has_draco gates the USDZ pipeline (never hand Draco to a Draco-less Blender)."""
+
+    def test_plain_glb_not_draco(self):
+        from converters.glb_optimize import glb_has_draco
+        tmp = _tmp_dir()
+        try:
+            assert glb_has_draco(_make_test_glb(tmp)) is False
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_draco_extension_detected(self):
+        # Craft a minimal GLB whose JSON declares Draco, no CLI needed.
+        import json
+        from converters.glb_optimize import glb_has_draco
+        tmp = _tmp_dir()
+        try:
+            j = json.dumps({"asset": {"version": "2.0"},
+                            "extensionsUsed": ["KHR_draco_mesh_compression"]}).encode()
+            j += b" " * ((4 - len(j) % 4) % 4)
+            blob = b"glTF" + struct.pack("<I", 2) + struct.pack("<I", 12 + 8 + len(j))
+            blob += struct.pack("<I", len(j)) + b"JSON" + j
+            path = str(tmp / "draco.glb")
+            with open(path, "wb") as fh:
+                fh.write(blob)
+            assert glb_has_draco(path) is True
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 class TestInjectPbrMaterial:
     """inject_pbr_material now uses pygltflib, not raw bytes."""
 

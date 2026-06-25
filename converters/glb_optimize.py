@@ -108,6 +108,29 @@ def optimize_glb(
     return True
 
 
+def glb_has_draco(path: str) -> bool:
+    """True if the GLB declares KHR_draco_mesh_compression (Draco geometry).
+
+    Reads only the GLB JSON chunk, so it is cheap and dependency-free. Used to
+    decide whether it is safe to hand a GLB straight to a Draco-less importer.
+    """
+    try:
+        import json
+
+        with open(path, "rb") as fh:
+            header = fh.read(12)
+            if len(header) < 12 or header[:4] != b"glTF":
+                return False
+            chunk_len = int.from_bytes(fh.read(4), "little")
+            if fh.read(4) != b"JSON":
+                return False
+            doc = json.loads(fh.read(chunk_len).decode("utf-8", "replace"))
+        used = set(doc.get("extensionsUsed") or []) | set(doc.get("extensionsRequired") or [])
+        return "KHR_draco_mesh_compression" in used
+    except Exception:
+        return False
+
+
 def decompress_glb(src_path: str, dst_path: str) -> bool:
     """Write a Draco-free copy of ``src_path`` to ``dst_path``.
 
