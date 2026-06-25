@@ -198,6 +198,136 @@ def mask_cutout_textures(glb_path: str) -> bool:
     return False
 
 
+_BAKE_BASECOLOR_FACTOR = os.environ.get("BAKE_BASECOLOR_FACTOR", "1").lower() in {
+    "1", "true", "yes", "on"
+}
+
+
+def _srgb_to_linear(c):
+    """sRGB (0..1) -> linear, vectorized over a numpy array."""
+    import numpy as np
+
+    c = np.asarray(c, dtype=np.float64)
+    return np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+
+
+def _linear_to_srgb(c):
+    """Linear (0..1) -> sRGB, vectorized over a numpy array (inverse of above)."""
+    import numpy as np
+
+    c = np.asarray(c, dtype=np.float64)
+    return np.where(c <= 0.0031308, c * 12.92, 1.055 * np.power(c, 1.0 / 2.4) - 0.055)
+
+
+def _image_bytes_for(gltf: GLTF2, image) -> bytes | None:
+    """Return the decoded image payload for a glTF image (bufferView or data URI)."""
+    if image.bufferView is not None and gltf.bufferViews:
+        bv = gltf.bufferViews[image.bufferView]
+        blob = gltf.binary_blob() or b""
+        start = bv.byteOffset or 0
+        return blob[start:start + bv.byteLength]
+    uri = image.uri or ""
+    if uri.startswith("data:"):
+        try:
+            return base64.b64decode(uri.split(",", 1)[1])
+        except Exception:
+            return None
+    return None
+
+
+def bake_base_color_factor(glb_path: str) -> bool:
+    """Bake a non-white ``baseColorFactor`` tint into its ``baseColorTexture``.
+
+    Spec-gloss FBX materials (after metalrough conversion) carry the diffuse
+    colour in ``baseColorFactor`` while the texture stays mostly neutral.
+    model-viewer renders ``texture × factor`` correctly (green leaves), but
+    Blender's glTF importer turns that product into a Multiply node and Blender's
+    USD exporter drops it — so the iOS USDZ keeps only the neutral texture and the
+    leaves render grey in AR. Multiplying the factor into the texture pixels (exact
+    linear-space product) and resetting the factor RGB to white makes the colour
+    live in the texture itself, which Blender preserves: web stays identical, AR
+    gets the right colour from a single source of truth.
+
+    Only materials with BOTH a ``baseColorTexture`` and a non-white
+    ``baseColorFactor`` RGB are touched. Each baked material gets a fresh image +
+    texture so a shared source texture is never cross-contaminated; the orphaned
+    originals are pruned by the later ``optimize_glb`` pass. Best-effort: any parse
+    or Pillow failure leaves the GLB untouched and returns False.
+    """
+    if not _BAKE_BASECOLOR_FACTOR:
+        return False
+    try:
+        import io
+
+        import numpy as np
+        from PIL import Image as PILImage
+        from pygltflib import Image as GLTFImage, Texture
+    except Exception:  # pragma: no cover - Pillow/numpy/pygltflib missing
+        return False
+
+    try:
+        gltf = _load_glb(glb_path)
+    except GLBQualityError:
+        return False
+    if not gltf.materials or not gltf.textures or not gltf.images:
+        return False
+    if gltf.bufferViews is None:
+        gltf.bufferViews = []
+
+    changed = False
+    for material in gltf.materials:
+        pbr = material.pbrMetallicRoughness
+        if not pbr or pbr.baseColorTexture is None:
+            continue
+        bcf = pbr.baseColorFactor
+        if not bcf or len(bcf) < 3:
+            continue
+        rgb = [float(bcf[0]), float(bcf[1]), float(bcf[2])]
+        if all(c >= 0.999 for c in rgb):
+            continue  # white factor — nothing to bake
+
+        tex_index = pbr.baseColorTexture.index
+        if tex_index is None or tex_index >= len(gltf.textures):
+            continue
+        src_texture = gltf.textures[tex_index]
+        if src_texture.source is None or src_texture.source >= len(gltf.images):
+            continue
+        src_image = gltf.images[src_texture.source]
+        payload = _image_bytes_for(gltf, src_image)
+        if not payload:
+            continue
+
+        try:
+            with PILImage.open(io.BytesIO(payload)) as im:
+                im = im.convert("RGBA")
+                arr = np.asarray(im, dtype=np.float64) / 255.0
+            rgb_lin = _srgb_to_linear(arr[..., :3]) * np.array(rgb, dtype=np.float64)
+            arr[..., :3] = np.clip(_linear_to_srgb(np.clip(rgb_lin, 0.0, 1.0)), 0.0, 1.0)
+            out = PILImage.fromarray((arr * 255.0 + 0.5).astype(np.uint8), "RGBA")
+            buf = io.BytesIO()
+            out.save(buf, format="PNG")
+            new_payload = buf.getvalue()
+        except Exception:  # pragma: no cover - corrupt/unsupported texture
+            continue
+
+        offset = _append_blob(gltf, new_payload)
+        view = BufferView(buffer=0, byteOffset=offset, byteLength=len(new_payload))
+        new_bv_index = len(gltf.bufferViews)
+        gltf.bufferViews.append(view)
+        new_img_index = len(gltf.images)
+        gltf.images.append(GLTFImage(bufferView=new_bv_index, mimeType="image/png"))
+        new_tex_index = len(gltf.textures)
+        gltf.textures.append(Texture(sampler=src_texture.sampler, source=new_img_index))
+
+        pbr.baseColorTexture.index = new_tex_index
+        bcf[0], bcf[1], bcf[2] = 1.0, 1.0, 1.0
+        changed = True
+
+    if changed:
+        gltf.save(glb_path)
+    return changed
+
+
 def ensure_pbr_materials(glb_path: str) -> bool:
     """Ensure primitives have valid PBR materials without replacing artwork.
 

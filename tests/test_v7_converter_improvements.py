@@ -214,6 +214,138 @@ class TestMaskCutoutTextures:
         assert g.materials[2].alphaMode == "BLEND"    # untextured blend untouched
 
 
+class TestBakeBaseColorFactor:
+    """Non-white baseColorFactor tint is baked into the baseColorTexture so the
+    colour survives Blender's USD export (which drops factor multiplies)."""
+
+    def test_color_math_roundtrips(self):
+        import numpy as np
+        from converters.glb_quality import _linear_to_srgb, _srgb_to_linear
+
+        xs = np.linspace(0.0, 1.0, 21)
+        back = _linear_to_srgb(_srgb_to_linear(xs))
+        assert np.allclose(back, xs, atol=1e-6)
+
+    def _glb_with_textured_material(self, tmp, factor, base_gray=0.5):
+        """Minimal GLB: one box, one material with an embedded solid-gray RGBA
+        baseColorTexture and the given baseColorFactor."""
+        import io
+        import numpy as np
+        from PIL import Image as PILImage
+        from pygltflib import (
+            GLTF2, Buffer, BufferView, Image, Material, Mesh, Primitive,
+            PbrMetallicRoughness, Texture, TextureInfo, Accessor, Scene, Node,
+        )
+
+        # Build a tiny GLB via trimesh, then attach our textured material.
+        glb_path = str(tmp / "tex.glb")
+        trimesh.Scene([trimesh.creation.box(extents=[1, 1, 1])]).export(glb_path)
+        ensure_pbr_materials(glb_path)
+        from pygltflib import GLTF2 as _G
+        g = _G.load(glb_path)
+
+        # Solid neutral-gray RGBA PNG (opaque) as the base color texture.
+        px = int(round(base_gray * 255))
+        im = PILImage.fromarray(
+            np.full((4, 4, 4), [px, px, px, 255], dtype=np.uint8), "RGBA"
+        )
+        buf = io.BytesIO()
+        im.save(buf, format="PNG")
+        png = buf.getvalue()
+
+        blob = g.binary_blob() or b""
+        pad = b"\x00" * ((4 - len(blob) % 4) % 4)
+        offset = len(blob) + len(pad)
+        g.set_binary_blob(blob + pad + png)
+        g.buffers[0].byteLength = len(g.binary_blob())
+        bv_index = len(g.bufferViews)
+        g.bufferViews.append(BufferView(buffer=0, byteOffset=offset, byteLength=len(png)))
+        img_index = len(g.images or [])
+        if g.images is None:
+            g.images = []
+        g.images.append(Image(bufferView=bv_index, mimeType="image/png"))
+        tex_index = len(g.textures or [])
+        if g.textures is None:
+            g.textures = []
+        g.textures.append(Texture(source=img_index))
+
+        g.materials[0].pbrMetallicRoughness = PbrMetallicRoughness(
+            baseColorFactor=list(factor),
+            baseColorTexture=TextureInfo(index=tex_index),
+        )
+        for mesh in g.meshes or []:
+            for prim in mesh.primitives or []:
+                prim.material = 0
+        g.save(glb_path)
+        return glb_path
+
+    def test_green_factor_baked_into_texture(self):
+        import io
+        import numpy as np
+        from PIL import Image as PILImage
+        from pygltflib import GLTF2
+        from converters.glb_quality import (
+            _image_bytes_for, _srgb_to_linear, bake_base_color_factor,
+        )
+
+        tmp = _tmp_dir()
+        try:
+            # Green tint (linear) on a 50%-gray texture.
+            factor = [0.0, 0.6, 0.0, 1.0]
+            glb = self._glb_with_textured_material(tmp, factor, base_gray=0.5)
+            assert bake_base_color_factor(glb) is True
+
+            g = GLTF2.load(glb)
+            mat = g.materials[0]
+            # Factor RGB reset to white, alpha preserved.
+            assert mat.pbrMetallicRoughness.baseColorFactor[:3] == [1.0, 1.0, 1.0]
+            assert mat.pbrMetallicRoughness.baseColorFactor[3] == 1.0
+
+            # The material now points at a NEW texture whose pixels carry the tint.
+            new_tex = g.textures[mat.pbrMetallicRoughness.baseColorTexture.index]
+            payload = _image_bytes_for(g, g.images[new_tex.source])
+            with PILImage.open(io.BytesIO(payload)) as im:
+                arr = np.asarray(im.convert("RGBA"), dtype=np.float64) / 255.0
+            lin = _srgb_to_linear(arr[..., :3])
+            # Expected: srgb_to_linear(0.5) * factor.
+            expected = _srgb_to_linear(0.5) * np.array([0.0, 0.6, 0.0])
+            assert np.allclose(lin.reshape(-1, 3).mean(axis=0), expected, atol=0.02)
+            # Red and blue channels are now ~0 (green-only tint); green non-zero.
+            mean = arr.reshape(-1, 4).mean(axis=0)
+            assert mean[0] < 0.05 and mean[2] < 0.05 and mean[1] > 0.1
+            assert mean[3] > 0.99  # alpha preserved
+
+            validate_glb_quality(glb)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_white_factor_is_noop(self):
+        from converters.glb_quality import bake_base_color_factor
+
+        tmp = _tmp_dir()
+        try:
+            glb = self._glb_with_textured_material(tmp, [1.0, 1.0, 1.0, 1.0])
+            assert bake_base_color_factor(glb) is False
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_untextured_factor_untouched(self):
+        from pygltflib import GLTF2, Material, PbrMetallicRoughness
+        from converters.glb_quality import bake_base_color_factor
+
+        tmp = _tmp_dir()
+        try:
+            glb = _make_test_glb(tmp)  # box with default material, no texture
+            g = GLTF2.load(glb)
+            g.materials[0].pbrMetallicRoughness.baseColorFactor = [0.0, 0.6, 0.0, 1.0]
+            g.save(glb)
+            assert bake_base_color_factor(glb) is False
+            g2 = GLTF2.load(glb)
+            assert g2.materials[0].pbrMetallicRoughness.baseColorFactor == [0.0, 0.6, 0.0, 1.0]
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 class TestInjectPbrMaterial:
     """inject_pbr_material now uses pygltflib, not raw bytes."""
 

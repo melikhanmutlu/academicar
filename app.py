@@ -32,6 +32,7 @@ from extensions import csrf, limiter, rate_limit_key
 from converters import FBXConverter, OBJConverter, STLConverter
 from converters.glb_quality import (
     GLBQualityError,
+    bake_base_color_factor,
     embed_external_textures,
     ensure_pbr_materials,
     mask_cutout_textures,
@@ -1412,6 +1413,14 @@ def finalize_converted_glb(glb_path: str, *, source_dir: str) -> None:
     # in iOS AR. Switch textured BLEND materials to MASK (alpha cutout) for crisp
     # foliage in both model-viewer and AR.
     mask_cutout_textures(glb_path)
+    # Bake a non-white baseColorFactor tint into its baseColorTexture so the colour
+    # lives in the texture itself. Spec-gloss FBX (after metalrough conversion) keeps
+    # the diffuse colour in baseColorFactor with a neutral texture; model-viewer
+    # renders texture × factor fine, but Blender's USD exporter drops the factor
+    # multiply, so iOS AR shows grey foliage. Runs before optimize_glb (which prunes
+    # the orphaned originals) and before validation. Web output is unchanged (the
+    # product is computed in linear space, exactly as the renderer would).
+    bake_base_color_factor(glb_path)
     ensure_pbr_materials(glb_path)
     # Tame absurd sizes (almost always a unit error, e.g. an FBX mis-converted to
     # ~150 m) so AR doesn't place a giant model you stand inside. Runs before
