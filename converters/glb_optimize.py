@@ -21,6 +21,12 @@ logger = logging.getLogger(__name__)
 
 _TIMEOUT = 120
 
+# Texture WebP compression is OFF by default: iOS AR Quick Look / RealityKit
+# cannot read WebP textures, and the USDZ is built from this same GLB — WebP made
+# AR models render magenta. Draco GEOMETRY compression (the main size win) stays
+# on. Set GLB_TEXTURE_WEBP=1 to re-enable WebP for the web GLB if ever needed.
+_TEXTURE_WEBP = os.environ.get("GLB_TEXTURE_WEBP", "0").lower() in {"1", "true", "yes", "on"}
+
 
 def _find_cli() -> list[str]:
     """Locate the gltf-transform CLI binary."""
@@ -40,7 +46,7 @@ def optimize_glb(
     glb_path: str,
     *,
     draco: bool = True,
-    texture_compress: bool = True,
+    texture_compress: bool = _TEXTURE_WEBP,
 ) -> bool:
     """Optimize a GLB file in-place using gltf-transform.
 

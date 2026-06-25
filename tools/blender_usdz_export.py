@@ -65,6 +65,17 @@ def export_usdz(input_path, output_path):
     )
     print(f"USDZ materials: {len(mats)} total, {textured} with image textures")
 
+    # iOS Quick Look / RealityKit cannot read WebP textures (they render magenta).
+    # Force every image datablock to PNG so export_textures writes PNG into the
+    # .usdz even if a source texture was WebP. Blender already decoded the image,
+    # so this re-encodes from the datablock.
+    for img in bpy.data.images:
+        try:
+            if img.users and (img.has_data or img.packed_file):
+                img.file_format = "PNG"
+        except Exception as exc:
+            print(f"image->PNG failed for {getattr(img, 'name', '?')}: {exc}")
+
     if not output_path.lower().endswith(".usdz"):
         output_path += ".usdz"
 
