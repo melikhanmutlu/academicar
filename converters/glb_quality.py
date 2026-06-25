@@ -158,6 +158,46 @@ def repair_transparent_base_color(glb_path: str) -> bool:
     return changed
 
 
+_FOLIAGE_ALPHA_MASK = os.environ.get("FOLIAGE_ALPHA_MASK", "1").lower() in {"1", "true", "yes", "on"}
+_FOLIAGE_ALPHA_CUTOFF = float(os.environ.get("FOLIAGE_ALPHA_CUTOFF", "0.5"))
+
+
+def _set_cutout_on_blend_textured(gltf: GLTF2) -> bool:
+    """Switch textured BLEND materials to MASK (alpha cutout). Pure, in-memory.
+
+    fbx2gltf leaves foliage/leaf-card materials (alpha shape in the baseColor
+    texture) as alphaMode=BLEND, which renders the cards semi-transparent/washed
+    (and worse in iOS AR). For an alpha-cutout texture the correct mode is MASK:
+    texels below the cutoff become fully transparent, above fully opaque -> crisp
+    leaves. Only BLEND materials that carry a baseColorTexture are touched.
+    """
+    changed = False
+    for material in gltf.materials or []:
+        pbr = material.pbrMetallicRoughness
+        if not pbr or pbr.baseColorTexture is None:
+            continue
+        if (material.alphaMode or "OPAQUE") == "BLEND":
+            material.alphaMode = "MASK"
+            material.alphaCutoff = _FOLIAGE_ALPHA_CUTOFF
+            changed = True
+    return changed
+
+
+def mask_cutout_textures(glb_path: str) -> bool:
+    """Convert textured BLEND materials to MASK (alpha cutout) so foliage renders
+    crisply in model-viewer and iOS AR instead of washed/semi-transparent."""
+    if not _FOLIAGE_ALPHA_MASK:
+        return False
+    try:
+        gltf = _load_glb(glb_path)
+    except GLBQualityError:
+        return False
+    if _set_cutout_on_blend_textured(gltf):
+        gltf.save(glb_path)
+        return True
+    return False
+
+
 def ensure_pbr_materials(glb_path: str) -> bool:
     """Ensure primitives have valid PBR materials without replacing artwork.
 

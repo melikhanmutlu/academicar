@@ -34,6 +34,7 @@ from converters.glb_quality import (
     GLBQualityError,
     embed_external_textures,
     ensure_pbr_materials,
+    mask_cutout_textures,
     repair_transparent_base_color,
     validate_glb_quality,
 )
@@ -1406,6 +1407,11 @@ def finalize_converted_glb(glb_path: str, *, source_dir: str) -> None:
     # transparent → textured but invisible, e.g. tree foliage). Restore them so
     # the texture renders. Runs before optimize so prune/webp see final alpha.
     repair_transparent_base_color(glb_path)
+    # Foliage/leaf-card materials come out of FBX2glTF as alphaMode=BLEND, which
+    # renders the alpha-cutout cards washed/semi-transparent (white leaves) — worse
+    # in iOS AR. Switch textured BLEND materials to MASK (alpha cutout) for crisp
+    # foliage in both model-viewer and AR.
+    mask_cutout_textures(glb_path)
     ensure_pbr_materials(glb_path)
     # Tame absurd sizes (almost always a unit error, e.g. an FBX mis-converted to
     # ~150 m) so AR doesn't place a giant model you stand inside. Runs before

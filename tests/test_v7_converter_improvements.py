@@ -192,6 +192,28 @@ class TestClampOversizedGlb:
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+class TestMaskCutoutTextures:
+    """Textured BLEND materials (FBX foliage) become MASK so leaves render crisp."""
+
+    def test_blend_textured_becomes_mask(self):
+        from pygltflib import GLTF2, Material, PbrMetallicRoughness, TextureInfo
+        from converters.glb_quality import _set_cutout_on_blend_textured
+
+        g = GLTF2()
+        g.materials = [
+            Material(alphaMode="BLEND",
+                     pbrMetallicRoughness=PbrMetallicRoughness(baseColorTexture=TextureInfo(index=0))),
+            Material(alphaMode="OPAQUE",
+                     pbrMetallicRoughness=PbrMetallicRoughness(baseColorTexture=TextureInfo(index=0))),
+            Material(alphaMode="BLEND", pbrMetallicRoughness=PbrMetallicRoughness()),  # no texture
+        ]
+        assert _set_cutout_on_blend_textured(g) is True
+        assert g.materials[0].alphaMode == "MASK"
+        assert g.materials[0].alphaCutoff == 0.5
+        assert g.materials[1].alphaMode == "OPAQUE"   # opaque untouched
+        assert g.materials[2].alphaMode == "BLEND"    # untextured blend untouched
+
+
 class TestInjectPbrMaterial:
     """inject_pbr_material now uses pygltflib, not raw bytes."""
 
