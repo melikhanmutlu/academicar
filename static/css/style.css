@@ -7828,6 +7828,25 @@ details[open] > .upload-summary .upload-inline-action svg {
   transform: none;
 }
 
+.color-hex-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Rectangular colour swatch sitting next to the hex input — opens the native
+   picker for manual colour selection. */
+.color-swatch-input {
+  width: 40px;
+  height: 34px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
 .color-hex-input {
   font-family: var(--font-inter, 'Inter', sans-serif);
   font-size: 13px;

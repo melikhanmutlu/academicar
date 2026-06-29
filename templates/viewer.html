@@ -345,6 +345,11 @@
        from the toolbar button we suppress the native one to avoid a duplicate.
        Needs !important to win over model-viewer's own visibility toggling. */
     .native-ar-button.is-suppressed { display: none !important; }
+    /* The toolbar AR buttons carry .viewer-tool-btn { display:inline-flex }, which
+       overrides the UA/[hidden] rule — so setting button.hidden alone left them
+       visible next to the native button (a duplicate AR button on iPad/tablet).
+       Make `hidden` authoritative for the AR buttons across every viewport. */
+    [data-ar-btn][hidden], [data-ios-ar-btn][hidden] { display: none !important; }
     .viewer-tool-heading {
       display: flex;
       align-items: center;
@@ -449,13 +454,14 @@
     .viewer-shot-bg {
       display: flex;
       align-items: center;
-      justify-content: space-between;
       gap: 0.5rem;
       margin-top: 0.5rem;
       font-size: 0.78rem;
       font-weight: 600;
       color: rgba(255, 255, 255, 0.8);
     }
+    /* .viewer-shot-bg sets display:flex, which would override [hidden]; force it. */
+    .viewer-shot-bg[hidden] { display: none !important; }
     .viewer-shot-bg-opts {
       display: inline-flex;
       gap: 0.3rem;
@@ -493,8 +499,6 @@
       grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 0.45rem;
       margin-top: 0.65rem;
-      max-height: 148px;
-      overflow-y: auto;
     }
     .viewer-shot-card {
       border: 1px solid rgba(255,255,255,0.10);
@@ -555,8 +559,8 @@
         right: 0.75rem !important;
         bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px)) !important;
         width: auto !important;
-        max-height: 40vh;
-        max-height: 40dvh;
+        max-height: 58vh;
+        max-height: 58dvh;
         overflow-y: auto;
         padding: 0.85rem !important;
         border-radius: 0.85rem;
@@ -576,7 +580,7 @@
       }
       .viewer-tool-heading > div { width: 100%; justify-content: space-between; }
       .viewer-tool-heading > div button { flex: 1 1 0; }
-      .viewer-shot-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); max-height: 96px; }
+      .viewer-shot-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
       .viewer-shot-actions { grid-template-columns: 1fr; }
       .viewer-inline-qr { display: none !important; }
       .viewer-control-panel[data-collapsed="true"] { max-height: none; overflow: visible; }
@@ -834,10 +838,13 @@
             </div>
             <label class="viewer-shot-qr-toggle">
               <input type="checkbox" data-qr-overlay checked>
-              <span>Include QR code on screenshots</span>
+              <span>Include QR code and name</span>
             </label>
-            <div class="viewer-shot-bg" data-shot-bg>
+            <label class="viewer-shot-qr-toggle">
+              <input type="checkbox" data-shot-bg-toggle>
               <span>Background</span>
+            </label>
+            <div class="viewer-shot-bg" data-shot-bg hidden>
               <div class="viewer-shot-bg-opts">
                 <button type="button" data-shot-bg-opt="white" aria-pressed="true">Light</button>
                 <button type="button" data-shot-bg-opt="dark" aria-pressed="false">Dark</button>
@@ -1417,12 +1424,15 @@
     let qrImageCache;
     const getQrImage = () => (qrImageCache ??= loadImage(shareCardQrUrl).catch(() => null));
     const qrEnabled = () => !!(qrOverlayToggle && qrOverlayToggle.checked);
-    let shotBgMode = 'white';  // 'white' | 'dark'
+    let shotBgEnabled = false; // Background off by default -> transparent screenshots.
+    let shotBgMode = 'white';  // 'white' | 'dark' (only when shotBgEnabled)
     const shotBgColor = () => (shotBgMode === 'dark' ? '#202020' : '#ffffff');
     const composeShot = async (shotUrl) => {
       if (!shotUrl) return shotUrl;
       const withQr = qrEnabled();
-      const dark = shotBgMode === 'dark';
+      // Only treat the canvas as "dark" when a dark background is actually drawn;
+      // with no background the title must read as graphite, not white-on-transparent.
+      const dark = shotBgEnabled && shotBgMode === 'dark';
       const [shot, qr] = await Promise.all([
         loadImage(shotUrl),
         withQr ? getQrImage() : Promise.resolve(null),
@@ -1433,9 +1443,12 @@
       canvas.width = W;
       canvas.height = H;
       const ctx = canvas.getContext('2d');
-      // Solid background (model's transparent areas -> chosen colour), then model.
-      ctx.fillStyle = shotBgColor();
-      ctx.fillRect(0, 0, W, H);
+      // Solid background (model's transparent areas -> chosen colour) when enabled;
+      // otherwise leave the canvas transparent so the PNG has no background.
+      if (shotBgEnabled) {
+        ctx.fillStyle = shotBgColor();
+        ctx.fillRect(0, 0, W, H);
+      }
       ctx.drawImage(shot, 0, 0, W, H);
       if (withQr) {
         const margin = Math.round(W * 0.035);
@@ -1668,8 +1681,15 @@
       renderShotGallery();
     };
     qrOverlayToggle?.addEventListener('change', refreshGalleryOverlay);
-    // Screenshot background (light/dark) selector — re-composites the gallery too.
+    // Background toggle: off -> transparent screenshots; on -> reveal Light/Dark.
+    const shotBgToggle = document.querySelector('[data-shot-bg-toggle]');
     const shotBgSelector = document.querySelector('[data-shot-bg]');
+    shotBgToggle?.addEventListener('change', () => {
+      shotBgEnabled = !!shotBgToggle.checked;
+      if (shotBgSelector) shotBgSelector.hidden = !shotBgEnabled;
+      refreshGalleryOverlay();
+    });
+    // Screenshot background (light/dark) selector — re-composites the gallery too.
     if (shotBgSelector) {
       shotBgSelector.querySelectorAll('[data-shot-bg-opt]').forEach((btn) => {
         btn.addEventListener('click', () => {

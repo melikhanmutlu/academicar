@@ -85,13 +85,12 @@
             <p class="model-edit-preview-hint">Live preview — drag to rotate. Unsaved until you update.</p>
           </div>
           <div class="model-edit-material-controls">
-            <label class="model-edit-color-row">
-              <span>Model color</span>
-              <input type="color" id="appearanceColor" name="color" value="{{ model.appearance_color or '#cccccc' }}" aria-label="Model color">
-            </label>
             <div class="model-edit-field-grid">
               <label class="field-label">Hex code</label>
-              <input type="text" class="color-hex-input" data-color-hex placeholder="#CCCCCC" maxlength="7" pattern="^#[0-9A-Fa-f]{6}$" value="{{ model.appearance_color or '#cccccc' }}">
+              <div class="color-hex-row">
+                <input type="color" id="appearanceColor" name="color" value="{{ model.appearance_color or '#cccccc' }}" class="color-swatch-input" aria-label="Pick model color">
+                <input type="text" class="color-hex-input" data-color-hex placeholder="#CCCCCC" maxlength="7" pattern="^#[0-9A-Fa-f]{6}$" value="{{ model.appearance_color or '#cccccc' }}">
+              </div>
               <div class="color-presets" data-color-presets>
                 <button type="button" class="color-preset" data-preset="#E8D5B7" title="Bone" style="background:#E8D5B7"></button>
                 <button type="button" class="color-preset" data-preset="#8B2252" title="Vein" style="background:#8B2252"></button>
@@ -106,7 +105,7 @@
                 <button type="button" class="color-preset" data-preset="#8B6914" title="Wood" style="background:#8B6914"></button>
                 <button type="button" class="color-preset" data-preset="#FFFFF0" title="Ivory" style="background:#FFFFF0"></button>
               </div>
-              <p>Pick a color above or type a hex code. Syncs with the color picker.</p>
+              <p>Use the swatch, type a hex code, or pick a preset — they stay in sync.</p>
             </div>
             <div class="model-edit-field-grid">
               <label class="field-label model-edit-slider-label">Roughness <span id="roughness-val">{{ '%.2f'|format(model.appearance_roughness or 0.35) }}</span></label>
