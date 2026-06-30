@@ -228,6 +228,10 @@
                   <button type="button" class="model-link-action" data-copy-link="{{ model_resolver_url(m) }}" aria-label="Copy viewer link"><span class="label-full">Copy link</span><span class="label-short">Copy</span></button>
                   <a href="{{ url_for('qr_print', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-link-action">QR</a>
                   <a href="{{ url_for('model_edit', model_id=m.id) }}" class="model-link-action">Edit</a>
+                  <form method="POST" action="{{ url_for('model_delete', model_id=m.id) }}" class="model-delete-form" onsubmit="return confirm('Delete this 3D model? This cannot be undone.');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="model-link-action model-link-danger" aria-label="Delete model">Delete</button>
+                  </form>
                 </div>
                 {% set upgrade_options = model_upgrade_options(m) %}
                 {% if upgrade_options %}
@@ -240,6 +244,10 @@
                 <span class="model-card-cta is-disabled">{{ 'Processing' if model_status != 'failed' else 'Not ready' }}</span>
                 <div class="model-actions-secondary">
                   <a href="{{ url_for('model_edit', model_id=m.id) }}" class="model-link-action">Edit</a>
+                  <form method="POST" action="{{ url_for('model_delete', model_id=m.id) }}" class="model-delete-form" onsubmit="return confirm('Delete this 3D model? This cannot be undone.');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="model-link-action model-link-danger" aria-label="Delete model">Delete</button>
+                  </form>
                 </div>
               {% endif %}
             </div>

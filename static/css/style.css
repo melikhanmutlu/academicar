@@ -5384,6 +5384,10 @@ input[type="file"]::-webkit-file-upload-button {
 .model-link-action:hover {
   color: var(--color-sunset-orange);
 }
+/* Delete action: form wrapper disappears so the button sits inline in the action
+   row (keeps the middot separators correct); destructive intent shown on hover only. */
+.model-delete-form { display: contents; }
+.model-link-danger:hover { color: #dc2626; }
 .model-actions-secondary > .model-link-action:not(:last-child)::after {
   content: "·";
   margin: 0 9px;

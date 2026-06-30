@@ -156,19 +156,29 @@ class TestViewerMobileAr:
 
     def test_ios_uses_native_model_viewer_ar_button(self):
         content = (TEMPLATES_DIR / "viewer.html").read_text()
-        ar_handler = content.split("if (arBtn && !useNativeIOSArButton) {", 1)[1].split("viewer.addEventListener('load'", 1)[0]
+        ar_handler = content.split(
+            "if (arBtn && !useNativeIOSArButton && !useIOSAnchorButton) {", 1
+        )[1].split("viewer.addEventListener('load'", 1)[0]
         assert "const isIOSChrome = isIOS && /CriOS/i.test(navigator.userAgent);" in content
         assert "const usdzUrl =" in content
         assert "const nativeArBtn = document.getElementById('nativeArBtn');" in content
         # iOS Safari uses model-viewer's native Quick Look button; iOS Chrome
-        # (CriOS) drives AR from the toolbar button + rel="ar" launcher instead.
+        # (CriOS) surfaces a real <a rel="ar"> anchor the user taps (a programmatic
+        # Quick Look launch is unreliable in iOS Chrome); Android/desktop drive AR
+        # from the toolbar button.
         assert "const useNativeIOSArButton = isIOS && !isIOSChrome && hasUsdz && nativeArBtn;" in content
+        assert "const useIOSAnchorButton = isIOS && !useNativeIOSArButton && hasUsdz && iosArButtons.length > 0;" in content
+        # iOS Safari branch hides our buttons and uses the native one.
         assert "arButtons.forEach((button) => { button.hidden = true; });" in content
         assert "iosArButtons.forEach((button) => { button.hidden = true; });" in content
-        assert "if (arBtn && !useNativeIOSArButton) {" in content
-        assert "if (isIOS && hasUsdz)" in ar_handler
+        # iOS Chrome branch reveals the real rel="ar" anchor instead.
+        assert "iosArButtons.forEach((button) => { button.hidden = false; });" in content
+        assert "if (arBtn && !useNativeIOSArButton && !useIOSAnchorButton) {" in content
+        # The toolbar handler still launches Quick Look on iOS without a usable anchor
+        # and never leaves a dead button (falls back to the QR).
+        assert "if (isIOS)" in ar_handler
         assert "launchIOSQuickLook(usdzUrl);" in ar_handler
-        assert "if (!isIOS) showQrFallback();" in ar_handler
+        assert "showQrFallback();" in ar_handler
 
 
 class TestMigrationExists:
