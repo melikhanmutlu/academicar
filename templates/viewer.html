@@ -724,7 +724,7 @@
           <span class="sm:hidden">AR</span>
         </button>
         {% if has_usdz %}
-        <a data-ios-ar-btn hidden class="viewer-tool-btn primary !py-1.5 !px-4 !text-xs" href="{{ url_for('serve_glb', unique_id=model.id, filename='model.usdz') }}?v={{ model_asset_token(model) }}" type="model/vnd.usdz+zip" aria-label="View in AR">
+        <a data-ios-ar-btn hidden rel="ar" class="viewer-tool-btn primary !py-1.5 !px-4 !text-xs" href="{{ url_for('serve_glb', unique_id=model.id, filename='model.usdz') }}?v={{ model_asset_token(model) }}" type="model/vnd.usdz+zip" aria-label="View in AR">
           <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
           <span class="hidden sm:inline">View in AR</span>
           <span class="sm:hidden">AR</span>
@@ -760,7 +760,7 @@
           <span class="hidden sm:inline">View in AR</span>
         </button>
         {% if has_usdz %}
-        <a data-ios-ar-btn hidden class="viewer-tool-btn primary" href="{{ url_for('serve_glb', unique_id=model.id, filename='model.usdz') }}?v={{ model_asset_token(model) }}" type="model/vnd.usdz+zip" aria-label="View in AR">
+        <a data-ios-ar-btn hidden rel="ar" class="viewer-tool-btn primary" href="{{ url_for('serve_glb', unique_id=model.id, filename='model.usdz') }}?v={{ model_asset_token(model) }}" type="model/vnd.usdz+zip" aria-label="View in AR">
           <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
           <svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1L14 4.5v7L8 15L2 11.5v-7z"/><path d="M8 1v6.5M8 7.5L14 4.5M8 7.5L2 4.5"/></svg>
           <span class="hidden sm:inline">View in AR</span>
@@ -1255,14 +1255,26 @@
     // defer to the native button on iOS Safari; iOS Chrome uses the toolbar
     // button + the rel="ar" launcher below.
     const useNativeIOSArButton = isIOS && !isIOSChrome && hasUsdz && nativeArBtn;
+    // iOS Chrome can't use model-viewer's native Quick Look button (canActivateAR is
+    // false there) AND a *programmatic* rel="ar" click is unreliable in iOS Chrome —
+    // Quick Look only opens from a genuine tap on a real <a rel="ar">. So on iOS
+    // Chrome we surface the real anchor button and let the user tap it directly.
+    const useIOSAnchorButton = isIOS && !useNativeIOSArButton && hasUsdz && iosArButtons.length > 0;
     if (useNativeIOSArButton) {
       // iOS Safari: use model-viewer's native Quick Look button, hide ours.
       arButtons.forEach((button) => { button.hidden = true; });
       iosArButtons.forEach((button) => { button.hidden = true; });
+    } else if (useIOSAnchorButton) {
+      // iOS Chrome: show the real rel="ar" anchor (a genuine tap opens Quick Look),
+      // hide the <button> we'd otherwise drive programmatically, and suppress the
+      // native button so there's exactly one AR affordance.
+      iosArButtons.forEach((button) => { button.hidden = false; });
+      arButtons.forEach((button) => { button.hidden = true; });
+      if (nativeArBtn) nativeArBtn.classList.add('is-suppressed');
     } else if (nativeArBtn) {
-      // Everywhere else (iOS Chrome, Android, desktop) we drive AR from the
-      // toolbar button, so suppress model-viewer's native button — otherwise it
-      // shows alongside ours (a visible duplicate) wherever canActivateAR=true.
+      // Everywhere else (Android, desktop) we drive AR from the toolbar button, so
+      // suppress model-viewer's native button — otherwise it shows alongside ours
+      // (a visible duplicate) wherever canActivateAR=true.
       nativeArBtn.classList.add('is-suppressed');
     }
 
@@ -1298,11 +1310,17 @@
       setTimeout(() => anchor.remove(), 1500);
     };
 
-    if (arBtn && !useNativeIOSArButton) {
+    // Only wire the <button> when it is the active AR affordance. On iOS Chrome the
+    // real rel="ar" anchor is used instead (useIOSAnchorButton), and on iOS Safari the
+    // native button is used (useNativeIOSArButton).
+    if (arBtn && !useNativeIOSArButton && !useIOSAnchorButton) {
       arBtn.addEventListener('click', () => {
-        // iOS (Safari or Chrome): hand the USDZ to Quick Look via rel="ar".
-        if (isIOS && hasUsdz) {
-          launchIOSQuickLook(usdzUrl);
+        // iOS only reaches here without a USDZ anchor (no Quick Look possible). Try the
+        // programmatic launcher as a safety net if a USDZ somehow exists, else fall
+        // back to the QR so the button is never dead.
+        if (isIOS) {
+          if (hasUsdz) { launchIOSQuickLook(usdzUrl); return; }
+          showQrFallback();
           return;
         }
         // Android / desktop: prefer real on-device AR (Scene Viewer).
@@ -1317,10 +1335,8 @@
           return;
         }
         // No on-device AR (desktop, or a phone where AR can't start): offer the
-        // QR so the model can be opened on an AR-capable phone instead. Without
-        // this gate, model-viewer's activateAR() resolves silently on desktop
-        // (it does not reject), so the button would appear dead.
-        if (!isIOS) showQrFallback();
+        // QR so the model can be opened on an AR-capable phone instead.
+        showQrFallback();
       });
     }
 
