@@ -86,10 +86,9 @@
           </div>
           <div class="model-edit-material-controls">
             <div class="model-edit-field-grid">
-              <label class="field-label">Hex code</label>
               <div class="color-hex-row">
                 <input type="color" id="appearanceColor" name="color" value="{{ model.appearance_color or '#cccccc' }}" class="color-swatch-input" aria-label="Pick model color">
-                <input type="text" class="color-hex-input" data-color-hex placeholder="#CCCCCC" maxlength="7" pattern="^#[0-9A-Fa-f]{6}$" value="{{ model.appearance_color or '#cccccc' }}">
+                <input type="text" class="color-hex-input" data-color-hex placeholder="#CCCCCC" maxlength="7" pattern="^#[0-9A-Fa-f]{6}$" value="{{ model.appearance_color or '#cccccc' }}" aria-label="Hex code">
               </div>
               <div class="color-presets" data-color-presets>
                 <button type="button" class="color-preset" data-preset="#E8D5B7" title="Bone" style="background:#E8D5B7"></button>
