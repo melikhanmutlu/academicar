@@ -152,6 +152,12 @@ class ModelAnnotation(db.Model):
     label = db.Column(db.String(120), nullable=False)
     description = db.Column(db.Text, nullable=True)
     order_index = db.Column(db.Integer, nullable=False, default=0)
+    # Optional camera angle the owner was viewing from when the note was placed, so a
+    # click can fly the camera back to it. model-viewer camera strings (orbit/target)
+    # and field-of-view; null for annotations created before this feature.
+    camera_orbit = db.Column(db.String(64), nullable=True)
+    camera_target = db.Column(db.String(96), nullable=True)
+    camera_fov = db.Column(db.String(16), nullable=True)
     created_at = db.Column(db.DateTime, default=utc_now)
 
     model = db.relationship("Model3D", backref=db.backref("annotations", lazy=True, cascade="all, delete-orphan"))
@@ -168,6 +174,11 @@ class ModelAnnotation(db.Model):
             "label": self.label,
             "description": self.description,
             "order_index": self.order_index,
+            "camera": {
+                "orbit": self.camera_orbit,
+                "target": self.camera_target,
+                "fov": self.camera_fov,
+            } if self.camera_orbit else None,
         }
 
 

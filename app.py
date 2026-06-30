@@ -4978,6 +4978,11 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "Position must be [x, y, z]"}), 400
         if not (isinstance(normal, list) and len(normal) == 3):
             return jsonify({"error": "Normal must be [x, y, z]"}), 400
+        # Optional camera angle the note was placed from (model-viewer strings).
+        camera = data.get("camera") or {}
+        camera_orbit = (str(camera.get("orbit")).strip()[:64] or None) if camera.get("orbit") else None
+        camera_target = (str(camera.get("target")).strip()[:96] or None) if camera.get("target") else None
+        camera_fov = (str(camera.get("fov")).strip()[:16] or None) if camera.get("fov") else None
         max_order = db.session.query(func.max(ModelAnnotation.order_index)).filter_by(model_id=model_id).scalar() or 0
         try:
             annotation = ModelAnnotation(
@@ -4991,6 +4996,9 @@ def register_routes(app: Flask) -> None:
                 label=label,
                 description=(data.get("description") or "").strip()[:2000] or None,
                 order_index=max_order + 1,
+                camera_orbit=camera_orbit,
+                camera_target=camera_target,
+                camera_fov=camera_fov,
             )
             db.session.add(annotation)
             db.session.commit()

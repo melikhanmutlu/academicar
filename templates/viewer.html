@@ -251,6 +251,34 @@
     .annotation-delete-btn:hover { color: #ff4444; }
     .owner-mode .annotation-delete-btn { display: inline; }
     .annotate-mode model-viewer { cursor: crosshair; }
+    /* Note popover shown when an annotation hotspot is clicked (dark-glass card). */
+    .annotation-note-popover {
+      position: fixed;
+      left: 50%;
+      bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+      transform: translateX(-50%) translateY(8px);
+      z-index: 45;
+      max-width: min(92vw, 420px);
+      padding: 0.85rem 2.4rem 0.85rem 1rem;
+      border-radius: 0.85rem;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(17,17,17,0.86);
+      color: #fff;
+      backdrop-filter: blur(14px);
+      box-shadow: 0 14px 40px rgba(0,0,0,0.4);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+    .annotation-note-popover.is-visible { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+    .annotation-note-popover .note-title { font-size: 0.95rem; font-weight: 700; }
+    .annotation-note-popover .note-desc { margin-top: 0.25rem; font-size: 0.82rem; color: rgba(255,255,255,0.72); line-height: 1.35; }
+    .annotation-note-popover .note-close {
+      position: absolute; top: 0.5rem; right: 0.6rem;
+      background: none; border: none; color: rgba(255,255,255,0.6);
+      font-size: 1.1rem; line-height: 1; cursor: pointer; padding: 2px;
+    }
+    .annotation-note-popover .note-close:hover { color: #fff; }
     #annotateBtn.is-active {
       background: #ff682c !important;
       border-color: #ff682c !important;
@@ -645,7 +673,8 @@
               data-position="{{ ann.position_x }} {{ ann.position_y }} {{ ann.position_z }}"
               data-normal="{{ ann.normal_x }} {{ ann.normal_y }} {{ ann.normal_z }}"
               data-annotation-id="{{ ann.id }}"
-              data-annotation-desc="{{ ann.description or '' }}">
+              data-annotation-desc="{{ ann.description or '' }}"
+              {% if ann.camera_orbit %}data-camera-orbit="{{ ann.camera_orbit }}" data-camera-target="{{ ann.camera_target }}" data-camera-fov="{{ ann.camera_fov }}"{% endif %}>
         <span class="annotation-label">{{ ann.label }}</span>
         <span class="annotation-delete-btn" data-delete-ann="{{ ann.id }}" title="Remove">×</span>
       </button>
@@ -929,7 +958,7 @@
           <img id="shotModalImg" src="" alt="Selected screenshot preview" class="max-w-full max-h-full rounded-lg object-contain">
         </div>
         <div class="mt-4 flex justify-end">
-          <a id="shotModalDownload" href="#" download class="viewer-tool-btn primary" type="button">Download PNG</a>
+          <a id="shotModalDownload" href="#" download class="viewer-tool-btn primary" type="button">Download screenshot</a>
         </div>
       </div>
     </div>
@@ -981,6 +1010,10 @@
     const defaultCameraOrbit = '0deg 90deg auto';
     const defaultFieldOfView = '28deg';
     const defaultOrientation = '0deg 0deg 0deg';
+    // Resolved (numeric) camera captured once the model is framed at load. Reset view
+    // restores this exact state so it can never re-resolve an "auto" radius to a
+    // tighter distance (which ballooned the model to fill the screen).
+    let initialCamera = null;
     let shotGallery = [];
     let modelAnimationAvailable = false;
     let modelAnimationPlaying = true;
@@ -1041,15 +1074,43 @@
       });
     }
 
-    // --- Annotation description popup ---
+    // --- Annotation click: fly the camera to the saved angle + show the note ---
+    let annotationNotePopover = null;
+    const hideAnnotationNote = () => annotationNotePopover && annotationNotePopover.classList.remove('is-visible');
+    const showAnnotationNote = (label, desc) => {
+      if (!annotationNotePopover) {
+        annotationNotePopover = document.createElement('div');
+        annotationNotePopover.className = 'annotation-note-popover';
+        annotationNotePopover.innerHTML = '<button type="button" class="note-close" aria-label="Close">&times;</button><div class="note-title"></div><div class="note-desc"></div>';
+        annotationNotePopover.querySelector('.note-close').addEventListener('click', hideAnnotationNote);
+        document.body.appendChild(annotationNotePopover);
+      }
+      annotationNotePopover.querySelector('.note-title').textContent = label || 'Annotation';
+      const descEl = annotationNotePopover.querySelector('.note-desc');
+      descEl.textContent = desc || '';
+      descEl.style.display = desc ? '' : 'none';
+      annotationNotePopover.classList.add('is-visible');
+    };
+    const flyCameraToAnnotation = (btn) => {
+      const orbit = btn.dataset.cameraOrbit;
+      if (!orbit) return; // older notes without a saved angle: just show the text
+      if (typeof setAutoRotateState === 'function') setAutoRotateState(false);
+      // Setting the properties (without jumpCameraToGoal) lets model-viewer
+      // interpolate smoothly to the saved angle.
+      viewer.cameraOrbit = orbit;
+      if (btn.dataset.cameraTarget) viewer.cameraTarget = btn.dataset.cameraTarget;
+      if (btn.dataset.cameraFov) viewer.fieldOfView = btn.dataset.cameraFov;
+    };
     document.querySelectorAll('.annotation-hotspot').forEach(btn => {
       btn.addEventListener('click', (e) => {
         if (e.target.classList.contains('annotation-delete-btn')) return;
+        flyCameraToAnnotation(btn);
         const desc = btn.dataset.annotationDesc;
         const label = btn.querySelector('.annotation-label')?.textContent;
-        if (desc && label) alert(label + ': ' + desc);
+        showAnnotationNote(label, desc);
       });
     });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideAnnotationNote(); });
 
     // --- Owner: interactive annotation placement ---
     const annotateBtn = document.getElementById('annotateBtn');
@@ -1061,6 +1122,7 @@
       let annotateMode = false;
       let pendingPos = null;
       let pendingNormal = null;
+      let pendingCamera = null;
       const container = viewer.closest('.relative') || viewer.parentElement;
       if (container) container.classList.add('owner-mode');
 
@@ -1093,6 +1155,9 @@
         if (!hit) return;
         pendingPos = hit.position;
         pendingNormal = hit.normal;
+        // Remember the angle the owner is viewing from, so clicking the note later
+        // can fly the camera back to it.
+        pendingCamera = (typeof cameraState === 'function') ? cameraState() : null;
         annotateForm.style.display = 'block';
         const formX = Math.min(e.clientX + 10, window.innerWidth - 280);
         const formY = Math.min(e.clientY + 10, window.innerHeight - 220);
@@ -1115,6 +1180,7 @@
           description: document.getElementById('annDescInput').value.trim(),
           position: [pendingPos.x, pendingPos.y, pendingPos.z],
           normal: [pendingNormal.x, pendingNormal.y, pendingNormal.z],
+          camera: pendingCamera || undefined,
         };
         try {
           const resp = await fetch('/models/' + modelId + '/annotations', {
@@ -1265,10 +1331,15 @@
       if (event.detail && event.detail.status === 'failed') showQrFallback();
     });
 
-    viewer.addEventListener('load', () => {
+    viewer.addEventListener('load', async () => {
       viewer.classList.add('is-loaded');
       viewerStatus.classList.add('hidden');
       initializeModelAnimation();
+      // Capture the correctly-framed camera once, so Reset view can return to it
+      // exactly (numeric orbit/target/fov — no "auto" re-resolution on reset).
+      if (viewer.updateComplete) await viewer.updateComplete;
+      await waitFrame();
+      initialCamera = cameraState();
     });
     viewer.addEventListener('error', () => {
       viewerStatus.textContent = 'The model could not be loaded. The GLB file may be unavailable or invalid.';
@@ -1543,7 +1614,9 @@
       const raw = await captureShot(null);
       if (!raw) return;
       const out = await processShot(raw);
-      downloadDataUrl(out, qrEnabled() ? 'current-view-qr' : 'current-view');
+      // Preview the current view in the modal (with a Download button) rather than
+      // pushing the file straight to the browser's downloads.
+      openShotModal({ key: 'current-view', label: 'Current view', rawDataUrl: raw, dataUrl: out, qr: qrEnabled() });
     };
     const generateShotSet = async () => {
       const state = cameraState();
@@ -1622,21 +1695,26 @@
         const valueEl = document.querySelector(`[data-rotate-value="${input.dataset.rotateAxis}"]`);
         if (valueEl) valueEl.textContent = '0deg';
       });
-      await applyModelOrientation({ x: 0, y: 0, z: 0 });
-      // Snap the camera home. Set both the attribute and the property and jump to
-      // the goal; then re-assert on the next frame so any in-flight auto-rotate /
-      // camera interpolation can't leave the view off its starting position.
+      // Return the model to its identity pose WITHOUT calling updateFraming(): with
+      // bounds="tight", re-framing here let the "auto" camera radius re-resolve to a
+      // much smaller distance, which ballooned the model to fill the screen.
+      viewer.setAttribute('orientation', defaultOrientation);
+      viewer.orientation = defaultOrientation;
+      if (typeof viewer.requestUpdate === 'function') viewer.requestUpdate('orientation', defaultOrientation);
+      if (viewer.updateComplete) await viewer.updateComplete;
+      // Restore the exact camera captured at load (numeric radius/target/fov) so the
+      // result is deterministic; fall back to the defaults if it wasn't captured yet.
+      const home = initialCamera || { orbit: defaultCameraOrbit, target: 'auto auto auto', fov: defaultFieldOfView };
       const applyHome = () => {
-        viewer.setAttribute('camera-orbit', defaultCameraOrbit);
-        viewer.setAttribute('field-of-view', defaultFieldOfView);
-        viewer.cameraOrbit = defaultCameraOrbit;
-        viewer.fieldOfView = defaultFieldOfView;
-        viewer.cameraTarget = 'auto auto auto';
+        viewer.cameraOrbit = home.orbit;
+        viewer.cameraTarget = home.target;
+        viewer.fieldOfView = home.fov;
         if (typeof viewer.jumpCameraToGoal === 'function') viewer.jumpCameraToGoal();
       };
       applyHome();
       if (viewer.updateComplete) await viewer.updateComplete;
       requestAnimationFrame(applyHome);
+      if (modelAnimationPlaying && typeof viewer.play === 'function') viewer.play();
     });
     viewer.setAttribute('orientation', defaultOrientation);
     autoRotateToggle?.addEventListener('click', () => {
