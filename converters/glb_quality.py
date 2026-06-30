@@ -122,6 +122,41 @@ def has_base_color_textures(glb_path: str) -> bool:
     return False
 
 
+def apply_pbr_factors(glb_path: str, *, roughness: float | None = None, metallic: float | None = None) -> bool:
+    """Set metallic/roughness FACTORS on every existing material in place.
+
+    Unlike ``enrich_glb_for_ar`` (which replaces each primitive's material with a
+    flat solid-colour material and so discards textures), this only adjusts the
+    numeric factors — leaving baseColor/normal/metallic-roughness textures and the
+    baseColorFactor untouched. Used to tune a textured model's finish (e.g. drop a
+    metallic FBX export to a matte look) without losing its artwork. Effective
+    metallic/roughness = factor × the material's metallic-roughness texture, so
+    a factor of 0 reliably removes the metallic sheen even when a texture is bound.
+
+    Returns True if at least one material was updated.
+    """
+    if roughness is None and metallic is None:
+        return False
+    try:
+        gltf = _load_glb(glb_path)
+    except GLBQualityError:
+        return False
+    changed = False
+    for material in gltf.materials or []:
+        pbr = material.pbrMetallicRoughness
+        if pbr is None:
+            pbr = PbrMetallicRoughness()
+            material.pbrMetallicRoughness = pbr
+        if metallic is not None:
+            pbr.metallicFactor = float(metallic)
+        if roughness is not None:
+            pbr.roughnessFactor = float(roughness)
+        changed = True
+    if changed:
+        gltf.save(glb_path)
+    return changed
+
+
 def repair_transparent_base_color(glb_path: str) -> bool:
     """Repair FBX2glTF's broken opacity-to-alpha mapping.
 

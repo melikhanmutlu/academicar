@@ -32,9 +32,11 @@ from extensions import csrf, limiter, rate_limit_key
 from converters import FBXConverter, OBJConverter, STLConverter
 from converters.glb_quality import (
     GLBQualityError,
+    apply_pbr_factors,
     bake_base_color_factor,
     embed_external_textures,
     ensure_pbr_materials,
+    has_base_color_textures,
     mask_cutout_textures,
     repair_transparent_base_color,
     validate_glb_quality,
@@ -4721,7 +4723,15 @@ def register_routes(app: Flask) -> None:
             if os.path.exists(glb_path):
                 shutil.copy2(glb_path, backup_path)
             try:
-                enrich_glb_for_ar(glb_path, rgba, roughness=roughness, metallic=metallic)
+                # Textured models (e.g. FBX exports with baseColor/normal/metallic-
+                # roughness maps) keep their artwork: only the metallic/roughness
+                # factors are tuned, so dropping metallic to 0 removes a golden FBX
+                # sheen without flattening the texture to a solid colour. Untextured
+                # models still get the solid-colour enrichment (the color picker).
+                if has_base_color_textures(glb_path):
+                    apply_pbr_factors(glb_path, roughness=roughness, metallic=metallic)
+                else:
+                    enrich_glb_for_ar(glb_path, rgba, roughness=roughness, metallic=metallic)
             except Exception as exc:
                 logger.exception("Appearance enrichment failed; restoring backup")
                 if os.path.exists(backup_path):
