@@ -1730,6 +1730,13 @@
       applyHome();
       if (viewer.updateComplete) await viewer.updateComplete;
       requestAnimationFrame(applyHome);
+      // Rewind the animation to its first frame so Reset view also returns the model
+      // to its starting pose — otherwise an animated model paused mid-motion
+      // (Animation off) stays frozen in that pose. Playback state is left as-is: if it
+      // was playing it restarts from the start; if it was off it shows frame 0 paused.
+      if (modelAnimationAvailable) {
+        try { viewer.currentTime = 0; } catch (e) { /* no-op if unsupported */ }
+      }
       if (modelAnimationPlaying && typeof viewer.play === 'function') viewer.play();
     });
     viewer.setAttribute('orientation', defaultOrientation);
