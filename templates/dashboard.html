@@ -27,7 +27,7 @@
 
   {% set public_count = (papers or [])|selectattr('is_public')|list|length %}
   <div class="dashboard-metrics reveal-up">
-    <div class="metric-card metric-card-feature">
+    <div class="metric-card">
       <div class="metric-card-head">
         <span class="metric-icon">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h12l4 4v12H4z"/><path d="M16 4v4h4"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
