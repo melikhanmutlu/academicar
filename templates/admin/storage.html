@@ -1,0 +1,54 @@
+{% extends "admin/base.html" %}
+{% block admin_title %}Storage{% endblock %}
+{% block admin_subtitle %}Total file usage, user-level storage, file type breakdown, and orphan files.{% endblock %}
+
+{% block admin_body %}
+  <section id="storage" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Storage</h2>
+        <p>Total file usage, user-level storage, file type breakdown, orphan files, and largest models.</p>
+      </div>
+      <span>File inventory</span>
+    </div>
+    <div class="admin-insight-grid">
+      <div class="admin-insight-card">
+        <span>Total model files</span>
+        <strong>{{ format_file_size(stats.total_model_storage) }}</strong>
+        <small>database-reported model upload sizes</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Converted files</span>
+        <strong>{{ format_file_size(storage_breakdown.models.size) }}</strong>
+        <small>{{ storage_breakdown.models.files }} files on disk</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>PDF / QR</span>
+        <strong>{{ format_file_size(storage_breakdown.pdfs.size) }} / {{ format_file_size(storage_breakdown.qr.size) }}</strong>
+        <small>{{ storage_breakdown.pdfs.files }} PDF files / {{ storage_breakdown.qr.files }} QR files</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Orphans</span>
+        <strong>{{ orphan_counts.converted + orphan_counts.pdf + orphan_counts.qr }}</strong>
+        <small>{{ orphan_counts.converted }} model / {{ orphan_counts.pdf }} PDF / {{ orphan_counts.qr }} QR</small>
+      </div>
+    </div>
+    <div class="admin-two-col">
+      <div class="admin-breakdown">
+        <h3>Storage by user</h3>
+        {% for item in storage_by_user %}
+          <div><span>{{ item.user.email if item.user else "User " ~ item.user_id }}</span><strong>{{ format_file_size(item.size) }} / {{ item.models }} models</strong></div>
+        {% else %}
+          <div><span>No user storage yet</span><strong>0 B</strong></div>
+        {% endfor %}
+      </div>
+      <div class="admin-breakdown">
+        <h3>File type breakdown</h3>
+        <div><span>Uploads</span><strong>{{ format_file_size(storage_breakdown.uploads.size) }} / {{ storage_breakdown.uploads.files }}</strong></div>
+        <div><span>Converted models</span><strong>{{ format_file_size(storage_breakdown.models.size) }} / {{ storage_breakdown.models.files }}</strong></div>
+        <div><span>PDFs</span><strong>{{ format_file_size(storage_breakdown.pdfs.size) }} / {{ storage_breakdown.pdfs.files }}</strong></div>
+        <div><span>QR codes</span><strong>{{ format_file_size(storage_breakdown.qr.size) }} / {{ storage_breakdown.qr.files }}</strong></div>
+      </div>
+    </div>
+  </section>
+{% endblock %}

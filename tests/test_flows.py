@@ -941,12 +941,15 @@ def test_admin_dashboard_requires_admin_user(client):
 
     response = client.get("/admin")
     assert response.status_code == 200
-    assert "AcademicAR control panel" in response.get_data(as_text=True)
+    # The redesigned panel uses a WordPress-style left sidebar; confirm the nav
+    # and the overview heading render.
+    assert "Back to site dashboard" in response.get_data(as_text=True)
     assert "Operations overview" in response.get_data(as_text=True)
 
     expected_pages = {
         "/admin/content": "Content and publication statistics",
         "/admin/models": "Model and conversion health",
+        "/admin/jobs": "Conversion jobs",
         "/admin/access": "QR and viewer analytics",
         "/admin/revenue": "License and revenue",
         "/admin/security": "Operations and security",
@@ -975,7 +978,7 @@ def test_configured_admin_email_is_always_admin(client):
     login(client, email="configured-admin@example.com")
     response = client.get("/admin")
     assert response.status_code == 200
-    assert "AcademicAR control panel" in response.get_data(as_text=True)
+    assert "Operations overview" in response.get_data(as_text=True)
 
     with client.application.app_context():
         user = User.query.filter_by(email="configured-admin@example.com").one()

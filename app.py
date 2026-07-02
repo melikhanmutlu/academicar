@@ -153,7 +153,12 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     @login_manager.user_loader
     def load_user(user_id):
-        return db.session.get(User, int(user_id))
+        user = db.session.get(User, int(user_id))
+        # Deactivated accounts must not resolve to a live session, so an admin
+        # deactivation takes effect immediately for already-logged-in users too.
+        if user is not None and user.deactivated_at is not None:
+            return None
+        return user
 
     init_oauth(app)
     app.register_blueprint(auth_bp)
@@ -228,6 +233,9 @@ COMPANION_FILE_EXTENSIONS = {".mtl", ".png", ".jpg", ".jpeg", ".webp"}
 # carry script). Raster formats only.
 ALLOWED_BLOG_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "gif"}
 MAX_BLOG_IMAGE_BYTES = 10 * 1024 * 1024
+# Rows per page for paginated admin tables (users, papers, models, payments,
+# QR records, audit log, conversion jobs).
+ADMIN_PER_PAGE = 50
 APPEARANCE_BACKUP_SUFFIX = ".appearance_backup"
 ERROR_MESSAGE_MAX_LENGTH = 2000
 COLOR_COMMAND_PATTERN = re.compile(
@@ -695,6 +703,9 @@ def ensure_sqlite_schema(app: Flask) -> None:
             connection.execute(text("ALTER TABLE payments ADD COLUMN model_id VARCHAR(36)"))
         if payment_columns and "plan_key" not in payment_columns:
             connection.execute(text("ALTER TABLE payments ADD COLUMN plan_key VARCHAR(30)"))
+        user_columns = {row[1] for row in connection.execute(text("PRAGMA table_info(users)")).fetchall()}
+        if user_columns and "deactivated_at" not in user_columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN deactivated_at DATETIME"))
 
 
 def _alembic_head_revision(app: Flask) -> str | None:
@@ -2897,6 +2908,7 @@ def register_routes(app: Flask) -> None:
             "users",
             "content",
             "models",
+            "jobs",
             "access",
             "revenue",
             "security",
@@ -2907,6 +2919,7 @@ def register_routes(app: Flask) -> None:
         }
         if admin_page not in admin_pages:
             abort(404)
+        page = max(request.args.get("page", type=int) or 1, 1)
         user_query_text = (request.args.get("user_q") or "").strip()
         user_plan_filter = (request.args.get("user_plan") or "all").strip().lower()
         user_role_filter = (request.args.get("user_role") or "all").strip().lower()
@@ -2914,6 +2927,15 @@ def register_routes(app: Flask) -> None:
         job_status_filter = (request.args.get("job_status") or "all").strip().lower()
         audit_event_filter = (request.args.get("audit_event") or "all").strip().lower()
         audit_query_text = (request.args.get("audit_q") or "").strip()
+        audit_user_filter = (request.args.get("audit_user") or "").strip()
+        paper_query_text = (request.args.get("paper_q") or "").strip()
+        paper_visibility_filter = (request.args.get("paper_visibility") or "all").strip().lower()
+        paper_status_filter = (request.args.get("paper_status") or "all").strip().lower()
+        pay_status_filter = (request.args.get("pay_status") or "all").strip().lower()
+        pay_provider_filter = (request.args.get("provider") or "all").strip().lower()
+        pay_query_text = (request.args.get("pay_q") or "").strip()
+        qr_status_filter = (request.args.get("qr_status") or "all").strip().lower()
+        qr_query_text = (request.args.get("qr_q") or "").strip()
 
         users_query = User.query
         if user_query_text:
@@ -2931,9 +2953,56 @@ def register_routes(app: Flask) -> None:
         elif user_role_filter == "member":
             users_query = users_query.filter(User.is_admin.is_(False))
 
+        # Publications list (admin sees deleted rows too, so it can restore them).
+        papers_query = Paper.query.options(selectinload(Paper.author))
+        if paper_query_text:
+            paper_pattern = f"%{paper_query_text.lower()}%"
+            papers_query = papers_query.outerjoin(User, Paper.user_id == User.id).filter(
+                or_(
+                    func.lower(Paper.title).like(paper_pattern),
+                    func.lower(Paper.slug).like(paper_pattern),
+                    func.lower(User.email).like(paper_pattern),
+                )
+            )
+        if paper_visibility_filter == "public":
+            papers_query = papers_query.filter(Paper.is_public.is_(True))
+        elif paper_visibility_filter == "private":
+            papers_query = papers_query.filter(Paper.is_public.is_(False))
+        if paper_status_filter == "active":
+            papers_query = papers_query.filter(or_(Paper.status.is_(None), Paper.status != "deleted"))
+        elif paper_status_filter == "deleted":
+            papers_query = papers_query.filter(Paper.status == "deleted")
+
         models_query = Model3D.query
         if model_status_filter != "all":
             models_query = models_query.filter(Model3D.processing_status == model_status_filter)
+
+        payments_query = Payment.query.options(selectinload(Payment.user))
+        if pay_status_filter in {"pending", "paid", "failed", "refunded"}:
+            payments_query = payments_query.filter(Payment.status == pay_status_filter)
+        if pay_provider_filter in {"manual", "paytr"}:
+            payments_query = payments_query.filter(Payment.provider == pay_provider_filter)
+        if pay_query_text:
+            pay_pattern = f"%{pay_query_text.lower()}%"
+            payments_query = payments_query.outerjoin(User, Payment.user_id == User.id).filter(
+                or_(
+                    func.lower(Payment.invoice_number).like(pay_pattern),
+                    func.lower(Payment.provider_reference).like(pay_pattern),
+                    func.lower(User.email).like(pay_pattern),
+                )
+            )
+
+        qr_query = QRLink.query.options(selectinload(QRLink.model))
+        if qr_status_filter in {"active", "disabled"}:
+            qr_query = qr_query.filter(QRLink.status == qr_status_filter)
+        if qr_query_text:
+            qr_pattern = f"%{qr_query_text.lower()}%"
+            qr_query = qr_query.filter(
+                or_(
+                    func.lower(QRLink.public_id).like(qr_pattern),
+                    func.lower(QRLink.model_id).like(qr_pattern),
+                )
+            )
 
         jobs_query = ConversionJob.query
         if job_status_filter != "all":
@@ -2942,6 +3011,8 @@ def register_routes(app: Flask) -> None:
         audit_query = AuditLog.query
         if audit_event_filter != "all":
             audit_query = audit_query.filter(AuditLog.event_type == audit_event_filter)
+        if audit_user_filter.isdigit():
+            audit_query = audit_query.filter(AuditLog.user_id == int(audit_user_filter))
         if audit_query_text:
             audit_pattern = f"%{audit_query_text.lower()}%"
             audit_query = audit_query.filter(
@@ -2952,24 +3023,40 @@ def register_routes(app: Flask) -> None:
                 )
             )
 
-        users = users_query.order_by(User.created_at.desc()).limit(100).all()
+        # Paginated lists (50 rows/page). Each page passes both the items (as the
+        # existing template variable) and the Pagination object for the controls.
+        users_pagination = users_query.order_by(User.created_at.desc()).paginate(
+            page=page, per_page=ADMIN_PER_PAGE, error_out=False
+        )
+        users = users_pagination.items
         # Eager-load relationships the admin templates touch per row, to avoid an
         # N+1 query storm (each model row reads paper+author; each QR row reads model).
-        papers = (
-            Paper.query.options(selectinload(Paper.author))
-            .order_by(Paper.created_at.desc()).limit(100).all()
+        papers_pagination = papers_query.order_by(Paper.created_at.desc()).paginate(
+            page=page, per_page=ADMIN_PER_PAGE, error_out=False
         )
-        models = (
+        papers = papers_pagination.items
+        models_pagination = (
             models_query.options(selectinload(Model3D.paper).selectinload(Paper.author))
-            .order_by(Model3D.created_at.desc()).limit(100).all()
+            .order_by(Model3D.created_at.desc())
+            .paginate(page=page, per_page=ADMIN_PER_PAGE, error_out=False)
         )
-        payments = Payment.query.order_by(Payment.created_at.desc()).limit(50).all()
-        qr_links = (
-            QRLink.query.options(selectinload(QRLink.model))
-            .order_by(QRLink.created_at.desc()).limit(100).all()
+        models = models_pagination.items
+        payments_pagination = payments_query.order_by(Payment.created_at.desc()).paginate(
+            page=page, per_page=ADMIN_PER_PAGE, error_out=False
         )
-        audit_logs = audit_query.order_by(AuditLog.timestamp.desc()).limit(50).all()
-        jobs = jobs_query.order_by(ConversionJob.created_at.desc()).limit(50).all()
+        payments = payments_pagination.items
+        qr_pagination = qr_query.order_by(QRLink.created_at.desc()).paginate(
+            page=page, per_page=ADMIN_PER_PAGE, error_out=False
+        )
+        qr_links = qr_pagination.items
+        audit_pagination = audit_query.order_by(AuditLog.timestamp.desc()).paginate(
+            page=page, per_page=ADMIN_PER_PAGE, error_out=False
+        )
+        audit_logs = audit_pagination.items
+        jobs_pagination = jobs_query.order_by(ConversionJob.created_at.desc()).paginate(
+            page=page, per_page=ADMIN_PER_PAGE, error_out=False
+        )
+        jobs = jobs_pagination.items
         now = datetime.now(UTC)
         last_7_days = now - timedelta(days=7)
         last_30_days = now - timedelta(days=30)
@@ -3271,7 +3358,7 @@ def register_routes(app: Flask) -> None:
             if edit_id.isdigit():
                 editing_post = db.session.get(BlogPost, int(edit_id))
         return render_template(
-            "admin_dashboard.html",
+            f"admin/{admin_page}.html",
             users=users,
             papers=papers,
             models=models,
@@ -3279,6 +3366,13 @@ def register_routes(app: Flask) -> None:
             qr_links=qr_links,
             audit_logs=audit_logs,
             jobs=jobs,
+            users_pagination=users_pagination,
+            papers_pagination=papers_pagination,
+            models_pagination=models_pagination,
+            payments_pagination=payments_pagination,
+            qr_pagination=qr_pagination,
+            audit_pagination=audit_pagination,
+            jobs_pagination=jobs_pagination,
             totals=totals,
             stats=stats,
             processing_counts=processing_counts,
@@ -3313,6 +3407,15 @@ def register_routes(app: Flask) -> None:
                 "job_status": job_status_filter,
                 "audit_event": audit_event_filter,
                 "audit_q": audit_query_text,
+                "audit_user": audit_user_filter,
+                "paper_q": paper_query_text,
+                "paper_visibility": paper_visibility_filter,
+                "paper_status": paper_status_filter,
+                "pay_status": pay_status_filter,
+                "provider": pay_provider_filter,
+                "pay_q": pay_query_text,
+                "qr_status": qr_status_filter,
+                "qr_q": qr_query_text,
             },
         )
 
@@ -3330,13 +3433,14 @@ def register_routes(app: Flask) -> None:
         total_spent = sum(payment.amount_kurus for payment in payments if payment.status == "paid")
         log_audit("admin_user_detail_viewed", user_id=current_user.id, resource_id=str(user.id))
         return render_template(
-            "admin_user_detail.html",
+            "admin/user_detail.html",
             user=user,
             papers=papers,
             models=models,
             payments=payments,
             audit_events=audit_events,
             total_spent=total_spent,
+            active_page="users",
         )
 
     @app.route("/admin/users/<int:user_id>/dashboard")
@@ -3675,6 +3779,19 @@ def register_routes(app: Flask) -> None:
         flash(f"QR record {qr_link.public_id} updated.", "success")
         return redirect(url_for("admin_dashboard", admin_page="access"))
 
+    def _apply_payment_license_effects(payment, previous, new_status):
+        """Reconcile a payment's model license state with its money state.
+
+        Shared by admin_payment_status_update and admin_payment_create so the
+        grant-on-paid / revoke-on-refund logic never diverges between the two.
+        """
+        if new_status == "paid" and payment.model is not None and (payment.plan_key or "") in PAID_PLAN_KEYS:
+            payment.model.access_starts_at = datetime.now(UTC)
+            apply_model_license_defaults(payment.model, payment.plan_key)
+        elif previous == "paid" and new_status in {"refunded", "failed"} and payment.model is not None:
+            apply_model_license_defaults(payment.model, "free")
+            payment.model.access_expires_at = datetime.now(UTC)  # revoke access now
+
     @app.route("/admin/payments/<int:payment_id>/status", methods=["POST"])
     @login_required
     def admin_payment_status_update(payment_id):
@@ -3690,15 +3807,7 @@ def register_routes(app: Flask) -> None:
         payment.status = new_status
         if new_status == "paid" and not payment.paid_at:
             payment.paid_at = datetime.now(UTC)
-        # Keep model license state consistent with the payment state, so a manual
-        # reconciliation actually grants access and a refund/fail actually revokes
-        # it (previously this route moved money state without touching the license).
-        if new_status == "paid" and payment.model is not None and (payment.plan_key or "") in PAID_PLAN_KEYS:
-            payment.model.access_starts_at = datetime.now(UTC)
-            apply_model_license_defaults(payment.model, payment.plan_key)
-        elif previous == "paid" and new_status in {"refunded", "failed"} and payment.model is not None:
-            apply_model_license_defaults(payment.model, "free")
-            payment.model.access_expires_at = datetime.now(UTC)  # revoke access now
+        _apply_payment_license_effects(payment, previous, new_status)
         try:
             db.session.commit()
         except SQLAlchemyError:
@@ -3713,6 +3822,407 @@ def register_routes(app: Flask) -> None:
         )
         flash("Payment status updated.", "success")
         return redirect(url_for("admin_dashboard", admin_page="revenue"))
+
+    @app.route("/admin/jobs/<int:job_id>/retry", methods=["POST"])
+    @login_required
+    def admin_job_retry(job_id):
+        require_admin()
+        job = db.session.get(ConversionJob, job_id)
+        if not job:
+            abort(404)
+        if job.status not in {"failed", "cancelled"}:
+            flash("Only failed or cancelled jobs can be retried.", "warning")
+            return redirect(url_for("admin_dashboard", admin_page="jobs"))
+        attempts_before = job.attempts
+        # Reset the row so the isolated worker re-claims it. attempts MUST return
+        # to 0, otherwise the worker's attempts>=max_attempts guard fails it again
+        # on the next poll. The web process NEVER runs the conversion inline.
+        job.status = "pending"
+        job.error = None
+        job.started_at = None
+        job.finished_at = None
+        job.attempts = 0
+        is_replacement = bool((job.payload or {}).get("is_replacement"))
+        if not is_replacement and job.model is not None and job.model.processing_status == "failed":
+            job.model.processing_status = "queued"
+            job.model.processing_error = None
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not retry the job. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="jobs"))
+        log_audit(
+            "admin_job_retried",
+            user_id=current_user.id,
+            resource_id=str(job.id),
+            details={"job_type": job.job_type, "attempts_before": attempts_before},
+        )
+        flash("Conversion job re-queued.", "success")
+        return redirect(url_for("admin_dashboard", admin_page="jobs"))
+
+    @app.route("/admin/jobs/<int:job_id>/cancel", methods=["POST"])
+    @login_required
+    def admin_job_cancel(job_id):
+        require_admin()
+        job = db.session.get(ConversionJob, job_id)
+        if not job:
+            abort(404)
+        # Only a pending job is safe to cancel; a processing job is owned by a
+        # live worker and cancelling it would race the worker's own writes.
+        if job.status != "pending":
+            flash("Only pending (queued) jobs can be cancelled.", "warning")
+            return redirect(url_for("admin_dashboard", admin_page="jobs"))
+        job.status = "cancelled"
+        job.finished_at = datetime.now(UTC)
+        job.error = "Cancelled by administrator."
+        is_replacement = bool((job.payload or {}).get("is_replacement"))
+        if not is_replacement and job.model is not None and job.model.processing_status == "queued":
+            job.model.processing_status = "failed"
+            job.model.processing_error = "Conversion cancelled by an administrator."
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not cancel the job. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="jobs"))
+        log_audit(
+            "admin_job_cancelled",
+            user_id=current_user.id,
+            resource_id=str(job.id),
+            details={"job_type": job.job_type},
+        )
+        flash("Conversion job cancelled.", "success")
+        return redirect(url_for("admin_dashboard", admin_page="jobs"))
+
+    def _admin_paper_redirect(next_hint, paper):
+        """Redirect back to content list or the owner's detail page after a
+        paper edit, restricted to a known-safe set of targets."""
+        if next_hint == "user_detail" and paper is not None:
+            return redirect(url_for("admin_user_detail", user_id=paper.user_id))
+        return redirect(url_for("admin_dashboard", admin_page="content"))
+
+    @app.route("/admin/papers/<int:paper_id>/metadata", methods=["POST"])
+    @login_required
+    def admin_paper_metadata_update(paper_id):
+        require_admin()
+        paper = db.session.get(Paper, paper_id)
+        if not paper:
+            abort(404)
+        next_hint = (request.form.get("next") or "").strip()
+        title = (request.form.get("title") or "").strip()
+        if not title:
+            flash("Title is required.", "danger")
+            return _admin_paper_redirect(next_hint, paper)
+        year_raw = (request.form.get("year") or "").strip()
+        year_value = paper.year
+        if year_raw:
+            if year_raw.isdigit() and 1500 <= int(year_raw) <= 2100:
+                year_value = int(year_raw)
+            else:
+                flash("Year must be a number between 1500 and 2100.", "danger")
+                return _admin_paper_redirect(next_hint, paper)
+        else:
+            year_value = None
+        expires_raw = (request.form.get("expires_at") or "").strip()
+        expires_value = paper.expires_at
+        if expires_raw:
+            try:
+                expires_value = datetime.strptime(expires_raw, "%Y-%m-%d")
+            except ValueError:
+                flash("Expiry date must be YYYY-MM-DD.", "danger")
+                return _admin_paper_redirect(next_hint, paper)
+        else:
+            expires_value = None
+        # slug is intentionally NOT editable (public URL stability).
+        new_values = {
+            "title": title[:500],
+            "authors": (request.form.get("authors") or "").strip()[:500] or None,
+            "year": year_value,
+            "field": (request.form.get("field") or "").strip()[:100] or None,
+            "doi": (request.form.get("doi") or "").strip()[:200] or None,
+            "pmid": (request.form.get("pmid") or "").strip()[:100] or None,
+            "institution": (request.form.get("institution") or "").strip()[:300] or None,
+            "expires_at": expires_value,
+        }
+        changed = {}
+        for attr, value in new_values.items():
+            before = getattr(paper, attr)
+            if before != value:
+                changed[attr] = [
+                    before.isoformat() if hasattr(before, "isoformat") else before,
+                    value.isoformat() if hasattr(value, "isoformat") else value,
+                ]
+                setattr(paper, attr, value)
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not update the publication. Please try again.", "danger")
+            return _admin_paper_redirect(next_hint, paper)
+        log_audit(
+            "admin_paper_metadata_changed",
+            user_id=current_user.id,
+            resource_id=str(paper.id),
+            details={"changed": changed},
+        )
+        flash(f"Publication metadata updated: {paper.title}.", "success")
+        return _admin_paper_redirect(next_hint, paper)
+
+    @app.route("/admin/models/<model_id>/access-window", methods=["POST"])
+    @login_required
+    def admin_model_access_window_update(model_id):
+        require_admin()
+        model = db.session.get(Model3D, model_id)
+        if not model:
+            abort(404)
+        next_hint = (request.form.get("next") or "").strip()
+        redirect_target = (
+            redirect(url_for("admin_user_detail", user_id=model.user_id))
+            if next_hint == "user_detail"
+            else redirect(url_for("admin_dashboard", admin_page="models"))
+        )
+
+        def _parse_dt(raw):
+            raw = (raw or "").strip()
+            if not raw:
+                return None
+            for fmt in ("%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+                try:
+                    return datetime.strptime(raw, fmt)
+                except ValueError:
+                    continue
+            raise ValueError(raw)
+
+        try:
+            starts_at = _parse_dt(request.form.get("access_starts_at"))
+            expires_at = _parse_dt(request.form.get("access_expires_at"))
+        except ValueError:
+            flash("Dates must be valid (YYYY-MM-DD or YYYY-MM-DDTHH:MM).", "danger")
+            return redirect_target
+        if starts_at is None:
+            flash("Access start is required.", "danger")
+            return redirect_target
+        if expires_at is not None and expires_at < starts_at:
+            flash("Access expiry cannot be before the access start.", "danger")
+            return redirect_target
+        previous = {
+            "access_starts_at": model.access_starts_at.isoformat() if model.access_starts_at else None,
+            "access_expires_at": model.access_expires_at.isoformat() if model.access_expires_at else None,
+        }
+        # Deliberate manual override: does NOT call apply_model_license_defaults
+        # (which would recompute expiry from the plan duration). license_type and
+        # storage_limit_bytes are left untouched.
+        model.access_starts_at = starts_at
+        model.access_expires_at = expires_at
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not update the access window. Please try again.", "danger")
+            return redirect_target
+        log_audit(
+            "admin_model_access_window_changed",
+            user_id=current_user.id,
+            resource_id=model.id,
+            details={
+                "from": previous,
+                "to": {
+                    "access_starts_at": starts_at.isoformat() if starts_at else None,
+                    "access_expires_at": expires_at.isoformat() if expires_at else None,
+                },
+            },
+        )
+        flash("Model access window updated.", "success")
+        return redirect_target
+
+    @app.route("/admin/models/<model_id>/qr/regenerate", methods=["POST"])
+    @login_required
+    def admin_model_qr_regenerate(model_id):
+        require_admin()
+        model = db.session.get(Model3D, model_id)
+        if not model:
+            abort(404)
+        next_hint = (request.form.get("next") or "").strip()
+        redirect_target = (
+            redirect(url_for("admin_user_detail", user_id=model.user_id))
+            if next_hint == "user_detail"
+            else redirect(url_for("admin_dashboard", admin_page="access"))
+        )
+        # ensure_model_qr_link is idempotent and never rotates an existing
+        # public_id, so the resolver URL and any printed QR keep working.
+        ensure_model_qr_link(model)
+        try:
+            model.qr_code_path = generate_model_qr(model, app.config["QR_FOLDER"])
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not regenerate the QR image. Please try again.", "danger")
+            return redirect_target
+        except Exception:  # noqa: BLE001
+            db.session.rollback()
+            flash("Could not regenerate the QR image. Please try again.", "danger")
+            return redirect_target
+        log_audit(
+            "admin_model_qr_regenerated",
+            user_id=current_user.id,
+            resource_id=model.id,
+            details={"public_id": model.public_id},
+        )
+        flash("QR image regenerated.", "success")
+        return redirect_target
+
+    @app.route("/admin/payments/create", methods=["POST"])
+    @login_required
+    def admin_payment_create():
+        require_admin()
+        email = (request.form.get("user_email") or "").strip().lower()
+        target_user = User.query.filter(func.lower(User.email) == email).first() if email else None
+        if target_user is None:
+            flash("No user found for that email.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="revenue"))
+        model_id = (request.form.get("model_id") or "").strip()
+        model = db.session.get(Model3D, model_id) if model_id else None
+        if model_id and model is None:
+            flash("No model found for that id.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="revenue"))
+        plan_key = (request.form.get("plan_key") or "").strip()
+        if plan_key and plan_key not in PAID_PLAN_KEYS:
+            flash("Invalid plan key.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="revenue"))
+        amount_raw = (request.form.get("amount") or "").strip()
+        try:
+            amount_major = float(amount_raw)
+        except ValueError:
+            flash("Amount must be a number.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="revenue"))
+        if amount_major <= 0:
+            flash("Amount must be greater than zero.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="revenue"))
+        amount_minor = int(round(amount_major * 100))
+        currency = (request.form.get("currency") or app.config.get("PAYMENT_CURRENCY") or "TRY").strip().upper()[:3]
+        status_value = (request.form.get("status") or "pending").strip().lower()
+        if status_value not in {"pending", "paid"}:
+            flash("Manual payments can only be created as pending or paid.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="revenue"))
+        payment = Payment(
+            user_id=target_user.id,
+            paper_id=model.paper_id if model else None,
+            model_id=model.id if model else None,
+            plan_key=plan_key or None,
+            amount_kurus=amount_minor,
+            currency=currency,
+            provider="manual",
+            provider_reference=(request.form.get("reference") or "").strip()[:200] or None,
+            status=status_value,
+        )
+        if status_value == "paid":
+            payment.paid_at = datetime.now(UTC)
+        db.session.add(payment)
+        try:
+            db.session.flush()
+            if status_value == "paid":
+                payment.invoice_number = build_invoice_number(payment.id)
+                _apply_payment_license_effects(payment, "pending", "paid")
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not create the payment. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="revenue"))
+        log_audit(
+            "admin_payment_created",
+            user_id=current_user.id,
+            resource_id=str(payment.id),
+            details={"user_id": target_user.id, "model_id": payment.model_id, "status": status_value, "amount_kurus": amount_minor},
+        )
+        flash("Manual payment recorded.", "success")
+        return redirect(url_for("admin_dashboard", admin_page="revenue"))
+
+    @app.route("/admin/users/<int:user_id>/email", methods=["POST"])
+    @login_required
+    def admin_user_email_update(user_id):
+        require_admin()
+        user = db.session.get(User, user_id)
+        if not user:
+            abort(404)
+        if user.google_id:
+            flash("This account is linked to Google; its email cannot be changed here.", "warning")
+            return redirect(url_for("admin_user_detail", user_id=user.id))
+        new_email = (request.form.get("email") or "").strip().lower()
+        if "@" not in new_email or "." not in new_email.split("@")[-1]:
+            flash("Enter a valid email address.", "danger")
+            return redirect(url_for("admin_user_detail", user_id=user.id))
+        clash = User.query.filter(func.lower(User.email) == new_email, User.id != user.id).first()
+        if clash is not None:
+            flash("Another account already uses that email.", "danger")
+            return redirect(url_for("admin_user_detail", user_id=user.id))
+        previous = user.email
+        if previous == new_email:
+            flash("Email is unchanged.", "info")
+            return redirect(url_for("admin_user_detail", user_id=user.id))
+        user.email = new_email
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not update the email. Please try again.", "danger")
+            return redirect(url_for("admin_user_detail", user_id=user.id))
+        log_audit(
+            "admin_user_email_changed",
+            user_id=current_user.id,
+            resource_id=str(user.id),
+            details={"from": previous, "to": new_email},
+        )
+        flash("Email updated. Note: configured-admin promotion is matched by email.", "success")
+        return redirect(url_for("admin_user_detail", user_id=user.id))
+
+    @app.route("/admin/users/<int:user_id>/deactivate", methods=["POST"])
+    @login_required
+    def admin_user_deactivate(user_id):
+        require_admin()
+        user = db.session.get(User, user_id)
+        if not user:
+            abort(404)
+        if user.id == current_user.id:
+            flash("You cannot deactivate your own account.", "warning")
+            return redirect(url_for("admin_user_detail", user_id=user.id))
+        if user_is_configured_admin(user):
+            flash("Configured admin accounts cannot be deactivated.", "warning")
+            return redirect(url_for("admin_user_detail", user_id=user.id))
+        if user.deactivated_at is not None:
+            flash("Account is already deactivated.", "info")
+            return redirect(url_for("admin_user_detail", user_id=user.id))
+        user.deactivated_at = datetime.now(UTC)
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not deactivate the account. Please try again.", "danger")
+            return redirect(url_for("admin_user_detail", user_id=user.id))
+        log_audit("admin_user_deactivated", user_id=current_user.id, resource_id=str(user.id))
+        flash(f"Account deactivated: {user.email}.", "success")
+        return redirect(url_for("admin_user_detail", user_id=user.id))
+
+    @app.route("/admin/users/<int:user_id>/reactivate", methods=["POST"])
+    @login_required
+    def admin_user_reactivate(user_id):
+        require_admin()
+        user = db.session.get(User, user_id)
+        if not user:
+            abort(404)
+        if user.deactivated_at is None:
+            flash("Account is already active.", "info")
+            return redirect(url_for("admin_user_detail", user_id=user.id))
+        user.deactivated_at = None
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not reactivate the account. Please try again.", "danger")
+            return redirect(url_for("admin_user_detail", user_id=user.id))
+        log_audit("admin_user_reactivated", user_id=current_user.id, resource_id=str(user.id))
+        flash(f"Account reactivated: {user.email}.", "success")
+        return redirect(url_for("admin_user_detail", user_id=user.id))
 
     def _read_blog_form() -> dict:
         rm = (request.form.get("read_minutes") or "").strip()

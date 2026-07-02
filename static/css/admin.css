@@ -1,0 +1,383 @@
+/* ==========================================================================
+   AcademicAR admin panel — WordPress-style left navigation shell.
+   Loaded only by templates/admin/base.html. Reuses the shared Ventriloc
+   tokens, cards, tables, buttons, chips and filter bars from style.css;
+   this file adds only the sidebar layout, top bar, pagination and the
+   inline <details> editors introduced by the admin redesign.
+   ========================================================================== */
+
+/* ---- Layout ------------------------------------------------------------- */
+.admin-layout {
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+  padding-top: 32px;
+  padding-bottom: 88px;
+}
+
+.admin-main {
+  min-width: 0;
+}
+
+/* ---- Sidebar ------------------------------------------------------------ */
+.admin-sidebar {
+  position: sticky;
+  top: 88px;
+  align-self: start;
+  max-height: calc(100vh - 108px);
+  overflow-y: auto;
+  padding-right: 20px;
+  border-right: 1px solid var(--color-light-pearl);
+}
+
+.admin-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 12px 16px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--color-light-pearl);
+}
+
+.admin-sidebar-brand strong {
+  font-family: var(--font-polysans);
+  font-size: 18px;
+  font-weight: 400;
+  letter-spacing: -0.36px;
+  color: var(--color-midnight-graphite);
+}
+
+.admin-sidebar-brand span {
+  font-family: var(--font-inter);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-silver-ash);
+}
+
+.admin-sidenav {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-sidenav-group {
+  padding: 16px 12px 6px;
+  font-family: var(--font-inter);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-silver-ash);
+}
+
+.admin-sidenav a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-family: var(--font-inter);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-dark-shale);
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.admin-sidenav a:hover {
+  background: var(--color-cloud-whisper);
+  color: var(--color-midnight-graphite);
+}
+
+.admin-sidenav a.is-active {
+  background: var(--color-slate-mist);
+  color: var(--color-midnight-graphite);
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--color-midnight-graphite);
+}
+
+.admin-sidenav-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.admin-sidenav-ico {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  color: currentColor;
+}
+
+/* Sparing sunset-orange accent: a small count badge only where something
+   needs attention (e.g. failed jobs / pending queue). */
+.admin-sidenav-alert {
+  flex: 0 0 auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 200px;
+  background: var(--color-sunset-orange);
+  color: #fff;
+  font-family: var(--font-inter);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+.admin-sidenav-count {
+  flex: 0 0 auto;
+  font-family: var(--font-inter);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-silver-ash);
+}
+
+.admin-sidebar-foot {
+  margin-top: 16px;
+  padding: 14px 12px 4px;
+  border-top: 1px solid var(--color-light-pearl);
+}
+
+.admin-sidebar-foot a {
+  font-family: var(--font-inter);
+  font-size: 13px;
+  color: var(--color-silver-ash);
+  text-decoration: none;
+}
+
+.admin-sidebar-foot a:hover {
+  color: var(--color-sunset-orange);
+}
+
+/* ---- Top bar ------------------------------------------------------------ */
+.admin-topbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.admin-topbar h1 {
+  font-family: var(--font-polysans);
+  font-size: 32px;
+  font-weight: 400;
+  letter-spacing: -0.64px;
+  color: var(--color-midnight-graphite);
+  margin: 0 0 4px;
+}
+
+.admin-topbar p {
+  font-family: var(--font-inter);
+  font-size: 14px;
+  color: var(--color-dark-shale);
+  margin: 0;
+  max-width: 640px;
+}
+
+.admin-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-menu-toggle {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  color: var(--color-midnight-graphite);
+  font-family: var(--font-inter);
+  font-size: 14px;
+  font-weight: 600;
+  border-bottom: 2px solid var(--color-midnight-graphite);
+  padding: 2px 2px 4px;
+  cursor: pointer;
+}
+
+/* ---- Pagination --------------------------------------------------------- */
+.admin-pagination {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.admin-pagination a,
+.admin-pagination span {
+  font-family: var(--font-inter);
+  font-size: 13px;
+  padding: 6px 11px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--color-dark-shale);
+}
+
+.admin-pagination a:hover {
+  background: var(--color-cloud-whisper);
+  color: var(--color-midnight-graphite);
+}
+
+.admin-pagination .is-active {
+  background: var(--color-slate-mist);
+  color: var(--color-midnight-graphite);
+  font-weight: 600;
+}
+
+.admin-pagination .is-disabled {
+  color: var(--color-light-pearl);
+}
+
+.admin-pagination .admin-pagination-gap {
+  color: var(--color-silver-ash);
+  padding: 6px 4px;
+}
+
+.admin-pagination-summary {
+  font-family: var(--font-inter);
+  font-size: 12px;
+  color: var(--color-silver-ash);
+}
+
+/* ---- Inline <details> editors ------------------------------------------ */
+.admin-editor {
+  margin-top: 8px;
+  border: 1px solid var(--color-light-pearl);
+  border-radius: 8px;
+  background: var(--color-cloud-whisper);
+}
+
+.admin-editor > summary {
+  cursor: pointer;
+  padding: 8px 12px;
+  font-family: var(--font-inter);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-midnight-graphite);
+  list-style: none;
+}
+
+.admin-editor > summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-editor > summary::after {
+  content: " +";
+  color: var(--color-silver-ash);
+}
+
+.admin-editor[open] > summary::after {
+  content: " –";
+}
+
+.admin-editor-body {
+  padding: 4px 12px 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.admin-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-editor-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.admin-editor-field > span {
+  font-family: var(--font-inter);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-silver-ash);
+}
+
+.admin-editor-field input,
+.admin-editor-field select {
+  width: 100%;
+  height: 34px;
+  padding: 6px 8px;
+  border: 1px solid var(--color-light-pearl);
+  border-radius: 6px;
+  background: var(--color-canvas-white);
+  font-family: var(--font-inter);
+  font-size: 13px;
+  color: var(--color-midnight-graphite);
+}
+
+.admin-editor-note {
+  font-family: var(--font-inter);
+  font-size: 12px;
+  color: var(--color-silver-ash);
+  margin: 0;
+}
+
+.admin-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-page-note {
+  font-family: var(--font-inter);
+  font-size: 13px;
+  color: var(--color-silver-ash);
+  margin: 0 0 16px;
+}
+
+/* ---- Off-canvas sidebar on smaller screens ----------------------------- */
+@media (max-width: 1024px) {
+  .admin-layout {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .admin-menu-toggle {
+    display: inline-flex;
+  }
+  .admin-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 60;
+    width: 264px;
+    max-height: none;
+    padding: 20px 16px;
+    background: var(--color-canvas-white);
+    border-right: 1px solid var(--color-light-pearl);
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    overflow-y: auto;
+  }
+  .admin-sidebar.is-open {
+    transform: translateX(0);
+    box-shadow: 0 0 0 100vw rgba(32, 32, 32, 0.28);
+  }
+}
+
+@media (max-width: 560px) {
+  .admin-topbar h1 {
+    font-size: 26px;
+  }
+  .admin-editor-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,115 @@
+{% extends "admin/base.html" %}
+{% from "admin/_pagination.html" import render_pagination %}
+{% block admin_title %}QR &amp; viewer{% endblock %}
+{% block admin_subtitle %}Resolver usage, viewer analytics, and public QR record management.{% endblock %}
+
+{% block admin_body %}
+  <section id="viewer-analytics" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>QR and viewer analytics</h2>
+        <p>Resolver usage, last scan time, viewed models, disabled links, and public viewer trend.</p>
+      </div>
+      <span>Access analytics</span>
+    </div>
+    <div class="admin-insight-grid">
+      <div class="admin-insight-card">
+        <span>QR resolves</span>
+        <strong>{{ stats.qr_resolved_total }}</strong>
+        <small>{{ stats.qr_resolved_30d }} records resolved in 30 days</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Last scan</span>
+        <strong>{{ stats.last_qr_resolved_at.strftime("%m-%d") if stats.last_qr_resolved_at else "-" }}</strong>
+        <small>{{ stats.last_qr_resolved_at.strftime("%Y-%m-%d %H:%M") if stats.last_qr_resolved_at else "No QR scan yet" }}</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Viewer opens</span>
+        <strong>{{ stats.viewer_access_total }}</strong>
+        <small>tracked from now on via audit events</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>QR issues</span>
+        <strong>{{ stats.disabled_qr_count }} / {{ stats.expired_qr_count }}</strong>
+        <small>disabled / expired resolver records</small>
+      </div>
+    </div>
+    <div class="admin-two-col">
+      <div class="admin-breakdown">
+        <h3>Most viewed models</h3>
+        {% for item in top_viewed_models %}
+          <div><span>{{ item.model.display_name if item.model else item.model_id }}</span><strong>{{ item.count }}</strong></div>
+        {% else %}
+          <div><span>No viewer events yet</span><strong>0</strong></div>
+        {% endfor %}
+      </div>
+      <div class="admin-breakdown">
+        <h3>30-day viewer trend</h3>
+        <div class="admin-sparkline" aria-label="Viewer trend">
+          {% for point in daily_viewer_trend %}
+            <span title="{{ point.label }}: {{ point.count }}" style="height: {{ 6 + (point.count * 14) }}px"></span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="qr" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>QR resolver records</h2>
+        <p>Enable or disable public resolver entries without changing model URLs.</p>
+      </div>
+      <span>{% if qr_pagination %}{{ qr_pagination.total }} total{% else %}{{ qr_links|length }} shown{% endif %}</span>
+    </div>
+    <form method="GET" action="{{ url_for('admin_dashboard', admin_page='access') }}" class="admin-filter-bar">
+      <input name="qr_q" class="field-input" value="{{ filters.qr_q or '' }}" placeholder="Search public id or model id">
+      <select name="qr_status" class="field-select compact-select">
+        <option value="all" {% if (filters.qr_status or 'all') == "all" %}selected{% endif %}>All statuses</option>
+        <option value="active" {% if filters.qr_status == "active" %}selected{% endif %}>Active</option>
+        <option value="disabled" {% if filters.qr_status == "disabled" %}selected{% endif %}>Disabled</option>
+      </select>
+      <button type="submit" class="btn-secondary compact">Filter</button>
+      <a href="{{ url_for('admin_dashboard', admin_page='access') }}" class="btn-secondary compact">Clear</a>
+    </form>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
+        <thead>
+          <tr>
+            <th>Public ID</th>
+            <th>Model</th>
+            <th>Status</th>
+            <th>Last resolved</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for qr in qr_links %}
+            <tr>
+              <td>
+                <a href="{{ model_resolver_url(qr.model) }}" target="_blank" rel="noopener noreferrer">{{ qr.public_id }}</a>
+                <small>{{ model_resolver_url(qr.model) }}</small>
+              </td>
+              <td><a href="{{ url_for('view_model', model_id=qr.model_id) }}" target="_blank" rel="noopener noreferrer">{{ qr.model_id }}</a></td>
+              <td><span class="status-chip">{{ qr.status|title }}</span></td>
+              <td>{{ qr.last_resolved_at.strftime("%Y-%m-%d %H:%M") if qr.last_resolved_at else "-" }}</td>
+              <td>
+                <form method="POST" action="{{ url_for('admin_qr_status_update', qr_id=qr.id) }}" class="admin-inline-form">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <select name="status" class="field-select compact-select">
+                    <option value="active" {% if qr.status == "active" %}selected{% endif %}>Active</option>
+                    <option value="disabled" {% if qr.status == "disabled" %}selected{% endif %}>Disabled</option>
+                  </select>
+                  <button type="submit" class="btn-secondary compact">Save</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5">No QR records yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ render_pagination(qr_pagination, 'admin_dashboard', {'admin_page': 'access'}) }}
+  </section>
+{% endblock %}

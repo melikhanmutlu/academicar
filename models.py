@@ -24,6 +24,9 @@ class User(UserMixin, db.Model):
     avatar_url = db.Column(db.String(500), nullable=True)
     is_admin = db.Column(db.Boolean, nullable=False, default=False)
     plan = db.Column(db.String(30), nullable=False, default="free")
+    # Set when an admin deactivates the account. A deactivated user cannot log in
+    # and existing sessions are invalidated (see load_user). NULL means active.
+    deactivated_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=utc_now)
 
     papers = db.relationship(
@@ -33,6 +36,12 @@ class User(UserMixin, db.Model):
         cascade="all, delete-orphan",
         foreign_keys="Paper.user_id",
     )
+
+    @property
+    def is_active(self) -> bool:
+        """Flask-Login gate: deactivated accounts are treated as inactive so
+        they cannot authenticate. Overrides UserMixin's always-True default."""
+        return self.deactivated_at is None
 
     def set_password(self, password: str) -> None:
         self.password_hash = generate_password_hash(password)

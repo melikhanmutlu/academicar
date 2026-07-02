@@ -1,0 +1,138 @@
+{% extends "admin/base.html" %}
+{% from "admin/_pagination.html" import render_pagination %}
+{% block admin_title %}Models{% endblock %}
+{% block admin_subtitle %}Processing state, licenses, access windows, and file-limit warnings.{% endblock %}
+
+{% block admin_body %}
+  <section id="model-health" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Model and conversion health</h2>
+        <p>Processing state, failed formats, conversion timing, error messages, and file-limit warnings.</p>
+      </div>
+      <span>Pipeline health</span>
+    </div>
+    <div class="admin-insight-grid">
+      <div class="admin-insight-card">
+        <span>Ready</span>
+        <strong>{{ processing_counts.get("ready", 0) }}</strong>
+        <small>viewer-ready models</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Queued / processing</span>
+        <strong>{{ processing_counts.get("queued", 0) }} / {{ processing_counts.get("processing", 0) }}</strong>
+        <small>models waiting or converting</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Failed</span>
+        <strong>{{ processing_counts.get("failed", 0) }}</strong>
+        <small>{{ processing_counts.get("replacement_failed", 0) }} replacement failures</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Avg conversion</span>
+        <strong>{{ stats.average_conversion_seconds }}s</strong>
+        <small>completed job average</small>
+      </div>
+    </div>
+    <div class="admin-two-col">
+      <div class="admin-breakdown">
+        <h3>Failed formats</h3>
+        {% for format, count in failed_format_counts.items() %}
+          <div><span>{{ format|upper }}</span><strong>{{ count }}</strong></div>
+        {% else %}
+          <div><span>No failed formats</span><strong>0</strong></div>
+        {% endfor %}
+      </div>
+      <div class="admin-breakdown">
+        <h3>Near file limits</h3>
+        {% for model in near_limit_models %}
+          <div><span>{{ model.display_name or model.original_filename or model.id }}</span><strong>{{ format_file_size(model.file_size) }} / {{ format_file_size(model.storage_limit_bytes) }}</strong></div>
+        {% else %}
+          <div><span>No large-file warnings</span><strong>-</strong></div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <section id="models" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Models and licenses</h2>
+        <p>Inspect model access, license tier, file size, QR id, and processing state.</p>
+      </div>
+      <span>{% if models_pagination %}{{ models_pagination.total }} total{% else %}{{ models|length }} shown{% endif %}</span>
+    </div>
+    <form method="GET" action="{{ url_for('admin_dashboard', admin_page='models') }}" class="admin-filter-bar">
+      <select name="model_status" class="field-select compact-select">
+        <option value="all" {% if filters.model_status == "all" %}selected{% endif %}>All model states</option>
+        {% for status in ["queued", "processing", "ready", "failed", "replacement_failed"] %}
+          <option value="{{ status }}" {% if filters.model_status == status %}selected{% endif %}>{{ status|replace("_", " ")|title }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn-secondary compact">Filter models</button>
+      <a href="{{ url_for('admin_dashboard', admin_page='models') }}" class="btn-secondary compact">Clear</a>
+    </form>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>User</th>
+            <th>License</th>
+            <th>Access</th>
+            <th>Processing</th>
+            <th>Size</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for model in models %}
+            <tr>
+              <td>
+                <strong>{{ model.display_name or model.original_filename or model.id }}</strong>
+                <small>{{ model.public_id or "No public id" }}</small>
+              </td>
+              <td>
+                {% if model.paper and model.paper.author %}
+                  <a href="{{ url_for('admin_user_detail', user_id=model.paper.author.id) }}">{{ model.paper.author.email }}</a>
+                {% else %}
+                  {{ model.user_id }}
+                {% endif %}
+              </td>
+              <td>{{ get_license_plan(model.license_type).label }}</td>
+              <td><span class="status-chip">{{ model_access_status(model)|title }}</span></td>
+              <td>{{ (model.processing_status or "ready")|title }}</td>
+              <td>{{ format_file_size(model.file_size) }}</td>
+              <td>
+                <div class="admin-actions">
+                  <a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener noreferrer" class="btn-secondary compact">Viewer</a>
+                  <form method="POST" action="{{ url_for('admin_model_license_update', model_id=model.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <select name="license_type" class="field-select compact-select">
+                      {% for key, plan in license_plans.items() if key in user_selectable_plan_keys or key == model.license_type %}
+                        <option value="{{ key }}" {% if model.license_type == key %}selected{% endif %}>{{ plan.label }}</option>
+                      {% endfor %}
+                    </select>
+                    <button type="submit" class="btn-secondary compact">Save license</button>
+                  </form>
+                  <form method="POST" action="{{ url_for('admin_model_processing_update', model_id=model.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <select name="processing_status" class="field-select compact-select">
+                      {% for status in ["queued", "processing", "ready", "failed", "replacement_failed"] %}
+                        <option value="{{ status }}" {% if (model.processing_status or "ready") == status %}selected{% endif %}>{{ status|replace("_", " ")|title }}</option>
+                      {% endfor %}
+                    </select>
+                    <button type="submit" class="btn-secondary compact">Save status</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7">No models yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ render_pagination(models_pagination, 'admin_dashboard', {'admin_page': 'models'}) }}
+  </section>
+{% endblock %}

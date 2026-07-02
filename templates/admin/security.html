@@ -1,0 +1,45 @@
+{% extends "admin/base.html" %}
+{% block admin_title %}Security{% endblock %}
+{% block admin_subtitle %}Admin actions, failed logins, account events, and critical system alerts.{% endblock %}
+
+{% block admin_body %}
+  <section id="security-ops" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Operations and security</h2>
+        <p>Audit filtering, admin actions, failed logins, account events, and critical system alerts.</p>
+      </div>
+      <span>Risk monitor</span>
+    </div>
+    <div class="admin-insight-grid">
+      <div class="admin-insight-card">
+        <span>Admin actions</span>
+        <strong>{{ security_events.admin_actions }}</strong>
+        <small>role, plan, content, model, QR, and billing changes</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Failed logins</span>
+        <strong>{{ security_events.failed_logins }}</strong>
+        <small>{{ stats.failed_login_24h }} in the last 24 hours</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Account events</span>
+        <strong>{{ security_events.account_deleted }}</strong>
+        <small>{{ security_events.email_changed }} email / {{ security_events.password_changed }} password changes</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Critical alerts</span>
+        <strong>{{ critical_alerts|length }}</strong>
+        <small>{{ "Needs attention" if critical_alerts else "No active alerts" }}</small>
+      </div>
+    </div>
+    <div class="admin-breakdown mt-4">
+      <h3>Critical system alerts</h3>
+      {% for alert in critical_alerts %}
+        <div><span>{{ alert }}</span><strong>Review</strong></div>
+      {% else %}
+        <div><span>No critical alerts detected.</span><strong>OK</strong></div>
+      {% endfor %}
+    </div>
+  </section>
+{% endblock %}

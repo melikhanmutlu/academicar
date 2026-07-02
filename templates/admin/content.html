@@ -1,0 +1,147 @@
+{% extends "admin/base.html" %}
+{% from "admin/_pagination.html" import render_pagination %}
+{% block admin_title %}Publications{% endblock %}
+{% block admin_subtitle %}Publication coverage, identifiers, field distribution, and visibility control.{% endblock %}
+
+{% block admin_body %}
+  <section id="content-stats" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Content and publication statistics</h2>
+        <p>Publication coverage, identifiers, field distribution, and 7/30 day publishing trend.</p>
+      </div>
+      <span>Editorial analytics</span>
+    </div>
+    <div class="admin-insight-grid">
+      <div class="admin-insight-card">
+        <span>Public / private</span>
+        <strong>{{ totals.public_papers }} / {{ stats.private_papers }}</strong>
+        <small>{{ stats.public_ratio }}% public visibility</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>PDF coverage</span>
+        <strong>{{ stats.papers_with_pdf }} / {{ stats.papers_without_pdf }}</strong>
+        <small>attached / missing publication PDFs</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>DOI / PMID</span>
+        <strong>{{ stats.papers_with_doi }} / {{ stats.papers_with_pmid }}</strong>
+        <small>identifier usage across records</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Publishing trend</span>
+        <strong>{{ stats.new_papers_7d }} / {{ stats.new_papers_30d }}</strong>
+        <small>new publications in 7 / 30 days</small>
+      </div>
+    </div>
+    <div class="admin-two-col">
+      <div class="admin-breakdown">
+        <h3>Fields</h3>
+        {% for field, count in field_counts.items() %}
+          <div><span>{{ field }}</span><strong>{{ count }}</strong></div>
+        {% else %}
+          <div><span>No field data</span><strong>0</strong></div>
+        {% endfor %}
+      </div>
+      <div class="admin-breakdown">
+        <h3>30-day publication trend</h3>
+        <div class="admin-sparkline" aria-label="Publication trend">
+          {% for point in daily_publication_trend %}
+            <span title="{{ point.label }}: {{ point.count }}" style="height: {{ 6 + (point.count * 14) }}px"></span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="papers" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Publications</h2>
+        <p>Control publication visibility, edit metadata, and open detail pages.</p>
+      </div>
+      <span>{% if papers_pagination %}{{ papers_pagination.total }} total{% else %}{{ papers|length }} shown{% endif %}</span>
+    </div>
+    <form method="GET" action="{{ url_for('admin_dashboard', admin_page='content') }}" class="admin-filter-bar">
+      <input name="paper_q" class="field-input" value="{{ filters.paper_q or '' }}" placeholder="Search title, slug, or owner email">
+      <select name="paper_visibility" class="field-select compact-select">
+        <option value="all" {% if (filters.paper_visibility or 'all') == "all" %}selected{% endif %}>All visibility</option>
+        <option value="public" {% if filters.paper_visibility == "public" %}selected{% endif %}>Public</option>
+        <option value="private" {% if filters.paper_visibility == "private" %}selected{% endif %}>Private</option>
+      </select>
+      <select name="paper_status" class="field-select compact-select">
+        <option value="all" {% if (filters.paper_status or 'all') == "all" %}selected{% endif %}>All statuses</option>
+        <option value="active" {% if filters.paper_status == "active" %}selected{% endif %}>Active</option>
+        <option value="deleted" {% if filters.paper_status == "deleted" %}selected{% endif %}>Deleted</option>
+      </select>
+      <button type="submit" class="btn-secondary compact">Filter</button>
+      <a href="{{ url_for('admin_dashboard', admin_page='content') }}" class="btn-secondary compact">Clear</a>
+    </form>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
+        <thead>
+          <tr>
+            <th>Publication</th>
+            <th>Owner</th>
+            <th>Visibility</th>
+            <th>Status</th>
+            <th>Models</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for paper in papers %}
+            <tr>
+              <td>
+                {% if paper.status == "deleted" %}
+                  <strong>{{ paper.title }}</strong>
+                  <small>Deleted{% if paper.deleted_at %} on {{ paper.deleted_at.strftime("%b %d, %Y") }}{% endif %}</small>
+                {% else %}
+                  <strong><a href="{{ url_for('paper_public', slug=paper.slug) }}" target="_blank" rel="noopener noreferrer">{{ paper.title }}</a></strong>
+                  <small><a href="{{ url_for('paper_public', slug=paper.slug) }}" target="_blank" rel="noopener noreferrer">{{ url_for('paper_public', slug=paper.slug, _external=True) }}</a></small>
+                {% endif %}
+              </td>
+              <td>
+                {% if paper.author %}
+                  <a href="{{ url_for('admin_user_detail', user_id=paper.author.id) }}">{{ paper.author.email }}</a>
+                {% else %}
+                  {{ paper.user_id }}
+                {% endif %}
+              </td>
+              <td><span class="status-chip">{{ "Public" if paper.is_public else "Private" }}</span></td>
+              <td>{{ paper.status|title }}</td>
+              <td>{{ paper.models|length }}</td>
+              <td>
+                <div class="admin-actions">
+                  <form method="POST" action="{{ url_for('admin_paper_visibility_update', paper_id=paper.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <select name="is_public" class="field-select compact-select">
+                      <option value="0" {% if not paper.is_public %}selected{% endif %}>Private</option>
+                      <option value="1" {% if paper.is_public %}selected{% endif %}>Public</option>
+                    </select>
+                    <select name="status" class="field-select compact-select" aria-label="Publication status">
+                      <option value="active" {% if (paper.status or 'active') == 'active' %}selected{% endif %}>Active</option>
+                      <option value="deleted" {% if paper.status == 'deleted' %}selected{% endif %}>Deleted</option>
+                    </select>
+                    <button type="submit" class="btn-secondary compact">Update</button>
+                  </form>
+                  {% if paper.status == "deleted" %}
+                    <form method="POST" action="{{ url_for('admin_paper_restore', paper_id=paper.id) }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="submit" class="btn-secondary compact">Restore</button>
+                    </form>
+                  {% else %}
+                    <a href="{{ url_for('paper_detail', slug=paper.slug) }}" class="btn-secondary compact">Open</a>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6">No publications yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ render_pagination(papers_pagination, 'admin_dashboard', {'admin_page': 'content'}) }}
+  </section>
+{% endblock %}

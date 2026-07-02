@@ -1,0 +1,154 @@
+{% extends "admin/base.html" %}
+{% block admin_title %}Operations overview{% endblock %}
+{% block admin_subtitle %}Monitor platform health, review records, and run operational fixes from one place.{% endblock %}
+
+{% block admin_body %}
+  <section class="admin-metrics">
+    <div class="admin-metric">
+      <span>Users</span>
+      <strong>{{ totals.users }}</strong>
+      <small>{{ totals.admins }} admins</small>
+    </div>
+    <div class="admin-metric">
+      <span>Publications</span>
+      <strong>{{ totals.papers }}</strong>
+      <small>{{ totals.public_papers }} public</small>
+    </div>
+    <div class="admin-metric">
+      <span>Models</span>
+      <strong>{{ totals.models }}</strong>
+      <small>{{ totals.active_models }} active</small>
+    </div>
+    <div class="admin-metric">
+      <span>QR records</span>
+      <strong>{{ totals.qr_links }}</strong>
+      <small>Resolver inventory</small>
+    </div>
+    <div class="admin-metric">
+      <span>Payments</span>
+      <strong>{{ totals.payments }}</strong>
+      <small>{{ "%.2f"|format(totals.paid_revenue / 100) }} {{ config.PAYMENT_CURRENCY }} paid</small>
+    </div>
+    <div class="admin-metric">
+      <span>Jobs</span>
+      <strong>{{ totals.pending_jobs }}</strong>
+      <small>{{ totals.failed_jobs }} failed</small>
+    </div>
+  </section>
+
+  <section id="overview" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Operations overview</h2>
+        <p>Growth, conversion health, storage, billing, and QR activity signals.</p>
+      </div>
+      <span>Live snapshot</span>
+    </div>
+    <div class="admin-insight-grid">
+      <div class="admin-insight-card">
+        <span>Growth</span>
+        <strong>{{ stats.new_users_7d }}</strong>
+        <small>new users in 7 days / {{ stats.new_users_30d }} in 30 days</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Content</span>
+        <strong>{{ stats.new_papers_30d }}</strong>
+        <small>new publications in 30 days / {{ stats.public_ratio }}% public</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Model intake</span>
+        <strong>{{ stats.new_models_30d }}</strong>
+        <small>new models in 30 days</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Storage</span>
+        <strong>{{ format_file_size(stats.total_model_storage) }}</strong>
+        <small>{{ format_file_size(stats.storage_average) }} average per model</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Revenue</span>
+        <strong>{{ "%.2f"|format(stats.revenue_30_days / 100) }}</strong>
+        <small>{{ config.PAYMENT_CURRENCY }} paid in the last 30 days</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Security</span>
+        <strong>{{ stats.failed_login_24h }}</strong>
+        <small>failed logins in 24 hours</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>QR activity</span>
+        <strong>{{ stats.qr_resolved_30d }}</strong>
+        <small>QR records resolved in 30 days</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>PDF coverage</span>
+        <strong>{{ stats.papers_with_pdf }}</strong>
+        <small>publications with PDFs</small>
+      </div>
+    </div>
+
+    <div class="admin-breakdown-grid">
+      <div class="admin-breakdown">
+        <h3>Conversion health</h3>
+        {% for status in ["ready", "queued", "processing", "failed", "replacement_failed"] %}
+          <div><span>{{ status|replace("_", " ")|title }}</span><strong>{{ processing_counts.get(status, 0) }}</strong></div>
+        {% endfor %}
+      </div>
+      <div class="admin-breakdown">
+        <h3>Licenses</h3>
+        {% for key, plan in license_plans.items() %}
+          <div><span>{{ plan.label }}</span><strong>{{ license_counts.get(key, 0) }}</strong></div>
+        {% endfor %}
+      </div>
+      <div class="admin-breakdown">
+        <h3>Source formats</h3>
+        {% for format, count in source_format_counts.items() %}
+          <div><span>{{ format|upper }}</span><strong>{{ count }}</strong></div>
+        {% else %}
+          <div><span>No formats</span><strong>0</strong></div>
+        {% endfor %}
+      </div>
+      <div class="admin-breakdown">
+        <h3>Payments</h3>
+        {% for status in ["pending", "paid", "failed", "refunded"] %}
+          <div><span>{{ status|title }}</span><strong>{{ payment_counts.get(status, 0) }}</strong></div>
+        {% endfor %}
+      </div>
+      <div class="admin-breakdown">
+        <h3>Job queue</h3>
+        {% for status in ["pending", "processing", "completed", "failed"] %}
+          <div><span>{{ status|title }}</span><strong>{{ job_counts.get(status, 0) }}</strong></div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="admin-watch-grid">
+      <div>
+        <h3>Largest models</h3>
+        <ul class="admin-watch-list">
+          {% for model in largest_models %}
+            <li>
+              <span>{{ model.display_name or model.original_filename or model.id }}</span>
+              <strong>{{ format_file_size(model.file_size) }}</strong>
+            </li>
+          {% else %}
+            <li><span>No model files yet.</span><strong>-</strong></li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div>
+        <h3>Licenses expiring in 30 days</h3>
+        <ul class="admin-watch-list">
+          {% for model in expiring_models %}
+            <li>
+              <span>{{ model.display_name or model.original_filename or model.id }}</span>
+              <strong>{{ model.access_expires_at.strftime("%Y-%m-%d") if model.access_expires_at else "-" }}</strong>
+            </li>
+          {% else %}
+            <li><span>No licenses expiring soon.</span><strong>-</strong></li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </section>
+{% endblock %}

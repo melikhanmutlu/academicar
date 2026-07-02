@@ -1,0 +1,110 @@
+{% extends "admin/base.html" %}
+{% from "admin/_pagination.html" import render_pagination %}
+{% block admin_title %}Conversion jobs{% endblock %}
+{% block admin_subtitle %}Model conversion work queue — inspect, retry, and cancel jobs.{% endblock %}
+
+{% block admin_body %}
+  <section id="jobs" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Conversion jobs</h2>
+        <p>Latest model conversion work queue events. Retry failed or cancelled jobs, or cancel queued work.</p>
+      </div>
+      <span>{% if jobs_pagination %}{{ jobs_pagination.total }} total{% else %}{{ jobs|length }} shown{% endif %}</span>
+    </div>
+    <form method="GET" action="{{ url_for('admin_dashboard', admin_page='jobs') }}" class="admin-filter-bar">
+      <select name="job_status" class="field-select compact-select">
+        <option value="all" {% if filters.job_status == "all" %}selected{% endif %}>All job states</option>
+        {% for status in ["pending", "processing", "completed", "failed", "cancelled"] %}
+          <option value="{{ status }}" {% if filters.job_status == status %}selected{% endif %}>{{ status|title }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn-secondary compact">Filter jobs</button>
+      <a href="{{ url_for('admin_dashboard', admin_page='jobs') }}" class="btn-secondary compact">Clear</a>
+    </form>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
+        <thead>
+          <tr>
+            <th>Job</th>
+            <th>Status</th>
+            <th>Model</th>
+            <th>Attempts</th>
+            <th>Error</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for job in jobs %}
+            <tr>
+              <td>
+                <strong>{{ job.job_type|replace("_", " ")|title }}</strong>
+                <small>{{ job.created_at.strftime("%Y-%m-%d %H:%M") if job.created_at else "-" }}</small>
+              </td>
+              <td><span class="status-chip">{{ job.status|title }}</span></td>
+              <td>{{ job.model_id }}</td>
+              <td>{{ job.attempts }} / {{ job.max_attempts }}</td>
+              <td>{{ job.error or "-" }}</td>
+              <td>
+                <div class="admin-actions">
+                  {% if job.status in ["failed", "cancelled"] %}
+                    <form method="POST" action="{{ url_for('admin_job_retry', job_id=job.id) }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="submit" class="btn-secondary compact">Retry</button>
+                    </form>
+                  {% endif %}
+                  {% if job.status == "pending" %}
+                    <form method="POST" action="{{ url_for('admin_job_cancel', job_id=job.id) }}" onsubmit="return confirm('Cancel this queued job?')">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="submit" class="btn-danger compact">Cancel</button>
+                    </form>
+                  {% endif %}
+                  {% if job.status not in ["failed", "cancelled", "pending"] %}
+                    <span class="admin-page-note" style="margin:0">—</span>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6">No conversion jobs yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ render_pagination(jobs_pagination, 'admin_dashboard', {'admin_page': 'jobs'}) }}
+  </section>
+
+  <section id="failed-jobs" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Failed job messages</h2>
+        <p>Most recent conversion failures with the model format and error text.</p>
+      </div>
+      <span>{{ failed_jobs|length }} shown</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
+        <thead>
+          <tr>
+            <th>Job</th>
+            <th>Format</th>
+            <th>Model</th>
+            <th>Error</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for job in failed_jobs %}
+            <tr>
+              <td>{{ job.job_type|replace("_", " ")|title }}</td>
+              <td>{{ (job.model.source_format if job.model else "unknown")|upper }}</td>
+              <td>{{ job.model_id }}</td>
+              <td>{{ job.error or "-" }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4">No failed jobs.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

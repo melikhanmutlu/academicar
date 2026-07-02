@@ -1,0 +1,123 @@
+{% extends "admin/base.html" %}
+{% from "admin/_pagination.html" import render_pagination %}
+{% block admin_title %}Revenue &amp; payments{% endblock %}
+{% block admin_subtitle %}License distribution, payment states, revenue trend, and billing records.{% endblock %}
+
+{% block admin_body %}
+  <section id="license-revenue" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>License and revenue</h2>
+        <p>License distribution, payment states, total revenue, monthly revenue, and upcoming expirations.</p>
+      </div>
+      <span>Commercial analytics</span>
+    </div>
+    <div class="admin-two-col">
+      <div class="admin-breakdown">
+        <h3>License distribution</h3>
+        {% for key, plan in license_plans.items() %}
+          <div><span>{{ plan.label }}</span><strong>{{ license_counts.get(key, 0) }}</strong></div>
+        {% endfor %}
+      </div>
+      <div class="admin-breakdown">
+        <h3>Payment states</h3>
+        {% for status in ["pending", "paid", "failed", "refunded"] %}
+          <div><span>{{ status|title }}</span><strong>{{ payment_counts.get(status, 0) }}</strong></div>
+        {% endfor %}
+        <div><span>Total paid revenue</span><strong>{{ "%.2f"|format(totals.paid_revenue / 100) }} {{ config.PAYMENT_CURRENCY }}</strong></div>
+      </div>
+    </div>
+    <div class="admin-section-subtable">
+      <h3>Monthly revenue</h3>
+      <div class="admin-bar-chart">
+        {% for month in monthly_revenue %}
+          <div>
+            <span style="height: {{ 8 + (month.amount / 1000)|int }}px"></span>
+            <small>{{ month.label[5:] }}</small>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="admin-section-subtable">
+      <h3>Licenses expiring soon</h3>
+      <ul class="admin-watch-list">
+        {% for model in expiring_models %}
+          <li><span>{{ model.display_name or model.original_filename or model.id }}</span><strong>{{ model.access_expires_at.strftime("%Y-%m-%d") if model.access_expires_at else "-" }}</strong></li>
+        {% else %}
+          <li><span>No licenses expiring soon.</span><strong>-</strong></li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+
+  <section id="payments" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Payments</h2>
+        <p>Review billing events and mark manual payment outcomes.</p>
+      </div>
+      <span>{% if payments_pagination %}{{ payments_pagination.total }} total{% else %}{{ payments|length }} shown{% endif %}</span>
+    </div>
+    <form method="GET" action="{{ url_for('admin_dashboard', admin_page='revenue') }}" class="admin-filter-bar">
+      <input name="pay_q" class="field-input" value="{{ filters.pay_q or '' }}" placeholder="Search invoice, reference, or email">
+      <select name="pay_status" class="field-select compact-select">
+        <option value="all" {% if (filters.pay_status or 'all') == "all" %}selected{% endif %}>All statuses</option>
+        {% for status in ["pending", "paid", "failed", "refunded"] %}
+          <option value="{{ status }}" {% if filters.pay_status == status %}selected{% endif %}>{{ status|title }}</option>
+        {% endfor %}
+      </select>
+      <select name="provider" class="field-select compact-select">
+        <option value="all" {% if (filters.provider or 'all') == "all" %}selected{% endif %}>All providers</option>
+        <option value="manual" {% if filters.provider == "manual" %}selected{% endif %}>Manual</option>
+        <option value="paytr" {% if filters.provider == "paytr" %}selected{% endif %}>PayTR</option>
+      </select>
+      <button type="submit" class="btn-secondary compact">Filter</button>
+      <a href="{{ url_for('admin_dashboard', admin_page='revenue') }}" class="btn-secondary compact">Clear</a>
+    </form>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
+        <thead>
+          <tr>
+            <th>Invoice</th>
+            <th>User</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Provider</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for payment in payments %}
+            <tr>
+              <td>{{ payment.invoice_number or "-" }}</td>
+              <td>
+                {% if payment.user %}
+                  <a href="{{ url_for('admin_user_detail', user_id=payment.user.id) }}">{{ payment.user.email }}</a>
+                {% else %}
+                  {{ payment.user_id }}
+                {% endif %}
+              </td>
+              <td>{{ "%.2f"|format(payment.amount_kurus / 100) }} {{ payment.currency }}</td>
+              <td><span class="status-chip">{{ payment.status|title }}</span></td>
+              <td>{{ payment.provider }}</td>
+              <td>
+                <form method="POST" action="{{ url_for('admin_payment_status_update', payment_id=payment.id) }}" class="admin-inline-form">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <select name="status" class="field-select compact-select">
+                    {% for status in ["pending", "paid", "failed", "refunded"] %}
+                      <option value="{{ status }}" {% if payment.status == status %}selected{% endif %}>{{ status|title }}</option>
+                    {% endfor %}
+                  </select>
+                  <button type="submit" class="btn-secondary compact">Save</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6">No payments yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ render_pagination(payments_pagination, 'admin_dashboard', {'admin_page': 'revenue'}) }}
+  </section>
+{% endblock %}

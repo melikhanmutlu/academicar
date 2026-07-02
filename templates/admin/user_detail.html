@@ -1,0 +1,276 @@
+{% extends "admin/base.html" %}
+{% block admin_title %}{{ user.username }}{% endblock %}
+{% block admin_subtitle %}{{ user.email }} · joined {{ user.created_at.strftime("%Y-%m-%d") if user.created_at else "-" }}{% if user.deactivated_at %} · deactivated{% endif %}{% endblock %}
+{% block admin_actions %}
+  <a href="{{ url_for('admin_user_dashboard', user_id=user.id) }}" class="btn-secondary compact">View dashboard</a>
+  <a href="{{ url_for('admin_dashboard', admin_page='users') }}" class="btn-secondary compact">All users</a>
+{% endblock %}
+
+{% block admin_body %}
+  <section class="admin-metrics">
+    <div class="admin-metric">
+      <span>Role</span>
+      <strong>{{ "Admin" if user.is_admin else "Member" }}</strong>
+      <small>{{ user.plan|title }} plan</small>
+    </div>
+    <div class="admin-metric">
+      <span>Publications</span>
+      <strong>{{ papers|length }}</strong>
+      <small>{{ papers|selectattr("is_public")|list|length }} public</small>
+    </div>
+    <div class="admin-metric">
+      <span>Models</span>
+      <strong>{{ models|length }}</strong>
+      <small>{{ models|selectattr("processing_status", "equalto", "ready")|list|length }} ready</small>
+    </div>
+    <div class="admin-metric">
+      <span>Spent</span>
+      <strong>{{ "%.2f"|format(total_spent / 100) }}</strong>
+      <small>{{ config.PAYMENT_CURRENCY }} paid</small>
+    </div>
+  </section>
+
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Account controls</h2>
+        <p>Role, plan, email, and activation changes are logged as admin actions.</p>
+      </div>
+      {% if user.deactivated_at %}<span>Deactivated</span>{% else %}<span>Active</span>{% endif %}
+    </div>
+    <div class="admin-actions">
+      <form method="POST" action="{{ url_for('admin_user_plan_update', user_id=user.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <select name="plan" class="field-select compact-select">
+          <option value="free" {% if user.plan == "free" %}selected{% endif %}>Free</option>
+          <option value="academic" {% if user.plan == "academic" %}selected{% endif %}>Academic</option>
+          <option value="extended_archive" {% if user.plan == "extended_archive" %}selected{% endif %}>Extended Archive</option>
+        </select>
+        <button type="submit" class="btn-secondary compact">Save plan</button>
+      </form>
+      <form method="POST" action="{{ url_for('admin_user_role_update', user_id=user.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="is_admin" value="{{ '0' if user.is_admin else '1' }}">
+        <button type="submit" class="btn-secondary compact">{{ "Remove admin" if user.is_admin else "Make admin" }}</button>
+      </form>
+      {% if user.deactivated_at %}
+        <form method="POST" action="{{ url_for('admin_user_reactivate', user_id=user.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn-secondary compact">Reactivate account</button>
+        </form>
+      {% else %}
+        <form method="POST" action="{{ url_for('admin_user_deactivate', user_id=user.id) }}" onsubmit="return confirm('Deactivate this account? The user will be logged out and unable to sign in.')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn-danger compact">Deactivate account</button>
+        </form>
+      {% endif %}
+    </div>
+
+    <details class="admin-editor">
+      <summary>Change email address</summary>
+      <div class="admin-editor-body">
+        {% if user.google_id %}
+          <p class="admin-editor-note">This account is linked to Google, so its email is managed by Google and cannot be changed here.</p>
+        {% else %}
+          <form method="POST" action="{{ url_for('admin_user_email_update', user_id=user.id) }}" class="admin-editor-actions">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label class="admin-editor-field" style="flex:1;min-width:220px">
+              <span>Email</span>
+              <input type="email" name="email" value="{{ user.email }}" required>
+            </label>
+            <button type="submit" class="btn-secondary compact">Save email</button>
+          </form>
+          <p class="admin-editor-note">Configured-admin promotion is matched by email — renaming can affect auto-promotion.</p>
+        {% endif %}
+      </div>
+    </details>
+  </section>
+
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Publications</h2>
+        <p>Edit publication metadata or open the public record. The slug (public URL) is fixed.</p>
+      </div>
+      <span>{{ papers|length }} records</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
+        <thead>
+          <tr>
+            <th>Publication</th>
+            <th>Status</th>
+            <th>Models</th>
+            <th>Created</th>
+            <th>Edit</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for paper in papers %}
+            <tr>
+              <td>
+                <strong><a href="{{ url_for('paper_public', slug=paper.slug) }}" target="_blank" rel="noopener noreferrer">{{ paper.title }}</a></strong>
+                <small>{{ paper.slug }}</small>
+              </td>
+              <td><span class="status-chip">{{ "Public" if paper.is_public else "Private" }}</span></td>
+              <td>{{ paper.models|length }}</td>
+              <td>{{ paper.created_at.strftime("%Y-%m-%d") if paper.created_at else "-" }}</td>
+              <td>
+                <details class="admin-editor">
+                  <summary>Edit metadata</summary>
+                  <div class="admin-editor-body">
+                    <form method="POST" action="{{ url_for('admin_paper_metadata_update', paper_id=paper.id) }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <input type="hidden" name="next" value="user_detail">
+                      <div class="admin-editor-grid">
+                        <label class="admin-editor-field"><span>Title</span><input name="title" value="{{ paper.title }}" required maxlength="500"></label>
+                        <label class="admin-editor-field"><span>Authors</span><input name="authors" value="{{ paper.authors or '' }}" maxlength="500"></label>
+                        <label class="admin-editor-field"><span>Year</span><input name="year" value="{{ paper.year or '' }}" inputmode="numeric"></label>
+                        <label class="admin-editor-field"><span>Field</span><input name="field" value="{{ paper.field or '' }}" maxlength="100"></label>
+                        <label class="admin-editor-field"><span>DOI</span><input name="doi" value="{{ paper.doi or '' }}" maxlength="200"></label>
+                        <label class="admin-editor-field"><span>PMID</span><input name="pmid" value="{{ paper.pmid or '' }}" maxlength="100"></label>
+                        <label class="admin-editor-field"><span>Institution</span><input name="institution" value="{{ paper.institution or '' }}" maxlength="300"></label>
+                        <label class="admin-editor-field"><span>Expires (YYYY-MM-DD)</span><input name="expires_at" value="{{ paper.expires_at.strftime('%Y-%m-%d') if paper.expires_at else '' }}" placeholder="metadata only"></label>
+                      </div>
+                      <p class="admin-editor-note">Publications don't currently expire; the expiry date is stored as metadata only.</p>
+                      <div class="admin-editor-actions">
+                        <button type="submit" class="btn-primary compact">Save metadata</button>
+                      </div>
+                    </form>
+                  </div>
+                </details>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5">No publications.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Models</h2>
+        <p>Adjust the access window or regenerate the QR image (the public id is preserved).</p>
+      </div>
+      <span>{{ models|length }} records</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>Publication</th>
+            <th>License</th>
+            <th>Status</th>
+            <th>Manage</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for model in models %}
+            <tr>
+              <td>
+                <a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener noreferrer">{{ model.display_name or model.original_filename or model.id }}</a>
+                <small>{{ model_resolver_url(model) if model.public_id else "No public id" }}</small>
+              </td>
+              <td>{{ model.paper.title if model.paper else "-" }}</td>
+              <td>{{ get_license_plan(model.license_type).label }}</td>
+              <td><span class="status-chip">{{ model_access_status(model)|title }}</span></td>
+              <td>
+                <div class="admin-actions">
+                  <form method="POST" action="{{ url_for('admin_model_qr_regenerate', model_id=model.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="next" value="user_detail">
+                    <button type="submit" class="btn-secondary compact">Regenerate QR</button>
+                  </form>
+                </div>
+                <details class="admin-editor">
+                  <summary>Access window</summary>
+                  <div class="admin-editor-body">
+                    <form method="POST" action="{{ url_for('admin_model_access_window_update', model_id=model.id) }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <input type="hidden" name="next" value="user_detail">
+                      <div class="admin-editor-grid">
+                        <label class="admin-editor-field"><span>Access starts</span><input type="datetime-local" name="access_starts_at" value="{{ model.access_starts_at.strftime('%Y-%m-%dT%H:%M') if model.access_starts_at else '' }}" required></label>
+                        <label class="admin-editor-field"><span>Access expires (blank = never)</span><input type="datetime-local" name="access_expires_at" value="{{ model.access_expires_at.strftime('%Y-%m-%dT%H:%M') if model.access_expires_at else '' }}"></label>
+                      </div>
+                      <p class="admin-editor-note">Explicit override — the license tier and storage limit are left unchanged.</p>
+                      <div class="admin-editor-actions">
+                        <button type="submit" class="btn-primary compact">Save access window</button>
+                      </div>
+                    </form>
+                  </div>
+                </details>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5">No models.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Payments and activity</h2>
+        <p>Recent payments, the user audit trail, and manual payment recording.</p>
+      </div>
+    </div>
+
+    <details class="admin-editor">
+      <summary>Record a manual payment</summary>
+      <div class="admin-editor-body">
+        <form method="POST" action="{{ url_for('admin_payment_create') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="admin-editor-grid">
+            <label class="admin-editor-field"><span>User email</span><input name="user_email" value="{{ user.email }}" required></label>
+            <label class="admin-editor-field"><span>Model id (optional)</span><input name="model_id" placeholder="grants license when paid"></label>
+            <label class="admin-editor-field"><span>Plan key (optional)</span>
+              <select name="plan_key">
+                <option value="">— none —</option>
+                {% for key, plan in license_plans.items() if key != "free" %}
+                  <option value="{{ key }}">{{ plan.label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label class="admin-editor-field"><span>Amount ({{ config.PAYMENT_CURRENCY }})</span><input name="amount" inputmode="decimal" required></label>
+            <label class="admin-editor-field"><span>Status</span>
+              <select name="status">
+                <option value="pending">Pending</option>
+                <option value="paid">Paid</option>
+              </select>
+            </label>
+            <label class="admin-editor-field"><span>Reference (optional)</span><input name="reference" maxlength="200"></label>
+          </div>
+          <p class="admin-editor-note">A paid manual payment with a model id and paid plan grants the model's access window.</p>
+          <div class="admin-editor-actions">
+            <button type="submit" class="btn-primary compact">Record payment</button>
+          </div>
+        </form>
+      </div>
+    </details>
+
+    <div class="admin-two-col" style="margin-top:16px">
+      <div class="admin-breakdown">
+        <h3>Payments</h3>
+        {% for payment in payments %}
+          <div><span>{{ payment.invoice_number or payment.provider }}</span><strong>{{ "%.2f"|format(payment.amount_kurus / 100) }} {{ payment.currency }} / {{ payment.status }}</strong></div>
+        {% else %}
+          <div><span>No payments</span><strong>-</strong></div>
+        {% endfor %}
+      </div>
+      <div class="admin-breakdown">
+        <h3>Recent audit events</h3>
+        {% for event in audit_events %}
+          <div><span>{{ event.event_type }}</span><strong>{{ event.timestamp.strftime("%m-%d %H:%M") if event.timestamp else "-" }}</strong></div>
+        {% else %}
+          <div><span>No audit events</span><strong>-</strong></div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+{% endblock %}
