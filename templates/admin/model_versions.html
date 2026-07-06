@@ -1,0 +1,48 @@
+{% extends "admin/base.html" %}
+{% block admin_title %}Version history{% endblock %}
+{% block admin_subtitle %}{{ model.display_name or model.original_filename or model.id }} — every upload/replace attempt for this model.{% endblock %}
+{% block admin_actions %}
+  <a href="{{ url_for('admin_dashboard', admin_page='models') }}" class="btn-secondary compact">Back to models</a>
+{% endblock %}
+
+{% block admin_body %}
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Version history</h2>
+        <p>Read-only. Each row is one upload or replace attempt, including failed conversions.</p>
+      </div>
+      <span>{{ versions|length }} versions</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
+        <thead>
+          <tr>
+            <th>Version</th>
+            <th>Status</th>
+            <th>Format</th>
+            <th>Size</th>
+            <th>Color</th>
+            <th>Created</th>
+            <th>Error</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for version in versions %}
+            <tr>
+              <td>v{{ version.version_number }}</td>
+              <td><span class="status-chip">{{ version.status|title }}</span></td>
+              <td>{{ (version.source_format or "-")|upper }}</td>
+              <td>{{ format_file_size(version.file_size) }}</td>
+              <td>{{ version.material_color or "-" }}</td>
+              <td>{{ version.created_at.strftime("%Y-%m-%d %H:%M") if version.created_at else "-" }}</td>
+              <td>{{ version.error or "-" }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7">No version history recorded yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

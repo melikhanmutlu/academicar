@@ -1,0 +1,65 @@
+{% extends "admin/base.html" %}
+{% block admin_title %}System health{% endblock %}
+{% block admin_subtitle %}External conversion tools and conversion queue liveness.{% endblock %}
+{% block admin_actions %}
+  <a href="{{ url_for('admin_ar_doctor') }}" target="_blank" rel="noopener noreferrer" class="btn-secondary compact">Run live GLB → USDZ test</a>
+{% endblock %}
+
+{% block admin_body %}
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Conversion dependencies</h2>
+        <p>Presence checks only — no conversion is run here. Use "Run live GLB → USDZ test" for a real Blender conversion.</p>
+      </div>
+    </div>
+    <div class="admin-insight-grid">
+      <div class="admin-insight-card">
+        <span>Blender</span>
+        <strong>{{ "OK" if system_health.blender.available else "Missing" }}</strong>
+        <small>{{ system_health.blender.detail }}</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>gltf-transform</span>
+        <strong>{{ "OK" if system_health.gltf_transform.available else "Missing" }}</strong>
+        <small>{{ system_health.gltf_transform.detail }}</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>obj2gltf</span>
+        <strong>{{ "OK" if system_health.obj2gltf.available else "Missing" }}</strong>
+        <small>{{ system_health.obj2gltf.detail }}</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>fbx2gltf</span>
+        <strong>{{ "OK" if system_health.fbx2gltf.available else "Missing" }}</strong>
+        <small>{{ system_health.fbx2gltf.detail }}</small>
+      </div>
+    </div>
+  </section>
+
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Conversion queue liveness</h2>
+        <p>A large "oldest pending job" age with no matching drop in the pending count suggests the worker process is not picking up jobs.</p>
+      </div>
+    </div>
+    <div class="admin-insight-grid">
+      <div class="admin-insight-card">
+        <span>Pending jobs</span>
+        <strong>{{ system_health.pending_job_count }}</strong>
+        <small>currently queued</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Oldest pending job age</span>
+        <strong>{{ (system_health.oldest_pending_age_seconds ~ "s") if system_health.oldest_pending_age_seconds is not none else "-" }}</strong>
+        <small>time since the oldest queued job was created</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Recent avg. conversion time</span>
+        <strong>{{ system_health.avg_recent_job_seconds }}s</strong>
+        <small>average of the last 20 completed jobs</small>
+      </div>
+    </div>
+  </section>
+{% endblock %}

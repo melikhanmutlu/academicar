@@ -32,7 +32,38 @@
         <strong>{{ orphan_counts.converted + orphan_counts.pdf + orphan_counts.qr }}</strong>
         <small>{{ orphan_counts.converted }} model / {{ orphan_counts.pdf }} PDF / {{ orphan_counts.qr }} QR</small>
       </div>
+      <div class="admin-insight-card">
+        <span>R2 mirror failures</span>
+        <strong>{{ mirror_failed_count }}</strong>
+        <small>models whose converted files failed to reach R2</small>
+      </div>
     </div>
+    {% if mirror_failed_models %}
+    <div class="admin-section-subtable">
+      <h3>R2 mirror failures</h3>
+      <div class="table-wrap">
+        <table class="data-table admin-table">
+          <thead>
+            <tr><th>Model</th><th>Failed at</th><th>Action</th></tr>
+          </thead>
+          <tbody>
+            {% for model in mirror_failed_models %}
+              <tr>
+                <td>{{ model.display_name or model.original_filename or model.id }}</td>
+                <td>{{ model.r2_mirror_failed_at.strftime("%Y-%m-%d %H:%M") if model.r2_mirror_failed_at else "-" }}</td>
+                <td>
+                  <form method="POST" action="{{ url_for('admin_model_mirror_retry', model_id=model.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn-secondary compact">Retry mirror</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
     <div class="admin-two-col">
       <div class="admin-breakdown">
         <h3>Storage by user</h3>

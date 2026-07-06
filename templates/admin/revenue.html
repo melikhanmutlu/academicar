@@ -58,6 +58,7 @@
       </div>
       <span>{% if payments_pagination %}{{ payments_pagination.total }} total{% else %}{{ payments|length }} shown{% endif %}</span>
     </div>
+    <p class="admin-page-note">Marking a payment "Refunded" only revokes in-app access — it does not call PayTR. Remember to issue the actual refund from the PayTR merchant panel.</p>
     <form method="GET" action="{{ url_for('admin_dashboard', admin_page='revenue') }}" class="admin-filter-bar">
       <input name="pay_q" class="field-input" value="{{ filters.pay_q or '' }}" placeholder="Search invoice, reference, or email">
       <select name="pay_status" class="field-select compact-select">
@@ -73,6 +74,7 @@
       </select>
       <button type="submit" class="btn-secondary compact">Filter</button>
       <a href="{{ url_for('admin_dashboard', admin_page='revenue') }}" class="btn-secondary compact">Clear</a>
+      <a href="{{ url_for('admin_revenue_export', **request.args) }}" class="btn-secondary compact">Download CSV</a>
     </form>
     <div class="table-wrap">
       <table class="data-table admin-table">

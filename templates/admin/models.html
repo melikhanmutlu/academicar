@@ -106,6 +106,7 @@
               <td>
                 <div class="admin-actions">
                   <a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener noreferrer" class="btn-secondary compact">Viewer</a>
+                  <a href="{{ url_for('admin_model_versions', model_id=model.id) }}" class="btn-secondary compact">History</a>
                   <form method="POST" action="{{ url_for('admin_model_license_update', model_id=model.id) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <select name="license_type" class="field-select compact-select">
@@ -124,7 +125,48 @@
                     </select>
                     <button type="submit" class="btn-secondary compact">Save status</button>
                   </form>
+                  <form method="POST" action="{{ url_for('admin_model_poster_regenerate', model_id=model.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn-secondary compact">Regenerate poster</button>
+                  </form>
                 </div>
+                <details class="admin-editor">
+                  <summary>Appearance &amp; description</summary>
+                  <div class="admin-editor-body">
+                    <form method="POST" action="{{ url_for('admin_model_appearance_update', model_id=model.id) }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <div class="admin-editor-grid">
+                        <label class="admin-editor-field"><span>Color</span><input type="color" name="color" value="{{ model.appearance_color or '#cccccc' }}"></label>
+                        <label class="admin-editor-field"><span>AR placement</span>
+                          <select name="ar_placement">
+                            <option value="floor" {% if (model.ar_placement or 'floor') == 'floor' %}selected{% endif %}>Floor</option>
+                            <option value="wall" {% if model.ar_placement == 'wall' %}selected{% endif %}>Wall</option>
+                          </select>
+                        </label>
+                        <label class="admin-editor-field"><span>Roughness (0-1)</span><input type="number" name="roughness" min="0" max="1" step="0.05" value="{{ '%.2f'|format(model.appearance_roughness or 0.35) }}"></label>
+                        <label class="admin-editor-field"><span>Metallic (0-1)</span><input type="number" name="metallic" min="0" max="1" step="0.05" value="{{ '%.2f'|format(model.appearance_metallic or 0.05) }}"></label>
+                        <label class="admin-editor-field"><span>Display name</span><input name="display_name" value="{{ model.display_name or '' }}" maxlength="255"></label>
+                      </div>
+                      <label class="admin-editor-field"><span>Description</span><input name="description" value="{{ model.description or '' }}" maxlength="5000"></label>
+                      <div class="admin-editor-actions">
+                        <button type="submit" class="btn-primary compact">Save appearance</button>
+                      </div>
+                    </form>
+                  </div>
+                </details>
+                <details class="admin-editor">
+                  <summary>Compliance record</summary>
+                  <div class="admin-editor-body">
+                    <div class="admin-breakdown" style="border:none;padding:0">
+                      <div><span>Anonymization confirmed</span><strong>{{ "Yes" if model.anonymization_confirmed else "No" }}</strong></div>
+                      <div><span>Rights confirmed</span><strong>{{ "Yes" if model.rights_confirmed else "No" }}</strong></div>
+                      <div><span>Ethics responsibility confirmed</span><strong>{{ "Yes" if model.ethics_responsibility_confirmed else "No" }}</strong></div>
+                      <div><span>Confirmed at</span><strong>{{ model.consent_confirmed_at.strftime("%Y-%m-%d %H:%M") if model.consent_confirmed_at else "-" }}</strong></div>
+                      <div><span>Consent IP</span><strong>{{ model.consent_ip or "-" }}</strong></div>
+                      <div><span>Terms version</span><strong>{{ model.terms_version }}</strong></div>
+                    </div>
+                  </div>
+                </details>
               </td>
             </tr>
           {% else %}

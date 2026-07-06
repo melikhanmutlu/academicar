@@ -76,11 +76,11 @@
         <span class="pricing-eyebrow">Free Access</span>
         <span class="pricing-meta">Preview</span>
       </div>
-      <h2>$0</h2>
+      <h2>${{ "%.2f"|format(license_plans['free'].price_usd) }}</h2>
       <p>For internal validation, reviewer demos, and quick model checks before a public publication is finalized.</p>
       <dl>
-        <div><dt>Access window</dt><dd>3 days</dd></div>
-        <div><dt>Storage limit</dt><dd>Up to 100 MB / model</dd></div>
+        <div><dt>Access window</dt><dd>{{ license_plans['free'].duration_days }} days</dd></div>
+        <div><dt>Storage limit</dt><dd>Up to {{ (license_plans['free'].storage_limit_bytes / 1024 / 1024) | round(0, 'floor') | int }} MB / model</dd></div>
         <div><dt>Viewer</dt><dd>Watermarked public viewer</dd></div>
         <div><dt>Best for</dt><dd>Short-lived previews and upload tests</dd></div>
       </dl>
@@ -97,11 +97,11 @@
         <span class="pricing-eyebrow">Academic</span>
         <span class="pricing-meta">Publication</span>
       </div>
-      <h2>$9.90</h2>
+      <h2>${{ "%.2f"|format(license_plans['academic'].price_usd) }}</h2>
       <p>One-time, per model access for papers, theses, conference posters, and academic supplementary material.</p>
       <dl>
-        <div><dt>Access window</dt><dd>3 years</dd></div>
-        <div><dt>Storage limit</dt><dd>Up to 200 MB / model</dd></div>
+        <div><dt>Access window</dt><dd>{{ (license_plans['academic'].duration_days / 365) | round(0, 'floor') | int }} years</dd></div>
+        <div><dt>Storage limit</dt><dd>Up to {{ (license_plans['academic'].storage_limit_bytes / 1024 / 1024) | round(0, 'floor') | int }} MB / model</dd></div>
         <div><dt>Viewer</dt><dd>No public watermark</dd></div>
         <div><dt>Best for</dt><dd>Citation-ready research assets</dd></div>
       </dl>
@@ -118,11 +118,11 @@
         <span class="pricing-eyebrow">Extended Archive</span>
         <span class="pricing-meta">Long term</span>
       </div>
-      <h2>$24.90</h2>
+      <h2>${{ "%.2f"|format(license_plans['extended_archive'].price_usd) }}</h2>
       <p>Long-lived model access for assets that need to remain available across thesis, archive, and teaching cycles.</p>
       <dl>
-        <div><dt>Access window</dt><dd>10 years</dd></div>
-        <div><dt>Storage limit</dt><dd>Up to 200 MB / model</dd></div>
+        <div><dt>Access window</dt><dd>{{ (license_plans['extended_archive'].duration_days / 365) | round(0, 'floor') | int }} years</dd></div>
+        <div><dt>Storage limit</dt><dd>Up to {{ (license_plans['extended_archive'].storage_limit_bytes / 1024 / 1024) | round(0, 'floor') | int }} MB / model</dd></div>
         <div><dt>Viewer</dt><dd>No public watermark</dd></div>
         <div><dt>Best for</dt><dd>Reference models and durable archives</dd></div>
       </dl>
@@ -157,8 +157,8 @@
           </tr>
         </thead>
         <tbody>
-          <tr><td>Access window</td><td>3 days</td><td>3 years</td><td>10 years</td></tr>
-          <tr><td>Model storage</td><td>100 MB</td><td>200 MB</td><td>200 MB</td></tr>
+          <tr><td>Access window</td><td>{{ license_plans['free'].duration_days }} days</td><td>{{ (license_plans['academic'].duration_days / 365) | round(0, 'floor') | int }} years</td><td>{{ (license_plans['extended_archive'].duration_days / 365) | round(0, 'floor') | int }} years</td></tr>
+          <tr><td>Model storage</td><td>{{ (license_plans['free'].storage_limit_bytes / 1024 / 1024) | round(0, 'floor') | int }} MB</td><td>{{ (license_plans['academic'].storage_limit_bytes / 1024 / 1024) | round(0, 'floor') | int }} MB</td><td>{{ (license_plans['extended_archive'].storage_limit_bytes / 1024 / 1024) | round(0, 'floor') | int }} MB</td></tr>
           <tr><td>Supported uploads</td><td>GLB, STL, OBJ, FBX</td><td>GLB, STL, OBJ, FBX</td><td>GLB, STL, OBJ, FBX</td></tr>
           <tr><td>QR resolver</td><td>Included</td><td>Persistent</td><td>Persistent</td></tr>
           <tr><td>Viewer screenshots</td><td>Included</td><td>Included</td><td>Included</td></tr>

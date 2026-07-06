@@ -32,6 +32,16 @@
         <strong>{{ critical_alerts|length }}</strong>
         <small>{{ "Needs attention" if critical_alerts else "No active alerts" }}</small>
       </div>
+      <div class="admin-insight-card">
+        <span>Rate limit hits</span>
+        <strong>{{ security_events.rate_limit_hits }}</strong>
+        <small>login, upload, and form throttling triggers</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Webhook signature failures</span>
+        <strong>{{ security_events.webhook_signature_failures }}</strong>
+        <small>rejected payment webhook callbacks</small>
+      </div>
     </div>
     <div class="admin-breakdown mt-4">
       <h3>Critical system alerts</h3>

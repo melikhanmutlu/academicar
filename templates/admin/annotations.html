@@ -1,0 +1,56 @@
+{% extends "admin/base.html" %}
+{% from "admin/_pagination.html" import render_pagination %}
+{% block admin_title %}Annotations{% endblock %}
+{% block admin_subtitle %}Moderate hotspot labels placed on public 3D models.{% endblock %}
+
+{% block admin_body %}
+  <section id="annotations" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Model annotations</h2>
+        <p>Every hotspot label across all models. Deleting here bypasses model ownership — use for abusive or inappropriate content.</p>
+      </div>
+      <span>{% if annotations_pagination %}{{ annotations_pagination.total }} total{% else %}{{ annotations|length }} shown{% endif %}</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
+        <thead>
+          <tr>
+            <th>Label</th>
+            <th>Description</th>
+            <th>Model</th>
+            <th>Publication</th>
+            <th>Created</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for annotation in annotations %}
+            <tr>
+              <td><strong>{{ annotation.label }}</strong></td>
+              <td>{{ (annotation.description or "-")|truncate(120) }}</td>
+              <td>
+                {% if annotation.model %}
+                  <a href="{{ url_for('view_model', model_id=annotation.model.id) }}" target="_blank" rel="noopener noreferrer">{{ annotation.model.display_name or annotation.model.original_filename or annotation.model.id }}</a>
+                {% else %}
+                  {{ annotation.model_id }}
+                {% endif %}
+              </td>
+              <td>{{ annotation.model.paper.title if annotation.model and annotation.model.paper else "-" }}</td>
+              <td>{{ annotation.created_at.strftime("%Y-%m-%d %H:%M") if annotation.created_at else "-" }}</td>
+              <td>
+                <form method="POST" action="{{ url_for('admin_annotation_delete', annotation_id=annotation.id) }}" onsubmit="return confirm('Delete this annotation permanently?')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn-danger compact">Delete</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6">No annotations yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ render_pagination(annotations_pagination, 'admin_dashboard', {'admin_page': 'annotations'}) }}
+  </section>
+{% endblock %}

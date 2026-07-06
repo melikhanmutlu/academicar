@@ -141,6 +141,11 @@ class Model3D(db.Model):
     consent_confirmed_at = db.Column(db.DateTime, nullable=True)
     consent_ip = db.Column(db.String(100), nullable=True)
     terms_version = db.Column(db.String(20), nullable=False, default="1.0")
+    # Set when the worker's synchronous R2 mirror of this model's converted
+    # files fails (e.g. bad credentials, bucket unreachable); cleared on the
+    # next successful mirror. NULL means "no known failure" — the async
+    # (web-request) mirror path does not set this column (see services/r2_mirror.py).
+    r2_mirror_failed_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=utc_now)
 
     def __repr__(self) -> str:
@@ -325,4 +330,31 @@ class BlogPost(db.Model):
 
     def __repr__(self) -> str:
         return f"<BlogPost {self.slug}>"
+
+
+class LicensePlanConfig(db.Model):
+    """Admin-editable price/duration/storage facts for a license plan key.
+
+    Rows are seeded at startup (app.seed_license_plans) from licensing.py's
+    Python-side defaults, mirroring sync_configured_admins. Read through
+    licensing.get_license_plan()/get_license_plans(), which cache-aside this
+    table — application code should not query this model directly except in
+    the admin pricing routes and the seed/cache-refresh functions.
+    """
+    __tablename__ = "license_plans"
+
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(30), unique=True, nullable=False, index=True)
+    label = db.Column(db.String(80), nullable=False)
+    # Minor units (cents) — matches Payment.amount_kurus's convention; avoids
+    # float rounding drift across repeated admin edits.
+    price_usd_cents = db.Column(db.Integer, nullable=False, default=0)
+    duration_days = db.Column(db.Integer, nullable=True)  # NULL = unlimited
+    storage_limit_bytes = db.Column(db.Integer, nullable=False)
+    is_purchasable = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=utc_now)
+    updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
+
+    def __repr__(self) -> str:
+        return f"<LicensePlanConfig {self.key}>"
 

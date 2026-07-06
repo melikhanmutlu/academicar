@@ -61,7 +61,7 @@
           <label class="field-label">Field</label>
           <select name="field" class="field-select">
             <option value="">Select</option>
-            {% for f in ['Medicine', 'Dentistry', 'Engineering', 'Architecture', 'Biology', 'Archaeology', 'Veterinary Medicine', 'Chemistry', 'Other'] %}
+            {% for f in academic_fields %}
               <option value="{{ f }}" {% if form.get('field') == f %}selected{% endif %}>{{ f }}</option>
             {% endfor %}
           </select>

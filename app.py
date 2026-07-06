@@ -13,7 +13,7 @@ import uuid
 import zipfile
 from datetime import UTC, datetime, timedelta
 
-from flask import Flask, abort, current_app, flash, jsonify, redirect, render_template, request, send_from_directory, session, url_for
+from flask import Flask, Response, abort, current_app, flash, jsonify, redirect, render_template, request, send_from_directory, session, url_for
 from flask_limiter.errors import RateLimitExceeded
 from flask_login import LoginManager, current_user, login_required
 from flask_migrate import Migrate
@@ -46,10 +46,10 @@ from converters.glb_scale import clamp_oversized_glb
 from converters.poster import generate_poster
 from converters.stl_converter import convert_glb_to_usdz, enrich_glb_for_ar
 from licensing import (
-    LICENSE_PLANS,
     USER_SELECTABLE_PLAN_KEYS,
     apply_model_license_defaults,
     get_license_plan,
+    get_license_plans,
     is_access_expired,
     is_valid_user_plan,
     license_expires_at,
@@ -58,11 +58,12 @@ from licensing import (
     model_is_accessible,
     model_upgrade_options,
     normalize_license_type,
+    refresh_license_plan_cache,
 )
 from licensing import paper_is_expired as licensing_paper_is_expired
 from blog_content import code_post_slugs, get_all_posts, get_post, render_body
 from discipline_content import all_disciplines, discipline_slugs, get_discipline, related_disciplines
-from models import AuditLog, BlogPost, ConversionJob, Model3D, ModelAnnotation, ModelVersion, Paper, Payment, QRLink, User, db
+from models import AuditLog, BlogPost, ConversionJob, LicensePlanConfig, Model3D, ModelAnnotation, ModelVersion, Paper, Payment, QRLink, User, db
 from services.r2_mirror import mirror_file, mirror_directory, mirror_directory_sync, mirror_delete, ensure_local
 from payments import (
     PAID_PLAN_KEYS,
@@ -171,13 +172,14 @@ def create_app(test_config: dict | None = None) -> Flask:
             "public_url": public_url,
             "canonical_url": canonical_url,
             "model_asset_token": model_asset_token,
-            "license_plans": LICENSE_PLANS,
+            "license_plans": get_license_plans(),
             "get_license_plan": get_license_plan,
             "model_resolver_url": model_resolver_url,
             "model_access_status": model_access_status,
             "model_upgrade_options": model_upgrade_options,
             "user_selectable_plan_keys": USER_SELECTABLE_PLAN_KEYS,
             "format_model_dimensions_cm": format_model_dimensions_cm,
+            "academic_fields": ACADEMIC_FIELDS,
         }
 
     @app.after_request
@@ -222,10 +224,24 @@ def create_app(test_config: dict | None = None) -> Flask:
             logger.warning("SQLite schema already existed during create_all; continuing with compatibility checks.")
         sync_configured_admins(app)
         ensure_sqlite_schema(app)
+        seed_license_plans(app)
         stamp_alembic_version_if_needed(app)
 
     return app
 
+
+# Canonical academic field/discipline options for the publication form's
+# "Field" dropdown. Single source of truth for both the template (rendered via
+# inject_globals) and server-side validation in validate_paper_form(). Distinct
+# from discipline_content.DISCIPLINES, which is a separate, marketing-oriented
+# taxonomy powering the /ar-for-* SEO landing pages (who the AR feature serves,
+# not what academic field a publication belongs to) — spelling of overlapping
+# terms (Biology, Archaeology, Chemistry, Engineering) is kept consistent
+# between the two, but the lists are not merged into one.
+ACADEMIC_FIELDS = (
+    "Medicine", "Dentistry", "Engineering", "Architecture", "Biology",
+    "Archaeology", "Veterinary Medicine", "Chemistry", "Other",
+)
 
 SUPPORTED_MODEL_EXTENSIONS = {"stl", "glb", "obj", "fbx"}
 COMPANION_FILE_EXTENSIONS = {".mtl", ".png", ".jpg", ".jpeg", ".webp"}
@@ -498,6 +514,37 @@ def sync_configured_admins(app: Flask) -> None:
         logger.exception("Could not sync configured admin users")
 
 
+def seed_license_plans(app: Flask) -> None:
+    """Idempotent: insert a license_plans row for any Python-fallback key that
+    doesn't have one yet. Never touches a key that already has a row, so an
+    admin's prior edits survive every restart. Mirrors sync_configured_admins.
+    """
+    from licensing import default_license_plans, refresh_license_plan_cache
+
+    try:
+        existing = {k for (k,) in db.session.query(LicensePlanConfig.key).all()}
+        to_insert = [
+            LicensePlanConfig(
+                key=plan.key,
+                label=plan.label,
+                price_usd_cents=int(round(plan.price_usd * 100)),
+                duration_days=plan.duration_days,
+                storage_limit_bytes=plan.storage_limit_bytes,
+                is_purchasable=plan.is_purchasable,
+            )
+            for key, plan in default_license_plans().items()
+            if key not in existing
+        ]
+        if to_insert:
+            db.session.add_all(to_insert)
+            db.session.commit()
+            logger.info("Seeded %s license plan row(s): %s", len(to_insert), [p.key for p in to_insert])
+    except SQLAlchemyError:
+        db.session.rollback()
+        logger.exception("Could not seed license plan rows")
+    refresh_license_plan_cache()
+
+
 def day_label(value: datetime) -> str:
     return value.strftime("%m-%d")
 
@@ -532,6 +579,65 @@ def count_orphan_files(folder: str, expected_filenames: set[str]) -> int:
             if file_path not in expected_filenames:
                 orphan_count += 1
     return orphan_count
+
+
+def _describe_cli_resolution(command: list[str]) -> dict:
+    """Side-effect-free presence check for a converter CLI: does the resolved
+    command point at a local file, or would it fall through to an on-demand
+    `npx` fetch? Never executes the command, so this can never hang or make a
+    network call — unlike an actual `--version` invocation would if the
+    package isn't cached locally.
+    """
+    if not command:
+        return {"available": False, "detail": "not configured"}
+    if command[0] == "npx":
+        return {"available": False, "detail": f"npx fallback (not installed locally): {' '.join(command)}"}
+    target = command[-1]
+    available = os.path.isfile(target) or bool(shutil.which(command[0]))
+    return {"available": available, "detail": " ".join(command)}
+
+
+def _admin_system_health() -> dict:
+    """Read-only, side-effect-free dependency + worker-liveness snapshot for
+    the admin System Health page. Deliberately does not run any subprocess
+    (unlike /admin/ar-doctor's live GLB->USDZ test) so this is safe and fast
+    to compute on every page visit.
+    """
+    from converters.external_converter import FBXConverter, OBJConverter
+    from converters.glb_optimize import _find_cli as find_gltf_transform_cli
+
+    blender_path = shutil.which("blender")
+    oldest_pending = (
+        ConversionJob.query.filter_by(status="pending").order_by(ConversionJob.created_at.asc()).first()
+    )
+    oldest_pending_age_seconds = None
+    if oldest_pending and oldest_pending.created_at:
+        oldest_pending_age_seconds = int(
+            (datetime.now(UTC) - oldest_pending.created_at.replace(tzinfo=UTC)).total_seconds()
+        )
+    completed_recent = (
+        ConversionJob.query.filter(
+            ConversionJob.started_at.isnot(None), ConversionJob.finished_at.isnot(None)
+        )
+        .order_by(ConversionJob.finished_at.desc())
+        .limit(20)
+        .all()
+    )
+    durations = [
+        (job.finished_at - job.started_at).total_seconds()
+        for job in completed_recent
+        if job.finished_at and job.started_at and job.finished_at >= job.started_at
+    ]
+    avg_recent_seconds = int(sum(durations) / len(durations)) if durations else 0
+    return {
+        "blender": {"available": bool(blender_path), "detail": blender_path or "not on PATH"},
+        "gltf_transform": _describe_cli_resolution(find_gltf_transform_cli()),
+        "obj2gltf": _describe_cli_resolution(OBJConverter()._command()),
+        "fbx2gltf": _describe_cli_resolution(FBXConverter()._command()),
+        "oldest_pending_age_seconds": oldest_pending_age_seconds,
+        "avg_recent_job_seconds": avg_recent_seconds,
+        "pending_job_count": ConversionJob.query.filter_by(status="pending").count(),
+    }
 
 
 def backup_folder(app: Flask) -> str:
@@ -706,6 +812,8 @@ def ensure_sqlite_schema(app: Flask) -> None:
         user_columns = {row[1] for row in connection.execute(text("PRAGMA table_info(users)")).fetchall()}
         if user_columns and "deactivated_at" not in user_columns:
             connection.execute(text("ALTER TABLE users ADD COLUMN deactivated_at DATETIME"))
+        if model_columns and "r2_mirror_failed_at" not in model_columns:
+            connection.execute(text("ALTER TABLE models ADD COLUMN r2_mirror_failed_at DATETIME"))
 
 
 def _alembic_head_revision(app: Flask) -> str | None:
@@ -947,6 +1055,9 @@ def validate_paper_form(form) -> tuple[dict, list[str]]:
         if len(value) > limit:
             errors.append(f"{label} can be at most {limit} characters.")
 
+    if field and field not in ACADEMIC_FIELDS:
+        errors.append("Invalid field selection.")
+
     year_int = None
     if year_raw:
         try:
@@ -1167,6 +1278,121 @@ def hex_to_rgba(hex_color: str | None) -> tuple[float, float, float, float] | No
     except ValueError:
         return None
     return (r, g, b, 1.0)
+
+
+def _apply_model_appearance_change(model, form):
+    """Parse and apply an appearance/description change to a model's GLB.
+
+    Shared by the owner route (model_appearance_update) and the admin
+    override (admin_model_appearance_update) so the GLB backup/restore-on-
+    failure logic and R2 re-mirror never diverge between the two callers.
+
+    Returns (ok, message, flash_category, changes). ``changes`` is the dict
+    of fields actually applied, for the caller's own audit log entry (the two
+    callers use different event names) — or None on failure.
+    """
+    color_command = form.get("color_command")
+    color_input = (form.get("color") or "").strip() or None
+    # text command takes precedence so users can type "make it light gray".
+    parsed = color_from_command(color_command) if color_command else None
+    new_color = parsed or color_input
+    if not new_color or HEX_COLOR_PATTERN.fullmatch(new_color) is None:
+        return False, "Provide a valid hex color (#RRGGBB) or a known color name.", "danger", None
+
+    rgba = hex_to_rgba(new_color)
+    if rgba is None:
+        return False, "Invalid color value.", "danger", None
+
+    roughness_raw = form.get("roughness")
+    metallic_raw = form.get("metallic")
+    try:
+        roughness = max(0.0, min(1.0, float(roughness_raw))) if roughness_raw else (model.appearance_roughness or 0.35)
+        metallic = max(0.0, min(1.0, float(metallic_raw))) if metallic_raw else (model.appearance_metallic or 0.05)
+    except (ValueError, TypeError):
+        return False, "Provide valid roughness and metallic values (0–1).", "danger", None
+
+    ar_placement_raw = form.get("ar_placement")
+    ar_placement = ar_placement_raw if ar_placement_raw in ("floor", "wall") else (model.ar_placement or "floor")
+
+    glb_path = model.glb_path
+    # Restore the working GLB from the R2 mirror if the local copy is gone.
+    ensure_local(glb_path, f"converted/{model.id}/model.glb")
+    backup_path = glb_path + APPEARANCE_BACKUP_SUFFIX
+    try:
+        if os.path.exists(glb_path):
+            shutil.copy2(glb_path, backup_path)
+        try:
+            # Textured models (e.g. FBX exports with baseColor/normal/metallic-
+            # roughness maps) keep their artwork: only the metallic/roughness
+            # factors are tuned, so dropping metallic to 0 removes a golden FBX
+            # sheen without flattening the texture to a solid colour. Untextured
+            # models still get the solid-colour enrichment (the color picker).
+            if has_base_color_textures(glb_path):
+                apply_pbr_factors(glb_path, roughness=roughness, metallic=metallic)
+            else:
+                enrich_glb_for_ar(glb_path, rgba, roughness=roughness, metallic=metallic)
+        except Exception as exc:
+            logger.exception("Appearance enrichment failed; restoring backup")
+            if os.path.exists(backup_path):
+                shutil.copy2(backup_path, glb_path)
+            glb_exists = os.path.exists(glb_path)
+            detail = f" (GLB {'found' if glb_exists else 'NOT found'} at {glb_path}; {type(exc).__name__}: {exc})"
+            return False, f"The model appearance could not be updated. The previous version is still active.{detail}", "warning", None
+
+        model.appearance_color = new_color
+        model.appearance_roughness = roughness
+        model.appearance_metallic = metallic
+        model.ar_placement = ar_placement
+        # The edit page saves the model name/note in this same form (one
+        # "Save Changes"). Only touch them when the fields are present so the
+        # inline registry color form (which omits them) can't wipe them.
+        if "display_name" in form:
+            model.display_name = (form.get("display_name") or "").strip()[:255] or None
+        if "description" in form:
+            model.description = (form.get("description") or "").strip()[:5000] or None
+        try:
+            model.file_size = os.path.getsize(glb_path)
+        except OSError:
+            pass
+        db.session.commit()
+        # Re-mirror the rewritten GLB so R2 doesn't keep the pre-recolor copy.
+        mirror_file(glb_path, f"converted/{model.id}/model.glb")
+        changes = {"color": new_color, "roughness": roughness, "metallic": metallic, "ar_placement": ar_placement}
+        return True, "Changes saved.", "success", changes
+    except SQLAlchemyError:
+        db.session.rollback()
+        if os.path.exists(backup_path):
+            try:
+                shutil.copy2(backup_path, glb_path)
+            except OSError:
+                logger.exception("Failed to restore appearance backup after DB error")
+        return False, "The model appearance could not be updated.", "danger", None
+    finally:
+        if os.path.exists(backup_path):
+            cleanup_file(backup_path)
+
+
+ADMIN_CSV_EXPORT_ROW_LIMIT = 5000
+
+
+def _csv_response(rows: list[dict], columns: list[str], filename: str, truncated: bool = False) -> Response:
+    """Build a downloadable CSV response from a list of plain dicts.
+
+    ``truncated`` only affects the note appended in the admin route's flash
+    message (via a query-string echo), not the file itself — the file always
+    contains exactly the rows it was given.
+    """
+    import csv
+    import io
+
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=columns, extrasaction="ignore")
+    writer.writeheader()
+    for row in rows:
+        writer.writerow(row)
+    response = Response(buf.getvalue(), mimetype="text/csv")
+    response.headers["Content-Disposition"] = f"attachment; filename={filename}"
+    return response
 
 
 def build_invoice_number(payment_id: int) -> str:
@@ -1673,10 +1899,13 @@ def process_model_upload_job(
             # daemon threads could be killed when the worker exits/redeploys,
             # leaving a model marked "ready" whose files never reached R2 (then
             # lost on the next ephemeral-volume recycle).
-            if not mirror_directory_sync(
+            mirror_ok = mirror_directory_sync(
                 os.path.join(app.config["CONVERTED_FOLDER"], model_id),
                 f"converted/{model_id}",
-            ):
+            )
+            model.r2_mirror_failed_at = None if mirror_ok else datetime.now(UTC)
+            db.session.commit()
+            if not mirror_ok:
                 logger.error(
                     "R2 mirror incomplete for model %s; converted files may be "
                     "lost if the local volume is recycled.",
@@ -2055,6 +2284,12 @@ def register_error_handlers(app: Flask) -> None:
 
     @app.errorhandler(RateLimitExceeded)
     def rate_limit_exceeded(error):
+        log_audit(
+            "rate_limit_exceeded",
+            user_id=(current_user.id if current_user.is_authenticated else None),
+            resource_id=request.endpoint,
+            details={"path": request.path},
+        )
         flash("Too many attempts in a short time. Please wait a few minutes and try again.", "warning")
         referrer = request.referrer or url_for("dashboard")
         return redirect(referrer)
@@ -2116,7 +2351,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/pricing")
     def pricing():
-        return render_template("pricing.html", license_plans=LICENSE_PLANS)
+        return render_template("pricing.html")
 
     @app.route("/demo/mitochondria/ar")
     def demo_mitochondria_ar():
@@ -2372,7 +2607,7 @@ def register_routes(app: Flask) -> None:
         if not model:
             abort(404)
         plan_key = (plan or "").strip().lower()
-        if plan_key not in PAID_PLAN_KEYS:
+        if plan_key not in PAID_PLAN_KEYS or not get_license_plan(plan_key).is_purchasable:
             flash("Choose a valid paid plan to upgrade this model.", "danger")
             return redirect(request.referrer or url_for("dashboard"))
 
@@ -2468,6 +2703,14 @@ def register_routes(app: Flask) -> None:
         if provider.name != (provider_name or "").strip().lower():
             abort(404)
         if not provider.verify_webhook(request):
+            # A signature mismatch could mean a forged callback or a
+            # misconfigured merchant key/salt; leave a durable trail like every
+            # other webhook rejection branch below, instead of a bare 400.
+            log_audit(
+                "payment_webhook_signature_invalid",
+                resource_id=provider_name,
+                details={"path": request.path},
+            )
             abort(400)
 
         # Some gateways (PayTR) require a literal "OK" acknowledgement; others
@@ -2909,10 +3152,13 @@ def register_routes(app: Flask) -> None:
             "content",
             "models",
             "jobs",
+            "annotations",
             "access",
             "revenue",
+            "pricing",
             "security",
             "storage",
+            "system",
             "logs",
             "backups",
             "blog",
@@ -3008,6 +3254,10 @@ def register_routes(app: Flask) -> None:
         if job_status_filter != "all":
             jobs_query = jobs_query.filter(ConversionJob.status == job_status_filter)
 
+        annotations_query = ModelAnnotation.query.options(
+            selectinload(ModelAnnotation.model).selectinload(Model3D.paper)
+        )
+
         audit_query = AuditLog.query
         if audit_event_filter != "all":
             audit_query = audit_query.filter(AuditLog.event_type == audit_event_filter)
@@ -3057,6 +3307,10 @@ def register_routes(app: Flask) -> None:
             page=page, per_page=ADMIN_PER_PAGE, error_out=False
         )
         jobs = jobs_pagination.items
+        annotations_pagination = annotations_query.order_by(ModelAnnotation.created_at.desc()).paginate(
+            page=page, per_page=ADMIN_PER_PAGE, error_out=False
+        )
+        annotations = annotations_pagination.items
         now = datetime.now(UTC)
         last_7_days = now - timedelta(days=7)
         last_30_days = now - timedelta(days=30)
@@ -3292,7 +3546,18 @@ def register_routes(app: Flask) -> None:
             "email_changed": AuditLog.query.filter_by(event_type="email_changed").count(),
             "password_changed": AuditLog.query.filter_by(event_type="password_changed").count(),
             "failed_logins": AuditLog.query.filter_by(event_type="user_login_failed").count(),
+            "rate_limit_hits": AuditLog.query.filter_by(event_type="rate_limit_exceeded").count(),
+            "webhook_signature_failures": AuditLog.query.filter_by(event_type="payment_webhook_signature_invalid").count(),
         }
+        mirror_failed_count = Model3D.query.filter(Model3D.r2_mirror_failed_at.isnot(None)).count()
+        mirror_failed_models = (
+            Model3D.query.filter(Model3D.r2_mirror_failed_at.isnot(None))
+            .order_by(Model3D.r2_mirror_failed_at.desc())
+            .limit(20)
+            .all()
+            if admin_page == "storage"
+            else []
+        )
         critical_alerts = []
         if totals["failed_jobs"]:
             critical_alerts.append(f"{totals['failed_jobs']} failed conversion job(s)")
@@ -3302,6 +3567,8 @@ def register_routes(app: Flask) -> None:
             critical_alerts.append(f"{expired_public_papers} expired public publication(s)")
         if sum(orphan_counts.values()):
             critical_alerts.append(f"{sum(orphan_counts.values())} orphan file(s) detected")
+        if mirror_failed_count:
+            critical_alerts.append(f"{mirror_failed_count} model(s) failed to mirror to R2")
         stats = {
             "new_users_7d": User.query.filter(User.created_at >= last_7_days).count(),
             "new_users_30d": User.query.filter(User.created_at >= last_30_days).count(),
@@ -3357,6 +3624,14 @@ def register_routes(app: Flask) -> None:
             edit_id = (request.args.get("edit") or "").strip()
             if edit_id.isdigit():
                 editing_post = db.session.get(BlogPost, int(edit_id))
+        system_health = _admin_system_health() if admin_page == "system" else {}
+        pricing_rows = []
+        if admin_page == "pricing":
+            # Self-heal on every visit — same precedent as
+            # `if admin_page == "backups": ensure_daily_backup(...)`.
+            seed_license_plans(app)
+            plan_order = {"free": 0, "academic": 1, "extended_archive": 2, "institutional": 3}
+            pricing_rows = sorted(LicensePlanConfig.query.all(), key=lambda r: plan_order.get(r.key, 99))
         return render_template(
             f"admin/{admin_page}.html",
             users=users,
@@ -3366,6 +3641,10 @@ def register_routes(app: Flask) -> None:
             qr_links=qr_links,
             audit_logs=audit_logs,
             jobs=jobs,
+            annotations=annotations,
+            annotations_pagination=annotations_pagination,
+            system_health=system_health,
+            pricing_rows=pricing_rows,
             users_pagination=users_pagination,
             papers_pagination=papers_pagination,
             models_pagination=models_pagination,
@@ -3393,6 +3672,8 @@ def register_routes(app: Flask) -> None:
             storage_by_user=storage_by_user,
             storage_breakdown=storage_breakdown,
             orphan_counts=orphan_counts,
+            mirror_failed_count=mirror_failed_count,
+            mirror_failed_models=mirror_failed_models,
             security_events=security_events,
             critical_alerts=critical_alerts,
             backups=backups,
@@ -3418,6 +3699,130 @@ def register_routes(app: Flask) -> None:
                 "qr_q": qr_query_text,
             },
         )
+
+    @app.route("/admin/users/export.csv")
+    @login_required
+    def admin_users_export():
+        require_admin()
+        user_query_text = (request.args.get("user_q") or "").strip()
+        user_plan_filter = (request.args.get("user_plan") or "all").strip().lower()
+        user_role_filter = (request.args.get("user_role") or "all").strip().lower()
+        query = User.query
+        if user_query_text:
+            pattern = f"%{user_query_text.lower()}%"
+            query = query.filter(or_(func.lower(User.email).like(pattern), func.lower(User.username).like(pattern)))
+        if user_plan_filter in USER_SELECTABLE_PLAN_KEYS:
+            query = query.filter(User.plan == user_plan_filter)
+        if user_role_filter == "admin":
+            query = query.filter(User.is_admin.is_(True))
+        elif user_role_filter == "member":
+            query = query.filter(User.is_admin.is_(False))
+        rows = [
+            {
+                "id": u.id, "email": u.email, "username": u.username, "plan": u.plan,
+                "is_admin": u.is_admin, "deactivated_at": u.deactivated_at,
+                "created_at": u.created_at,
+            }
+            for u in query.order_by(User.created_at.desc()).limit(ADMIN_CSV_EXPORT_ROW_LIMIT).all()
+        ]
+        if len(rows) >= ADMIN_CSV_EXPORT_ROW_LIMIT:
+            flash(f"Export truncated to the first {ADMIN_CSV_EXPORT_ROW_LIMIT} matching rows.", "warning")
+        return _csv_response(rows, ["id", "email", "username", "plan", "is_admin", "deactivated_at", "created_at"], "users.csv")
+
+    @app.route("/admin/content/export.csv")
+    @login_required
+    def admin_content_export():
+        require_admin()
+        paper_query_text = (request.args.get("paper_q") or "").strip()
+        paper_visibility_filter = (request.args.get("paper_visibility") or "all").strip().lower()
+        paper_status_filter = (request.args.get("paper_status") or "all").strip().lower()
+        query = Paper.query.options(selectinload(Paper.author))
+        if paper_query_text:
+            pattern = f"%{paper_query_text.lower()}%"
+            query = query.outerjoin(User, Paper.user_id == User.id).filter(
+                or_(func.lower(Paper.title).like(pattern), func.lower(Paper.slug).like(pattern), func.lower(User.email).like(pattern))
+            )
+        if paper_visibility_filter == "public":
+            query = query.filter(Paper.is_public.is_(True))
+        elif paper_visibility_filter == "private":
+            query = query.filter(Paper.is_public.is_(False))
+        if paper_status_filter == "active":
+            query = query.filter(or_(Paper.status.is_(None), Paper.status != "deleted"))
+        elif paper_status_filter == "deleted":
+            query = query.filter(Paper.status == "deleted")
+        rows = [
+            {
+                "id": p.id, "title": p.title, "slug": p.slug, "owner_email": (p.author.email if p.author else None),
+                "is_public": p.is_public, "status": p.status, "field": p.field, "year": p.year,
+                "created_at": p.created_at,
+            }
+            for p in query.order_by(Paper.created_at.desc()).limit(ADMIN_CSV_EXPORT_ROW_LIMIT).all()
+        ]
+        if len(rows) >= ADMIN_CSV_EXPORT_ROW_LIMIT:
+            flash(f"Export truncated to the first {ADMIN_CSV_EXPORT_ROW_LIMIT} matching rows.", "warning")
+        return _csv_response(rows, ["id", "title", "slug", "owner_email", "is_public", "status", "field", "year", "created_at"], "publications.csv")
+
+    @app.route("/admin/revenue/export.csv")
+    @login_required
+    def admin_revenue_export():
+        require_admin()
+        pay_status_filter = (request.args.get("pay_status") or "all").strip().lower()
+        pay_provider_filter = (request.args.get("provider") or "all").strip().lower()
+        pay_query_text = (request.args.get("pay_q") or "").strip()
+        query = Payment.query.options(selectinload(Payment.user))
+        if pay_status_filter in {"pending", "paid", "failed", "refunded"}:
+            query = query.filter(Payment.status == pay_status_filter)
+        if pay_provider_filter in {"manual", "paytr"}:
+            query = query.filter(Payment.provider == pay_provider_filter)
+        if pay_query_text:
+            pattern = f"%{pay_query_text.lower()}%"
+            query = query.outerjoin(User, Payment.user_id == User.id).filter(
+                or_(func.lower(Payment.invoice_number).like(pattern), func.lower(Payment.provider_reference).like(pattern), func.lower(User.email).like(pattern))
+            )
+        rows = [
+            {
+                "id": p.id, "invoice_number": p.invoice_number, "user_email": (p.user.email if p.user else None),
+                "amount_major": p.amount_kurus / 100.0, "currency": p.currency, "status": p.status,
+                "provider": p.provider, "provider_reference": p.provider_reference,
+                "created_at": p.created_at, "paid_at": p.paid_at,
+            }
+            for p in query.order_by(Payment.created_at.desc()).limit(ADMIN_CSV_EXPORT_ROW_LIMIT).all()
+        ]
+        if len(rows) >= ADMIN_CSV_EXPORT_ROW_LIMIT:
+            flash(f"Export truncated to the first {ADMIN_CSV_EXPORT_ROW_LIMIT} matching rows.", "warning")
+        return _csv_response(
+            rows,
+            ["id", "invoice_number", "user_email", "amount_major", "currency", "status", "provider", "provider_reference", "created_at", "paid_at"],
+            "payments.csv",
+        )
+
+    @app.route("/admin/logs/export.csv")
+    @login_required
+    def admin_logs_export():
+        require_admin()
+        audit_event_filter = (request.args.get("audit_event") or "all").strip().lower()
+        audit_query_text = (request.args.get("audit_q") or "").strip()
+        audit_user_filter = (request.args.get("audit_user") or "").strip()
+        query = AuditLog.query
+        if audit_event_filter != "all":
+            query = query.filter(AuditLog.event_type == audit_event_filter)
+        if audit_user_filter.isdigit():
+            query = query.filter(AuditLog.user_id == int(audit_user_filter))
+        if audit_query_text:
+            pattern = f"%{audit_query_text.lower()}%"
+            query = query.filter(
+                or_(func.lower(AuditLog.event_type).like(pattern), func.lower(AuditLog.resource_id).like(pattern), func.lower(AuditLog.ip_address).like(pattern))
+            )
+        rows = [
+            {
+                "id": a.id, "event_type": a.event_type, "user_id": a.user_id, "resource_id": a.resource_id,
+                "ip_address": a.ip_address, "timestamp": a.timestamp,
+            }
+            for a in query.order_by(AuditLog.timestamp.desc()).limit(ADMIN_CSV_EXPORT_ROW_LIMIT).all()
+        ]
+        if len(rows) >= ADMIN_CSV_EXPORT_ROW_LIMIT:
+            flash(f"Export truncated to the first {ADMIN_CSV_EXPORT_ROW_LIMIT} matching rows.", "warning")
+        return _csv_response(rows, ["id", "event_type", "user_id", "resource_id", "ip_address", "timestamp"], "audit_log.csv")
 
     @app.route("/admin/users/<int:user_id>")
     @login_required
@@ -3720,6 +4125,85 @@ def register_routes(app: Flask) -> None:
         )
         flash(f"Model license updated to {get_license_plan(new_license).label}.", "success")
         return redirect(url_for("admin_dashboard", admin_page="models"))
+
+    @app.route("/admin/pricing/<plan_key>", methods=["POST"])
+    @login_required
+    def admin_pricing_update(plan_key):
+        require_admin()
+        plan_row = LicensePlanConfig.query.filter_by(key=plan_key).first()
+        if not plan_row:
+            abort(404)
+        label = (request.form.get("label") or "").strip()
+        if not label:
+            flash("Label is required.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="pricing"))
+        try:
+            price_major = float((request.form.get("price_usd") or "").strip())
+        except ValueError:
+            flash("Price must be a number.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="pricing"))
+        if price_major < 0:
+            flash("Price cannot be negative.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="pricing"))
+        duration_raw = (request.form.get("duration_days") or "").strip()
+        duration_days = None
+        if duration_raw:
+            try:
+                duration_days = int(duration_raw)
+            except ValueError:
+                flash("Duration must be a whole number of days, or blank for unlimited.", "danger")
+                return redirect(url_for("admin_dashboard", admin_page="pricing"))
+            if duration_days <= 0:
+                flash("Duration must be positive, or blank for unlimited.", "danger")
+                return redirect(url_for("admin_dashboard", admin_page="pricing"))
+        try:
+            storage_mb = int((request.form.get("storage_limit_mb") or "").strip())
+        except ValueError:
+            flash("Storage limit must be a whole number of MB.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="pricing"))
+        if storage_mb <= 0:
+            flash("Storage limit must be positive.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="pricing"))
+        is_purchasable = request.form.get("is_purchasable") == "1"
+
+        previous = {
+            "label": plan_row.label,
+            "price_usd": plan_row.price_usd_cents / 100.0,
+            "duration_days": plan_row.duration_days,
+            "storage_limit_bytes": plan_row.storage_limit_bytes,
+            "is_purchasable": plan_row.is_purchasable,
+        }
+        plan_row.label = label
+        plan_row.price_usd_cents = int(round(price_major * 100))
+        plan_row.duration_days = duration_days
+        plan_row.storage_limit_bytes = storage_mb * 1024 * 1024
+        plan_row.is_purchasable = is_purchasable
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not update the plan. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="pricing"))
+
+        refresh_license_plan_cache()  # this dyno reflects the edit immediately
+
+        log_audit(
+            "admin_pricing_changed",
+            user_id=current_user.id,
+            resource_id=plan_key,
+            details={
+                "from": previous,
+                "to": {
+                    "label": plan_row.label,
+                    "price_usd": plan_row.price_usd_cents / 100.0,
+                    "duration_days": plan_row.duration_days,
+                    "storage_limit_bytes": plan_row.storage_limit_bytes,
+                    "is_purchasable": plan_row.is_purchasable,
+                },
+            },
+        )
+        flash(f"Pricing updated for {plan_row.label}.", "success")
+        return redirect(url_for("admin_dashboard", admin_page="pricing"))
 
     @app.route("/admin/models/<model_id>/processing", methods=["POST"])
     @login_required
@@ -4036,6 +4520,25 @@ def register_routes(app: Flask) -> None:
         flash("Model access window updated.", "success")
         return redirect_target
 
+    @app.route("/admin/models/<model_id>/appearance", methods=["POST"])
+    @login_required
+    def admin_model_appearance_update(model_id):
+        require_admin()
+        model = db.session.get(Model3D, model_id)
+        if not model:
+            abort(404)
+        next_hint = (request.form.get("next") or "").strip()
+        redirect_target = (
+            redirect(url_for("admin_user_detail", user_id=model.user_id))
+            if next_hint == "user_detail"
+            else redirect(url_for("admin_dashboard", admin_page="models"))
+        )
+        ok, message, category, changes = _apply_model_appearance_change(model, request.form)
+        if ok:
+            log_audit("admin_model_appearance_changed", user_id=current_user.id, resource_id=model.id, details=changes)
+        flash(message, category)
+        return redirect_target
+
     @app.route("/admin/models/<model_id>/qr/regenerate", methods=["POST"])
     @login_required
     def admin_model_qr_regenerate(model_id):
@@ -4071,6 +4574,140 @@ def register_routes(app: Flask) -> None:
         )
         flash("QR image regenerated.", "success")
         return redirect_target
+
+    @app.route("/admin/models/<model_id>/versions")
+    @login_required
+    def admin_model_versions(model_id):
+        require_admin()
+        model = db.session.get(Model3D, model_id)
+        if not model:
+            abort(404)
+        versions = (
+            ModelVersion.query.filter_by(model_id=model_id)
+            .order_by(ModelVersion.version_number.desc())
+            .all()
+        )
+        return render_template("admin/model_versions.html", model=model, versions=versions)
+
+    @app.route("/admin/models/<model_id>/poster/regenerate", methods=["POST"])
+    @login_required
+    def admin_model_poster_regenerate(model_id):
+        require_admin()
+        model = db.session.get(Model3D, model_id)
+        if not model:
+            abort(404)
+        next_hint = (request.form.get("next") or "").strip()
+        redirect_target = (
+            redirect(url_for("admin_user_detail", user_id=model.user_id))
+            if next_hint == "user_detail"
+            else redirect(url_for("admin_dashboard", admin_page="models"))
+        )
+        glb_path = model.glb_path
+        ensure_local(glb_path, f"converted/{model_id}/model.glb")
+        poster_png = os.path.join(os.path.dirname(glb_path), "poster.png")
+        from converters.poster import generate_poster
+
+        if not generate_poster(glb_path, poster_png):
+            flash("Could not regenerate the poster from this model's GLB.", "danger")
+            return redirect_target
+        model.poster_path = poster_png
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not save the regenerated poster. Please try again.", "danger")
+            return redirect_target
+        mirror_file(poster_png, f"converted/{model_id}/poster.png")
+        log_audit("admin_model_poster_regenerated", user_id=current_user.id, resource_id=model.id)
+        flash("Poster regenerated.", "success")
+        return redirect_target
+
+    @app.route("/admin/models/<model_id>/mirror/retry", methods=["POST"])
+    @login_required
+    def admin_model_mirror_retry(model_id):
+        require_admin()
+        model = db.session.get(Model3D, model_id)
+        if not model:
+            abort(404)
+        redirect_target = redirect(url_for("admin_dashboard", admin_page="storage"))
+        ok = mirror_directory_sync(
+            os.path.join(app.config["CONVERTED_FOLDER"], model_id),
+            f"converted/{model_id}",
+        )
+        model.r2_mirror_failed_at = None if ok else datetime.now(UTC)
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not update the mirror status. Please try again.", "danger")
+            return redirect_target
+        if ok:
+            log_audit("admin_model_mirror_retried", user_id=current_user.id, resource_id=model.id)
+            flash("R2 mirror retried successfully.", "success")
+        else:
+            flash("R2 mirror retry failed again. Check R2 credentials/connectivity.", "warning")
+        return redirect_target
+
+    @app.route("/admin/jobs/<int:job_id>/max-attempts", methods=["POST"])
+    @login_required
+    def admin_job_max_attempts_update(job_id):
+        require_admin()
+        job = db.session.get(ConversionJob, job_id)
+        if not job:
+            abort(404)
+        raw = (request.form.get("max_attempts") or "").strip()
+        try:
+            new_max = int(raw)
+        except ValueError:
+            flash("Max attempts must be a whole number.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="jobs"))
+        if new_max < 1 or new_max > 20:
+            flash("Max attempts must be between 1 and 20.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="jobs"))
+        previous = job.max_attempts
+        job.max_attempts = new_max
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not update max attempts. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="jobs"))
+        log_audit(
+            "admin_job_max_attempts_changed",
+            user_id=current_user.id,
+            resource_id=str(job.id),
+            details={"from": previous, "to": new_max},
+        )
+        flash("Max attempts updated.", "success")
+        return redirect(url_for("admin_dashboard", admin_page="jobs"))
+
+    @app.route("/admin/annotations/<int:annotation_id>/delete", methods=["POST"])
+    @login_required
+    def admin_annotation_delete(annotation_id):
+        # Admin-only moderation path: unlike model_annotation_delete (the owner
+        # route), this deliberately bypasses require_model_ownership so a
+        # public model's abusive/inappropriate hotspot can be removed without
+        # the owner's cooperation.
+        require_admin()
+        annotation = db.session.get(ModelAnnotation, annotation_id)
+        if not annotation:
+            abort(404)
+        details = {"label": annotation.label, "model_id": annotation.model_id}
+        db.session.delete(annotation)
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not delete the annotation. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="annotations"))
+        log_audit(
+            "admin_annotation_deleted",
+            user_id=current_user.id,
+            resource_id=str(annotation_id),
+            details=details,
+        )
+        flash("Annotation deleted.", "success")
+        return redirect(url_for("admin_dashboard", admin_page="annotations"))
 
     @app.route("/admin/payments/create", methods=["POST"])
     @login_required
@@ -5199,94 +5836,10 @@ def register_routes(app: Flask) -> None:
         # registry) when a safe same-site path is provided, else the model page.
         next_url = request.form.get("next") or ""
         dest = next_url if (next_url.startswith("/") and not next_url.startswith("//")) else url_for("model_edit", model_id=model.id)
-        color_command = request.form.get("color_command")
-        color_input = (request.form.get("color") or "").strip() or None
-        # text command takes precedence so users can type "make it light gray".
-        parsed = color_from_command(color_command) if color_command else None
-        new_color = parsed or color_input
-        if not new_color or HEX_COLOR_PATTERN.fullmatch(new_color) is None:
-            flash("Provide a valid hex color (#RRGGBB) or a known color name.", "danger")
-            return redirect(dest)
-
-        rgba = hex_to_rgba(new_color)
-        if rgba is None:
-            flash("Invalid color value.", "danger")
-            return redirect(dest)
-
-        roughness_raw = request.form.get("roughness")
-        metallic_raw = request.form.get("metallic")
-        try:
-            roughness = max(0.0, min(1.0, float(roughness_raw))) if roughness_raw else (model.appearance_roughness or 0.35)
-            metallic = max(0.0, min(1.0, float(metallic_raw))) if metallic_raw else (model.appearance_metallic or 0.05)
-        except (ValueError, TypeError):
-            flash("Provide valid roughness and metallic values (0–1).", "danger")
-            return redirect(dest)
-
-        ar_placement_raw = request.form.get("ar_placement")
-        ar_placement = ar_placement_raw if ar_placement_raw in ("floor", "wall") else (model.ar_placement or "floor")
-
-        glb_path = model.glb_path
-        # Restore the working GLB from the R2 mirror if the local copy is gone.
-        ensure_local(glb_path, f"converted/{model.id}/model.glb")
-        backup_path = glb_path + APPEARANCE_BACKUP_SUFFIX
-        try:
-            if os.path.exists(glb_path):
-                shutil.copy2(glb_path, backup_path)
-            try:
-                # Textured models (e.g. FBX exports with baseColor/normal/metallic-
-                # roughness maps) keep their artwork: only the metallic/roughness
-                # factors are tuned, so dropping metallic to 0 removes a golden FBX
-                # sheen without flattening the texture to a solid colour. Untextured
-                # models still get the solid-colour enrichment (the color picker).
-                if has_base_color_textures(glb_path):
-                    apply_pbr_factors(glb_path, roughness=roughness, metallic=metallic)
-                else:
-                    enrich_glb_for_ar(glb_path, rgba, roughness=roughness, metallic=metallic)
-            except Exception as exc:
-                logger.exception("Appearance enrichment failed; restoring backup")
-                if os.path.exists(backup_path):
-                    shutil.copy2(backup_path, glb_path)
-                glb_exists = os.path.exists(glb_path)
-                detail = f" (GLB {'found' if glb_exists else 'NOT found'} at {glb_path}; {type(exc).__name__}: {exc})"
-                flash(f"The model appearance could not be updated. The previous version is still active.{detail}", "warning")
-                return redirect(dest)
-
-            model.appearance_color = new_color
-            model.appearance_roughness = roughness
-            model.appearance_metallic = metallic
-            model.ar_placement = ar_placement
-            # The edit page saves the model name/note in this same form (one
-            # "Save Changes"). Only touch them when the fields are present so the
-            # inline registry color form (which omits them) can't wipe them.
-            if "display_name" in request.form:
-                model.display_name = (request.form.get("display_name") or "").strip()[:255] or None
-            if "description" in request.form:
-                model.description = (request.form.get("description") or "").strip()[:5000] or None
-            try:
-                model.file_size = os.path.getsize(glb_path)
-            except OSError:
-                pass
-            db.session.commit()
-            # Re-mirror the rewritten GLB so R2 doesn't keep the pre-recolor copy.
-            mirror_file(glb_path, f"converted/{model.id}/model.glb")
-            log_audit(
-                "model_appearance_updated",
-                user_id=current_user.id,
-                resource_id=model_id,
-                details={"color": new_color, "roughness": roughness, "metallic": metallic, "ar_placement": ar_placement},
-            )
-            flash("Changes saved.", "success")
-        except SQLAlchemyError:
-            db.session.rollback()
-            if os.path.exists(backup_path):
-                try:
-                    shutil.copy2(backup_path, glb_path)
-                except OSError:
-                    logger.exception("Failed to restore appearance backup after DB error")
-            flash("The model appearance could not be updated.", "danger")
-        finally:
-            if os.path.exists(backup_path):
-                cleanup_file(backup_path)
+        ok, message, category, changes = _apply_model_appearance_change(model, request.form)
+        if ok:
+            log_audit("model_appearance_updated", user_id=current_user.id, resource_id=model_id, details=changes)
+        flash(message, category)
         return redirect(dest)
 
     @app.route("/models/<model_id>/rescale", methods=["POST"])

@@ -47,6 +47,14 @@
       </a>
     </li>
     <li>
+      <a href="{{ url_for('admin_dashboard', admin_page='annotations') }}" class="{% if active_page == 'annotations' %}is-active{% endif %}" {% if active_page == 'annotations' %}aria-current="page"{% endif %}>
+        <span class="admin-sidenav-label">
+          <svg class="admin-sidenav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>
+          Annotations
+        </span>
+      </a>
+    </li>
+    <li>
       <a href="{{ url_for('admin_dashboard', admin_page='blog') }}" class="{% if active_page == 'blog' %}is-active{% endif %}" {% if active_page == 'blog' %}aria-current="page"{% endif %}>
         <span class="admin-sidenav-label">
           <svg class="admin-sidenav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 19.5V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 1.5z"/><path d="M8 7h8M8 11h6"/></svg>
@@ -74,6 +82,14 @@
         </span>
       </a>
     </li>
+    <li>
+      <a href="{{ url_for('admin_dashboard', admin_page='pricing') }}" class="{% if active_page == 'pricing' %}is-active{% endif %}" {% if active_page == 'pricing' %}aria-current="page"{% endif %}>
+        <span class="admin-sidenav-label">
+          <svg class="admin-sidenav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          Pricing &amp; plans
+        </span>
+      </a>
+    </li>
 
     <li class="admin-sidenav-group">Access</li>
     <li>
@@ -86,6 +102,14 @@
     </li>
 
     <li class="admin-sidenav-group">System</li>
+    <li>
+      <a href="{{ url_for('admin_dashboard', admin_page='system') }}" class="{% if active_page == 'system' %}is-active{% endif %}" {% if active_page == 'system' %}aria-current="page"{% endif %}>
+        <span class="admin-sidenav-label">
+          <svg class="admin-sidenav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.7 8.4a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V2a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V8a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+          System health
+        </span>
+      </a>
+    </li>
     <li>
       <a href="{{ url_for('admin_dashboard', admin_page='storage') }}" class="{% if active_page == 'storage' %}is-active{% endif %}" {% if active_page == 'storage' %}aria-current="page"{% endif %}>
         <span class="admin-sidenav-label">

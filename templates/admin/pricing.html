@@ -1,0 +1,40 @@
+{% extends "admin/base.html" %}
+{% block admin_title %}Pricing &amp; plans{% endblock %}
+{% block admin_subtitle %}Edit license plan price, duration, and storage limits without a deploy.{% endblock %}
+
+{% block admin_body %}
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>License plans</h2>
+        <p>Changes apply to new checkouts and license grants immediately. Existing purchases and already-granted access windows are never recomputed.</p>
+      </div>
+      <span>{{ pricing_rows|length }} plans</span>
+    </div>
+    {% for plan in pricing_rows %}
+      <div class="admin-breakdown" style="margin-bottom:16px">
+        <h3><code>{{ plan.key }}</code></h3>
+        <form method="POST" action="{{ url_for('admin_pricing_update', plan_key=plan.key) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="admin-editor-grid">
+            <label class="admin-editor-field"><span>Label</span><input name="label" value="{{ plan.label }}" required maxlength="80"></label>
+            <label class="admin-editor-field"><span>Price (USD)</span><input type="number" name="price_usd" min="0" step="0.01" value="{{ '%.2f'|format(plan.price_usd_cents / 100) }}" required></label>
+            <label class="admin-editor-field"><span>Duration (days, blank = unlimited)</span><input type="number" name="duration_days" min="1" value="{{ plan.duration_days or '' }}" placeholder="unlimited"></label>
+            <label class="admin-editor-field"><span>Storage limit (MB)</span><input type="number" name="storage_limit_mb" min="1" value="{{ (plan.storage_limit_bytes / 1024 / 1024) | round(0, 'floor') | int }}" required></label>
+            <label class="admin-editor-field"><span>Purchasable</span>
+              <select name="is_purchasable">
+                <option value="1" {% if plan.is_purchasable %}selected{% endif %}>Yes</option>
+                <option value="0" {% if not plan.is_purchasable %}selected{% endif %}>No</option>
+              </select>
+            </label>
+          </div>
+          <div class="admin-editor-actions" style="margin-top:12px">
+            <button type="submit" class="btn-primary compact">Save {{ plan.label }}</button>
+          </div>
+        </form>
+      </div>
+    {% else %}
+      <p>No pricing rows yet — visit this page again in a moment to let the defaults seed.</p>
+    {% endfor %}
+  </section>
+{% endblock %}

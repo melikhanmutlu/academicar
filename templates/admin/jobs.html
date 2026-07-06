@@ -63,6 +63,21 @@
                     <span class="admin-page-note" style="margin:0">—</span>
                   {% endif %}
                 </div>
+                <details class="admin-editor">
+                  <summary>Details</summary>
+                  <div class="admin-editor-body">
+                    <form method="POST" action="{{ url_for('admin_job_max_attempts_update', job_id=job.id) }}" class="admin-editor-actions">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <label class="admin-editor-field" style="max-width:140px">
+                        <span>Max attempts</span>
+                        <input type="number" name="max_attempts" min="1" max="20" value="{{ job.max_attempts }}">
+                      </label>
+                      <button type="submit" class="btn-secondary compact">Save</button>
+                    </form>
+                    <p class="admin-editor-note">Payload</p>
+                    <pre style="white-space:pre-wrap;word-break:break-all;font-size:12px;margin:0">{{ job.payload | tojson(indent=2) }}</pre>
+                  </div>
+                </details>
               </td>
             </tr>
           {% else %}

@@ -180,10 +180,16 @@
               <td><span class="status-chip">{{ model_access_status(model)|title }}</span></td>
               <td>
                 <div class="admin-actions">
+                  <a href="{{ url_for('admin_model_versions', model_id=model.id) }}" class="btn-secondary compact">History</a>
                   <form method="POST" action="{{ url_for('admin_model_qr_regenerate', model_id=model.id) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="next" value="user_detail">
                     <button type="submit" class="btn-secondary compact">Regenerate QR</button>
+                  </form>
+                  <form method="POST" action="{{ url_for('admin_model_poster_regenerate', model_id=model.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="next" value="user_detail">
+                    <button type="submit" class="btn-secondary compact">Regenerate poster</button>
                   </form>
                 </div>
                 <details class="admin-editor">
@@ -201,6 +207,19 @@
                         <button type="submit" class="btn-primary compact">Save access window</button>
                       </div>
                     </form>
+                  </div>
+                </details>
+                <details class="admin-editor">
+                  <summary>Compliance record</summary>
+                  <div class="admin-editor-body">
+                    <div class="admin-breakdown" style="border:none;padding:0">
+                      <div><span>Anonymization confirmed</span><strong>{{ "Yes" if model.anonymization_confirmed else "No" }}</strong></div>
+                      <div><span>Rights confirmed</span><strong>{{ "Yes" if model.rights_confirmed else "No" }}</strong></div>
+                      <div><span>Ethics responsibility confirmed</span><strong>{{ "Yes" if model.ethics_responsibility_confirmed else "No" }}</strong></div>
+                      <div><span>Confirmed at</span><strong>{{ model.consent_confirmed_at.strftime("%Y-%m-%d %H:%M") if model.consent_confirmed_at else "-" }}</strong></div>
+                      <div><span>Consent IP</span><strong>{{ model.consent_ip or "-" }}</strong></div>
+                      <div><span>Terms version</span><strong>{{ model.terms_version }}</strong></div>
+                    </div>
                   </div>
                 </details>
               </td>

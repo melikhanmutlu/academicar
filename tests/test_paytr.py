@@ -7,7 +7,7 @@ import uuid
 import pytest
 
 from app import create_app, limiter
-from models import Model3D, Paper, Payment, User, db
+from models import AuditLog, Model3D, Paper, Payment, User, db
 
 MERCHANT_KEY = "testmerchantkey"
 MERCHANT_SALT = "testmerchantsalt"
@@ -138,6 +138,18 @@ def test_paytr_callback_rejects_bad_hash(paytr_client, paytr_app):
     assert resp.status_code == 400
     with paytr_app.app_context():
         assert db.session.get(Model3D, model_id).license_type == "free"
+
+
+def test_paytr_callback_bad_hash_leaves_an_audit_trail(paytr_client, paytr_app):
+    """A signature mismatch previously vanished with a bare 400 and no trace;
+    it must now be durably logged so admin's Security tab can see it."""
+    model_id, merchant_oid = _make_pending_payment(paytr_app)
+    paytr_client.post(
+        "/payment/webhook/paytr",
+        data={"merchant_oid": merchant_oid, "status": "success", "total_amount": "990", "hash": "wrong"},
+    )
+    with paytr_app.app_context():
+        assert AuditLog.query.filter_by(event_type="payment_webhook_signature_invalid").count() == 1
 
 
 def test_paytr_callback_is_idempotent(paytr_client, paytr_app):
