@@ -7849,7 +7849,8 @@ details[open] > .upload-summary .upload-inline-action svg {
 .admin-table .compact-select,
 .admin-table .compact-input {
   min-width: 132px;
-  width: 132px;
+  width: auto;
+  max-width: 190px;
   padding: 8px 10px;
   font-size: 12px;
 }

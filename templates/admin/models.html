@@ -131,7 +131,7 @@
                   </form>
                 </div>
                 <details class="admin-editor">
-                  <summary>Appearance &amp; description</summary>
+                  <summary>Appearance, description &amp; compliance</summary>
                   <div class="admin-editor-body">
                     <form method="POST" action="{{ url_for('admin_model_appearance_update', model_id=model.id) }}">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -152,12 +152,8 @@
                         <button type="submit" class="btn-primary compact">Save appearance</button>
                       </div>
                     </form>
-                  </div>
-                </details>
-                <details class="admin-editor">
-                  <summary>Compliance record</summary>
-                  <div class="admin-editor-body">
-                    <div class="admin-breakdown" style="border:none;padding:0">
+                    <div class="admin-breakdown" style="border:none;padding:0;margin-top:16px">
+                      <h3 style="margin:0 0 8px">Compliance record</h3>
                       <div><span>Anonymization confirmed</span><strong>{{ "Yes" if model.anonymization_confirmed else "No" }}</strong></div>
                       <div><span>Rights confirmed</span><strong>{{ "Yes" if model.rights_confirmed else "No" }}</strong></div>
                       <div><span>Ethics responsibility confirmed</span><strong>{{ "Yes" if model.ethics_responsibility_confirmed else "No" }}</strong></div>
