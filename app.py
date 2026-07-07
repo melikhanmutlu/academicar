@@ -226,6 +226,7 @@ def create_app(test_config: dict | None = None) -> Flask:
         sync_configured_admins(app)
         ensure_sqlite_schema(app)
         seed_license_plans(app)
+        seed_builtin_blog_posts(app)
         stamp_alembic_version_if_needed(app)
 
     return app
@@ -561,6 +562,41 @@ def seed_license_plans(app: Flask) -> None:
         db.session.rollback()
         logger.exception("Could not seed license plan rows")
     refresh_license_plan_cache()
+
+
+def seed_builtin_blog_posts(app: Flask) -> None:
+    """Idempotent: insert a blog_posts row for any built-in code post (see
+    blog_content.py) whose slug has no DB row yet, so the launch articles are
+    editable from the admin panel like any other post. Never touches a slug
+    that already has a row, so an admin's edits (or a deliberate delete)
+    survive every restart — mirrors seed_license_plans.
+    """
+    try:
+        existing = {slug for (slug,) in db.session.query(BlogPost.slug).all()}
+        to_insert = [
+            BlogPost(
+                slug=p["slug"],
+                title=p["title"],
+                description=p.get("description"),
+                body=p["body"],
+                tags=", ".join(p.get("tags") or []) or None,
+                persona=p.get("persona"),
+                author=p.get("author") or "AcademicAR Team",
+                read_minutes=p.get("read_minutes"),
+                is_published=True,
+                created_at=datetime.strptime(p["date"], "%Y-%m-%d").replace(tzinfo=UTC),
+                updated_at=datetime.strptime(p["date"], "%Y-%m-%d").replace(tzinfo=UTC),
+            )
+            for p in get_all_posts()
+            if p["slug"] not in existing
+        ]
+        if to_insert:
+            db.session.add_all(to_insert)
+            db.session.commit()
+            logger.info("Seeded %s built-in blog post row(s): %s", len(to_insert), [p.slug for p in to_insert])
+    except SQLAlchemyError:
+        db.session.rollback()
+        logger.exception("Could not seed built-in blog post rows")
 
 
 def day_label(value: datetime) -> str:
@@ -3649,6 +3685,10 @@ def register_routes(app: Flask) -> None:
         if admin_page == "backups":
             ensure_daily_backup(app, created_by_user_id=current_user.id)
         backups = list_backup_archives(app) if admin_page == "backups" else []
+        if admin_page == "blog":
+            # Self-heal on every visit — same precedent as
+            # `if admin_page == "backups": ensure_daily_backup(...)`.
+            seed_builtin_blog_posts(app)
         blog_posts = (
             BlogPost.query.order_by(BlogPost.created_at.desc()).all() if admin_page == "blog" else []
         )

@@ -57,6 +57,31 @@ def test_built_in_code_posts_still_listed(client):
     assert "How to Add Interactive 3D Models" in listing
 
 
+def test_builtin_post_seeded_into_db_and_editable_from_admin(client, app):
+    _login_admin(client, app)
+    # Visiting the admin blog page self-heals the built-in posts into the DB
+    # (same precedent as seed_license_plans on the pricing page).
+    listing = client.get("/admin/blog").get_data(as_text=True)
+    assert "How to Add Interactive 3D Models" in listing
+
+    with app.app_context():
+        seeded = BlogPost.query.filter_by(slug="how-to-add-3d-models-to-research-papers").first()
+        assert seeded is not None
+        assert seeded.is_published is True
+        post_id = seeded.id
+
+    client.post(
+        f"/admin/blog/{post_id}/update",
+        data={
+            "title": "How to Add Interactive 3D Models to Your Research Paper",
+            "body": "## Updated\n\nedited straight from admin",
+            "is_published": "on",
+        },
+    )
+    public = client.get("/blog/how-to-add-3d-models-to-research-papers").get_data(as_text=True)
+    assert "edited straight from admin" in public
+
+
 def test_non_admin_cannot_create_or_view_admin_blog(client, app):
     from tests.conftest import login, register
 
@@ -137,4 +162,9 @@ def test_create_requires_title_and_body(client, app):
     resp = client.post("/admin/blog/create", data={"title": "", "body": "", "is_published": "on"}, follow_redirects=True)
     assert resp.status_code == 200
     with app.app_context():
-        assert BlogPost.query.count() == 0
+        # The redirect lands on /admin/blog, which self-heals the 6 built-in
+        # posts into the DB (same precedent as the pricing page and
+        # seed_license_plans) — but the invalid submission itself must not
+        # have created anything.
+        assert BlogPost.query.count() == 6
+        assert BlogPost.query.filter_by(title="").count() == 0

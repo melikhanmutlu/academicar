@@ -310,8 +310,11 @@ class AuditLog(db.Model):
 class BlogPost(db.Model):
     """Admin-authored blog post (Markdown body), managed from the admin panel.
 
-    The built-in launch articles still live in ``blog_content.py``; the public
-    blog merges these DB rows (which take precedence by slug) with those.
+    The built-in launch articles are defined in ``blog_content.py`` and seeded
+    into this table on startup (``app.seed_builtin_blog_posts``, self-healing
+    like ``seed_license_plans``) so they show up and are editable in the admin
+    panel too. The public blog merges DB rows (which take precedence by slug)
+    with any not-yet-seeded code posts.
     """
     __tablename__ = "blog_posts"
 
