@@ -41,7 +41,7 @@
               <td>
                 <form method="POST" action="{{ url_for('admin_annotation_delete', annotation_id=annotation.id) }}" onsubmit="return confirm('Delete this annotation permanently?')">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                  <button type="submit" class="btn-danger compact">Delete</button>
+                  <button type="submit" class="admin-btn admin-btn-danger compact">Delete</button>
                 </form>
               </td>
             </tr>

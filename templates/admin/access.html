@@ -69,8 +69,8 @@
         <option value="active" {% if filters.qr_status == "active" %}selected{% endif %}>Active</option>
         <option value="disabled" {% if filters.qr_status == "disabled" %}selected{% endif %}>Disabled</option>
       </select>
-      <button type="submit" class="btn-secondary compact">Filter</button>
-      <a href="{{ url_for('admin_dashboard', admin_page='access') }}" class="btn-secondary compact">Clear</a>
+      <button type="submit" class="admin-btn admin-btn-secondary compact">Filter</button>
+      <a href="{{ url_for('admin_dashboard', admin_page='access') }}" class="admin-btn admin-btn-secondary compact">Clear</a>
     </form>
     <div class="table-wrap">
       <table class="data-table admin-table">
@@ -91,7 +91,7 @@
                 <small>{{ model_resolver_url(qr.model) }}</small>
               </td>
               <td><a href="{{ url_for('view_model', model_id=qr.model_id) }}" target="_blank" rel="noopener noreferrer">{{ qr.model_id }}</a></td>
-              <td><span class="status-chip">{{ qr.status|title }}</span></td>
+              <td><span class="status-chip {{ admin_chip_class(qr.status) }}">{{ qr.status|title }}</span></td>
               <td>{{ qr.last_resolved_at.strftime("%Y-%m-%d %H:%M") if qr.last_resolved_at else "-" }}</td>
               <td>
                 <form method="POST" action="{{ url_for('admin_qr_status_update', qr_id=qr.id) }}" class="admin-inline-form">
@@ -100,7 +100,7 @@
                     <option value="active" {% if qr.status == "active" %}selected{% endif %}>Active</option>
                     <option value="disabled" {% if qr.status == "disabled" %}selected{% endif %}>Disabled</option>
                   </select>
-                  <button type="submit" class="btn-secondary compact">Save</button>
+                  <button type="submit" class="admin-btn admin-btn-secondary compact">Save</button>
                 </form>
               </td>
             </tr>

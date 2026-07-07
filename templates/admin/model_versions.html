@@ -2,7 +2,7 @@
 {% block admin_title %}Version history{% endblock %}
 {% block admin_subtitle %}{{ model.display_name or model.original_filename or model.id }} — every upload/replace attempt for this model.{% endblock %}
 {% block admin_actions %}
-  <a href="{{ url_for('admin_dashboard', admin_page='models') }}" class="btn-secondary compact">Back to models</a>
+  <a href="{{ url_for('admin_dashboard', admin_page='models') }}" class="admin-btn admin-btn-secondary compact">Back to models</a>
 {% endblock %}
 
 {% block admin_body %}
@@ -31,7 +31,7 @@
           {% for version in versions %}
             <tr>
               <td>v{{ version.version_number }}</td>
-              <td><span class="status-chip">{{ version.status|title }}</span></td>
+              <td><span class="status-chip {{ admin_chip_class(version.status) }}">{{ version.status|title }}</span></td>
               <td>{{ (version.source_format or "-")|upper }}</td>
               <td>{{ format_file_size(version.file_size) }}</td>
               <td>{{ version.material_color or "-" }}</td>

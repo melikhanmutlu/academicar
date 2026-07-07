@@ -74,9 +74,9 @@
         <option value="active" {% if filters.paper_status == "active" %}selected{% endif %}>Active</option>
         <option value="deleted" {% if filters.paper_status == "deleted" %}selected{% endif %}>Deleted</option>
       </select>
-      <button type="submit" class="btn-secondary compact">Filter</button>
-      <a href="{{ url_for('admin_dashboard', admin_page='content') }}" class="btn-secondary compact">Clear</a>
-      <a href="{{ url_for('admin_content_export', **request.args) }}" class="btn-secondary compact">Download CSV</a>
+      <button type="submit" class="admin-btn admin-btn-secondary compact">Filter</button>
+      <a href="{{ url_for('admin_dashboard', admin_page='content') }}" class="admin-btn admin-btn-secondary compact">Clear</a>
+      <a href="{{ url_for('admin_content_export', **request.args) }}" class="admin-btn admin-btn-secondary compact">Download CSV</a>
     </form>
     <div class="table-wrap">
       <table class="data-table admin-table">
@@ -109,7 +109,7 @@
                   {{ paper.user_id }}
                 {% endif %}
               </td>
-              <td><span class="status-chip">{{ "Public" if paper.is_public else "Private" }}</span></td>
+              <td><span class="status-chip {{ admin_chip_class('public' if paper.is_public else 'private') }}">{{ "Public" if paper.is_public else "Private" }}</span></td>
               <td>{{ paper.status|title }}</td>
               <td>{{ paper.models|length }}</td>
               <td>
@@ -124,15 +124,15 @@
                       <option value="active" {% if (paper.status or 'active') == 'active' %}selected{% endif %}>Active</option>
                       <option value="deleted" {% if paper.status == 'deleted' %}selected{% endif %}>Deleted</option>
                     </select>
-                    <button type="submit" class="btn-secondary compact">Update</button>
+                    <button type="submit" class="admin-btn admin-btn-secondary compact">Update</button>
                   </form>
                   {% if paper.status == "deleted" %}
                     <form method="POST" action="{{ url_for('admin_paper_restore', paper_id=paper.id) }}">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                      <button type="submit" class="btn-secondary compact">Restore</button>
+                      <button type="submit" class="admin-btn admin-btn-secondary compact">Restore</button>
                     </form>
                   {% else %}
-                    <a href="{{ url_for('paper_detail', slug=paper.slug) }}" class="btn-secondary compact">Open</a>
+                    <a href="{{ url_for('paper_detail', slug=paper.slug) }}" class="admin-btn admin-btn-secondary compact">Open</a>
                   {% endif %}
                 </div>
                 <details class="admin-editor">
@@ -153,7 +153,7 @@
                       </div>
                       <p class="admin-editor-note">Publications don't currently expire; the expiry date is stored as metadata only.</p>
                       <div class="admin-editor-actions">
-                        <button type="submit" class="btn-primary compact">Save metadata</button>
+                        <button type="submit" class="admin-btn admin-btn-primary compact">Save metadata</button>
                       </div>
                     </form>
                   </div>

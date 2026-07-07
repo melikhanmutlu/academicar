@@ -180,6 +180,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             "user_selectable_plan_keys": USER_SELECTABLE_PLAN_KEYS,
             "format_model_dimensions_cm": format_model_dimensions_cm,
             "academic_fields": ACADEMIC_FIELDS,
+            "admin_chip_class": admin_chip_class,
         }
 
     @app.after_request
@@ -312,6 +313,23 @@ def format_file_size(size_bytes: int | None) -> str:
             return f"{size:.1f} {unit}" if unit != "B" else f"{int(size)} B"
         size /= 1024
     return f"{size_bytes} B"
+
+
+_ADMIN_CHIP_GOOD = {"ready", "active", "public", "paid", "completed", "admin"}
+_ADMIN_CHIP_WARN = {"queued", "pending", "processing"}
+_ADMIN_CHIP_BAD = {"failed", "replacement_failed", "expired", "cancelled", "refunded", "private", "deleted", "disabled"}
+
+
+def admin_chip_class(value) -> str:
+    """Map an admin status/label string to a status-chip color modifier."""
+    key = (value or "").strip().lower()
+    if key in _ADMIN_CHIP_GOOD:
+        return "is-ready"
+    if key in _ADMIN_CHIP_WARN:
+        return "is-queued"
+    if key in _ADMIN_CHIP_BAD:
+        return "is-failed"
+    return ""
 
 
 def _model_glb_candidate_paths(model: Model3D) -> list[str]:

@@ -69,8 +69,8 @@
           <option value="{{ status }}" {% if filters.model_status == status %}selected{% endif %}>{{ status|replace("_", " ")|title }}</option>
         {% endfor %}
       </select>
-      <button type="submit" class="btn-secondary compact">Filter models</button>
-      <a href="{{ url_for('admin_dashboard', admin_page='models') }}" class="btn-secondary compact">Clear</a>
+      <button type="submit" class="admin-btn admin-btn-secondary compact">Filter models</button>
+      <a href="{{ url_for('admin_dashboard', admin_page='models') }}" class="admin-btn admin-btn-secondary compact">Clear</a>
     </form>
     <div class="table-wrap">
       <table class="data-table admin-table">
@@ -100,13 +100,13 @@
                 {% endif %}
               </td>
               <td>{{ get_license_plan(model.license_type).label }}</td>
-              <td><span class="status-chip">{{ model_access_status(model)|title }}</span></td>
+              <td><span class="status-chip {{ admin_chip_class(model_access_status(model)) }}">{{ model_access_status(model)|title }}</span></td>
               <td>{{ (model.processing_status or "ready")|title }}</td>
               <td>{{ format_file_size(model.file_size) }}</td>
               <td>
                 <div class="admin-actions">
-                  <a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener noreferrer" class="btn-secondary compact">Viewer</a>
-                  <a href="{{ url_for('admin_model_versions', model_id=model.id) }}" class="btn-secondary compact">History</a>
+                  <a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener noreferrer" class="admin-btn admin-btn-secondary compact">Viewer</a>
+                  <a href="{{ url_for('admin_model_versions', model_id=model.id) }}" class="admin-btn admin-btn-secondary compact">History</a>
                   <form method="POST" action="{{ url_for('admin_model_license_update', model_id=model.id) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <select name="license_type" class="field-select compact-select">
@@ -114,7 +114,7 @@
                         <option value="{{ key }}" {% if model.license_type == key %}selected{% endif %}>{{ plan.label }}</option>
                       {% endfor %}
                     </select>
-                    <button type="submit" class="btn-secondary compact">Save license</button>
+                    <button type="submit" class="admin-btn admin-btn-secondary compact">Save license</button>
                   </form>
                   <form method="POST" action="{{ url_for('admin_model_processing_update', model_id=model.id) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -123,11 +123,11 @@
                         <option value="{{ status }}" {% if (model.processing_status or "ready") == status %}selected{% endif %}>{{ status|replace("_", " ")|title }}</option>
                       {% endfor %}
                     </select>
-                    <button type="submit" class="btn-secondary compact">Save status</button>
+                    <button type="submit" class="admin-btn admin-btn-secondary compact">Save status</button>
                   </form>
                   <form method="POST" action="{{ url_for('admin_model_poster_regenerate', model_id=model.id) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn-secondary compact">Regenerate poster</button>
+                    <button type="submit" class="admin-btn admin-btn-secondary compact">Regenerate poster</button>
                   </form>
                 </div>
                 <details class="admin-editor">
@@ -149,7 +149,7 @@
                       </div>
                       <label class="admin-editor-field"><span>Description</span><input name="description" value="{{ model.description or '' }}" maxlength="5000"></label>
                       <div class="admin-editor-actions">
-                        <button type="submit" class="btn-primary compact">Save appearance</button>
+                        <button type="submit" class="admin-btn admin-btn-primary compact">Save appearance</button>
                       </div>
                     </form>
                     <div class="admin-breakdown" style="border:none;padding:0;margin-top:16px">

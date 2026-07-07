@@ -19,8 +19,8 @@
           <option value="{{ status }}" {% if filters.job_status == status %}selected{% endif %}>{{ status|title }}</option>
         {% endfor %}
       </select>
-      <button type="submit" class="btn-secondary compact">Filter jobs</button>
-      <a href="{{ url_for('admin_dashboard', admin_page='jobs') }}" class="btn-secondary compact">Clear</a>
+      <button type="submit" class="admin-btn admin-btn-secondary compact">Filter jobs</button>
+      <a href="{{ url_for('admin_dashboard', admin_page='jobs') }}" class="admin-btn admin-btn-secondary compact">Clear</a>
     </form>
     <div class="table-wrap">
       <table class="data-table admin-table">
@@ -41,7 +41,7 @@
                 <strong>{{ job.job_type|replace("_", " ")|title }}</strong>
                 <small>{{ job.created_at.strftime("%Y-%m-%d %H:%M") if job.created_at else "-" }}</small>
               </td>
-              <td><span class="status-chip">{{ job.status|title }}</span></td>
+              <td><span class="status-chip {{ admin_chip_class(job.status) }}">{{ job.status|title }}</span></td>
               <td>{{ job.model_id }}</td>
               <td>{{ job.attempts }} / {{ job.max_attempts }}</td>
               <td>{{ job.error or "-" }}</td>
@@ -50,13 +50,13 @@
                   {% if job.status in ["failed", "cancelled"] %}
                     <form method="POST" action="{{ url_for('admin_job_retry', job_id=job.id) }}">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                      <button type="submit" class="btn-secondary compact">Retry</button>
+                      <button type="submit" class="admin-btn admin-btn-secondary compact">Retry</button>
                     </form>
                   {% endif %}
                   {% if job.status == "pending" %}
                     <form method="POST" action="{{ url_for('admin_job_cancel', job_id=job.id) }}" onsubmit="return confirm('Cancel this queued job?')">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                      <button type="submit" class="btn-danger compact">Cancel</button>
+                      <button type="submit" class="admin-btn admin-btn-danger compact">Cancel</button>
                     </form>
                   {% endif %}
                   {% if job.status not in ["failed", "cancelled", "pending"] %}
@@ -72,7 +72,7 @@
                         <span>Max attempts</span>
                         <input type="number" name="max_attempts" min="1" max="20" value="{{ job.max_attempts }}">
                       </label>
-                      <button type="submit" class="btn-secondary compact">Save</button>
+                      <button type="submit" class="admin-btn admin-btn-secondary compact">Save</button>
                     </form>
                     <p class="admin-editor-note">Payload</p>
                     <pre style="white-space:pre-wrap;word-break:break-all;font-size:12px;margin:0">{{ job.payload | tojson(indent=2) }}</pre>

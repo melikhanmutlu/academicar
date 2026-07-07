@@ -46,7 +46,7 @@
         <span>Insert image (uploads, then pastes the Markdown at your cursor)</span>
         <div class="admin-blog-uploader">
           <input type="file" id="blog-image-file" accept="image/png,image/jpeg,image/webp,image/gif">
-          <button type="button" class="btn-secondary compact" id="blog-image-upload-btn">Upload &amp; insert</button>
+          <button type="button" class="admin-btn admin-btn-secondary compact" id="blog-image-upload-btn">Upload &amp; insert</button>
           <span id="blog-image-status" class="admin-blog-upload-status"></span>
         </div>
       </div>
@@ -78,9 +78,9 @@
         <span>Published (uncheck to keep as a draft)</span>
       </label>
       <div class="admin-blog-actions">
-        <button type="submit" class="btn-primary compact">{{ "Update post" if editing_post else "Create post" }}</button>
+        <button type="submit" class="admin-btn admin-btn-primary compact">{{ "Update post" if editing_post else "Create post" }}</button>
         {% if editing_post %}
-          <a href="{{ url_for('admin_dashboard', admin_page='blog') }}" class="btn-secondary compact">Cancel edit</a>
+          <a href="{{ url_for('admin_dashboard', admin_page='blog') }}" class="admin-btn admin-btn-secondary compact">Cancel edit</a>
         {% endif %}
       </div>
     </form>
@@ -98,15 +98,15 @@
               <td>{{ "Published" if p.is_published else "Draft" }}</td>
               <td>{{ p.created_at.strftime("%Y-%m-%d") if p.created_at else "" }}</td>
               <td class="admin-blog-row-actions">
-                <a href="{{ url_for('blog_post', slug=p.slug) }}" class="btn-secondary compact" target="_blank" rel="noopener">View</a>
-                <a href="{{ url_for('admin_dashboard', admin_page='blog', edit=p.id) }}" class="btn-secondary compact">Edit</a>
+                <a href="{{ url_for('blog_post', slug=p.slug) }}" class="admin-btn admin-btn-secondary compact" target="_blank" rel="noopener">View</a>
+                <a href="{{ url_for('admin_dashboard', admin_page='blog', edit=p.id) }}" class="admin-btn admin-btn-secondary compact">Edit</a>
                 <form method="POST" action="{{ url_for('admin_blog_publish', post_id=p.id) }}" style="display:inline">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                  <button type="submit" class="btn-secondary compact">{{ "Unpublish" if p.is_published else "Publish" }}</button>
+                  <button type="submit" class="admin-btn admin-btn-secondary compact">{{ "Unpublish" if p.is_published else "Publish" }}</button>
                 </form>
                 <form method="POST" action="{{ url_for('admin_blog_delete', post_id=p.id) }}" style="display:inline" onsubmit="return confirm('Delete this post permanently?')">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                  <button type="submit" class="btn-danger compact">Delete</button>
+                  <button type="submit" class="admin-btn admin-btn-danger compact">Delete</button>
                 </form>
               </td>
             </tr>

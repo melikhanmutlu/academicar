@@ -6,7 +6,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="app-shell admin-layout">
+<div class="admin-layout">
   <aside class="admin-sidebar" id="adminSidebar" aria-label="Admin navigation">
     {% include "admin/_sidebar.html" %}
   </aside>
@@ -23,8 +23,8 @@
       </div>
       <div class="admin-topbar-actions">
         {% block admin_actions %}
-          <a href="{{ url_for('dashboard') }}" class="btn-secondary compact">My dashboard</a>
-          <a href="{{ url_for('paper_new') }}" class="btn-primary compact">New publication</a>
+          <a href="{{ url_for('dashboard') }}" class="admin-btn admin-btn-secondary compact">My dashboard</a>
+          <a href="{{ url_for('paper_new') }}" class="admin-btn admin-btn-primary compact">New publication</a>
         {% endblock %}
       </div>
     </div>

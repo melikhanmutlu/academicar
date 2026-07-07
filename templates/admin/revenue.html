@@ -72,9 +72,9 @@
         <option value="manual" {% if filters.provider == "manual" %}selected{% endif %}>Manual</option>
         <option value="paytr" {% if filters.provider == "paytr" %}selected{% endif %}>PayTR</option>
       </select>
-      <button type="submit" class="btn-secondary compact">Filter</button>
-      <a href="{{ url_for('admin_dashboard', admin_page='revenue') }}" class="btn-secondary compact">Clear</a>
-      <a href="{{ url_for('admin_revenue_export', **request.args) }}" class="btn-secondary compact">Download CSV</a>
+      <button type="submit" class="admin-btn admin-btn-secondary compact">Filter</button>
+      <a href="{{ url_for('admin_dashboard', admin_page='revenue') }}" class="admin-btn admin-btn-secondary compact">Clear</a>
+      <a href="{{ url_for('admin_revenue_export', **request.args) }}" class="admin-btn admin-btn-secondary compact">Download CSV</a>
     </form>
     <div class="table-wrap">
       <table class="data-table admin-table">
@@ -100,7 +100,7 @@
                 {% endif %}
               </td>
               <td>{{ "%.2f"|format(payment.amount_kurus / 100) }} {{ payment.currency }}</td>
-              <td><span class="status-chip">{{ payment.status|title }}</span></td>
+              <td><span class="status-chip {{ admin_chip_class(payment.status) }}">{{ payment.status|title }}</span></td>
               <td>{{ payment.provider }}</td>
               <td>
                 <form method="POST" action="{{ url_for('admin_payment_status_update', payment_id=payment.id) }}" class="admin-inline-form">
@@ -110,7 +110,7 @@
                       <option value="{{ status }}" {% if payment.status == status %}selected{% endif %}>{{ status|title }}</option>
                     {% endfor %}
                   </select>
-                  <button type="submit" class="btn-secondary compact">Save</button>
+                  <button type="submit" class="admin-btn admin-btn-secondary compact">Save</button>
                 </form>
               </td>
             </tr>

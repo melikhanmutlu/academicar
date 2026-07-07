@@ -54,7 +54,7 @@
                 <td>
                   <form method="POST" action="{{ url_for('admin_model_mirror_retry', model_id=model.id) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn-secondary compact">Retry mirror</button>
+                    <button type="submit" class="admin-btn admin-btn-secondary compact">Retry mirror</button>
                   </form>
                 </td>
               </tr>

@@ -6,29 +6,37 @@
    inline <details> editors introduced by the admin redesign.
    ========================================================================== */
 
-/* ---- Layout ------------------------------------------------------------- */
+/* ---- Layout --------------------------------------------------------------
+   Full-page shell: the sidebar is fixed app chrome spanning the viewport
+   height below the site header, and the content column is no longer capped
+   by the shared .app-shell 1440px max-width — admin/base.html does not use
+   that class, so this layout owns its own width/padding independently. */
+:root {
+  --admin-header-height: 65px; /* site-header-inner height (64px) + 1px border */
+}
+
 .admin-layout {
-  display: grid;
-  grid-template-columns: 236px minmax(0, 1fr);
-  gap: 32px;
-  align-items: start;
-  padding-top: 32px;
-  padding-bottom: 88px;
+  min-height: calc(100vh - var(--admin-header-height));
 }
 
 .admin-main {
   min-width: 0;
+  margin-left: 236px;
+  padding: 32px 40px 88px 32px;
 }
 
 /* ---- Sidebar ------------------------------------------------------------ */
 .admin-sidebar {
-  position: sticky;
-  top: 88px;
-  align-self: start;
-  max-height: calc(100vh - 108px);
+  position: fixed;
+  top: var(--admin-header-height);
+  left: 0;
+  width: 236px;
+  height: calc(100vh - var(--admin-header-height));
   overflow-y: auto;
-  padding-right: 20px;
+  padding: 24px 16px 24px 24px;
   border-right: 1px solid var(--color-light-pearl);
+  background: var(--color-canvas-white);
+  z-index: 20;
 }
 
 .admin-sidebar-brand {
@@ -315,7 +323,7 @@
   height: 34px;
   padding: 6px 8px;
   border: 1px solid var(--color-light-pearl);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--color-canvas-white);
   font-family: var(--font-inter);
   font-size: 13px;
@@ -343,29 +351,27 @@
   margin: 0 0 16px;
 }
 
-/* ---- Off-canvas sidebar on smaller screens ----------------------------- */
+/* ---- Off-canvas sidebar on smaller screens -----------------------------
+   Below 1024px the sidebar becomes a full-viewport overlay drawer (ignores
+   the header offset, sits above everything including it) instead of the
+   permanent app-chrome column used at desktop widths. */
 @media (max-width: 1024px) {
-  .admin-layout {
-    grid-template-columns: 1fr;
-    gap: 0;
+  .admin-main {
+    margin-left: 0;
+    padding: 24px 20px 60px;
   }
   .admin-menu-toggle {
     display: inline-flex;
   }
   .admin-sidebar {
-    position: fixed;
     top: 0;
     left: 0;
-    bottom: 0;
+    height: 100vh;
     z-index: 60;
     width: 264px;
-    max-height: none;
     padding: 20px 16px;
-    background: var(--color-canvas-white);
-    border-right: 1px solid var(--color-light-pearl);
     transform: translateX(-100%);
     transition: transform 0.25s ease;
-    overflow-y: auto;
   }
   .admin-sidebar.is-open {
     transform: translateX(0);
@@ -380,4 +386,90 @@
   .admin-editor-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* ---- Buttons -------------------------------------------------------------
+   Bounded, admin-only deviation from the site's ghost-button language: real
+   filled/bordered buttons so secondary actions read as clickable. Built
+   entirely from existing Ventriloc tokens; radii stay within the closed
+   {3,8,12,20,200}px set. Never applied outside templates/admin/*.html. */
+.admin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--font-inter);
+  font-weight: 500;
+  font-size: 13px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.admin-btn.compact {
+  min-height: 34px;
+  padding: 7px 11px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.admin-btn-primary {
+  background: var(--color-midnight-graphite);
+  color: var(--color-canvas-white);
+  border-color: var(--color-midnight-graphite);
+}
+
+.admin-btn-primary:hover {
+  background: var(--color-dark-shale);
+  border-color: var(--color-sunset-orange);
+}
+
+.admin-btn-secondary {
+  background: var(--color-canvas-white);
+  color: var(--color-midnight-graphite);
+  border-color: var(--color-light-pearl);
+}
+
+.admin-btn-secondary:hover {
+  background: var(--color-cloud-whisper);
+  border-color: var(--color-silver-ash);
+}
+
+/* Reuses the same red already established elsewhere in the app for
+   destructive actions (deactivate account, cancel job) — formalized here
+   as the admin panel's official danger tone rather than a new invention. */
+.admin-btn-danger {
+  background: var(--color-canvas-white);
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.admin-btn-danger:hover {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
+/* ---- Status chip color variants -------------------------------------------
+   Additive modifiers on the shared .status-chip base (never redefines it) —
+   assigned via the admin_chip_class() template global based on the chip's
+   underlying status value. */
+.status-chip.is-ready {
+  background: var(--color-slate-mist);
+  color: var(--color-midnight-graphite);
+  font-weight: 600;
+}
+
+.status-chip.is-queued {
+  background: var(--color-warm-ivory);
+  color: var(--color-data-gold);
+  font-weight: 600;
+}
+
+.status-chip.is-failed {
+  background: #fef2f2;
+  color: #b91c1c;
+  font-weight: 600;
 }

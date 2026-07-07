@@ -2,8 +2,8 @@
 {% block admin_title %}{{ user.username }}{% endblock %}
 {% block admin_subtitle %}{{ user.email }} · joined {{ user.created_at.strftime("%Y-%m-%d") if user.created_at else "-" }}{% if user.deactivated_at %} · deactivated{% endif %}{% endblock %}
 {% block admin_actions %}
-  <a href="{{ url_for('admin_user_dashboard', user_id=user.id) }}" class="btn-secondary compact">View dashboard</a>
-  <a href="{{ url_for('admin_dashboard', admin_page='users') }}" class="btn-secondary compact">All users</a>
+  <a href="{{ url_for('admin_user_dashboard', user_id=user.id) }}" class="admin-btn admin-btn-secondary compact">View dashboard</a>
+  <a href="{{ url_for('admin_dashboard', admin_page='users') }}" class="admin-btn admin-btn-secondary compact">All users</a>
 {% endblock %}
 
 {% block admin_body %}
@@ -46,22 +46,22 @@
           <option value="academic" {% if user.plan == "academic" %}selected{% endif %}>Academic</option>
           <option value="extended_archive" {% if user.plan == "extended_archive" %}selected{% endif %}>Extended Archive</option>
         </select>
-        <button type="submit" class="btn-secondary compact">Save plan</button>
+        <button type="submit" class="admin-btn admin-btn-secondary compact">Save plan</button>
       </form>
       <form method="POST" action="{{ url_for('admin_user_role_update', user_id=user.id) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="is_admin" value="{{ '0' if user.is_admin else '1' }}">
-        <button type="submit" class="btn-secondary compact">{{ "Remove admin" if user.is_admin else "Make admin" }}</button>
+        <button type="submit" class="admin-btn admin-btn-secondary compact">{{ "Remove admin" if user.is_admin else "Make admin" }}</button>
       </form>
       {% if user.deactivated_at %}
         <form method="POST" action="{{ url_for('admin_user_reactivate', user_id=user.id) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="btn-secondary compact">Reactivate account</button>
+          <button type="submit" class="admin-btn admin-btn-secondary compact">Reactivate account</button>
         </form>
       {% else %}
         <form method="POST" action="{{ url_for('admin_user_deactivate', user_id=user.id) }}" onsubmit="return confirm('Deactivate this account? The user will be logged out and unable to sign in.')">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="btn-danger compact">Deactivate account</button>
+          <button type="submit" class="admin-btn admin-btn-danger compact">Deactivate account</button>
         </form>
       {% endif %}
     </div>
@@ -78,7 +78,7 @@
               <span>Email</span>
               <input type="email" name="email" value="{{ user.email }}" required>
             </label>
-            <button type="submit" class="btn-secondary compact">Save email</button>
+            <button type="submit" class="admin-btn admin-btn-secondary compact">Save email</button>
           </form>
           <p class="admin-editor-note">Configured-admin promotion is matched by email — renaming can affect auto-promotion.</p>
         {% endif %}
@@ -112,7 +112,7 @@
                 <strong><a href="{{ url_for('paper_public', slug=paper.slug) }}" target="_blank" rel="noopener noreferrer">{{ paper.title }}</a></strong>
                 <small>{{ paper.slug }}</small>
               </td>
-              <td><span class="status-chip">{{ "Public" if paper.is_public else "Private" }}</span></td>
+              <td><span class="status-chip {{ admin_chip_class('public' if paper.is_public else 'private') }}">{{ "Public" if paper.is_public else "Private" }}</span></td>
               <td>{{ paper.models|length }}</td>
               <td>{{ paper.created_at.strftime("%Y-%m-%d") if paper.created_at else "-" }}</td>
               <td>
@@ -134,7 +134,7 @@
                       </div>
                       <p class="admin-editor-note">Publications don't currently expire; the expiry date is stored as metadata only.</p>
                       <div class="admin-editor-actions">
-                        <button type="submit" class="btn-primary compact">Save metadata</button>
+                        <button type="submit" class="admin-btn admin-btn-primary compact">Save metadata</button>
                       </div>
                     </form>
                   </div>
@@ -177,19 +177,19 @@
               </td>
               <td>{{ model.paper.title if model.paper else "-" }}</td>
               <td>{{ get_license_plan(model.license_type).label }}</td>
-              <td><span class="status-chip">{{ model_access_status(model)|title }}</span></td>
+              <td><span class="status-chip {{ admin_chip_class(model_access_status(model)) }}">{{ model_access_status(model)|title }}</span></td>
               <td>
                 <div class="admin-actions">
-                  <a href="{{ url_for('admin_model_versions', model_id=model.id) }}" class="btn-secondary compact">History</a>
+                  <a href="{{ url_for('admin_model_versions', model_id=model.id) }}" class="admin-btn admin-btn-secondary compact">History</a>
                   <form method="POST" action="{{ url_for('admin_model_qr_regenerate', model_id=model.id) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="next" value="user_detail">
-                    <button type="submit" class="btn-secondary compact">Regenerate QR</button>
+                    <button type="submit" class="admin-btn admin-btn-secondary compact">Regenerate QR</button>
                   </form>
                   <form method="POST" action="{{ url_for('admin_model_poster_regenerate', model_id=model.id) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="next" value="user_detail">
-                    <button type="submit" class="btn-secondary compact">Regenerate poster</button>
+                    <button type="submit" class="admin-btn admin-btn-secondary compact">Regenerate poster</button>
                   </form>
                 </div>
                 <details class="admin-editor">
@@ -204,7 +204,7 @@
                       </div>
                       <p class="admin-editor-note">Explicit override — the license tier and storage limit are left unchanged.</p>
                       <div class="admin-editor-actions">
-                        <button type="submit" class="btn-primary compact">Save access window</button>
+                        <button type="submit" class="admin-btn admin-btn-primary compact">Save access window</button>
                       </div>
                     </form>
                   </div>
@@ -267,7 +267,7 @@
           </div>
           <p class="admin-editor-note">A paid manual payment with a model id and paid plan grants the model's access window.</p>
           <div class="admin-editor-actions">
-            <button type="submit" class="btn-primary compact">Record payment</button>
+            <button type="submit" class="admin-btn admin-btn-primary compact">Record payment</button>
           </div>
         </form>
       </div>
