@@ -5,6 +5,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ model.display_name or model.original_filename }} — AcademicAR</title>
+  {% set viewer_display_name = model.display_name or model.original_filename or 'Model' %}
+  {% set viewer_description = (viewer_display_name ~ ' — interactive 3D model from "' ~ paper.title ~ '" on AcademicAR.')|striptags|truncate(160) %}
+  <meta name="description" content="{{ viewer_description }}">
+  <link rel="canonical" href="{{ canonical_url() }}">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{{ viewer_display_name }} — AcademicAR">
+  <meta property="og:description" content="{{ viewer_description }}">
+  <meta property="og:url" content="{{ canonical_url() }}">
 
   <!-- Apply the saved viewer background theme before paint to avoid a flash. -->
   <script>

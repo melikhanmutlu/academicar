@@ -236,6 +236,10 @@ class Config:
     if SITE_URL and not SITE_URL.startswith(("http://", "https://")):
         SITE_URL = f"https://{SITE_URL}"
 
+    # Google Search Console ownership verification (HTML tag method). Paste the
+    # content value Search Console gives you for your property; empty = no-op.
+    GOOGLE_SITE_VERIFICATION = os.environ.get("GOOGLE_SITE_VERIFICATION", "")
+
     @staticmethod
     def init_app(app):
         for folder in (
