@@ -3578,15 +3578,30 @@ def register_routes(app: Flask) -> None:
         )
         critical_alerts = []
         if totals["failed_jobs"]:
-            critical_alerts.append(f"{totals['failed_jobs']} failed conversion job(s)")
+            critical_alerts.append({
+                "text": f"{totals['failed_jobs']} failed conversion job(s)",
+                "url": url_for("admin_dashboard", admin_page="jobs", job_status="failed"),
+            })
         if near_limit_models:
-            critical_alerts.append(f"{len(near_limit_models)} model(s) near storage limit")
+            critical_alerts.append({
+                "text": f"{len(near_limit_models)} model(s) near storage limit",
+                "url": url_for("admin_dashboard", admin_page="models"),
+            })
         if expired_public_papers:
-            critical_alerts.append(f"{expired_public_papers} expired public publication(s)")
+            critical_alerts.append({
+                "text": f"{expired_public_papers} expired public publication(s)",
+                "url": url_for("admin_dashboard", admin_page="content"),
+            })
         if sum(orphan_counts.values()):
-            critical_alerts.append(f"{sum(orphan_counts.values())} orphan file(s) detected")
+            critical_alerts.append({
+                "text": f"{sum(orphan_counts.values())} orphan file(s) detected",
+                "url": url_for("admin_dashboard", admin_page="storage"),
+            })
         if mirror_failed_count:
-            critical_alerts.append(f"{mirror_failed_count} model(s) failed to mirror to R2")
+            critical_alerts.append({
+                "text": f"{mirror_failed_count} model(s) failed to mirror to R2",
+                "url": url_for("admin_dashboard", admin_page="storage"),
+            })
         stats = {
             "new_users_7d": User.query.filter(User.created_at >= last_7_days).count(),
             "new_users_30d": User.query.filter(User.created_at >= last_30_days).count(),

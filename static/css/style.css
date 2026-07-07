@@ -7351,13 +7351,14 @@ label.rounded-xl input[type="checkbox"] {
 }
 
 .admin-metrics {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 24px;
 }
 
 .admin-metric {
+  flex: 1 1 200px;
   min-height: 132px;
   border: 1px solid var(--color-light-pearl);
   background: var(--color-canvas-white);
@@ -7430,12 +7431,13 @@ label.rounded-xl input[type="checkbox"] {
 }
 
 .admin-insight-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
 .admin-insight-card {
+  flex: 1 1 200px;
   min-height: 128px;
   border: 1px solid var(--color-light-pearl);
   border-radius: 8px;
@@ -7476,6 +7478,7 @@ label.rounded-xl input[type="checkbox"] {
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
   margin-top: 16px;
+  align-items: start;
 }
 
 .admin-two-col {
@@ -7483,6 +7486,7 @@ label.rounded-xl input[type="checkbox"] {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin-top: 16px;
+  align-items: start;
 }
 
 .admin-breakdown,
@@ -7536,6 +7540,7 @@ label.rounded-xl input[type="checkbox"] {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin-top: 16px;
+  align-items: start;
 }
 
 .admin-watch-list {
@@ -7563,7 +7568,7 @@ label.rounded-xl input[type="checkbox"] {
 
 .admin-sparkline,
 .admin-bar-chart {
-  min-height: 120px;
+  min-height: 90px;
   display: flex;
   align-items: flex-end;
   gap: 4px;
@@ -7841,6 +7846,16 @@ details[open] > .upload-summary .upload-inline-action svg {
   font-size: 13px;
 }
 
+/* The legacy .field-select rule (width: 100%, further up in this file)
+   otherwise wins here since nothing else sets a width for it, forcing
+   every filter-bar select onto its own full-width row instead of sitting
+   inline with the search box and buttons. */
+.admin-filter-bar .field-select {
+  width: auto;
+  min-width: 160px;
+  max-width: 220px;
+}
+
 .admin-table strong {
   display: block;
   font-weight: 600;
@@ -7869,10 +7884,6 @@ details[open] > .upload-summary .upload-inline-action svg {
 }
 
 @media (max-width: 1180px) {
-  .admin-metrics {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .admin-insight-grid,
   .admin-breakdown-grid,
   .admin-two-col {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -7888,9 +7899,6 @@ details[open] > .upload-summary .upload-inline-action svg {
     align-items: flex-start;
     flex-direction: column;
   }
-  .admin-metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   .admin-watch-grid {
     grid-template-columns: 1fr;
   }
@@ -7900,8 +7908,8 @@ details[open] > .upload-summary .upload-inline-action svg {
   .stats-grid {
     grid-template-columns: 1fr;
   }
-  .admin-metrics {
-    grid-template-columns: 1fr;
+  .admin-metric {
+    flex-basis: 100%;
   }
   .admin-header h1 {
     font-size: 36px;
@@ -7915,7 +7923,9 @@ details[open] > .upload-summary .upload-inline-action svg {
     align-items: stretch;
     flex-direction: column;
   }
-  .admin-insight-grid,
+  .admin-insight-card {
+    flex-basis: 100%;
+  }
   .admin-breakdown-grid,
   .admin-two-col {
     grid-template-columns: 1fr;

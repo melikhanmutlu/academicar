@@ -39,52 +39,51 @@
   <section class="admin-section">
     <div class="admin-section-head">
       <div>
-        <h2>License &amp; processing</h2>
-        <p>Change the plan tier or force a processing state.</p>
+        <h2>License, processing, poster &amp; QR</h2>
+        <p>Change the plan tier or processing state, or regenerate the poster/QR image. The public id never changes.</p>
       </div>
     </div>
-    <div class="admin-actions">
-      <form method="POST" action="{{ url_for('admin_model_license_update', model_id=model.id) }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="next" value="model_detail">
-        <select name="license_type" class="field-select compact-select">
-          {% for key, plan in license_plans.items() if key in user_selectable_plan_keys or key == model.license_type %}
-            <option value="{{ key }}" {% if model.license_type == key %}selected{% endif %}>{{ plan.label }}</option>
-          {% endfor %}
-        </select>
-        <button type="submit" class="admin-btn admin-btn-secondary compact">Save license</button>
-      </form>
-      <form method="POST" action="{{ url_for('admin_model_processing_update', model_id=model.id) }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="next" value="model_detail">
-        <select name="processing_status" class="field-select compact-select">
-          {% for status in ["queued", "processing", "ready", "failed", "replacement_failed"] %}
-            <option value="{{ status }}" {% if (model.processing_status or "ready") == status %}selected{% endif %}>{{ status|replace("_", " ")|title }}</option>
-          {% endfor %}
-        </select>
-        <button type="submit" class="admin-btn admin-btn-secondary compact">Save status</button>
-      </form>
-    </div>
-  </section>
-
-  <section class="admin-section">
-    <div class="admin-section-head">
-      <div>
-        <h2>Poster &amp; QR</h2>
-        <p>Regenerate the thumbnail poster or the printable QR image. The public id never changes.</p>
+    <div class="admin-two-col">
+      <div class="admin-breakdown">
+        <h3>License &amp; processing</h3>
+        <div class="admin-actions">
+          <form method="POST" action="{{ url_for('admin_model_license_update', model_id=model.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next" value="model_detail">
+            <select name="license_type" class="field-select compact-select">
+              {% for key, plan in license_plans.items() if key in user_selectable_plan_keys or key == model.license_type %}
+                <option value="{{ key }}" {% if model.license_type == key %}selected{% endif %}>{{ plan.label }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="admin-btn admin-btn-secondary compact">Save license</button>
+          </form>
+          <form method="POST" action="{{ url_for('admin_model_processing_update', model_id=model.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next" value="model_detail">
+            <select name="processing_status" class="field-select compact-select">
+              {% for status in ["queued", "processing", "ready", "failed", "replacement_failed"] %}
+                <option value="{{ status }}" {% if (model.processing_status or "ready") == status %}selected{% endif %}>{{ status|replace("_", " ")|title }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="admin-btn admin-btn-secondary compact">Save status</button>
+          </form>
+        </div>
       </div>
-    </div>
-    <div class="admin-actions">
-      <form method="POST" action="{{ url_for('admin_model_poster_regenerate', model_id=model.id) }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="next" value="model_detail">
-        <button type="submit" class="admin-btn admin-btn-secondary compact">Regenerate poster</button>
-      </form>
-      <form method="POST" action="{{ url_for('admin_model_qr_regenerate', model_id=model.id) }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="next" value="model_detail">
-        <button type="submit" class="admin-btn admin-btn-secondary compact">Regenerate QR</button>
-      </form>
+      <div class="admin-breakdown">
+        <h3>Poster &amp; QR</h3>
+        <div class="admin-actions">
+          <form method="POST" action="{{ url_for('admin_model_poster_regenerate', model_id=model.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next" value="model_detail">
+            <button type="submit" class="admin-btn admin-btn-secondary compact">Regenerate poster</button>
+          </form>
+          <form method="POST" action="{{ url_for('admin_model_qr_regenerate', model_id=model.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next" value="model_detail">
+            <button type="submit" class="admin-btn admin-btn-secondary compact">Regenerate QR</button>
+          </form>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -111,7 +110,7 @@
             </label>
             <label class="admin-editor-field"><span>Roughness (0-1)</span><input type="number" name="roughness" min="0" max="1" step="0.05" value="{{ '%.2f'|format(model.appearance_roughness or 0.35) }}"></label>
             <label class="admin-editor-field"><span>Metallic (0-1)</span><input type="number" name="metallic" min="0" max="1" step="0.05" value="{{ '%.2f'|format(model.appearance_metallic or 0.05) }}"></label>
-            <label class="admin-editor-field"><span>Display name</span><input name="display_name" value="{{ model.display_name or '' }}" maxlength="255"></label>
+            <label class="admin-editor-field" style="grid-column:1/-1"><span>Display name</span><input name="display_name" value="{{ model.display_name or '' }}" maxlength="255"></label>
           </div>
           <label class="admin-editor-field"><span>Description</span><input name="description" value="{{ model.description or '' }}" maxlength="5000"></label>
           <div class="admin-editor-actions">

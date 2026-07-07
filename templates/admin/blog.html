@@ -16,11 +16,11 @@
           action="{{ url_for('admin_blog_update', post_id=editing_post.id) if editing_post else url_for('admin_blog_create') }}"
           class="admin-blog-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <label class="admin-blog-field">
+      <label class="admin-blog-field" style="max-width:520px">
         <span>Title</span>
         <input name="title" required maxlength="300" value="{{ editing_post.title if editing_post else '' }}">
       </label>
-      <label class="admin-blog-field">
+      <label class="admin-blog-field" style="max-width:520px">
         <span>Description (used as the meta description &amp; list summary)</span>
         <input name="description" maxlength="500" value="{{ editing_post.description if editing_post else '' }}">
       </label>
@@ -38,7 +38,7 @@
           <input name="read_minutes" type="number" min="1" max="120" value="{{ editing_post.read_minutes if editing_post else 5 }}">
         </label>
       </div>
-      <label class="admin-blog-field">
+      <label class="admin-blog-field" style="max-width:520px">
         <span>Author</span>
         <input name="author" maxlength="120" value="{{ editing_post.author if editing_post else 'AcademicAR Team' }}">
       </label>

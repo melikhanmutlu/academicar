@@ -46,7 +46,7 @@
     <div class="admin-breakdown mt-4">
       <h3>Critical system alerts</h3>
       {% for alert in critical_alerts %}
-        <div><span>{{ alert }}</span><strong>Review</strong></div>
+        <div><span>{{ alert.text }}</span><a href="{{ alert.url }}" class="admin-btn admin-btn-secondary compact">Review</a></div>
       {% else %}
         <div><span>No critical alerts detected.</span><strong>OK</strong></div>
       {% endfor %}
