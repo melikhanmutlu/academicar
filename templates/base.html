@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}AcademicAR{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/favicon.svg') }}">
+  {% if config.GOOGLE_SITE_VERIFICATION %}<meta name="google-site-verification" content="{{ config.GOOGLE_SITE_VERIFICATION }}">{% endif %}
 
   <meta name="description" content="{% block meta_description %}Share 3D and AR models with academic papers, posters, and presentations. Upload STL or GLB, get a viewer link and a QR code.{% endblock %}">
   {% block canonical %}<link rel="canonical" href="{{ canonical_url() }}">{% endblock %}

@@ -2567,6 +2567,8 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/robots.txt")
     def robots_txt():
+        if current_app.config.get("APP_ENV") not in {"production", "prod", "pilot"}:
+            return current_app.response_class("User-agent: *\nDisallow: /\n", mimetype="text/plain")
         body = "\n".join(
             [
                 "User-agent: *",
