@@ -7,12 +7,16 @@
    ========================================================================== */
 
 /* ---- Layout --------------------------------------------------------------
-   Full-page shell: the sidebar is fixed app chrome spanning the viewport
-   height below the site header, and the content column is no longer capped
-   by the shared .app-shell 1440px max-width — admin/base.html does not use
-   that class, so this layout owns its own width/padding independently. */
+   Full-page shell: the sidebar is fixed app chrome spanning the full
+   viewport height, and the content column is no longer capped by the
+   shared .app-shell 1440px max-width — admin/base.html does not use that
+   class, so this layout owns its own width/padding independently. The
+   site's public header/footer are both hidden on admin routes (see
+   templates/base.html), so the sidebar owns the entire left edge from
+   the top of the viewport; profile/logout live in the sidebar foot
+   instead of the (hidden) site header. */
 :root {
-  --admin-header-height: 65px; /* site-header-inner height (64px) + 1px border */
+  --admin-header-height: 0px;
 }
 
 .admin-layout {
@@ -151,17 +155,82 @@
   margin-top: 16px;
   padding: 14px 12px 4px;
   border-top: 1px solid var(--color-light-pearl);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.admin-sidebar-foot a {
+.admin-sidebar-foot a,
+.admin-sidebar-foot button {
   font-family: var(--font-inter);
   font-size: 13px;
   color: var(--color-silver-ash);
   text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
 }
 
-.admin-sidebar-foot a:hover {
+.admin-sidebar-foot a:hover,
+.admin-sidebar-foot button:hover {
   color: var(--color-sunset-orange);
+}
+
+.admin-sidebar-foot form {
+  margin: 0;
+}
+
+/* Profile identity, standing in for the site header's avatar now that the
+   header is hidden on admin routes. */
+.admin-sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.admin-sidebar-user img,
+.admin-sidebar-user-avatar {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 200px;
+}
+
+.admin-sidebar-user-avatar {
+  display: grid;
+  place-items: center;
+  background: var(--color-midnight-graphite);
+  color: var(--color-canvas-white);
+  font-family: var(--font-inter);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.admin-sidebar-user-name {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-sidebar-user-name strong {
+  font-family: var(--font-inter);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-midnight-graphite);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-sidebar-user-name small {
+  font-size: 11px;
+  color: var(--color-silver-ash);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ---- Top bar ------------------------------------------------------------ */
