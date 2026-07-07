@@ -153,7 +153,7 @@
     <div class="admin-section-head">
       <div>
         <h2>Models</h2>
-        <p>Adjust the access window or regenerate the QR image (the public id is preserved).</p>
+        <p>Open a model's detail page to manage license, appearance, access window, QR, and compliance.</p>
       </div>
       <span>{{ models|length }} records</span>
     </div>
@@ -179,49 +179,7 @@
               <td>{{ get_license_plan(model.license_type).label }}</td>
               <td><span class="status-chip {{ admin_chip_class(model_access_status(model)) }}">{{ model_access_status(model)|title }}</span></td>
               <td>
-                <div class="admin-actions">
-                  <a href="{{ url_for('admin_model_versions', model_id=model.id) }}" class="admin-btn admin-btn-secondary compact">History</a>
-                  <form method="POST" action="{{ url_for('admin_model_qr_regenerate', model_id=model.id) }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="next" value="user_detail">
-                    <button type="submit" class="admin-btn admin-btn-secondary compact">Regenerate QR</button>
-                  </form>
-                  <form method="POST" action="{{ url_for('admin_model_poster_regenerate', model_id=model.id) }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="next" value="user_detail">
-                    <button type="submit" class="admin-btn admin-btn-secondary compact">Regenerate poster</button>
-                  </form>
-                </div>
-                <details class="admin-editor">
-                  <summary>Access window</summary>
-                  <div class="admin-editor-body">
-                    <form method="POST" action="{{ url_for('admin_model_access_window_update', model_id=model.id) }}">
-                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                      <input type="hidden" name="next" value="user_detail">
-                      <div class="admin-editor-grid">
-                        <label class="admin-editor-field"><span>Access starts</span><input type="datetime-local" name="access_starts_at" value="{{ model.access_starts_at.strftime('%Y-%m-%dT%H:%M') if model.access_starts_at else '' }}" required></label>
-                        <label class="admin-editor-field"><span>Access expires (blank = never)</span><input type="datetime-local" name="access_expires_at" value="{{ model.access_expires_at.strftime('%Y-%m-%dT%H:%M') if model.access_expires_at else '' }}"></label>
-                      </div>
-                      <p class="admin-editor-note">Explicit override — the license tier and storage limit are left unchanged.</p>
-                      <div class="admin-editor-actions">
-                        <button type="submit" class="admin-btn admin-btn-primary compact">Save access window</button>
-                      </div>
-                    </form>
-                  </div>
-                </details>
-                <details class="admin-editor">
-                  <summary>Compliance record</summary>
-                  <div class="admin-editor-body">
-                    <div class="admin-breakdown" style="border:none;padding:0">
-                      <div><span>Anonymization confirmed</span><strong>{{ "Yes" if model.anonymization_confirmed else "No" }}</strong></div>
-                      <div><span>Rights confirmed</span><strong>{{ "Yes" if model.rights_confirmed else "No" }}</strong></div>
-                      <div><span>Ethics responsibility confirmed</span><strong>{{ "Yes" if model.ethics_responsibility_confirmed else "No" }}</strong></div>
-                      <div><span>Confirmed at</span><strong>{{ model.consent_confirmed_at.strftime("%Y-%m-%d %H:%M") if model.consent_confirmed_at else "-" }}</strong></div>
-                      <div><span>Consent IP</span><strong>{{ model.consent_ip or "-" }}</strong></div>
-                      <div><span>Terms version</span><strong>{{ model.terms_version }}</strong></div>
-                    </div>
-                  </div>
-                </details>
+                <a href="{{ url_for('admin_model_detail', model_id=model.id) }}" class="admin-btn admin-btn-primary compact">Manage</a>
               </td>
             </tr>
           {% else %}

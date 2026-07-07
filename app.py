@@ -4119,6 +4119,16 @@ def register_routes(app: Flask) -> None:
         flash(f"Publication restored: {paper.title}.", "success")
         return redirect(url_for("admin_dashboard", admin_page="content"))
 
+    def _admin_model_redirect(next_hint, model, default_page="models"):
+        """Redirect back to the models list, a model's consolidated detail
+        page, or the owning user's detail page, restricted to a known-safe
+        set of targets (same pattern as _admin_paper_redirect)."""
+        if next_hint == "user_detail":
+            return redirect(url_for("admin_user_detail", user_id=model.user_id))
+        if next_hint == "model_detail":
+            return redirect(url_for("admin_model_detail", model_id=model.id))
+        return redirect(url_for("admin_dashboard", admin_page=default_page))
+
     @app.route("/admin/models/<model_id>/license", methods=["POST"])
     @login_required
     def admin_model_license_update(model_id):
@@ -4126,6 +4136,7 @@ def register_routes(app: Flask) -> None:
         model = db.session.get(Model3D, model_id)
         if not model:
             abort(404)
+        next_hint = (request.form.get("next") or "").strip()
         new_license = normalize_license_type(request.form.get("license_type"))
         previous = model.license_type
         apply_model_license_defaults(model, new_license)
@@ -4134,7 +4145,7 @@ def register_routes(app: Flask) -> None:
         except SQLAlchemyError:
             db.session.rollback()
             flash("Could not update. Please try again.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="models"))
+            return _admin_model_redirect(next_hint, model)
         log_audit(
             "admin_model_license_changed",
             user_id=current_user.id,
@@ -4142,7 +4153,7 @@ def register_routes(app: Flask) -> None:
             details={"from": previous, "to": new_license},
         )
         flash(f"Model license updated to {get_license_plan(new_license).label}.", "success")
-        return redirect(url_for("admin_dashboard", admin_page="models"))
+        return _admin_model_redirect(next_hint, model)
 
     @app.route("/admin/pricing/<plan_key>", methods=["POST"])
     @login_required
@@ -4230,10 +4241,11 @@ def register_routes(app: Flask) -> None:
         model = db.session.get(Model3D, model_id)
         if not model:
             abort(404)
+        next_hint = (request.form.get("next") or "").strip()
         new_status = (request.form.get("processing_status") or "ready").strip().lower()
         if new_status not in {"queued", "processing", "ready", "failed", "replacement_failed"}:
             flash("Invalid model processing status.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="models"))
+            return _admin_model_redirect(next_hint, model)
         previous = model.processing_status
         model.processing_status = new_status
         if new_status != "failed":
@@ -4243,7 +4255,7 @@ def register_routes(app: Flask) -> None:
         except SQLAlchemyError:
             db.session.rollback()
             flash("Could not update. Please try again.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="models"))
+            return _admin_model_redirect(next_hint, model)
         log_audit(
             "admin_model_processing_changed",
             user_id=current_user.id,
@@ -4251,7 +4263,7 @@ def register_routes(app: Flask) -> None:
             details={"from": previous, "to": new_status},
         )
         flash("Model processing status updated.", "success")
-        return redirect(url_for("admin_dashboard", admin_page="models"))
+        return _admin_model_redirect(next_hint, model)
 
     @app.route("/admin/qr-links/<int:qr_id>/status", methods=["POST"])
     @login_required
@@ -4479,11 +4491,7 @@ def register_routes(app: Flask) -> None:
         if not model:
             abort(404)
         next_hint = (request.form.get("next") or "").strip()
-        redirect_target = (
-            redirect(url_for("admin_user_detail", user_id=model.user_id))
-            if next_hint == "user_detail"
-            else redirect(url_for("admin_dashboard", admin_page="models"))
-        )
+        redirect_target = _admin_model_redirect(next_hint, model)
 
         def _parse_dt(raw):
             raw = (raw or "").strip()
@@ -4546,11 +4554,7 @@ def register_routes(app: Flask) -> None:
         if not model:
             abort(404)
         next_hint = (request.form.get("next") or "").strip()
-        redirect_target = (
-            redirect(url_for("admin_user_detail", user_id=model.user_id))
-            if next_hint == "user_detail"
-            else redirect(url_for("admin_dashboard", admin_page="models"))
-        )
+        redirect_target = _admin_model_redirect(next_hint, model)
         ok, message, category, changes = _apply_model_appearance_change(model, request.form)
         if ok:
             log_audit("admin_model_appearance_changed", user_id=current_user.id, resource_id=model.id, details=changes)
@@ -4565,11 +4569,7 @@ def register_routes(app: Flask) -> None:
         if not model:
             abort(404)
         next_hint = (request.form.get("next") or "").strip()
-        redirect_target = (
-            redirect(url_for("admin_user_detail", user_id=model.user_id))
-            if next_hint == "user_detail"
-            else redirect(url_for("admin_dashboard", admin_page="access"))
-        )
+        redirect_target = _admin_model_redirect(next_hint, model, default_page="access")
         # ensure_model_qr_link is idempotent and never rotates an existing
         # public_id, so the resolver URL and any printed QR keep working.
         ensure_model_qr_link(model)
@@ -4593,9 +4593,9 @@ def register_routes(app: Flask) -> None:
         flash("QR image regenerated.", "success")
         return redirect_target
 
-    @app.route("/admin/models/<model_id>/versions")
+    @app.route("/admin/models/<model_id>")
     @login_required
-    def admin_model_versions(model_id):
+    def admin_model_detail(model_id):
         require_admin()
         model = db.session.get(Model3D, model_id)
         if not model:
@@ -4605,7 +4605,19 @@ def register_routes(app: Flask) -> None:
             .order_by(ModelVersion.version_number.desc())
             .all()
         )
-        return render_template("admin/model_versions.html", model=model, versions=versions)
+        return render_template("admin/model_detail.html", model=model, versions=versions)
+
+    @app.route("/admin/models/<model_id>/versions")
+    @login_required
+    def admin_model_versions(model_id):
+        # Version history is now a section on the consolidated model detail
+        # page; this route survives as a redirect so any bookmarked or
+        # external links to it keep working.
+        require_admin()
+        model = db.session.get(Model3D, model_id)
+        if not model:
+            abort(404)
+        return redirect(url_for("admin_model_detail", model_id=model_id) + "#versions")
 
     @app.route("/admin/models/<model_id>/poster/regenerate", methods=["POST"])
     @login_required
@@ -4615,11 +4627,7 @@ def register_routes(app: Flask) -> None:
         if not model:
             abort(404)
         next_hint = (request.form.get("next") or "").strip()
-        redirect_target = (
-            redirect(url_for("admin_user_detail", user_id=model.user_id))
-            if next_hint == "user_detail"
-            else redirect(url_for("admin_dashboard", admin_page="models"))
-        )
+        redirect_target = _admin_model_redirect(next_hint, model)
         glb_path = model.glb_path
         ensure_local(glb_path, f"converted/{model_id}/model.glb")
         poster_png = os.path.join(os.path.dirname(glb_path), "poster.png")

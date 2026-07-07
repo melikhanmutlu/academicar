@@ -86,15 +86,17 @@ def test_academic_field_allowlist_accepts_known_value(client):
         assert paper.field == "Chemistry"
 
 
-def test_model_versions_page_renders_for_admin(client):
+def test_model_versions_route_redirects_to_model_detail(client):
+    # Version history is now a section on the consolidated model detail page;
+    # the old dedicated route survives as a redirect for bookmarked links.
     _make_admin(client)
     model_id = _seed_model(client)
     response = client.get(f"/admin/models/{model_id}/versions")
-    assert response.status_code == 200
-    assert "Version history" in response.get_data(as_text=True)
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith(f"/admin/models/{model_id}#versions")
 
 
-def test_model_versions_page_forbidden_for_member(client):
+def test_model_versions_route_forbidden_for_member(client):
     with client.application.app_context():
         create_user()
     login(client)
@@ -102,12 +104,23 @@ def test_model_versions_page_forbidden_for_member(client):
     assert client.get(f"/admin/models/{model_id}/versions").status_code == 403
 
 
-def test_models_page_shows_compliance_record(client):
+def test_model_detail_page_shows_version_history_and_compliance_record(client):
     _make_admin(client)
-    _seed_model(client)
-    text = client.get("/admin/models").get_data(as_text=True)
+    model_id = _seed_model(client)
+    response = client.get(f"/admin/models/{model_id}")
+    assert response.status_code == 200
+    text = response.get_data(as_text=True)
+    assert "Version history" in text
     assert "Compliance record" in text
     assert "127.0.0.1" in text
+
+
+def test_model_detail_page_forbidden_for_member(client):
+    with client.application.app_context():
+        create_user()
+    login(client)
+    model_id = _seed_model(client)
+    assert client.get(f"/admin/models/{model_id}").status_code == 403
 
 
 def test_admin_poster_regenerate_success(client, tmp_path):
