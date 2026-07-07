@@ -1,0 +1,121 @@
+{% extends "admin/base.html" %}
+{% from "admin/_pagination.html" import render_pagination %}
+{% block admin_title %}Institutions{% endblock %}
+{% block admin_subtitle %}B2B contracts: universities, labs, and institutes with quota-funded member licensing.{% endblock %}
+
+{% block admin_body %}
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Institutions</h2>
+        <p>Members join via invite links; their uploads use the institutional plan while the contract is current and within quota.</p>
+      </div>
+      <span>{% if institutions_pagination %}{{ institutions_pagination.total }} total{% else %}{{ institutions|length }} shown{% endif %}</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
+        <thead>
+          <tr>
+            <th>Institution</th>
+            <th>Status</th>
+            <th>Contract ends</th>
+            <th>Members</th>
+            <th>Usage</th>
+            <th>Annual price</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for institution in institutions %}
+            {% set usage = institution_usage_map.get(institution.id, {"models": 0, "bytes": 0}) %}
+            <tr>
+              <td>
+                <strong><a href="{{ url_for('admin_institution_detail', institution_id=institution.id) }}">{{ institution.name }}</a></strong>
+                {% if institution.email_domains %}<small>@{{ institution.domain_list()|join(", @") }}</small>{% endif %}
+              </td>
+              <td><span class="status-chip {{ admin_chip_class(institution.status) }}">{{ institution.status|title }}</span></td>
+              <td>{{ institution.contract_ends_at.strftime("%Y-%m-%d") if institution.contract_ends_at else "Open-ended" }}</td>
+              <td>{{ institution_member_counts.get(institution.id, 0) }}</td>
+              <td>
+                {{ usage.models }}{% if institution.quota_model_count is not none %} / {{ institution.quota_model_count }}{% endif %} models
+                <small>{{ format_file_size(usage.bytes) }}{% if institution.quota_storage_bytes is not none %} / {{ format_file_size(institution.quota_storage_bytes) }}{% endif %}</small>
+              </td>
+              <td>
+                {% if institution.annual_price_cents is not none %}
+                  {{ "%.2f"|format(institution.annual_price_cents / 100) }} {{ institution.currency }}
+                {% else %}
+                  &mdash;
+                {% endif %}
+              </td>
+              <td>
+                <div class="admin-actions">
+                  <a href="{{ url_for('admin_institution_detail', institution_id=institution.id) }}" class="admin-btn admin-btn-secondary compact">Manage</a>
+                </div>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7">No institutions yet. Create the first one below.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ render_pagination(institutions_pagination, 'admin_dashboard', {'admin_page': 'institutions'}) }}
+  </section>
+
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Create institution</h2>
+        <p>Contract price, quota, and dates are set here; assign an institution admin from the detail page afterwards.</p>
+      </div>
+    </div>
+    <form method="POST" action="{{ url_for('admin_institution_create') }}" class="admin-editor-body">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="admin-editor-actions" style="flex-wrap:wrap;gap:12px">
+        <label class="admin-editor-field" style="flex:1;min-width:220px">
+          <span>Name</span>
+          <input type="text" name="name" required maxlength="200" placeholder="Bogazici University">
+        </label>
+        <label class="admin-editor-field" style="flex:1;min-width:220px">
+          <span>Email domains (comma-separated, optional)</span>
+          <input type="text" name="email_domains" placeholder="boun.edu.tr, alumni.boun.edu.tr">
+        </label>
+      </div>
+      <div class="admin-editor-actions" style="flex-wrap:wrap;gap:12px">
+        <label class="admin-editor-field">
+          <span>Contract starts</span>
+          <input type="date" name="contract_starts_at">
+        </label>
+        <label class="admin-editor-field">
+          <span>Contract ends (blank = open-ended)</span>
+          <input type="date" name="contract_ends_at">
+        </label>
+        <label class="admin-editor-field">
+          <span>Annual price</span>
+          <input type="number" name="annual_price" step="0.01" min="0" placeholder="25000">
+        </label>
+        <label class="admin-editor-field">
+          <span>Currency</span>
+          <input type="text" name="currency" value="TRY" maxlength="3" style="width:70px">
+        </label>
+      </div>
+      <div class="admin-editor-actions" style="flex-wrap:wrap;gap:12px">
+        <label class="admin-editor-field">
+          <span>Model quota (blank = unlimited)</span>
+          <input type="number" name="quota_model_count" min="0" step="1" placeholder="200">
+        </label>
+        <label class="admin-editor-field">
+          <span>Storage quota MB (blank = unlimited)</span>
+          <input type="number" name="quota_storage_mb" min="0" step="1" placeholder="10240">
+        </label>
+        <label class="admin-editor-field" style="flex:1;min-width:220px">
+          <span>Notes (internal)</span>
+          <input type="text" name="notes" maxlength="5000" placeholder="Contact, procurement reference...">
+        </label>
+      </div>
+      <div class="admin-editor-actions">
+        <button type="submit" class="admin-btn compact">Create institution</button>
+      </div>
+    </form>
+  </section>
+{% endblock %}

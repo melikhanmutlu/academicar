@@ -1,0 +1,230 @@
+{% extends "admin/base.html" %}
+{% block admin_title %}{{ institution.name }}{% endblock %}
+{% block admin_subtitle %}Institutional contract &middot; created {{ institution.created_at.strftime("%Y-%m-%d") if institution.created_at else "-" }}{% endblock %}
+{% block admin_actions %}
+  <a href="{{ url_for('admin_dashboard', admin_page='institutions') }}" class="admin-btn admin-btn-secondary compact">All institutions</a>
+{% endblock %}
+
+{% block admin_body %}
+  <section class="admin-metrics">
+    <div class="admin-metric">
+      <span>Status</span>
+      <strong>{{ institution.status|title }}</strong>
+      <small>{% if institution.contract_is_current() %}Contract current{% else %}Contract not current{% endif %}</small>
+    </div>
+    <div class="admin-metric">
+      <span>Contract ends</span>
+      <strong>{{ institution.contract_ends_at.strftime("%Y-%m-%d") if institution.contract_ends_at else "Open-ended" }}</strong>
+      <small>{% if institution.contract_starts_at %}from {{ institution.contract_starts_at.strftime("%Y-%m-%d") }}{% else %}no start date{% endif %}</small>
+    </div>
+    <div class="admin-metric">
+      <span>Members</span>
+      <strong>{{ members|length }}</strong>
+      <small>{{ members|selectattr("role", "equalto", "admin")|list|length }} institution admin(s)</small>
+    </div>
+    <div class="admin-metric">
+      <span>Usage</span>
+      <strong>{{ usage_models }}{% if institution.quota_model_count is not none %} / {{ institution.quota_model_count }}{% endif %}</strong>
+      <small>{{ format_file_size(usage_bytes) }}{% if institution.quota_storage_bytes is not none %} of {{ format_file_size(institution.quota_storage_bytes) }}{% endif %}</small>
+    </div>
+  </section>
+
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Contract &amp; quota</h2>
+        <p>Changing the contract end date refreshes the access window on every model this institution funds.</p>
+      </div>
+      <span class="status-chip {{ admin_chip_class(institution.status) }}">{{ institution.status|title }}</span>
+    </div>
+    <form method="POST" action="{{ url_for('admin_institution_update', institution_id=institution.id) }}" class="admin-editor-body">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="admin-editor-actions" style="flex-wrap:wrap;gap:12px">
+        <label class="admin-editor-field" style="flex:1;min-width:220px">
+          <span>Name</span>
+          <input type="text" name="name" value="{{ institution.name }}" required maxlength="200">
+        </label>
+        <label class="admin-editor-field" style="flex:1;min-width:220px">
+          <span>Email domains (comma-separated, optional)</span>
+          <input type="text" name="email_domains" value="{{ institution.email_domains or '' }}" placeholder="boun.edu.tr">
+        </label>
+      </div>
+      <div class="admin-editor-actions" style="flex-wrap:wrap;gap:12px">
+        <label class="admin-editor-field">
+          <span>Contract starts</span>
+          <input type="date" name="contract_starts_at" value="{{ institution.contract_starts_at.strftime('%Y-%m-%d') if institution.contract_starts_at else '' }}">
+        </label>
+        <label class="admin-editor-field">
+          <span>Contract ends (blank = open-ended)</span>
+          <input type="date" name="contract_ends_at" value="{{ institution.contract_ends_at.strftime('%Y-%m-%d') if institution.contract_ends_at else '' }}">
+        </label>
+        <label class="admin-editor-field">
+          <span>Annual price</span>
+          <input type="number" name="annual_price" step="0.01" min="0" value="{{ '%.2f'|format(institution.annual_price_cents / 100) if institution.annual_price_cents is not none else '' }}">
+        </label>
+        <label class="admin-editor-field">
+          <span>Currency</span>
+          <input type="text" name="currency" value="{{ institution.currency }}" maxlength="3" style="width:70px">
+        </label>
+      </div>
+      <div class="admin-editor-actions" style="flex-wrap:wrap;gap:12px">
+        <label class="admin-editor-field">
+          <span>Model quota (blank = unlimited)</span>
+          <input type="number" name="quota_model_count" min="0" step="1" value="{{ institution.quota_model_count if institution.quota_model_count is not none else '' }}">
+        </label>
+        <label class="admin-editor-field">
+          <span>Storage quota MB (blank = unlimited)</span>
+          <input type="number" name="quota_storage_mb" min="0" step="1" value="{{ (institution.quota_storage_bytes / (1024 * 1024))|round|int if institution.quota_storage_bytes is not none else '' }}">
+        </label>
+        <label class="admin-editor-field" style="flex:1;min-width:220px">
+          <span>Notes (internal)</span>
+          <input type="text" name="notes" value="{{ institution.notes or '' }}" maxlength="5000">
+        </label>
+      </div>
+      <div class="admin-editor-actions">
+        <button type="submit" class="admin-btn compact">Save contract</button>
+      </div>
+    </form>
+    <div class="admin-actions" style="margin-top:12px">
+      <form method="POST" action="{{ url_for('admin_institution_status', institution_id=institution.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="status" value="{{ 'suspended' if institution.status == 'active' else 'active' }}">
+        <button type="submit" class="admin-btn admin-btn-secondary compact">{{ "Suspend (block new uploads)" if institution.status == "active" else "Reactivate" }}</button>
+      </form>
+      <form method="POST" action="{{ url_for('admin_institution_end_access', institution_id=institution.id) }}" onsubmit="return confirm('End access now? Every model funded by this institution expires immediately.')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="admin-btn admin-btn-danger compact">End access now</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Members</h2>
+        <p>Institution admins manage members and invites from their own panel at /institution.</p>
+      </div>
+      <span>{{ members|length }} member(s)</span>
+    </div>
+    <form method="POST" action="{{ url_for('admin_institution_admin_assign', institution_id=institution.id) }}" class="admin-editor-actions" style="margin-bottom:12px">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="admin-editor-field" style="flex:1;min-width:220px">
+        <span>Assign institution admin by account email</span>
+        <input type="email" name="email" required placeholder="dekan@boun.edu.tr">
+      </label>
+      <button type="submit" class="admin-btn admin-btn-secondary compact">Make institution admin</button>
+    </form>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
+        <thead>
+          <tr><th>User</th><th>Role</th><th>Joined</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          {% for member in members %}
+            <tr>
+              <td>
+                <strong><a href="{{ url_for('admin_user_detail', user_id=member.user.id) }}">{{ member.user.username }}</a></strong>
+                <small>{{ member.user.email }}</small>
+              </td>
+              <td><span class="status-chip {{ admin_chip_class(member.role) }}">{{ "Institution admin" if member.role == "admin" else "Member" }}</span></td>
+              <td>{{ member.joined_at.strftime("%Y-%m-%d") if member.joined_at else "-" }}</td>
+              <td>
+                <form method="POST" action="{{ url_for('admin_institution_member_remove', institution_id=institution.id, member_id=member.id) }}" onsubmit="return confirm('Remove this member? Their already-funded models keep institutional access.')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="admin-btn admin-btn-danger compact">Remove</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4">No members yet. Assign an institution admin above; they can then invite members.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Invites</h2>
+        <p>Created by institution admins from their panel; listed here for oversight.</p>
+      </div>
+      <span>{{ invites|length }} invite(s)</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
+        <thead>
+          <tr><th>Created</th><th>Expires</th><th>Uses</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          {% for invite in invites %}
+            <tr>
+              <td>{{ invite.created_at.strftime("%Y-%m-%d") if invite.created_at else "-" }}</td>
+              <td>{{ invite.expires_at.strftime("%Y-%m-%d") if invite.expires_at else "Never" }}</td>
+              <td>{{ invite.use_count }}{% if invite.max_uses is not none %} / {{ invite.max_uses }}{% endif %}</td>
+              <td>
+                {% if invite.revoked_at %}<span class="status-chip is-failed">Revoked</span>
+                {% else %}<span class="status-chip is-ready">Active</span>{% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4">No invites yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Contract payments</h2>
+        <p>Offline invoices (bank transfer) recorded manually. Institution payments never change model licenses.</p>
+      </div>
+      <span>{{ payments|length }} payment(s)</span>
+    </div>
+    <form method="POST" action="{{ url_for('admin_institution_payment_create', institution_id=institution.id) }}" class="admin-editor-actions" style="margin-bottom:12px;flex-wrap:wrap;gap:12px">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="admin-editor-field">
+        <span>Amount</span>
+        <input type="number" name="amount" step="0.01" min="0.01" required placeholder="25000">
+      </label>
+      <label class="admin-editor-field">
+        <span>Currency</span>
+        <input type="text" name="currency" value="{{ institution.currency }}" maxlength="3" style="width:70px">
+      </label>
+      <label class="admin-editor-field">
+        <span>Status</span>
+        <select name="status" class="field-select compact-select">
+          <option value="pending">Pending</option>
+          <option value="paid">Paid</option>
+        </select>
+      </label>
+      <label class="admin-editor-field" style="flex:1;min-width:180px">
+        <span>Reference (optional)</span>
+        <input type="text" name="reference" maxlength="200" placeholder="Bank transfer ref / PO number">
+      </label>
+      <button type="submit" class="admin-btn admin-btn-secondary compact">Record payment</button>
+    </form>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
+        <thead>
+          <tr><th>Created</th><th>Amount</th><th>Status</th><th>Invoice</th><th>Reference</th></tr>
+        </thead>
+        <tbody>
+          {% for payment in payments %}
+            <tr>
+              <td>{{ payment.created_at.strftime("%Y-%m-%d") if payment.created_at else "-" }}</td>
+              <td>{{ "%.2f"|format(payment.amount_kurus / 100) }} {{ payment.currency }}</td>
+              <td><span class="status-chip {{ admin_chip_class(payment.status) }}">{{ payment.status|title }}</span></td>
+              <td>{{ payment.invoice_number or "-" }}</td>
+              <td>{{ payment.provider_reference or "-" }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5">No payments recorded yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

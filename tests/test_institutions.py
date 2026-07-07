@@ -344,6 +344,211 @@ def test_member_leaving_keeps_model_funded(client):
         assert used > 0
 
 
+# --- Platform admin CRUD --------------------------------------------------------
+
+
+def make_admin(client, email="admin@example.com"):
+    from tests.conftest import register
+
+    register(client, email=email, username="Admin")
+    with client.application.app_context():
+        from models import User
+
+        user = User.query.filter_by(email=email).one()
+        user.is_admin = True
+        db.session.commit()
+        return user.id
+
+
+def test_admin_institutions_page_requires_admin(client):
+    from tests.conftest import register
+
+    register(client)
+    assert client.get("/admin/institutions").status_code == 403
+
+    client.post("/auth/logout")
+    make_admin(client)
+    response = client.get("/admin/institutions")
+    assert response.status_code == 200
+    assert b"Create institution" in response.data
+
+
+def test_admin_institution_create_and_duplicate(client):
+    make_admin(client)
+    response = client.post(
+        "/admin/institutions/create",
+        data={
+            "name": "Bogazici University",
+            "email_domains": " @Boun.edu.tr, boun.edu.tr , metu.edu.tr ",
+            "contract_starts_at": "2026-01-01",
+            "contract_ends_at": "2027-01-01",
+            "annual_price": "25000",
+            "currency": "try",
+            "quota_model_count": "100",
+            "quota_storage_mb": "1024",
+            "notes": "Pilot contract",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    with client.application.app_context():
+        institution = Institution.query.one()
+        assert institution.email_domains == "boun.edu.tr, metu.edu.tr"  # normalized + deduped
+        assert institution.annual_price_cents == 2500000
+        assert institution.currency == "TRY"
+        assert institution.quota_storage_bytes == 1024 * 1024 * 1024
+        from models import AuditLog
+
+        assert AuditLog.query.filter_by(event_type="institution_created").count() == 1
+
+    duplicate = client.post(
+        "/admin/institutions/create",
+        data={"name": "bogazici university"},
+        follow_redirects=True,
+    )
+    assert b"already exists" in duplicate.data
+    with client.application.app_context():
+        assert Institution.query.count() == 1
+
+
+def test_admin_contract_renewal_bulk_updates_models(client):
+    from tests.conftest import register
+
+    register(client, email="member@example.com", username="Member")
+    with client.application.app_context():
+        from models import User
+
+        user = User.query.filter_by(email="member@example.com").one()
+        institution = create_institution()
+        add_member(institution, user)
+        institution_id = institution.id
+
+    model_id = upload_model_for(client)
+    client.post("/auth/logout")
+    make_admin(client)
+
+    response = client.post(
+        f"/admin/institutions/{institution_id}/update",
+        data={
+            "name": "Test University",
+            "contract_ends_at": "2030-06-30",
+            "currency": "TRY",
+        },
+        follow_redirects=True,
+    )
+    assert b"refreshed on 1 model(s)" in response.data
+    with client.application.app_context():
+        model = db.session.get(Model3D, model_id)
+        assert model.access_expires_at == datetime(2030, 6, 30)
+
+
+def test_admin_end_access_and_suspend(client):
+    from tests.conftest import register
+
+    register(client, email="member@example.com", username="Member")
+    with client.application.app_context():
+        from models import User
+
+        user = User.query.filter_by(email="member@example.com").one()
+        institution = create_institution()
+        add_member(institution, user)
+        institution_id = institution.id
+
+    model_id = upload_model_for(client)
+    client.post("/auth/logout")
+    make_admin(client)
+
+    client.post(f"/admin/institutions/{institution_id}/status", data={"status": "suspended"}, follow_redirects=True)
+    with client.application.app_context():
+        institution = db.session.get(Institution, institution_id)
+        assert institution.status == "suspended"
+        # Suspension alone does not expire existing access.
+        model = db.session.get(Model3D, model_id)
+        assert model_access_status(model) == "active"
+
+    client.post(f"/admin/institutions/{institution_id}/end-access", follow_redirects=True)
+    with client.application.app_context():
+        model = db.session.get(Model3D, model_id)
+        assert model_access_status(model) == "expired"
+
+
+def test_admin_assign_institution_admin_by_email(client):
+    from tests.conftest import create_user
+
+    make_admin(client)
+    with client.application.app_context():
+        create_user(email="prof@boun.edu.tr", username="Prof")
+        institution = create_institution()
+        other = create_institution(name="Other Uni")
+        other_user = create_user(email="taken@example.com", username="Taken")
+        add_member(other, other_user)
+        institution_id = institution.id
+
+    unknown = client.post(
+        f"/admin/institutions/{institution_id}/admins",
+        data={"email": "ghost@example.com"},
+        follow_redirects=True,
+    )
+    assert b"No account found" in unknown.data
+
+    taken = client.post(
+        f"/admin/institutions/{institution_id}/admins",
+        data={"email": "taken@example.com"},
+        follow_redirects=True,
+    )
+    assert b"another institution" in taken.data
+
+    ok = client.post(
+        f"/admin/institutions/{institution_id}/admins",
+        data={"email": "Prof@BOUN.edu.tr"},
+        follow_redirects=True,
+    )
+    assert b"is now an institution admin" in ok.data
+    with client.application.app_context():
+        member = InstitutionMember.query.filter_by(institution_id=institution_id).one()
+        assert member.role == "admin"
+
+
+def test_admin_institution_payment_has_no_license_side_effects(client):
+    from tests.conftest import create_user
+
+    make_admin(client)
+    with client.application.app_context():
+        institution = create_institution()
+        institution_id = institution.id
+
+    response = client.post(
+        f"/admin/institutions/{institution_id}/payments",
+        data={"amount": "25000", "currency": "TRY", "status": "paid", "reference": "PO-42"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    with client.application.app_context():
+        from models import Payment
+
+        payment = Payment.query.one()
+        assert payment.institution_id == institution_id
+        assert payment.plan_key == "institutional"
+        assert payment.status == "paid"
+        assert payment.invoice_number
+        assert payment.model_id is None
+
+    revenue = client.get("/admin/revenue")
+    assert b"Test University" in revenue.data
+
+    # Flipping status must remain side-effect free for institution payments.
+    with client.application.app_context():
+        from models import Payment
+
+        payment_id = Payment.query.one().id
+    client.post(f"/admin/payments/{payment_id}/status", data={"status": "refunded"}, follow_redirects=True)
+    with client.application.app_context():
+        from models import Payment
+
+        assert Payment.query.one().status == "refunded"
+        assert Model3D.query.count() == 0  # nothing to touch, nothing crashed
+
+
 def test_institution_usage_excludes_soft_deleted_papers(client):
     from tests.conftest import register
 

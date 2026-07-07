@@ -327,7 +327,7 @@ def format_file_size(size_bytes: int | None) -> str:
 
 _ADMIN_CHIP_GOOD = {"ready", "active", "public", "paid", "completed", "admin"}
 _ADMIN_CHIP_WARN = {"queued", "pending", "processing"}
-_ADMIN_CHIP_BAD = {"failed", "replacement_failed", "expired", "cancelled", "refunded", "private", "deleted", "disabled"}
+_ADMIN_CHIP_BAD = {"failed", "replacement_failed", "expired", "cancelled", "refunded", "private", "deleted", "disabled", "suspended"}
 
 
 def admin_chip_class(value) -> str:
@@ -3267,6 +3267,7 @@ def register_routes(app: Flask) -> None:
             "logs",
             "backups",
             "blog",
+            "institutions",
         }
         if admin_page not in admin_pages:
             abort(404)
@@ -3328,7 +3329,7 @@ def register_routes(app: Flask) -> None:
         if model_status_filter != "all":
             models_query = models_query.filter(Model3D.processing_status == model_status_filter)
 
-        payments_query = Payment.query.options(selectinload(Payment.user))
+        payments_query = Payment.query.options(selectinload(Payment.user), selectinload(Payment.institution))
         if pay_status_filter in {"pending", "paid", "failed", "refunded"}:
             payments_query = payments_query.filter(Payment.status == pay_status_filter)
         if pay_provider_filter in {"manual", "paytr"}:
@@ -3748,6 +3749,41 @@ def register_routes(app: Flask) -> None:
             edit_id = (request.args.get("edit") or "").strip()
             if edit_id.isdigit():
                 editing_post = db.session.get(BlogPost, int(edit_id))
+        institutions_rows = []
+        institutions_pagination = None
+        institution_member_counts = {}
+        institution_usage_map = {}
+        if admin_page == "institutions":
+            institutions_pagination = Institution.query.order_by(Institution.created_at.desc()).paginate(
+                page=page, per_page=ADMIN_PER_PAGE, error_out=False
+            )
+            institutions_rows = institutions_pagination.items
+            institution_ids = [inst.id for inst in institutions_rows]
+            if institution_ids:
+                institution_member_counts = dict(
+                    db.session.query(InstitutionMember.institution_id, func.count(InstitutionMember.id))
+                    .filter(InstitutionMember.institution_id.in_(institution_ids))
+                    .group_by(InstitutionMember.institution_id)
+                    .all()
+                )
+                usage_rows = (
+                    db.session.query(
+                        Model3D.institution_id,
+                        func.count(Model3D.id),
+                        func.coalesce(func.sum(Model3D.file_size), 0),
+                    )
+                    .join(Paper, Model3D.paper_id == Paper.id)
+                    .filter(
+                        Model3D.institution_id.in_(institution_ids),
+                        Model3D.license_type == "institutional",
+                        or_(Paper.status.is_(None), Paper.status != "deleted"),
+                    )
+                    .group_by(Model3D.institution_id)
+                    .all()
+                )
+                institution_usage_map = {
+                    row[0]: {"models": int(row[1] or 0), "bytes": int(row[2] or 0)} for row in usage_rows
+                }
         system_health = _admin_system_health() if admin_page == "system" else {}
         pricing_rows = []
         if admin_page == "pricing":
@@ -3803,6 +3839,10 @@ def register_routes(app: Flask) -> None:
             backups=backups,
             blog_posts=blog_posts,
             editing_post=editing_post,
+            institutions=institutions_rows,
+            institutions_pagination=institutions_pagination,
+            institution_member_counts=institution_member_counts,
+            institution_usage_map=institution_usage_map,
             active_page=admin_page,
             filters={
                 "user_q": user_query_text,
@@ -3987,6 +4027,329 @@ def register_routes(app: Flask) -> None:
             admin_view=True,
             viewed_user=user,
         )
+
+    def _institution_or_404(institution_id):
+        institution = db.session.get(Institution, institution_id)
+        if institution is None:
+            abort(404)
+        return institution
+
+    def _normalize_institution_domains(raw: str) -> str | None:
+        """Lowercase, strip whitespace and leading '@', dedupe, keep order."""
+        seen = []
+        for piece in (raw or "").split(","):
+            domain = piece.strip().lower().lstrip("@")
+            if domain and domain not in seen:
+                seen.append(domain)
+        return ", ".join(seen) or None
+
+    def _parse_institution_date(raw):
+        raw = (raw or "").strip()
+        if not raw:
+            return None
+        for fmt in ("%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+            try:
+                return datetime.strptime(raw, fmt)
+            except ValueError:
+                continue
+        raise ValueError(raw)
+
+    def _institution_form_values():
+        """Parse and validate the shared create/update institution form.
+        Returns (values, error_message)."""
+        name = (request.form.get("name") or "").strip()[:200]
+        if not name:
+            return None, "Institution name is required."
+        try:
+            starts_at = _parse_institution_date(request.form.get("contract_starts_at"))
+            ends_at = _parse_institution_date(request.form.get("contract_ends_at"))
+        except ValueError:
+            return None, "Contract dates must be valid (YYYY-MM-DD)."
+        if starts_at and ends_at and ends_at < starts_at:
+            return None, "Contract end cannot be before its start."
+        price_raw = (request.form.get("annual_price") or "").strip()
+        annual_price_cents = None
+        if price_raw:
+            try:
+                annual_price_major = float(price_raw)
+            except ValueError:
+                return None, "Annual price must be a number."
+            if annual_price_major < 0:
+                return None, "Annual price cannot be negative."
+            annual_price_cents = int(round(annual_price_major * 100))
+        currency = (request.form.get("currency") or "TRY").strip().upper()[:3] or "TRY"
+        quota_models_raw = (request.form.get("quota_model_count") or "").strip()
+        quota_model_count = None
+        if quota_models_raw:
+            if not quota_models_raw.isdigit():
+                return None, "Model quota must be a whole number."
+            quota_model_count = int(quota_models_raw)
+        quota_storage_raw = (request.form.get("quota_storage_mb") or "").strip()
+        quota_storage_bytes = None
+        if quota_storage_raw:
+            try:
+                quota_storage_mb = float(quota_storage_raw)
+            except ValueError:
+                return None, "Storage quota must be a number of MB."
+            if quota_storage_mb < 0:
+                return None, "Storage quota cannot be negative."
+            quota_storage_bytes = int(quota_storage_mb * 1024 * 1024)
+        return {
+            "name": name,
+            "email_domains": _normalize_institution_domains(request.form.get("email_domains") or ""),
+            "contract_starts_at": starts_at,
+            "contract_ends_at": ends_at,
+            "annual_price_cents": annual_price_cents,
+            "currency": currency,
+            "quota_model_count": quota_model_count,
+            "quota_storage_bytes": quota_storage_bytes,
+            "notes": (request.form.get("notes") or "").strip()[:5000] or None,
+        }, None
+
+    @app.route("/admin/institutions/<int:institution_id>")
+    @login_required
+    def admin_institution_detail(institution_id):
+        require_admin()
+        institution = _institution_or_404(institution_id)
+        members = (
+            InstitutionMember.query.options(selectinload(InstitutionMember.user))
+            .filter_by(institution_id=institution.id)
+            .order_by(InstitutionMember.joined_at.asc())
+            .all()
+        )
+        invites = (
+            InstitutionInvite.query.filter_by(institution_id=institution.id)
+            .order_by(InstitutionInvite.created_at.desc())
+            .all()
+        )
+        payments = (
+            Payment.query.filter_by(institution_id=institution.id)
+            .order_by(Payment.created_at.desc())
+            .all()
+        )
+        model_count, bytes_used = institution_usage(institution.id)
+        log_audit("admin_institution_detail_viewed", user_id=current_user.id, resource_id=str(institution.id))
+        return render_template(
+            "admin/institution_detail.html",
+            institution=institution,
+            members=members,
+            invites=invites,
+            payments=payments,
+            usage_models=model_count,
+            usage_bytes=bytes_used,
+            active_page="institutions",
+        )
+
+    @app.route("/admin/institutions/create", methods=["POST"])
+    @login_required
+    def admin_institution_create():
+        require_admin()
+        values, error = _institution_form_values()
+        if error:
+            flash(error, "danger")
+            return redirect(url_for("admin_dashboard", admin_page="institutions"))
+        existing = Institution.query.filter(func.lower(Institution.name) == values["name"].lower()).first()
+        if existing is not None:
+            flash("An institution with that name already exists.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="institutions"))
+        institution = Institution(**values)
+        db.session.add(institution)
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not create the institution. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="institutions"))
+        log_audit(
+            "institution_created",
+            user_id=current_user.id,
+            resource_id=str(institution.id),
+            details={"name": institution.name},
+        )
+        flash("Institution created.", "success")
+        return redirect(url_for("admin_institution_detail", institution_id=institution.id))
+
+    @app.route("/admin/institutions/<int:institution_id>/update", methods=["POST"])
+    @login_required
+    def admin_institution_update(institution_id):
+        require_admin()
+        institution = _institution_or_404(institution_id)
+        values, error = _institution_form_values()
+        if error:
+            flash(error, "danger")
+            return redirect(url_for("admin_institution_detail", institution_id=institution.id))
+        duplicate = Institution.query.filter(
+            func.lower(Institution.name) == values["name"].lower(), Institution.id != institution.id
+        ).first()
+        if duplicate is not None:
+            flash("An institution with that name already exists.", "danger")
+            return redirect(url_for("admin_institution_detail", institution_id=institution.id))
+        previous_end = institution.contract_ends_at
+        new_end = values.pop("contract_ends_at")
+        for field, value in values.items():
+            setattr(institution, field, value)
+        models_updated = 0
+        if new_end != previous_end:
+            # Contract end drives every funded model's access window; the bulk
+            # update must never be forgotten, so it lives in the same helper.
+            models_updated = renew_institution_contract(institution, new_end)
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not update the institution. Please try again.", "danger")
+            return redirect(url_for("admin_institution_detail", institution_id=institution.id))
+        log_audit(
+            "institution_updated",
+            user_id=current_user.id,
+            resource_id=str(institution.id),
+            details={
+                "old_contract_ends_at": previous_end.isoformat() if previous_end else None,
+                "new_contract_ends_at": new_end.isoformat() if new_end else None,
+                "models_updated": models_updated,
+            },
+        )
+        if new_end != previous_end:
+            flash(f"Institution updated. Access window refreshed on {models_updated} model(s).", "success")
+        else:
+            flash("Institution updated.", "success")
+        return redirect(url_for("admin_institution_detail", institution_id=institution.id))
+
+    @app.route("/admin/institutions/<int:institution_id>/status", methods=["POST"])
+    @login_required
+    def admin_institution_status(institution_id):
+        require_admin()
+        institution = _institution_or_404(institution_id)
+        new_status = (request.form.get("status") or "").strip().lower()
+        if new_status not in {"active", "suspended"}:
+            flash("Invalid institution status.", "danger")
+            return redirect(url_for("admin_institution_detail", institution_id=institution.id))
+        previous = institution.status
+        institution.status = new_status
+        db.session.commit()
+        log_audit(
+            "institution_status_changed",
+            user_id=current_user.id,
+            resource_id=str(institution.id),
+            details={"from": previous, "to": new_status},
+        )
+        flash(f"Institution {new_status}.", "success")
+        return redirect(url_for("admin_institution_detail", institution_id=institution.id))
+
+    @app.route("/admin/institutions/<int:institution_id>/end-access", methods=["POST"])
+    @login_required
+    def admin_institution_end_access(institution_id):
+        require_admin()
+        institution = _institution_or_404(institution_id)
+        expired = end_institution_access_now(institution, datetime.now(UTC))
+        db.session.commit()
+        log_audit(
+            "institution_access_ended",
+            user_id=current_user.id,
+            resource_id=str(institution.id),
+            details={"models_expired": expired},
+        )
+        flash(f"Access ended now on {expired} model(s).", "success")
+        return redirect(url_for("admin_institution_detail", institution_id=institution.id))
+
+    @app.route("/admin/institutions/<int:institution_id>/admins", methods=["POST"])
+    @login_required
+    def admin_institution_admin_assign(institution_id):
+        require_admin()
+        institution = _institution_or_404(institution_id)
+        email = (request.form.get("email") or "").strip().lower()
+        user = User.query.filter(func.lower(User.email) == email).first() if email else None
+        if user is None:
+            flash("No account found with that email.", "danger")
+            return redirect(url_for("admin_institution_detail", institution_id=institution.id))
+        membership = InstitutionMember.query.filter_by(user_id=user.id).first()
+        if membership is not None and membership.institution_id != institution.id:
+            flash("That user already belongs to another institution.", "danger")
+            return redirect(url_for("admin_institution_detail", institution_id=institution.id))
+        if membership is None:
+            membership = InstitutionMember(institution_id=institution.id, user_id=user.id, role="admin")
+            db.session.add(membership)
+        else:
+            membership.role = "admin"
+        db.session.commit()
+        log_audit(
+            "institution_admin_assigned",
+            user_id=current_user.id,
+            resource_id=str(institution.id),
+            details={"member_user_id": user.id},
+        )
+        flash(f"{user.email} is now an institution admin.", "success")
+        return redirect(url_for("admin_institution_detail", institution_id=institution.id))
+
+    @app.route("/admin/institutions/<int:institution_id>/members/<int:member_id>/remove", methods=["POST"])
+    @login_required
+    def admin_institution_member_remove(institution_id, member_id):
+        require_admin()
+        institution = _institution_or_404(institution_id)
+        member = InstitutionMember.query.filter_by(id=member_id, institution_id=institution.id).first()
+        if member is None:
+            abort(404)
+        removed_user_id = member.user_id
+        db.session.delete(member)
+        db.session.commit()
+        log_audit(
+            "institution_member_removed",
+            user_id=current_user.id,
+            resource_id=str(institution.id),
+            details={"member_user_id": removed_user_id, "removed_by": "platform_admin"},
+        )
+        flash("Member removed from the institution.", "success")
+        return redirect(url_for("admin_institution_detail", institution_id=institution.id))
+
+    @app.route("/admin/institutions/<int:institution_id>/payments", methods=["POST"])
+    @login_required
+    def admin_institution_payment_create(institution_id):
+        require_admin()
+        institution = _institution_or_404(institution_id)
+        amount_raw = (request.form.get("amount") or "").strip()
+        try:
+            amount_major = float(amount_raw)
+        except ValueError:
+            flash("Amount must be a number.", "danger")
+            return redirect(url_for("admin_institution_detail", institution_id=institution.id))
+        if amount_major <= 0:
+            flash("Amount must be greater than zero.", "danger")
+            return redirect(url_for("admin_institution_detail", institution_id=institution.id))
+        amount_minor = int(round(amount_major * 100))
+        currency = (request.form.get("currency") or institution.currency or "TRY").strip().upper()[:3]
+        status_value = (request.form.get("status") or "pending").strip().lower()
+        if status_value not in {"pending", "paid"}:
+            flash("Institution payments can only be created as pending or paid.", "danger")
+            return redirect(url_for("admin_institution_detail", institution_id=institution.id))
+        payment = Payment(
+            institution_id=institution.id,
+            plan_key="institutional",
+            amount_kurus=amount_minor,
+            currency=currency,
+            provider="manual",
+            provider_reference=(request.form.get("reference") or "").strip()[:200] or None,
+            status=status_value,
+        )
+        if status_value == "paid":
+            payment.paid_at = datetime.now(UTC)
+        db.session.add(payment)
+        try:
+            db.session.flush()
+            if status_value == "paid":
+                payment.invoice_number = build_invoice_number(payment.id)
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not record the payment. Please try again.", "danger")
+            return redirect(url_for("admin_institution_detail", institution_id=institution.id))
+        log_audit(
+            "institution_payment_created",
+            user_id=current_user.id,
+            resource_id=str(payment.id),
+            details={"institution_id": institution.id, "status": status_value, "amount_kurus": amount_minor},
+        )
+        flash("Institution payment recorded.", "success")
+        return redirect(url_for("admin_institution_detail", institution_id=institution.id))
 
     @app.route("/admin/ar-doctor")
     @login_required
@@ -4405,6 +4768,11 @@ def register_routes(app: Flask) -> None:
         Shared by admin_payment_status_update and admin_payment_create so the
         grant-on-paid / revoke-on-refund logic never diverges between the two.
         """
+        if payment.institution_id is not None and payment.model_id is None:
+            # Institution contract payments (offline invoices) carry no model;
+            # their license effects are managed via the institution's contract
+            # dates, never through payment status flips.
+            return
         if new_status == "paid" and payment.model is not None and (payment.plan_key or "") in PAID_PLAN_KEYS:
             payment.model.access_starts_at = datetime.now(UTC)
             apply_model_license_defaults(payment.model, payment.plan_key)

@@ -93,7 +93,10 @@
             <tr>
               <td>{{ payment.invoice_number or "-" }}</td>
               <td>
-                {% if payment.user %}
+                {% if payment.institution %}
+                  <a href="{{ url_for('admin_institution_detail', institution_id=payment.institution.id) }}">{{ payment.institution.name }}</a>
+                  <small>Institution</small>
+                {% elif payment.user %}
                   <a href="{{ url_for('admin_user_detail', user_id=payment.user.id) }}">{{ payment.user.email }}</a>
                 {% else %}
                   {{ payment.user_id }}
