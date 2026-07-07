@@ -549,6 +549,252 @@ def test_admin_institution_payment_has_no_license_side_effects(client):
         assert Model3D.query.count() == 0  # nothing to touch, nothing crashed
 
 
+# --- Invite join flow -----------------------------------------------------------
+
+
+def test_join_flow_logged_in_user(client):
+    from tests.conftest import register
+
+    register(client, email="joiner@boun.edu.tr", username="Joiner")
+    with client.application.app_context():
+        institution = create_institution(email_domains="boun.edu.tr")
+        invite = make_invite(institution)
+        token = invite.token
+
+    page = client.get(f"/institution/join/{token}")
+    assert page.status_code == 200
+    assert b"Join Test University" in page.data
+
+    response = client.post(f"/institution/join/{token}", follow_redirects=True)
+    assert b"you joined Test University" in response.data
+    with client.application.app_context():
+        member = InstitutionMember.query.one()
+        assert member.role == "member"
+        assert member.invite_id is not None
+        invite = InstitutionInvite.query.one()
+        assert invite.use_count == 1
+        from models import AuditLog
+
+        assert AuditLog.query.filter_by(event_type="institution_member_joined").count() == 1
+
+    # Joining again is friendly, not a crash or a duplicate row.
+    again = client.post(f"/institution/join/{token}", follow_redirects=True)
+    assert b"already a member" in again.data
+    with client.application.app_context():
+        assert InstitutionMember.query.count() == 1
+
+
+def test_join_anonymous_shows_auth_ctas_and_register_next_returns(client):
+    with client.application.app_context():
+        institution = create_institution()
+        token = make_invite(institution).token
+
+    page = client.get(f"/institution/join/{token}")
+    assert page.status_code == 200
+    assert f"/auth/register?next=%2Finstitution%2Fjoin%2F{token}".encode() in page.data or \
+        f"next=/institution/join/{token}".encode() in page.data
+
+    response = client.post(
+        f"/auth/register?next=/institution/join/{token}",
+        data={
+            "username": "New User",
+            "email": "new@example.com",
+            "password": "password123",
+            "confirm": "password123",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith(f"/institution/join/{token}")
+
+
+def test_join_domain_restriction(client):
+    from tests.conftest import register
+
+    register(client, email="outsider@gmail.com", username="Outsider")
+    with client.application.app_context():
+        institution = create_institution(email_domains="boun.edu.tr")
+        token = make_invite(institution).token
+
+    response = client.post(f"/institution/join/{token}")
+    assert b"requires an email address at: @boun.edu.tr" in response.data
+    with client.application.app_context():
+        assert InstitutionMember.query.count() == 0
+
+
+def test_join_one_institution_per_user(client):
+    from tests.conftest import register
+
+    register(client, email="member@example.com", username="Member")
+    with client.application.app_context():
+        from models import User
+
+        user = User.query.one()
+        first = create_institution(name="First Uni")
+        add_member(first, user)
+        second = create_institution(name="Second Uni")
+        token = make_invite(second).token
+
+    response = client.post(f"/institution/join/{token}", follow_redirects=True)
+    assert b"already belong to an institution" in response.data
+    with client.application.app_context():
+        member = InstitutionMember.query.one()
+        assert member.institution.name == "First Uni"
+
+
+def test_invite_invalidity_is_generic_404(client):
+    from tests.conftest import register
+
+    register(client)
+    with client.application.app_context():
+        institution = create_institution()
+        expired = make_invite(institution, expires_at=datetime.now(UTC) - timedelta(days=1))
+        exhausted = make_invite(institution, max_uses=1, use_count=1)
+        revoked = make_invite(institution, revoked_at=datetime.now(UTC))
+        suspended_inst = create_institution(name="Suspended Uni", status="suspended")
+        suspended = make_invite(suspended_inst)
+        tokens = [expired.token, exhausted.token, revoked.token, suspended.token, "not-a-real-token"]
+
+    for token in tokens:
+        response = client.get(f"/institution/join/{token}")
+        assert response.status_code == 404
+        # One generic message for every failure mode, and no institution leak.
+        assert b"invalid or has expired" in response.data
+        assert b"Test University" not in response.data
+        assert b"Suspended Uni" not in response.data
+
+
+def test_invite_create_and_revoke_from_panel(client):
+    from tests.conftest import register
+
+    register(client, email="dean@boun.edu.tr", username="Dean")
+    with client.application.app_context():
+        from models import User
+
+        user = User.query.one()
+        institution = create_institution()
+        add_member(institution, user, role="admin")
+
+    response = client.post(
+        "/institution/invites/create",
+        data={"expires_days": "14", "max_uses": "5"},
+        follow_redirects=True,
+    )
+    assert b"Invite link created" in response.data
+    with client.application.app_context():
+        invite = InstitutionInvite.query.one()
+        assert invite.max_uses == 5
+        assert invite.expires_at is not None
+        invite_id = invite.id
+        token = invite.token
+
+    invites_page = client.get("/institution/invites")
+    assert token.encode() in invites_page.data
+
+    client.post(f"/institution/invites/{invite_id}/revoke", follow_redirects=True)
+    with client.application.app_context():
+        assert InstitutionInvite.query.one().revoked_at is not None
+
+    # Revoked invite no longer joins anyone.
+    assert client.get(f"/institution/join/{token}").status_code == 404
+
+
+# --- Panel authorization ----------------------------------------------------------
+
+
+def test_panel_requires_institution_admin_role(client):
+    from tests.conftest import register
+
+    register(client, email="member@boun.edu.tr", username="Member")
+    with client.application.app_context():
+        from models import User
+
+        user = User.query.one()
+        institution = create_institution()
+        add_member(institution, user, role="member")
+
+    for path in ("/institution/", "/institution/members", "/institution/invites", "/institution/models"):
+        assert client.get(path).status_code == 403, path
+
+    client.post("/auth/logout")
+    from tests.conftest import register as register2
+
+    register2(client, email="outsider@example.com", username="Outsider")
+    assert client.get("/institution/").status_code == 403
+
+
+def test_platform_admin_without_membership_gets_403_on_panel(client):
+    make_admin(client)
+    assert client.get("/institution/").status_code == 403
+
+
+def test_panel_cross_tenant_isolation_and_self_guards(client):
+    from tests.conftest import create_user, register
+
+    register(client, email="admin-a@example.com", username="AdminA")
+    with client.application.app_context():
+        from models import User
+
+        admin_a = User.query.filter_by(email="admin-a@example.com").one()
+        inst_a = create_institution(name="Uni A")
+        membership_a = add_member(inst_a, admin_a, role="admin")
+        membership_a_id = membership_a.id
+
+        inst_b = create_institution(name="Uni B")
+        user_b = create_user(email="member-b@example.com", username="MemberB")
+        member_b = add_member(inst_b, user_b)
+        member_b_id = member_b.id
+
+    # IDOR: A's admin cannot touch B's member.
+    assert client.post(f"/institution/members/{member_b_id}/remove").status_code == 404
+    assert client.post(f"/institution/members/{member_b_id}/role", data={"role": "admin"}).status_code == 404
+
+    # Self guards.
+    self_remove = client.post(f"/institution/members/{membership_a_id}/remove", follow_redirects=True)
+    assert b"cannot remove yourself" in self_remove.data
+    self_demote = client.post(
+        f"/institution/members/{membership_a_id}/role", data={"role": "member"}, follow_redirects=True
+    )
+    assert b"cannot remove your own admin role" in self_demote.data
+    with client.application.app_context():
+        assert InstitutionMember.query.filter_by(id=membership_a_id).one().role == "admin"
+
+
+def test_panel_member_management_and_models_list(client):
+    from tests.conftest import create_user, register
+
+    register(client, email="dean@example.com", username="Dean")
+    with client.application.app_context():
+        from models import User
+
+        dean = User.query.filter_by(email="dean@example.com").one()
+        institution = create_institution()
+        add_member(institution, dean, role="admin")
+        colleague = create_user(email="colleague@example.com", username="Colleague")
+        member_row = add_member(institution, colleague)
+        member_id = member_row.id
+
+    promote = client.post(f"/institution/members/{member_id}/role", data={"role": "admin"}, follow_redirects=True)
+    assert b"role updated" in promote.data
+    with client.application.app_context():
+        assert InstitutionMember.query.filter_by(id=member_id).one().role == "admin"
+
+    remove = client.post(f"/institution/members/{member_id}/remove", follow_redirects=True)
+    assert b"Member removed" in remove.data
+    with client.application.app_context():
+        assert InstitutionMember.query.filter_by(id=member_id).count() == 0
+
+    # Panel models list shows institution-funded models (upload as the dean).
+    model_id = upload_model_for(client)
+    models_page = client.get("/institution/models")
+    assert models_page.status_code == 200
+    with client.application.app_context():
+        model = db.session.get(Model3D, model_id)
+        name = (model.display_name or model.original_filename or model.id).encode()
+    assert name in models_page.data
+    assert f"/view/{model_id}".encode() in models_page.data
+
+
 def test_institution_usage_excludes_soft_deleted_papers(client):
     from tests.conftest import register
 

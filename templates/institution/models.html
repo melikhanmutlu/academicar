@@ -1,0 +1,34 @@
+{% extends "institution/_panel.html" %}
+{% from "admin/_pagination.html" import render_pagination %}
+
+{% block panel_body %}
+  <section class="surface reveal-up inst-section">
+    <div class="inst-section-head">
+      <h2>Funded models</h2>
+      <span>{{ models_pagination.total }} model(s)</span>
+    </div>
+    <p class="inst-note">Models uploaded by your members under the institutional license. They count against the contract quota even if the member later leaves.</p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>Model</th><th>Publication</th><th>Size</th><th>License</th><th>Access until</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for model in models_pagination.items %}
+            <tr>
+              <td><strong>{{ model.display_name or model.original_filename or model.id }}</strong></td>
+              <td>{{ model.paper.title if model.paper else "-" }}</td>
+              <td>{{ format_file_size(model.file_size) }}</td>
+              <td><span class="status-chip">{{ model.license_type|title }}</span></td>
+              <td>{{ model.access_expires_at.strftime("%Y-%m-%d") if model.access_expires_at else "Open-ended" }}</td>
+              <td><a href="{{ url_for('view_model', model_id=model.id) }}" class="btn-secondary btn-compact" target="_blank" rel="noopener">View</a></td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6">No institution-funded models yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ render_pagination(models_pagination, 'institution.models_list') }}
+  </section>
+{% endblock %}

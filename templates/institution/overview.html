@@ -1,0 +1,80 @@
+{% extends "institution/_panel.html" %}
+
+{% block panel_body %}
+  <div class="dashboard-metrics reveal-up">
+    <div class="metric-card">
+      <div class="metric-card-head">
+        <span class="metric-label" data-mobile-label="Members">Members</span>
+        <strong class="metric-value-compact">{{ member_count }}</strong>
+      </div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-card-head">
+        <span class="metric-label" data-mobile-label="Models">Funded models</span>
+        <strong class="metric-value-compact">{{ usage_models }}{% if institution.quota_model_count is not none %}<small class="metric-divider">/{{ institution.quota_model_count }}</small>{% endif %}</strong>
+      </div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-card-head">
+        <span class="metric-label" data-mobile-label="Storage">Storage used</span>
+        <strong class="metric-value-compact">{{ format_file_size(usage_bytes) }}</strong>
+      </div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-card-head">
+        <span class="metric-label" data-mobile-label="Invites">Active invites</span>
+        <strong class="metric-value-compact">{{ active_invites }}</strong>
+      </div>
+    </div>
+  </div>
+
+  <section class="surface reveal-up inst-section">
+    <h2>Contract</h2>
+    <div class="inst-contract-grid">
+      <div>
+        <span class="inst-field-label">Status</span>
+        <strong>{{ institution.status|title }}{% if not institution.contract_is_current() %} &middot; contract not current{% endif %}</strong>
+      </div>
+      <div>
+        <span class="inst-field-label">Contract window</span>
+        <strong>
+          {{ institution.contract_starts_at.strftime("%Y-%m-%d") if institution.contract_starts_at else "—" }}
+          &rarr;
+          {{ institution.contract_ends_at.strftime("%Y-%m-%d") if institution.contract_ends_at else "open-ended" }}
+        </strong>
+      </div>
+      <div>
+        <span class="inst-field-label">Email domains</span>
+        <strong>{% if institution.email_domains %}@{{ institution.domain_list()|join(", @") }}{% else %}Any email may accept invites{% endif %}</strong>
+      </div>
+    </div>
+    <p class="inst-note">
+      Uploads by your members are covered by the institutional license while the contract is current and quota remains.
+      Contract terms are managed by the AcademicAR team.
+    </p>
+  </section>
+
+  <section class="surface reveal-up inst-section">
+    <h2>Quota usage</h2>
+    {% if institution.quota_model_count is not none %}
+      {% set model_pct = ((usage_models / institution.quota_model_count) * 100)|round|int if institution.quota_model_count else 100 %}
+      <div class="inst-usage-row">
+        <span>Models</span>
+        <div class="inst-usage-bar"><div class="inst-usage-fill {% if model_pct >= 90 %}is-hot{% endif %}" style="width: {{ [model_pct, 100]|min }}%"></div></div>
+        <span>{{ usage_models }} / {{ institution.quota_model_count }}</span>
+      </div>
+    {% else %}
+      <div class="inst-usage-row"><span>Models</span><span>{{ usage_models }} (no quota)</span></div>
+    {% endif %}
+    {% if institution.quota_storage_bytes is not none %}
+      {% set storage_pct = ((usage_bytes / institution.quota_storage_bytes) * 100)|round|int if institution.quota_storage_bytes else 100 %}
+      <div class="inst-usage-row">
+        <span>Storage</span>
+        <div class="inst-usage-bar"><div class="inst-usage-fill {% if storage_pct >= 90 %}is-hot{% endif %}" style="width: {{ [storage_pct, 100]|min }}%"></div></div>
+        <span>{{ format_file_size(usage_bytes) }} / {{ format_file_size(institution.quota_storage_bytes) }}</span>
+      </div>
+    {% else %}
+      <div class="inst-usage-row"><span>Storage</span><span>{{ format_file_size(usage_bytes) }} (no quota)</span></div>
+    {% endif %}
+  </section>
+{% endblock %}

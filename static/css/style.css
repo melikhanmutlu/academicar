@@ -8873,3 +8873,90 @@ body.nav-menu-open {
   }
   .lp-hero-visual { transform: none; will-change: auto; }
 }
+
+/* ===== Institution panel (B2B) ===== */
+.inst-nav {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--color-light-pearl);
+  margin-bottom: 24px;
+}
+.inst-nav a {
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-dark-shale);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.inst-nav a:hover { color: var(--color-midnight-graphite); }
+.inst-nav a.is-active {
+  color: var(--color-midnight-graphite);
+  border-bottom-color: var(--color-sunset-orange);
+}
+.inst-section { padding: 24px; margin-bottom: 24px; }
+.inst-section h2 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+.inst-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.inst-section-head span { color: var(--color-silver-ash); font-size: 13px; }
+.inst-note { color: var(--color-silver-ash); font-size: 13px; margin-bottom: 16px; }
+.inst-field-label {
+  display: block;
+  font-size: 12px;
+  color: var(--color-silver-ash);
+  margin-bottom: 4px;
+}
+.inst-contract-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+.inst-usage-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+  font-size: 13px;
+}
+.inst-usage-row > span:first-child { width: 64px; color: var(--color-dark-shale); }
+.inst-usage-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--color-slate-mist);
+  border: 1px solid var(--color-light-pearl);
+  overflow: hidden;
+}
+.inst-usage-fill { height: 100%; background: var(--color-dark-shale); }
+.inst-usage-fill.is-hot { background: var(--color-sunset-orange); }
+.inst-row-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.inst-cell-sub { display: block; color: var(--color-silver-ash); font-size: 12px; }
+.btn-compact { padding: 4px 10px; font-size: 12px; }
+.inst-invite-form {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.inst-invite-form input {
+  border: 1px solid var(--color-light-pearl);
+  padding: 8px 10px;
+  font-size: 14px;
+  width: 160px;
+}
+.inst-invite-url {
+  width: 100%;
+  min-width: 220px;
+  border: 1px solid var(--color-light-pearl);
+  background: var(--color-cloud-whisper);
+  padding: 6px 8px;
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+}
+.inst-status-active { border-color: var(--color-light-pearl); }
+.inst-status-suspended { color: var(--color-sunset-orange); border-color: var(--color-orange-soft-border); }
+.inst-invite-revoked, .inst-invite-expired, .inst-invite-exhausted { opacity: 0.6; }

@@ -63,6 +63,7 @@ from licensing import (
 from licensing import paper_is_expired as licensing_paper_is_expired
 from blog_content import code_post_slugs, get_all_posts, get_post, render_body
 from discipline_content import all_disciplines, discipline_slugs, get_discipline, related_disciplines
+from institution_panel import institution_bp
 from institutions import (
     apply_institutional_license,
     end_institution_access_now,
@@ -172,6 +173,7 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     init_oauth(app)
     app.register_blueprint(auth_bp)
+    app.register_blueprint(institution_bp)
 
     @app.context_processor
     def inject_globals():

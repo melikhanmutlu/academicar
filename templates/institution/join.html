@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}{% if invite %}Join {{ institution.name }}{% else %}Invite link{% endif %} - AcademicAR{% endblock %}
+
+{% block content %}
+<div class="auth-shell">
+  <div class="max-w-md mx-auto w-full">
+    <section class="surface rounded-xl p-6 sm:p-8 lg:p-10">
+      {% if not invite %}
+        <h1 class="font-serif text-4xl font-bold text-[#111827] mt-5">Invite link</h1>
+        <p class="text-[#5c6473] mt-2 mb-7">This invite link is invalid or has expired. Ask your institution admin for a new one.</p>
+        <a href="{{ url_for('landing') }}" class="btn-secondary w-full">Back to AcademicAR</a>
+      {% else %}
+        <h1 class="font-serif text-4xl font-bold text-[#111827] mt-5">Join {{ institution.name }}</h1>
+        <p class="text-[#5c6473] mt-2 mb-4">
+          Members' 3D model uploads are covered by {{ institution.name }}'s institutional license
+          while the contract is active.
+        </p>
+        {% if institution.email_domains %}
+          <p class="inst-note mb-6">Requires an account email at: @{{ institution.domain_list()|join(", @") }}</p>
+        {% endif %}
+
+        {% if current_user.is_authenticated %}
+          {% if already_member %}
+            {% if already_member.institution_id == institution.id %}
+              <p class="text-[#5c6473] mb-6">You are already a member of {{ institution.name }}.</p>
+              <a href="{{ url_for('dashboard') }}" class="btn-primary w-full">Go to dashboard</a>
+            {% else %}
+              <p class="text-[#5c6473] mb-6">
+                You already belong to {{ already_member.institution.name }}. Accounts can belong to one
+                institution — contact the AcademicAR team to switch.
+              </p>
+              <a href="{{ url_for('dashboard') }}" class="btn-secondary w-full">Back to dashboard</a>
+            {% endif %}
+          {% else %}
+            <form method="POST" class="space-y-4">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <p class="text-[#5c6473]">Join as <strong>{{ current_user.email }}</strong>?</p>
+              {% if domain_mismatch %}
+                <p class="text-xs text-red-600">
+                  Your current account email does not match the required domain. Create a separate account
+                  with your institutional email, then open this link again.
+                </p>
+              {% endif %}
+              <button type="submit" class="btn-primary w-full">Join {{ institution.name }}</button>
+            </form>
+          {% endif %}
+        {% else %}
+          <p class="text-[#5c6473] mb-4">Log in or create an account to accept this invite. If you use Google sign-in, open this link again afterwards.</p>
+          <div class="space-y-3">
+            <a href="{{ url_for('auth.login', next=request.path) }}" class="btn-primary w-full">Log in</a>
+            <a href="{{ url_for('auth.register', next=request.path) }}" class="btn-secondary w-full">Create account</a>
+          </div>
+        {% endif %}
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

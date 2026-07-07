@@ -1,0 +1,51 @@
+{% extends "institution/_panel.html" %}
+{% from "admin/_pagination.html" import render_pagination %}
+
+{% block panel_body %}
+  <section class="surface reveal-up inst-section">
+    <div class="inst-section-head">
+      <h2>Members</h2>
+      <span>{{ members_pagination.total }} member(s)</span>
+    </div>
+    <p class="inst-note">Removing a member stops future institutional uploads; models they already uploaded keep their access.</p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>User</th><th>Role</th><th>Joined</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          {% for member in members_pagination.items %}
+            <tr>
+              <td>
+                <strong>{{ member.user.username }}</strong>
+                <small class="inst-cell-sub">{{ member.user.email }}</small>
+              </td>
+              <td><span class="status-chip">{{ "Institution admin" if member.role == "admin" else "Member" }}</span></td>
+              <td>{{ member.joined_at.strftime("%Y-%m-%d") if member.joined_at else "-" }}</td>
+              <td>
+                {% if member.user_id != current_user.id %}
+                  <div class="inst-row-actions">
+                    <form method="POST" action="{{ url_for('institution.member_role', member_id=member.id) }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <input type="hidden" name="role" value="{{ 'member' if member.role == 'admin' else 'admin' }}">
+                      <button type="submit" class="btn-secondary btn-compact">{{ "Make member" if member.role == "admin" else "Make admin" }}</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('institution.member_remove', member_id=member.id) }}" onsubmit="return confirm('Remove this member from {{ institution.name }}?')">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="submit" class="btn-secondary btn-compact">Remove</button>
+                    </form>
+                  </div>
+                {% else %}
+                  <span class="inst-cell-sub">You</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4">No members yet — share an invite link from the Invites tab.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ render_pagination(members_pagination, 'institution.members') }}
+  </section>
+{% endblock %}

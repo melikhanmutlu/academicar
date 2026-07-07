@@ -1,0 +1,22 @@
+{# Shared layout for the institution admin panel. Lighter than the platform
+   admin shell on purpose: extends the public site base, adds a header with
+   the institution's name/status and a four-tab subnav. Child templates fill
+   panel_body. #}
+{% extends "base.html" %}
+{% block title %}{{ institution.name }} - Institution panel - AcademicAR{% endblock %}
+
+{% block content %}
+<div class="app-shell dashboard-shell py-8">
+  <div class="dashboard-header reveal-up">
+    <div>
+      <h1>{{ institution.name }}</h1>
+      <p>Institution panel &middot; manage members, invites, and contract usage.</p>
+    </div>
+    <span class="status-chip inst-status-{{ institution.status }}">{{ institution.status|title }}</span>
+  </div>
+
+  {% include "institution/_nav.html" %}
+
+  {% block panel_body %}{% endblock %}
+</div>
+{% endblock %}

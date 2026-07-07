@@ -211,6 +211,13 @@ def register():
         except Exception:
             pass  # Fail silently if audit logging fails
         flash("Registration successful. Welcome.", "success")
+        # Same-site ?next= support (mirrors login): lets flows like an
+        # institution invite send new users back to the join page. The URL —
+        # not the session — carries it, because _rotate_session() clears the
+        # session right before login_user.
+        next_page = request.args.get("next")
+        if next_page and is_safe_redirect_url(next_page):
+            return redirect(next_page)
         return redirect(url_for("dashboard"))
 
     return render_template(

@@ -1,0 +1,65 @@
+{% extends "institution/_panel.html" %}
+
+{% block panel_body %}
+  <section class="surface reveal-up inst-section">
+    <div class="inst-section-head">
+      <h2>Create invite link</h2>
+    </div>
+    <p class="inst-note">
+      Anyone with the link can request to join{% if institution.email_domains %} — but only accounts with a
+      @{{ institution.domain_list()|join(", @") }} email can accept{% endif %}.
+    </p>
+    <form method="POST" action="{{ url_for('institution.invite_create') }}" class="inst-invite-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>
+        <span class="inst-field-label">Valid for (days)</span>
+        <input type="number" name="expires_days" min="1" max="365" value="14" placeholder="blank = no expiry">
+      </label>
+      <label>
+        <span class="inst-field-label">Max uses</span>
+        <input type="number" name="max_uses" min="1" placeholder="blank = unlimited">
+      </label>
+      <button type="submit" class="btn-primary">Create invite</button>
+    </form>
+  </section>
+
+  <section class="surface reveal-up inst-section">
+    <div class="inst-section-head">
+      <h2>Invite links</h2>
+      <span>{{ invites|length }} total</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>Link</th><th>Expires</th><th>Uses</th><th>Status</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          {% for row in invites %}
+            <tr>
+              <td>
+                {% if row.state == "active" %}
+                  <input type="text" class="inst-invite-url" value="{{ row.join_url }}" readonly onclick="this.select()">
+                {% else %}
+                  <span class="inst-cell-sub">{{ row.join_url }}</span>
+                {% endif %}
+              </td>
+              <td>{{ row.invite.expires_at.strftime("%Y-%m-%d") if row.invite.expires_at else "Never" }}</td>
+              <td>{{ row.invite.use_count }}{% if row.invite.max_uses is not none %} / {{ row.invite.max_uses }}{% endif %}</td>
+              <td><span class="status-chip inst-invite-{{ row.state }}">{{ row.state|title }}</span></td>
+              <td>
+                {% if row.invite.revoked_at is none %}
+                  <form method="POST" action="{{ url_for('institution.invite_revoke', invite_id=row.invite.id) }}" onsubmit="return confirm('Revoke this invite link?')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn-secondary btn-compact">Revoke</button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5">No invites yet — create the first one above.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}
