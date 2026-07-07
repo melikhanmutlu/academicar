@@ -63,7 +63,16 @@ from licensing import (
 from licensing import paper_is_expired as licensing_paper_is_expired
 from blog_content import code_post_slugs, get_all_posts, get_post, render_body
 from discipline_content import all_disciplines, discipline_slugs, get_discipline, related_disciplines
-from models import AuditLog, BlogPost, ConversionJob, LicensePlanConfig, Model3D, ModelAnnotation, ModelVersion, Paper, Payment, QRLink, User, db
+from institutions import (
+    apply_institutional_license,
+    end_institution_access_now,
+    get_active_membership,
+    institution_can_fund_upload,
+    institution_usage,
+    reapply_model_license,
+    renew_institution_contract,
+)
+from models import AuditLog, BlogPost, ConversionJob, Institution, InstitutionInvite, InstitutionMember, LicensePlanConfig, Model3D, ModelAnnotation, ModelVersion, Paper, Payment, QRLink, User, db
 from services.r2_mirror import mirror_file, mirror_directory, mirror_directory_sync, mirror_delete, ensure_local
 from payments import (
     PAID_PLAN_KEYS,
@@ -1927,7 +1936,7 @@ def process_model_upload_job(
             if is_replacement:
                 model.replacement_status = "ready"
                 model.replacement_error = None
-            apply_model_license_defaults(model, model.license_type)
+            reapply_model_license(model)
 
             if job is not None:
                 job.status = "completed"
@@ -2166,7 +2175,8 @@ def _create_model_for_paper(
     # Self-serve uploads always start on the free (3-day) tier. Paid plans are
     # granted only through the checkout flow (upgrade_model_license) or an admin
     # override (admin_model_license_update); never trust a license picked on the
-    # upload form, or a model could get a paid window for free.
+    # upload form, or a model could get a paid window for free. The institutional
+    # plan is likewise a server-side grant (membership + quota check below).
     license_normalized = "free"
     display_name = (display_name or "").strip()[:255] or None
     description = (description or "").strip()[:5000] or None
@@ -2213,6 +2223,22 @@ def _create_model_for_paper(
             return False, str(e)
 
     file_size = os.path.getsize(source_path)
+
+    # Institutional grant: a member's upload is covered by their institution's
+    # contract while it is active, current, and within quota. Decided here
+    # (file_size is known) so the per-file limit check below already enforces
+    # the institutional plan's own cap.
+    funding_institution = None
+    institutional_fallback_reason = None
+    membership = get_active_membership(paper.user_id)
+    if membership is not None:
+        can_fund, reason = institution_can_fund_upload(membership.institution, file_size)
+        if can_fund:
+            license_normalized = "institutional"
+            funding_institution = membership.institution
+        else:
+            institutional_fallback_reason = reason
+
     size_error = model_file_limit_error(file_size, license_normalized)
     if size_error:
         cleanup_dir(upload_dir)
@@ -2272,7 +2298,10 @@ def _create_model_for_paper(
         consent_ip=client_ip(),
         terms_version=current_app.config.get("TERMS_VERSION", "1.0"),
     )
-    apply_model_license_defaults(model, license_normalized)
+    if funding_institution is not None:
+        apply_institutional_license(model, funding_institution)
+    else:
+        apply_model_license_defaults(model, license_normalized)
     db.session.add(model)
     # Public id + QR record exist from the moment the model is created so QR
     # codes can be printed even before conversion completes.
@@ -2312,8 +2341,28 @@ def _create_model_for_paper(
         "version_id": version_row.id,
     }
     enqueue_conversion_job(current_app, model=model, job_kwargs=job_kwargs, job_type="model_upload")
-    log_audit("model_upload_queued", user_id=paper.user_id, resource_id=unique_id)
-    return True, "Model upload accepted. Processing has started in the background."
+    audit_details = {}
+    if funding_institution is not None:
+        audit_details["institution_id"] = funding_institution.id
+    elif institutional_fallback_reason:
+        audit_details["institutional_fallback_reason"] = institutional_fallback_reason
+    log_audit(
+        "model_upload_queued",
+        user_id=paper.user_id,
+        resource_id=unique_id,
+        details=audit_details or None,
+    )
+    message = "Model upload accepted. Processing has started in the background."
+    if funding_institution is not None:
+        message += f" Covered by {funding_institution.name}'s institutional license"
+        if funding_institution.contract_ends_at is not None:
+            message += f" until {funding_institution.contract_ends_at.strftime('%Y-%m-%d')}"
+        message += "."
+    elif institutional_fallback_reason in {"quota_models", "quota_storage"}:
+        message += " Your institution's quota is currently full, so this model uses the free 3-day plan."
+    elif institutional_fallback_reason in {"contract_expired", "suspended"}:
+        message += " Your institution's contract is not active, so this model uses the free 3-day plan."
+    return True, message
 
 
 def cleanup_paths(paths: list[tuple[str, str]]) -> None:

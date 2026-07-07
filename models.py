@@ -121,6 +121,11 @@ class Model3D(db.Model):
     access_starts_at = db.Column(db.DateTime, nullable=True, default=utc_now)
     access_expires_at = db.Column(db.DateTime, nullable=True)
     storage_limit_bytes = db.Column(db.Integer, nullable=True)
+    # Set when an institution's contract funded this model's "institutional"
+    # license at upload time. Kept (SET NULL only on institution delete) even if
+    # the member later leaves, so the model keeps counting against the
+    # institution's quota — the institution paid for the storage.
+    institution_id = db.Column(db.Integer, db.ForeignKey("institutions.id", ondelete="SET NULL"), nullable=True, index=True)
     appearance_color = db.Column(db.String(20), nullable=True)
     appearance_roughness = db.Column(db.Float, nullable=True, default=0.35)
     appearance_metallic = db.Column(db.Float, nullable=True, default=0.05)
@@ -269,6 +274,10 @@ class Payment(db.Model):
     # ondelete=SET NULL so the payment/invoice record survives if the model is
     # later deleted (financial audit trail must outlive the asset).
     model_id = db.Column(db.String(36), db.ForeignKey("models.id", ondelete="SET NULL"), nullable=True, index=True)
+    # B2B: an institution's offline contract payment (invoice/bank transfer),
+    # recorded manually by the platform admin. Same survival rationale as
+    # model_id — the financial record must outlive the institution row.
+    institution_id = db.Column(db.Integer, db.ForeignKey("institutions.id", ondelete="SET NULL"), nullable=True, index=True)
     # The license plan this payment grants (academic / extended_archive). Needed
     # because some gateways (e.g. PayTR) don't echo custom data in the callback,
     # so the plan is recovered from this row by merchant_oid (provider_reference).
@@ -287,6 +296,7 @@ class Payment(db.Model):
     user = db.relationship("User", backref=db.backref("payments", lazy=True))
     paper = db.relationship("Paper", backref=db.backref("payments", lazy=True))
     model = db.relationship("Model3D", backref=db.backref("payments", lazy=True))
+    institution = db.relationship("Institution", backref=db.backref("payments", lazy=True))
 
     def __repr__(self) -> str:
         return f"<Payment {self.status} {self.amount_kurus} {self.currency}>"
@@ -360,4 +370,126 @@ class LicensePlanConfig(db.Model):
 
     def __repr__(self) -> str:
         return f"<LicensePlanConfig {self.key}>"
+
+
+class Institution(db.Model):
+    """A university/lab/institute on a B2B contract.
+
+    Created and priced manually by the platform admin (offline invoicing —
+    there is no self-serve institutional checkout). Members join via invite
+    links; their uploads get the "institutional" license plan while the
+    contract is current and the quota below is not exhausted (see
+    institutions.py helpers).
+    """
+    __tablename__ = "institutions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), unique=True, nullable=False, index=True)
+    # Comma-separated lowercase email domains without "@" (e.g.
+    # "boun.edu.tr, metu.edu.tr"). When set, invite acceptance requires the
+    # joining user's email to match one of them; empty = any email may join.
+    email_domains = db.Column(db.String(500), nullable=True)
+    status = db.Column(db.String(20), nullable=False, default="active", index=True)  # active | suspended
+    contract_starts_at = db.Column(db.DateTime, nullable=True)
+    contract_ends_at = db.Column(db.DateTime, nullable=True)  # NULL = open-ended
+    # Contract price in minor units (kurus for TRY, cents for USD) — same
+    # convention as Payment.amount_kurus. Informational; actual money is
+    # tracked via Payment rows with institution_id set.
+    annual_price_cents = db.Column(db.Integer, nullable=True)
+    currency = db.Column(db.String(3), nullable=False, default="TRY")
+    # Contract quota across ALL models the institution has funded. NULL means
+    # unlimited. BigInteger: storage contracts exceed the 2 GB int32 range.
+    quota_storage_bytes = db.Column(db.BigInteger, nullable=True)
+    quota_model_count = db.Column(db.Integer, nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=utc_now)
+    updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
+
+    def domain_list(self) -> list[str]:
+        if not self.email_domains:
+            return []
+        return [d.strip().lower().lstrip("@") for d in self.email_domains.split(",") if d.strip()]
+
+    def email_matches_domains(self, email: str | None) -> bool:
+        """True when the email's domain is allowed. No domains configured = allow any."""
+        domains = self.domain_list()
+        if not domains:
+            return True
+        domain = (email or "").rsplit("@", 1)[-1].strip().lower()
+        return bool(domain) and domain in domains
+
+    def contract_is_current(self) -> bool:
+        """True when today falls inside the contract window (NULL bounds are
+        open). Mirrors licensing.is_access_expired's naive-UTC convention."""
+        now = datetime.now(UTC)
+        starts = self.contract_starts_at
+        if starts is not None:
+            if starts.tzinfo is None:
+                starts = starts.replace(tzinfo=UTC)
+            if starts > now:
+                return False
+        ends = self.contract_ends_at
+        if ends is not None:
+            if ends.tzinfo is None:
+                ends = ends.replace(tzinfo=UTC)
+            if ends < now:
+                return False
+        return True
+
+    def __repr__(self) -> str:
+        return f"<Institution {self.name}>"
+
+
+class InstitutionInvite(db.Model):
+    """A shareable join link for an institution, created from the institution
+    panel. Stored as a row (not a signed token) because invites need
+    revocation, max-use counting, and listing."""
+    __tablename__ = "institution_invites"
+
+    id = db.Column(db.Integer, primary_key=True)
+    institution_id = db.Column(db.Integer, db.ForeignKey("institutions.id", ondelete="CASCADE"), nullable=False, index=True)
+    token = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    expires_at = db.Column(db.DateTime, nullable=True)  # NULL = no expiry
+    max_uses = db.Column(db.Integer, nullable=True)  # NULL = unlimited
+    use_count = db.Column(db.Integer, nullable=False, default=0)
+    revoked_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=utc_now)
+
+    institution = db.relationship(
+        "Institution",
+        backref=db.backref("invites", lazy=True, cascade="all, delete-orphan"),
+    )
+    created_by = db.relationship("User", foreign_keys=[created_by_user_id])
+
+    def __repr__(self) -> str:
+        return f"<InstitutionInvite {self.id} inst={self.institution_id}>"
+
+
+class InstitutionMember(db.Model):
+    """Membership of a user in an institution.
+
+    v1: one institution per user (UNIQUE on user_id) so exactly one
+    institution can fund an upload; relaxing to multi-institution later is
+    just dropping that constraint. role is "member" or "admin" — institution
+    admins manage the /institution panel and are unrelated to User.is_admin.
+    """
+    __tablename__ = "institution_members"
+
+    id = db.Column(db.Integer, primary_key=True)
+    institution_id = db.Column(db.Integer, db.ForeignKey("institutions.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    role = db.Column(db.String(20), nullable=False, default="member")  # member | admin
+    joined_at = db.Column(db.DateTime, default=utc_now)
+    invite_id = db.Column(db.Integer, db.ForeignKey("institution_invites.id", ondelete="SET NULL"), nullable=True)
+
+    institution = db.relationship(
+        "Institution",
+        backref=db.backref("members", lazy=True, cascade="all, delete-orphan"),
+    )
+    user = db.relationship("User", backref=db.backref("institution_membership", uselist=False))
+    invite = db.relationship("InstitutionInvite", foreign_keys=[invite_id])
+
+    def __repr__(self) -> str:
+        return f"<InstitutionMember user={self.user_id} inst={self.institution_id} {self.role}>"
 
