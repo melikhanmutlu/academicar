@@ -177,6 +177,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     def inject_globals():
         return {
             "current_year": datetime.now(UTC).year,
+            "asset_version": app.config.get("ASSET_VERSION", ""),
             "format_file_size": format_file_size,
             "public_url": public_url,
             "canonical_url": canonical_url,

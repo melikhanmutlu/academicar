@@ -201,6 +201,16 @@ class Config:
     # Compliance & Legal
     TERMS_VERSION = os.environ.get("TERMS_VERSION", "1.0")
 
+    # Cache-busting token appended to static asset URLs (?v=...). Prefer the
+    # deploy's git commit SHA so every release invalidates browser CSS/JS
+    # caches; fall back to the process start time so a plain restart also
+    # busts stale caches. Prevents "new HTML + old cached CSS" rendering bugs.
+    ASSET_VERSION = (
+        os.environ.get("RAILWAY_GIT_COMMIT_SHA")
+        or os.environ.get("GIT_COMMIT_SHA")
+        or __import__("time").strftime("%Y%m%d%H%M%S")
+    )[:16]
+
     # Contact email advertised to external scholarly APIs (Crossref "polite
     # pool" etiquette) via the outbound User-Agent header. Override in prod.
     CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "info@academicar.com")

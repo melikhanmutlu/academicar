@@ -147,7 +147,7 @@
       </div>
 
       {% for p in papers %}
-        {% set paper_href = url_for('demo_mitochondria_ar', source='demo_dashboard') if demo else (url_for('paper_public', slug=p.slug) if admin_view is defined and admin_view else url_for('paper_detail', slug=p.slug)) %}
+        {% set paper_href = url_for('auth.register') if demo else (url_for('paper_public', slug=p.slug) if admin_view is defined and admin_view else url_for('paper_detail', slug=p.slug)) %}
         {% set first_model = p.models[0] if p.models else none %}
         {% set clean_authors = (p.authors or '').replace('Dr. ','').replace('Prof. ','').replace('Dr.','').replace('Prof.','').strip() %}
         {% if clean_authors %}

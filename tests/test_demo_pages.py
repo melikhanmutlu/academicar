@@ -20,8 +20,9 @@ def test_demo_dashboard_actions_do_not_point_to_protected_routes(client):
     # Authoring routes must not appear as action targets (they'd redirect to login)
     assert "/papers/new" not in body
     assert "/papers/demo-publication/edit" not in body
-    # Title/Details link through to the real public viewer demo instead
-    assert "/demo/mitochondria/ar" in body
+    # Publication title/Details resolve to the sign-up CTA, not the model viewer
+    assert "/demo/mitochondria/ar" not in body
+    assert "/auth/register" in body
 
 
 def test_demo_institution_public_and_populated(client):

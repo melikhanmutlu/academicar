@@ -9029,7 +9029,7 @@ body.nav-menu-open {
 .demo-banner-cross:hover { color: var(--color-orange-pressed); }
 
 .lp-hero-examples {
-  margin-top: 16px;
+  margin: -8px 0 24px;
   font-size: 14px;
   color: var(--color-silver-ash);
 }
