@@ -217,6 +217,69 @@ def send_monthly_institution_reports(now: datetime | None = None) -> int:
     return sent
 
 
+def send_contract_renewal_reminders(now: datetime | None = None) -> int:
+    """Email institution admins (and the platform contact) when a contract
+    ends within 30 days. One reminder per contract end date: the stamp
+    records WHICH contract_ends_at was announced, so renewing to a later
+    date re-arms the reminder automatically. Called from the worker loop.
+    Stamped even if delivery fails, mirroring the monthly reports."""
+    from flask import current_app
+
+    from utils.email import send_email
+
+    now = now or datetime.now(UTC)
+    window_end = now + timedelta(days=30)
+    sent = 0
+    institutions = (
+        Institution.query.filter(
+            Institution.status == "active",
+            Institution.contract_ends_at.isnot(None),
+            Institution.contract_ends_at >= now.replace(tzinfo=None),
+            Institution.contract_ends_at <= window_end.replace(tzinfo=None),
+        ).all()
+    )
+    for institution in institutions:
+        if institution.renewal_reminder_sent_for == institution.contract_ends_at:
+            continue
+        model_count, bytes_used = institution_usage(institution.id)
+        ends = institution.contract_ends_at.strftime("%Y-%m-%d")
+        body = (
+            f"The AcademicAR institutional contract for {institution.name} "
+            f"ends on {ends}.\n\n"
+            f"Current usage: {model_count} funded model(s), "
+            f"{bytes_used / (1024 * 1024):.1f} MB storage.\n\n"
+            "Models funded by the contract lose public AR/QR access when it "
+            "expires. Contact the AcademicAR team to renew."
+        )
+        subject = f"AcademicAR contract renewal — {institution.name} ends {ends}"
+        admin_members = (
+            InstitutionMember.query.filter_by(institution_id=institution.id, role="admin").all()
+        )
+        recipients = [m.user.email for m in admin_members if m.user and m.user.email]
+        contact = (current_app.config.get("CONTACT_EMAIL") or "").strip()
+        if contact:
+            recipients.append(contact)
+        institution.renewal_reminder_sent_for = institution.contract_ends_at
+        delivered = False
+        for recipient in recipients:
+            try:
+                if send_email(recipient, subject, body):
+                    delivered = True
+            except Exception:
+                logger.exception("renewal reminder email failed for institution %s", institution.id)
+        db.session.add(
+            AuditLog(
+                event_type="institution_renewal_reminder_sent",
+                resource_id=str(institution.id),
+                details={"contract_ends_at": ends, "recipients": len(recipients), "delivered": delivered},
+            )
+        )
+        sent += 1
+    if institutions:
+        db.session.commit()
+    return sent
+
+
 def end_institution_access_now(institution, now: datetime) -> int:
     """Hard cutoff: expire every institutional model of this institution
     immediately (suspension alone only blocks NEW uploads). Returns the

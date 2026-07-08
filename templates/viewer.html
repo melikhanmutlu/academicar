@@ -804,13 +804,16 @@
           <h1 class="font-serif text-2xl sm:text-3xl font-semibold mt-1 line-clamp-1">{{ model.display_name or model.original_filename }}</h1>
           <p class="text-sm text-white/60 mt-1 line-clamp-1">{{ paper.title }}</p>
           {% if model.license_type == 'institutional' and model.institution %}
-            <p class="text-xs text-white/45 mt-1 line-clamp-1">
-              Supported by
+            <p class="text-xs text-white/45 mt-1 line-clamp-1 flex items-center gap-1.5">
+              {% if model.institution.logo_path %}
+                <img src="{{ url_for('serve_institution_logo', filename=model.institution.logo_path) }}" alt="" style="height:16px;width:auto;border-radius:2px" loading="lazy">
+              {% endif %}
+              <span>Supported by
               {%- if model.institution.slug %}
                 <a href="{{ url_for('institution_showcase', slug=model.institution.slug) }}" class="text-white/70 underline underline-offset-2 hover:text-white">{{ model.institution.name }}</a>
               {%- else %}
                 <span class="text-white/70">{{ model.institution.name }}</span>
-              {%- endif %}
+              {%- endif %}</span>
             </p>
           {% endif %}
         </div>

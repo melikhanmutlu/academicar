@@ -32,6 +32,9 @@
               <td>
                 <strong><a href="{{ url_for('admin_institution_detail', institution_id=institution.id) }}">{{ institution.name }}</a></strong>
                 {% if institution.email_domains %}<small>@{{ institution.domain_list()|join(", @") }}</small>{% endif %}
+                {% if institution.slug %}
+                  <small><a href="{{ url_for('institution_showcase', slug=institution.slug) }}" target="_blank" rel="noopener">Showcase: /i/{{ institution.slug }} &#8599;</a></small>
+                {% endif %}
               </td>
               <td><span class="status-chip {{ admin_chip_class(institution.status) }}">{{ institution.status|title }}</span></td>
               <td>{{ institution.contract_ends_at.strftime("%Y-%m-%d") if institution.contract_ends_at else "Open-ended" }}</td>

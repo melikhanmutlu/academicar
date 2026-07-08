@@ -27,6 +27,8 @@ uploads/
 converted/
 qr_codes/
 pdfs/
+blog_images/
+institution_logos/
 storage/
 tests_runtime/
 .pytest_cache/

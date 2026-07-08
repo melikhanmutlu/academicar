@@ -105,6 +105,7 @@ class Config:
     QR_FOLDER = runtime_folder("QR_FOLDER", "qr_codes", _runtime_base)
     PDF_FOLDER = runtime_folder("PDF_FOLDER", "pdfs", _runtime_base)
     BLOG_IMAGE_FOLDER = runtime_folder("BLOG_IMAGE_FOLDER", "blog_images", _runtime_base)
+    INSTITUTION_LOGO_FOLDER = runtime_folder("INSTITUTION_LOGO_FOLDER", "institution_logos", _runtime_base)
 
     # S3-compatible mirror (best-effort backup). Silently disabled if unset.
     # Works with Cloudflare R2 (set R2_ACCOUNT_ID) or any S3 provider such as
@@ -248,6 +249,7 @@ class Config:
             app.config["QR_FOLDER"],
             app.config["PDF_FOLDER"],
             app.config["BLOG_IMAGE_FOLDER"],
+            app.config["INSTITUTION_LOGO_FOLDER"],
             app.config["STORAGE_ROOT"],
         ):
             os.makedirs(folder, exist_ok=True)

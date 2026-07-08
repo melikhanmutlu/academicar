@@ -260,6 +260,9 @@ COMPANION_FILE_EXTENSIONS = {".mtl", ".png", ".jpg", ".jpeg", ".webp"}
 # carry script). Raster formats only.
 ALLOWED_BLOG_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "gif"}
 MAX_BLOG_IMAGE_BYTES = 10 * 1024 * 1024
+# Institution showcase logos: raster only (no SVG — script injection risk).
+ALLOWED_INSTITUTION_LOGO_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
+MAX_INSTITUTION_LOGO_BYTES = 2 * 1024 * 1024
 # Rows per page for paginated admin tables (users, papers, models, payments,
 # QR records, audit log, conversion jobs).
 ADMIN_PER_PAGE = 50
@@ -2683,6 +2686,18 @@ def register_routes(app: Flask) -> None:
             member_count=member_count,
         )
 
+    @app.route("/institution-logos/<path:filename>")
+    def serve_institution_logo(filename):
+        safe = os.path.basename(filename)
+        local = os.path.join(app.config["INSTITUTION_LOGO_FOLDER"], safe)
+        if not os.path.exists(local):
+            ensure_local(local, f"institution_logos/{safe}")
+        if not os.path.exists(local):
+            abort(404)
+        response = send_from_directory(app.config["INSTITUTION_LOGO_FOLDER"], safe, conditional=True)
+        response.headers["Cache-Control"] = "public, max-age=86400"
+        return response
+
     @app.route("/blog-images/<path:filename>")
     def serve_blog_image(filename):
         safe = os.path.basename(filename)
@@ -4178,6 +4193,7 @@ def register_routes(app: Flask) -> None:
             "quota_model_count": quota_model_count,
             "quota_storage_bytes": quota_storage_bytes,
             "notes": (request.form.get("notes") or "").strip()[:5000] or None,
+            "public_description": (request.form.get("public_description") or "").strip()[:1000] or None,
         }, None
 
     @app.route("/admin/institutions/<int:institution_id>")
@@ -4202,6 +4218,13 @@ def register_routes(app: Flask) -> None:
             .all()
         )
         model_count, bytes_used = institution_usage(institution.id)
+        page = max(request.args.get("page", type=int) or 1, 1)
+        funded_models_pagination = (
+            Model3D.query.options(selectinload(Model3D.paper))
+            .filter(Model3D.institution_id == institution.id)
+            .order_by(Model3D.created_at.desc())
+            .paginate(page=page, per_page=ADMIN_PER_PAGE, error_out=False)
+        )
         log_audit("admin_institution_detail_viewed", user_id=current_user.id, resource_id=str(institution.id))
         return render_template(
             "admin/institution_detail.html",
@@ -4211,6 +4234,7 @@ def register_routes(app: Flask) -> None:
             payments=payments,
             usage_models=model_count,
             usage_bytes=bytes_used,
+            funded_models_pagination=funded_models_pagination,
             active_page="institutions",
         )
 
@@ -4262,6 +4286,9 @@ def register_routes(app: Flask) -> None:
         new_end = values.pop("contract_ends_at")
         for field, value in values.items():
             setattr(institution, field, value)
+        if not institution.slug:
+            # Self-heal rows created before the showcase slug existed.
+            institution.slug = make_institution_slug(institution.name)
         models_updated = 0
         if new_end != previous_end:
             # Contract end drives every funded model's access window; the bulk
@@ -4424,6 +4451,76 @@ def register_routes(app: Flask) -> None:
         )
         flash("Institution payment recorded.", "success")
         return redirect(url_for("admin_institution_detail", institution_id=institution.id))
+
+    @app.route("/admin/institutions/<int:institution_id>/logo", methods=["POST"])
+    @login_required
+    def admin_institution_logo_update(institution_id):
+        require_admin()
+        institution = _institution_or_404(institution_id)
+        redirect_target = redirect(url_for("admin_institution_detail", institution_id=institution.id))
+        if request.form.get("remove") == "1":
+            if institution.logo_path:
+                old = os.path.join(app.config["INSTITUTION_LOGO_FOLDER"], os.path.basename(institution.logo_path))
+                institution.logo_path = None
+                db.session.commit()
+                cleanup_file(old)
+                log_audit("institution_logo_updated", user_id=current_user.id, resource_id=str(institution.id), details={"removed": True})
+            flash("Logo removed.", "success")
+            return redirect_target
+        file = request.files.get("logo")
+        if not file or not file.filename:
+            flash("Choose a logo file first.", "danger")
+            return redirect_target
+        ext = os.path.splitext(file.filename)[1].lower().lstrip(".")
+        if ext not in ALLOWED_INSTITUTION_LOGO_EXTENSIONS:
+            flash("Unsupported logo type. Use PNG, JPG, or WEBP.", "danger")
+            return redirect_target
+        safe = secure_filename(file.filename) or f"logo.{ext}"
+        filename = f"inst{institution.id}_{uuid.uuid4().hex[:10]}_{safe}"
+        dest = os.path.join(app.config["INSTITUTION_LOGO_FOLDER"], filename)
+        try:
+            safe_save_file(file, dest)
+        except StorageError:
+            flash("Could not save the logo. Please try again.", "danger")
+            return redirect_target
+        try:
+            if os.path.getsize(dest) > MAX_INSTITUTION_LOGO_BYTES:
+                os.remove(dest)
+                flash("Logo is too large (max 2 MB).", "danger")
+                return redirect_target
+        except OSError:
+            pass
+        old_path = institution.logo_path
+        institution.logo_path = filename
+        db.session.commit()
+        mirror_file(dest, f"institution_logos/{filename}")
+        if old_path:
+            cleanup_file(os.path.join(app.config["INSTITUTION_LOGO_FOLDER"], os.path.basename(old_path)))
+        log_audit("institution_logo_updated", user_id=current_user.id, resource_id=str(institution.id), details={"filename": filename})
+        flash("Logo updated.", "success")
+        return redirect_target
+
+    @app.route("/admin/institutions/<int:institution_id>/members.csv")
+    @login_required
+    def admin_institution_members_csv(institution_id):
+        require_admin()
+        institution = _institution_or_404(institution_id)
+        members = (
+            InstitutionMember.query.options(selectinload(InstitutionMember.user))
+            .filter_by(institution_id=institution.id)
+            .order_by(InstitutionMember.joined_at.asc())
+            .all()
+        )
+        rows = [
+            {
+                "email": m.user.email if m.user else "",
+                "username": m.user.username if m.user else "",
+                "role": m.role,
+                "joined_at": m.joined_at,
+            }
+            for m in members
+        ]
+        return _csv_response(rows, ["email", "username", "role", "joined_at"], f"institution_{institution.id}_members.csv")
 
     @app.route("/admin/ar-doctor")
     @login_required

@@ -21,7 +21,11 @@
       </p>
       {% if institution_membership is defined and institution_membership %}
         <p class="dashboard-institution-badge">
-          <span class="status-chip">{{ institution_membership.institution.name }}</span>
+          {% if institution_membership.institution.slug %}
+            <a href="{{ url_for('institution_showcase', slug=institution_membership.institution.slug) }}" target="_blank" rel="noopener"><span class="status-chip">{{ institution_membership.institution.name }}</span></a>
+          {% else %}
+            <span class="status-chip">{{ institution_membership.institution.name }}</span>
+          {% endif %}
           <span class="dashboard-institution-note">
             Institutional access
             {%- if institution_membership.institution.contract_ends_at %} until {{ institution_membership.institution.contract_ends_at.strftime("%Y-%m-%d") }}{% else %} active{% endif %}

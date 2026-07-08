@@ -1,7 +1,11 @@
 {% extends "admin/base.html" %}
+{% from "admin/_pagination.html" import render_pagination %}
 {% block admin_title %}{{ institution.name }}{% endblock %}
 {% block admin_subtitle %}Institutional contract &middot; created {{ institution.created_at.strftime("%Y-%m-%d") if institution.created_at else "-" }}{% endblock %}
 {% block admin_actions %}
+  {% if institution.slug %}
+    <a href="{{ url_for('institution_showcase', slug=institution.slug) }}" target="_blank" rel="noopener" class="admin-btn admin-btn-secondary compact">View showcase &#8599;</a>
+  {% endif %}
   <a href="{{ url_for('admin_dashboard', admin_page='institutions') }}" class="admin-btn admin-btn-secondary compact">All institutions</a>
 {% endblock %}
 
@@ -82,9 +86,32 @@
         </label>
       </div>
       <div class="admin-editor-actions">
+        <label class="admin-editor-field" style="flex:1;min-width:280px">
+          <span>Public showcase description (shown on /i/{{ institution.slug or '...' }})</span>
+          <textarea name="public_description" rows="2" maxlength="1000">{{ institution.public_description or '' }}</textarea>
+        </label>
+      </div>
+      <div class="admin-editor-actions">
         <button type="submit" class="admin-btn compact">Save contract</button>
       </div>
     </form>
+    <div class="admin-editor-actions" style="margin-top:12px;align-items:center;gap:12px">
+      {% if institution.logo_path %}
+        <img src="{{ url_for('serve_institution_logo', filename=institution.logo_path) }}" alt="{{ institution.name }} logo" style="height:40px;border:1px solid #e8e8e8;padding:4px;background:#fff">
+      {% endif %}
+      <form method="POST" action="{{ url_for('admin_institution_logo_update', institution_id=institution.id) }}" enctype="multipart/form-data" class="admin-editor-actions" style="align-items:center;gap:8px">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="file" name="logo" accept=".png,.jpg,.jpeg,.webp">
+        <button type="submit" class="admin-btn admin-btn-secondary compact">Upload logo</button>
+      </form>
+      {% if institution.logo_path %}
+        <form method="POST" action="{{ url_for('admin_institution_logo_update', institution_id=institution.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="remove" value="1">
+          <button type="submit" class="admin-btn admin-btn-secondary compact">Remove logo</button>
+        </form>
+      {% endif %}
+    </div>
     <div class="admin-actions" style="margin-top:12px">
       <form method="POST" action="{{ url_for('admin_institution_status', institution_id=institution.id) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -104,7 +131,10 @@
         <h2>Members</h2>
         <p>Institution admins manage members and invites from their own panel at /institution.</p>
       </div>
-      <span>{{ members|length }} member(s)</span>
+      <div class="admin-actions">
+        <a href="{{ url_for('admin_institution_members_csv', institution_id=institution.id) }}" class="admin-btn admin-btn-secondary compact">Download CSV</a>
+        <span>{{ members|length }} member(s)</span>
+      </div>
     </div>
     <form method="POST" action="{{ url_for('admin_institution_admin_assign', institution_id=institution.id) }}" class="admin-editor-actions" style="margin-bottom:12px">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -141,6 +171,38 @@
         </tbody>
       </table>
     </div>
+  </section>
+
+  <section class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Funded models</h2>
+        <p>Models covered by this institution's contract. They count against quota even if the uploader left.</p>
+      </div>
+      <span>{{ funded_models_pagination.total }} model(s)</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
+        <thead>
+          <tr><th>Model</th><th>Publication</th><th>Size</th><th>License</th><th>Access until</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for model in funded_models_pagination.items %}
+            <tr>
+              <td><strong><a href="{{ url_for('admin_model_detail', model_id=model.id) }}">{{ model.display_name or model.original_filename or model.id }}</a></strong></td>
+              <td>{{ model.paper.title if model.paper else "-" }}</td>
+              <td>{{ format_file_size(model.file_size) }}</td>
+              <td><span class="status-chip">{{ model.license_type|title }}</span></td>
+              <td>{{ model.access_expires_at.strftime("%Y-%m-%d") if model.access_expires_at else "Open-ended" }}</td>
+              <td><a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener" class="admin-btn admin-btn-secondary compact">View</a></td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6">No funded models yet. Members' uploads appear here while the contract is current and within quota.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ render_pagination(funded_models_pagination, 'admin_institution_detail', {'institution_id': institution.id}) }}
   </section>
 
   <section class="admin-section">

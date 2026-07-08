@@ -384,6 +384,10 @@ class Institution(db.Model):
     # (kept stable on rename, like Paper.slug); nullable only for rows that
     # predate the column — the admin update route self-heals those.
     slug = db.Column(db.String(220), unique=True, nullable=True, index=True)
+    # Showcase branding: uploaded raster logo (served via /institution-logos/)
+    # and a short blurb the institution admin edits from their panel.
+    logo_path = db.Column(db.String(500), nullable=True)
+    public_description = db.Column(db.Text, nullable=True)
     # Comma-separated lowercase email domains without "@" (e.g.
     # "boun.edu.tr, metu.edu.tr"). When set, invite acceptance requires the
     # joining user's email to match one of them; empty = any email may join.
@@ -406,6 +410,10 @@ class Institution(db.Model):
     # worker loop). NULL = never sent. Stamped even when no mail backend is
     # configured so an unconfigured deployment doesn't retry every poll.
     last_usage_report_at = db.Column(db.DateTime, nullable=True)
+    # The contract_ends_at value a 30-day renewal reminder was sent for.
+    # Comparing against the CURRENT contract_ends_at re-arms the reminder
+    # automatically whenever the contract is renewed to a later date.
+    renewal_reminder_sent_for = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=utc_now)
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
 

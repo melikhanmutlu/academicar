@@ -12,7 +12,12 @@
       <h1>{{ institution.name }}</h1>
       <p>Institution panel &middot; manage members, invites, and contract usage.</p>
     </div>
-    <span class="status-chip inst-status-{{ institution.status }}">{{ institution.status|title }}</span>
+    <div class="inst-head-side">
+      {% if institution.slug %}
+        <a href="{{ url_for('institution_showcase', slug=institution.slug) }}" target="_blank" rel="noopener" class="dashboard-institution-link">View public page &#8599;</a>
+      {% endif %}
+      <span class="status-chip inst-status-{{ institution.status }}">{{ institution.status|title }}</span>
+    </div>
   </div>
 
   {% include "institution/_nav.html" %}

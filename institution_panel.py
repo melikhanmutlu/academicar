@@ -113,6 +113,45 @@ def members():
     )
 
 
+@institution_bp.route("/showcase-settings", methods=["POST"])
+@login_required
+def showcase_settings():
+    membership, institution = _require_institution_admin()
+    institution.public_description = (request.form.get("public_description") or "").strip()[:1000] or None
+    db.session.commit()
+    _log_audit(
+        "institution_showcase_updated",
+        user_id=current_user.id,
+        resource_id=str(institution.id),
+    )
+    flash("Showcase description updated.", "success")
+    return redirect(url_for("institution.overview"))
+
+
+@institution_bp.route("/members.csv")
+@login_required
+def members_csv():
+    membership, institution = _require_institution_admin()
+    from app import _csv_response  # lazy: avoids app <-> blueprint circular import
+
+    members = (
+        InstitutionMember.query.options(selectinload(InstitutionMember.user))
+        .filter_by(institution_id=institution.id)
+        .order_by(InstitutionMember.joined_at.asc())
+        .all()
+    )
+    rows = [
+        {
+            "email": member.user.email if member.user else "",
+            "username": member.user.username if member.user else "",
+            "role": member.role,
+            "joined_at": member.joined_at,
+        }
+        for member in members
+    ]
+    return _csv_response(rows, ["email", "username", "role", "joined_at"], "members.csv")
+
+
 @institution_bp.route("/members/<int:member_id>/remove", methods=["POST"])
 @login_required
 def member_remove(member_id):
@@ -210,6 +249,10 @@ def invite_create():
             flash("Max uses must be a positive number (or blank for unlimited).", "danger")
             return redirect(url_for("institution.invites"))
         max_uses = int(max_uses_raw)
+    send_to = (request.form.get("send_to") or "").strip()[:200]
+    if send_to and ("@" not in send_to or "." not in send_to.rsplit("@", 1)[-1]):
+        flash("The invite email address looks invalid.", "danger")
+        return redirect(url_for("institution.invites"))
     invite = InstitutionInvite(
         institution_id=institution.id,
         token=secrets.token_urlsafe(24),
@@ -224,13 +267,39 @@ def invite_create():
         db.session.rollback()
         flash("Could not create the invite. Please try again.", "danger")
         return redirect(url_for("institution.invites"))
+    emailed = False
+    if send_to:
+        from utils.email import send_email
+
+        join_url = public_url("institution.join", token=invite.token)
+        body = (
+            f"You have been invited to join {institution.name} on AcademicAR.\n\n"
+            f"Accept the invite: {join_url}\n"
+        )
+        if institution.email_domains:
+            domains = ", ".join("@" + d for d in institution.domain_list())
+            body += f"\nNote: joining requires an account email at {domains}.\n"
+        try:
+            emailed = bool(send_email(send_to, f"Invitation to join {institution.name} on AcademicAR", body))
+        except Exception:
+            emailed = False
     _log_audit(
         "institution_invite_created",
         user_id=current_user.id,
         resource_id=str(institution.id),
-        details={"invite_id": invite.id, "max_uses": max_uses, "expires_at": expires_at.isoformat() if expires_at else None},
+        details={
+            "invite_id": invite.id,
+            "max_uses": max_uses,
+            "expires_at": expires_at.isoformat() if expires_at else None,
+            "emailed": emailed,
+        },
     )
-    flash("Invite link created. Copy it from the list below.", "success")
+    if send_to and emailed:
+        flash("Invite created and emailed. You can also copy the link below.", "success")
+    elif send_to:
+        flash("Invite created, but the email could not be sent — copy the link below instead.", "warning")
+    else:
+        flash("Invite link created. Copy it from the list below.", "success")
     return redirect(url_for("institution.invites"))
 
 

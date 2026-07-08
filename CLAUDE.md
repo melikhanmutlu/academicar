@@ -108,7 +108,8 @@ flask db downgrade base
 
 ## Current State & Implemented Features
 
-- **Model-based licensing** (`licensing.py`): per-model plan (free/academic/extended_archive) with `LicensePlan` dataclass, access start/expiry dates, storage limits.
+- **Model-based licensing** (`licensing.py`): per-model plan (free/academic/extended_archive/institutional) with `LicensePlan` dataclass, access start/expiry dates, storage limits. Licensing is per-model ONLY — there is no account-level user plan and papers never expire (both were removed; do not reintroduce).
+- **Institutional (B2B) module** (`institutions.py`, `institution_panel.py`): Institution contracts with quotas (model count + storage), invite-link membership (optional edu email-domain restriction, one institution per user), quota-funded "institutional" licensing on member uploads with expiry bound to `contract_ends_at`, an institution-admin panel at `/institution`, a public showcase at `/i/<slug>`, "Supported by" viewer attribution, offline contract payments (`Payment.institution_id`), and worker-driven monthly usage reports + 30-day renewal reminders.
 - **Stable QR resolver** (`/m/<public_id>`): QRLink model maps public_id to model_id. QR codes survive replacements, upgrades, and color changes.
 - **Model versioning**: ModelVersion table tracks replacement history per model. Replace-model flow preserves model ID, QR public ID, and resolver URL.
 - **Converter pipeline**: GLB direct upload + STL/OBJ/FBX to GLB conversion via STLConverter (trimesh) and ExternalConverter (Node CLI wrappers). USDZ companion generated for iOS AR.
@@ -132,8 +133,9 @@ flask db downgrade base
 
 2. **Publication Creation** (Paper model)
    - User creates a Paper (thesis/article) with metadata (title, authors, year, DOI, PMID, abstract)
-   - Two package types: `temporary` (3-day free) or `academic` (3-year paid)
-   - Expires based on `expires_at`; checked at view time, not cleaned up proactively
+   - Papers carry no plan/package and never expire; access windows live on each
+     model's license (`Model3D.license_type` + `access_expires_at`, checked at
+     view time via `licensing.model_access_status`)
    - Optional PDF upload (user-only access)
 
 3. **Model Upload & Conversion** (Model3D model + `converters/`)
@@ -144,7 +146,8 @@ flask db downgrade base
 
 4. **Public Viewing** (`/view/<model_id>`)
    - No login required
-   - Checks expiration; returns 404 if expired
+   - Checks the model's access window; expired models render the graceful
+     `model_access_unavailable.html` state (HTTP 410), never a dead link
    - Serves GLB from `/files/<model_id>/model.glb`
    - Google `<model-viewer>` renders 3D + AR
    - Screenshot capture via `.toDataURL()` from model-viewer
@@ -158,8 +161,9 @@ flask db downgrade base
 
 - **User** → owns many **Papers** (cascade delete)
 - **Paper** → owns many **Model3D** (cascade delete)
-- **Model3D** → single GLB file + QR code + consent audit fields
-- **Payment** → optional record for future paid package handling
+- **Model3D** → single GLB file + QR code + consent audit fields (+ optional funding `institution_id`)
+- **Institution** → **InstitutionMember** rows (one institution per user; role member/admin) + **InstitutionInvite** join tokens; funds members' models within contract quota
+- **Payment** → order/invoice record for per-model checkouts and manual institution contract payments
 - **AuditLog** → optional, for compliance logging
 
 ### Important Implementation Details
@@ -214,9 +218,9 @@ Environment variables in `.env` (see `.env.example`):
 - For production, move files to S3, Cloudflare R2, or Supabase Storage
 
 **File Storage**
-- Currently writes to local directories (`uploads/`, `converted/`, `qr_codes/`, `pdfs/`)
+- Currently writes to local directories (`uploads/`, `converted/`, `qr_codes/`, `pdfs/`, `blog_images/`, `institution_logos/`)
 - For production: implement an S3 backend in converters and file-serving routes
-- Consider adding cleanup for expired temporary publications
+- Consider adding cleanup for files of models whose access window expired
 
 ## Testing Strategy
 

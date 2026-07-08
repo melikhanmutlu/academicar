@@ -32,11 +32,17 @@ def main() -> None:
             last_report_check = time.monotonic()
             try:
                 with app.app_context():
-                    from institutions import send_monthly_institution_reports
+                    from institutions import (
+                        send_contract_renewal_reminders,
+                        send_monthly_institution_reports,
+                    )
 
                     count = send_monthly_institution_reports()
                     if count:
                         app.logger.info("Sent monthly usage reports for %d institution(s).", count)
+                    reminded = send_contract_renewal_reminders()
+                    if reminded:
+                        app.logger.info("Sent renewal reminders for %d institution(s).", reminded)
             except Exception:
                 app.logger.exception("Unexpected error in institution usage reports")
         if processed:

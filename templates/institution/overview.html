@@ -55,6 +55,27 @@
   </section>
 
   <section class="surface reveal-up inst-section">
+    <div class="inst-section-head">
+      <h2>Public showcase</h2>
+      {% if institution.slug %}
+        <a href="{{ url_for('institution_showcase', slug=institution.slug) }}" target="_blank" rel="noopener" class="dashboard-institution-link">/i/{{ institution.slug }} &#8599;</a>
+      {% endif %}
+    </div>
+    <p class="inst-note">
+      Your public page lists {{ institution.name }}'s publicly visible publications with institution-funded models.
+      The short description below appears under your name there{% if not institution.logo_path %}; ask the AcademicAR team to add your logo{% endif %}.
+    </p>
+    <form method="POST" action="{{ url_for('institution.showcase_settings') }}" class="inst-invite-form" style="align-items:flex-end">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label style="flex:1;min-width:260px">
+        <span class="inst-field-label">Showcase description (max 1000 characters)</span>
+        <textarea name="public_description" rows="2" maxlength="1000" style="width:100%;border:1px solid var(--color-light-pearl);padding:8px 10px;font-size:14px">{{ institution.public_description or '' }}</textarea>
+      </label>
+      <button type="submit" class="btn-secondary btn-compact">Save</button>
+    </form>
+  </section>
+
+  <section class="surface reveal-up inst-section">
     <h2>Quota usage</h2>
     {% if institution.quota_model_count is not none %}
       {% set model_pct = ((usage_models / institution.quota_model_count) * 100)|round|int if institution.quota_model_count else 100 %}

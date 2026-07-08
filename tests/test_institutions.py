@@ -1047,6 +1047,247 @@ def test_monthly_usage_report_skips_new_suspended_and_adminless(client, monkeypa
         assert Institution.query.filter_by(name="Suspended Uni").one().last_usage_report_at is None
 
 
+# --- Faz 7: discoverability, showcase branding, ops automation -------------------
+
+
+def test_admin_update_self_heals_missing_slug_and_shows_showcase_link(client):
+    make_admin(client)
+    with client.application.app_context():
+        institution = create_institution(name="Legacy Uni", slug=None)
+        institution_id = institution.id
+
+    client.post(
+        f"/admin/institutions/{institution_id}/update",
+        data={"name": "Legacy Uni", "currency": "TRY"},
+        follow_redirects=True,
+    )
+    with client.application.app_context():
+        institution = db.session.get(Institution, institution_id)
+        assert institution.slug == "legacy-uni"
+
+    listing = client.get("/admin/institutions")
+    assert b"/i/legacy-uni" in listing.data
+    detail = client.get(f"/admin/institutions/{institution_id}")
+    assert b"View showcase" in detail.data
+
+
+def test_admin_detail_lists_funded_models(client):
+    from tests.conftest import register
+
+    register(client, email="member@example.com", username="Member")
+    with client.application.app_context():
+        from models import User
+
+        user = User.query.filter_by(email="member@example.com").one()
+        institution = create_institution()
+        add_member(institution, user)
+        institution_id = institution.id
+
+    model_id = upload_model_for(client, title="Funded Paper")
+    client.post("/auth/logout")
+    make_admin(client)
+
+    detail = client.get(f"/admin/institutions/{institution_id}")
+    assert b"Funded models" in detail.data
+    with client.application.app_context():
+        model = db.session.get(Model3D, model_id)
+        name = (model.display_name or model.original_filename or model.id).encode()
+    assert name in detail.data
+
+
+def test_admin_logo_upload_validation_and_removal(client):
+    import io
+
+    make_admin(client)
+    with client.application.app_context():
+        institution = create_institution()
+        institution_id = institution.id
+
+    # Minimal valid PNG header bytes are enough for storage-level testing.
+    png_bytes = b"\x89PNG\r\n\x1a\n" + b"0" * 64
+    bad = client.post(
+        f"/admin/institutions/{institution_id}/logo",
+        data={"logo": (io.BytesIO(b"not an image"), "logo.txt")},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert b"Unsupported logo type" in bad.data
+
+    ok = client.post(
+        f"/admin/institutions/{institution_id}/logo",
+        data={"logo": (io.BytesIO(png_bytes), "brand.png")},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert b"Logo updated" in ok.data
+    with client.application.app_context():
+        import os
+
+        institution = db.session.get(Institution, institution_id)
+        assert institution.logo_path
+        stored = os.path.join(client.application.config["INSTITUTION_LOGO_FOLDER"], institution.logo_path)
+        assert os.path.exists(stored)
+        logo_filename = institution.logo_path
+
+    assert client.get(f"/institution-logos/{logo_filename}").status_code == 200
+
+    removed = client.post(
+        f"/admin/institutions/{institution_id}/logo",
+        data={"remove": "1"},
+        follow_redirects=True,
+    )
+    assert b"Logo removed" in removed.data
+    with client.application.app_context():
+        assert db.session.get(Institution, institution_id).logo_path is None
+
+
+def test_showcase_renders_description_logo_and_poster(client):
+    from tests.conftest import register
+
+    register(client, email="member@example.com", username="Member")
+    with client.application.app_context():
+        institution = create_institution(
+            slug="test-university",
+            public_description="Leading neuroscience 3D archive.",
+            logo_path="brand.png",
+        )
+        from models import User
+
+        add_member(institution, User.query.one())
+
+    model_id = upload_model_for(client, title="Poster Paper", visibility="public")
+    with client.application.app_context():
+        model = db.session.get(Model3D, model_id)
+        model.poster_path = "/some/where/poster.png"
+        db.session.commit()
+
+    page = client.get("/i/test-university")
+    assert b"Leading neuroscience 3D archive." in page.data
+    assert b"/institution-logos/brand.png" in page.data
+    assert f"/files/{model_id}/poster.png".encode() in page.data
+    assert b"CollectionPage" in page.data  # JSON-LD
+
+
+def test_panel_showcase_settings_updates_description(client):
+    from tests.conftest import register
+
+    register(client, email="dean@example.com", username="Dean")
+    with client.application.app_context():
+        from models import User
+
+        institution = create_institution()
+        add_member(institution, User.query.one(), role="admin")
+
+    overview = client.get("/institution/")
+    assert b"Public showcase" in overview.data
+
+    response = client.post(
+        "/institution/showcase-settings",
+        data={"public_description": "  Our lab publishes interactive anatomy.  "},
+        follow_redirects=True,
+    )
+    assert b"Showcase description updated" in response.data
+    with client.application.app_context():
+        assert Institution.query.one().public_description == "Our lab publishes interactive anatomy."
+
+
+def test_panel_members_csv_authz_and_content(client):
+    from tests.conftest import create_user, register
+
+    register(client, email="dean@example.com", username="Dean")
+    with client.application.app_context():
+        from models import User
+
+        institution = create_institution()
+        add_member(institution, User.query.filter_by(email="dean@example.com").one(), role="admin")
+        colleague = create_user(email="colleague@example.com", username="Colleague")
+        add_member(institution, colleague)
+
+    csv_response = client.get("/institution/members.csv")
+    assert csv_response.status_code == 200
+    body = csv_response.data.decode()
+    assert "dean@example.com" in body and "colleague@example.com" in body
+    assert "role" in body.splitlines()[0]
+
+    client.post("/auth/logout")
+    from tests.conftest import login
+
+    login(client, email="colleague@example.com")
+    assert client.get("/institution/members.csv").status_code == 403
+
+
+def test_invite_create_sends_email_when_requested(client, monkeypatch):
+    sent = []
+    monkeypatch.setattr(
+        "utils.email.send_email", lambda to, subject, body: sent.append((to, subject, body)) or True
+    )
+
+    from tests.conftest import register
+
+    register(client, email="dean@boun.edu.tr", username="Dean")
+    with client.application.app_context():
+        from models import User
+
+        institution = create_institution(email_domains="boun.edu.tr")
+        add_member(institution, User.query.one(), role="admin")
+
+    response = client.post(
+        "/institution/invites/create",
+        data={"expires_days": "14", "send_to": "colleague@boun.edu.tr"},
+        follow_redirects=True,
+    )
+    assert b"Invite created and emailed" in response.data
+    assert len(sent) == 1
+    to, subject, body = sent[0]
+    assert to == "colleague@boun.edu.tr"
+    with client.application.app_context():
+        token = InstitutionInvite.query.one().token
+    assert token in body
+    assert "@boun.edu.tr" in body  # domain requirement note
+
+
+def test_renewal_reminder_once_per_contract_end(client, monkeypatch):
+    from institutions import send_contract_renewal_reminders
+
+    sent = []
+    monkeypatch.setattr(
+        "utils.email.send_email", lambda to, subject, body: sent.append(to) or True
+    )
+
+    from tests.conftest import register
+
+    register(client, email="dean@example.com", username="Dean")
+    with client.application.app_context():
+        from models import User
+
+        near = create_institution(contract_ends_at=datetime.now(UTC) + timedelta(days=10))
+        add_member(near, User.query.one(), role="admin")
+        # Not due: far-future, open-ended, and suspended institutions.
+        create_institution(name="Far Uni", contract_ends_at=datetime.now(UTC) + timedelta(days=90))
+        create_institution(name="Open Uni", contract_ends_at=None)
+        suspended = create_institution(
+            name="Susp Uni",
+            status="suspended",
+            contract_ends_at=datetime.now(UTC) + timedelta(days=5),
+        )
+
+        count = send_contract_renewal_reminders()
+        assert count == 1
+        assert "dean@example.com" in sent
+        from models import AuditLog
+
+        assert AuditLog.query.filter_by(event_type="institution_renewal_reminder_sent").count() == 1
+
+        # Same contract end: no repeat.
+        assert send_contract_renewal_reminders() == 0
+
+        # Renewed to a later date: reminder re-arms once the new end enters the window.
+        near = Institution.query.filter_by(name="Test University").one()
+        near.contract_ends_at = datetime.now(UTC) + timedelta(days=25)
+        db.session.commit()
+        assert send_contract_renewal_reminders() == 1
+
+
 def test_institution_usage_excludes_soft_deleted_papers(client):
     from tests.conftest import register
 

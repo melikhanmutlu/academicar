@@ -5,7 +5,10 @@
   <section class="surface reveal-up inst-section">
     <div class="inst-section-head">
       <h2>Members</h2>
-      <span>{{ members_pagination.total }} member(s)</span>
+      <span>
+        <a href="{{ url_for('institution.members_csv') }}" class="dashboard-institution-link">Download CSV</a>
+        &middot; {{ members_pagination.total }} member(s)
+      </span>
     </div>
     <p class="inst-note">Removing a member stops future institutional uploads; models they already uploaded keep their access.</p>
     <div class="table-wrap">

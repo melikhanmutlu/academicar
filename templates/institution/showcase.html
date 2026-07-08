@@ -3,12 +3,30 @@
 {% block meta_description %}Interactive 3D and AR research models published by {{ institution.name }} members on AcademicAR.{% endblock %}
 
 {% block content %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "CollectionPage",
+  "name": {{ institution.name|tojson }},
+  "url": {{ public_url('institution_showcase', slug=institution.slug)|tojson }},
+  "about": {
+    "@type": "Organization",
+    "name": {{ institution.name|tojson }}{% if institution.logo_path %},
+    "logo": {{ public_url('serve_institution_logo', filename=institution.logo_path)|tojson }}{% endif %}
+  }
+}
+</script>
 <div class="app-shell dashboard-shell py-8">
   <div class="dashboard-header reveal-up">
-    <div>
-      <span class="landing-eyebrow">Institution</span>
-      <h1>{{ institution.name }}</h1>
-      <p>Interactive 3D &amp; AR research models published under {{ institution.name }}'s institutional license.</p>
+    <div class="inst-showcase-head">
+      {% if institution.logo_path %}
+        <img src="{{ url_for('serve_institution_logo', filename=institution.logo_path) }}" alt="{{ institution.name }} logo" class="inst-showcase-logo">
+      {% endif %}
+      <div>
+        <span class="landing-eyebrow">Institution</span>
+        <h1>{{ institution.name }}</h1>
+        <p>{{ institution.public_description or ("Interactive 3D & AR research models published under " ~ institution.name ~ "'s institutional license.") }}</p>
+      </div>
     </div>
   </div>
 
@@ -37,6 +55,14 @@
     <div class="inst-showcase-grid reveal-up">
       {% for paper in papers %}
         <a href="{{ url_for('paper_public', slug=paper.slug) }}" class="surface inst-showcase-card">
+          {% set poster_model = paper.models|selectattr("poster_path")|list|first %}
+          {% if poster_model %}
+            <div class="inst-showcase-thumb"><img src="{{ url_for('serve_poster', unique_id=poster_model.id) }}" alt="" loading="lazy"></div>
+          {% else %}
+            <div class="inst-showcase-thumb inst-showcase-thumb-empty" aria-hidden="true">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 4 6v12l8 4 8-4V6z"/><path d="M4 6l8 4 8-4"/><line x1="12" y1="22" x2="12" y2="10"/></svg>
+            </div>
+          {% endif %}
           <h2>{{ paper.title }}</h2>
           {% if paper.authors %}<p class="inst-cell-sub">{{ paper.authors }}</p>{% endif %}
           <p class="inst-showcase-meta">
