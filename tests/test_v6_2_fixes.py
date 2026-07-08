@@ -1,10 +1,8 @@
 """Regression tests for the v6.2 third audit fixes.
 
 Covers: account deletion FK anonymization, model_delete null paper guard,
-external converter timeout handling, QR print expiry check.
+external converter timeout handling, QR image deleted-paper check.
 """
-from datetime import UTC, datetime, timedelta
-
 from models import AuditLog, ConversionJob, Model3D, Paper, Payment, User, db
 
 
@@ -106,26 +104,25 @@ def test_external_converter_bad_timeout_env(monkeypatch):
     assert _safe_timeout() == 120
 
 
-def test_qr_print_expired_paper_returns_404(client):
-    """QR print page should 404 when paper_is_expired returns True."""
-    from unittest.mock import patch
-
-    from tests.conftest import login, register
+def test_qr_image_deleted_paper_returns_404(client):
+    """QR image should 404 when the paper was soft-deleted (papers never
+    expire on their own; per-model access windows gate the viewer instead)."""
+    from tests.conftest import register
 
     register(client, email="qrexp@example.com")
     app = client.application
     with app.app_context():
         user = User.query.filter_by(email="qrexp@example.com").one()
         paper = Paper(
-            title="Expired Paper",
-            slug="expired-paper",
+            title="Deleted Paper",
+            slug="deleted-paper",
             user_id=user.id,
-            expires_at=datetime.now(UTC) - timedelta(days=1),
+            status="deleted",
         )
         db.session.add(paper)
         db.session.flush()
         model = Model3D(
-            id="expired-qr-print",
+            id="deleted-qr-image",
             paper_id=paper.id,
             user_id=user.id,
             glb_path="model.glb",
@@ -135,7 +132,5 @@ def test_qr_print_expired_paper_returns_404(client):
         db.session.add(model)
         db.session.commit()
 
-    login(client, email="qrexp@example.com")
-    with patch("app.paper_is_expired", return_value=True):
-        resp = client.get("/qr-print/expired-qr-print")
+    resp = client.get("/qr-image/deleted-qr-image")
     assert resp.status_code == 404

@@ -11,7 +11,7 @@
     <div class="admin-metric">
       <span>Role</span>
       <strong>{{ "Admin" if user.is_admin else "Member" }}</strong>
-      <small>{{ user.plan|title }} plan</small>
+      <small>{% if user.deactivated_at %}Deactivated{% else %}Active account{% endif %}</small>
     </div>
     <div class="admin-metric">
       <span>Publications</span>
@@ -34,20 +34,11 @@
     <div class="admin-section-head">
       <div>
         <h2>Account controls</h2>
-        <p>Role, plan, email, and activation changes are logged as admin actions.</p>
+        <p>Role, email, and activation changes are logged as admin actions. Model licenses are managed per model.</p>
       </div>
       {% if user.deactivated_at %}<span>Deactivated</span>{% else %}<span>Active</span>{% endif %}
     </div>
     <div class="admin-actions">
-      <form method="POST" action="{{ url_for('admin_user_plan_update', user_id=user.id) }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <select name="plan" class="field-select compact-select">
-          <option value="free" {% if user.plan == "free" %}selected{% endif %}>Free</option>
-          <option value="academic" {% if user.plan == "academic" %}selected{% endif %}>Academic</option>
-          <option value="extended_archive" {% if user.plan == "extended_archive" %}selected{% endif %}>Extended Archive</option>
-        </select>
-        <button type="submit" class="admin-btn admin-btn-secondary compact">Save plan</button>
-      </form>
       <form method="POST" action="{{ url_for('admin_user_role_update', user_id=user.id) }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="is_admin" value="{{ '0' if user.is_admin else '1' }}">
@@ -130,9 +121,8 @@
                         <label class="admin-editor-field"><span>DOI</span><input name="doi" value="{{ paper.doi or '' }}" maxlength="200"></label>
                         <label class="admin-editor-field"><span>PMID</span><input name="pmid" value="{{ paper.pmid or '' }}" maxlength="100"></label>
                         <label class="admin-editor-field"><span>Institution</span><input name="institution" value="{{ paper.institution or '' }}" maxlength="300"></label>
-                        <label class="admin-editor-field"><span>Expires (YYYY-MM-DD)</span><input name="expires_at" value="{{ paper.expires_at.strftime('%Y-%m-%d') if paper.expires_at else '' }}" placeholder="metadata only"></label>
                       </div>
-                      <p class="admin-editor-note">Publications don't currently expire; the expiry date is stored as metadata only.</p>
+                      <p class="admin-editor-note">Publications never expire; access windows live on each model's license.</p>
                       <div class="admin-editor-actions">
                         <button type="submit" class="admin-btn admin-btn-primary compact">Save metadata</button>
                       </div>

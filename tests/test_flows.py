@@ -985,7 +985,7 @@ def test_configured_admin_email_is_always_admin(client):
         assert user.is_admin is True
 
 
-def test_admin_can_update_user_plan_and_role(client):
+def test_admin_can_update_user_role(client):
     from tests.conftest import create_user, login
 
     with client.application.app_context():
@@ -997,14 +997,6 @@ def test_admin_can_update_user_plan_and_role(client):
 
     login(client, email="admin@example.com")
     response = client.post(
-        f"/admin/users/{member_id}/plan",
-        data={"plan": "academic"},
-        follow_redirects=True,
-    )
-    assert response.status_code == 200
-    assert "Plan updated" in response.get_data(as_text=True)
-
-    response = client.post(
         f"/admin/users/{member_id}/role",
         data={"is_admin": "1"},
         follow_redirects=True,
@@ -1014,7 +1006,6 @@ def test_admin_can_update_user_plan_and_role(client):
 
     with client.application.app_context():
         member = db.session.get(User, member_id)
-        assert member.plan == "academic"
         assert member.is_admin is True
 
 

@@ -23,7 +23,6 @@ class User(UserMixin, db.Model):
     google_id = db.Column(db.String(100), unique=True, nullable=True, index=True)
     avatar_url = db.Column(db.String(500), nullable=True)
     is_admin = db.Column(db.Boolean, nullable=False, default=False)
-    plan = db.Column(db.String(30), nullable=False, default="free")
     # Set when an admin deactivates the account. A deactivated user cannot log in
     # and existing sessions are invalidated (see load_user). NULL means active.
     deactivated_at = db.Column(db.DateTime, nullable=True)
@@ -69,14 +68,9 @@ class Paper(db.Model):
     pdf_path = db.Column(db.String(500), nullable=True)
     slug = db.Column(db.String(250), unique=True, nullable=False, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    package_type = db.Column(db.String(30), nullable=False, default="temporary")
     status = db.Column(db.String(30), nullable=False, default="active")
     is_public = db.Column(db.Boolean, nullable=False, default=False)
-    payment_status = db.Column(db.String(30), nullable=False, default="free")
-    payment_provider = db.Column(db.String(50), nullable=True)
-    payment_reference = db.Column(db.String(200), nullable=True)
     pmid = db.Column(db.String(100), nullable=True)
-    expires_at = db.Column(db.DateTime, nullable=True, default=None)
     deleted_at = db.Column(db.DateTime, nullable=True)
     deleted_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = db.Column(db.DateTime, default=utc_now)

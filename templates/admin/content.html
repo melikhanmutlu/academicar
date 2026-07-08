@@ -149,9 +149,8 @@
                         <label class="admin-editor-field"><span>DOI</span><input name="doi" value="{{ paper.doi or '' }}" maxlength="200"></label>
                         <label class="admin-editor-field"><span>PMID</span><input name="pmid" value="{{ paper.pmid or '' }}" maxlength="100"></label>
                         <label class="admin-editor-field"><span>Institution</span><input name="institution" value="{{ paper.institution or '' }}" maxlength="300"></label>
-                        <label class="admin-editor-field"><span>Expires (YYYY-MM-DD)</span><input name="expires_at" value="{{ paper.expires_at.strftime('%Y-%m-%d') if paper.expires_at else '' }}" placeholder="metadata only"></label>
                       </div>
-                      <p class="admin-editor-note">Publications don't currently expire; the expiry date is stored as metadata only.</p>
+                      <p class="admin-editor-note">Publications never expire; access windows live on each model's license.</p>
                       <div class="admin-editor-actions">
                         <button type="submit" class="admin-btn admin-btn-primary compact">Save metadata</button>
                       </div>

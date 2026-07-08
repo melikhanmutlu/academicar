@@ -23,11 +23,11 @@ def _make_admin(client, email="admin6@example.com"):
     return app, user_id
 
 
-def test_admin_plan_update_commit_failure_is_graceful(client, monkeypatch):
+def test_admin_role_update_commit_failure_is_graceful(client, monkeypatch):
     """If commit fails, the admin route should flash danger + redirect (no 500)."""
     app, admin_id = _make_admin(client)
 
-    # Create a second user to change the plan of.
+    # Create a second user to change the role of.
     with app.app_context():
         target = User(email="target6@example.com", username="Target")
         target.set_password("password123")
@@ -44,8 +44,8 @@ def test_admin_plan_update_commit_failure_is_graceful(client, monkeypatch):
     monkeypatch.setattr(db.session, "commit", boom)
 
     resp = client.post(
-        f"/admin/users/{target_id}/plan",
-        data={"plan": "academic"},
+        f"/admin/users/{target_id}/role",
+        data={"is_admin": "1"},
         follow_redirects=True,
     )
 
@@ -53,11 +53,11 @@ def test_admin_plan_update_commit_failure_is_graceful(client, monkeypatch):
     assert resp.status_code == 200
     assert b"Could not update" in resp.data
 
-    # Restore commit and confirm the plan change did NOT persist.
+    # Restore commit and confirm the role change did NOT persist.
     monkeypatch.setattr(db.session, "commit", original_commit)
     with app.app_context():
         target = db.session.get(User, target_id)
-        assert target.plan != "academic"
+        assert target.is_admin is False
 
 
 def test_admin_paper_visibility_commit_failure_is_graceful(client, monkeypatch):

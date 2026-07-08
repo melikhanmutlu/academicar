@@ -51,7 +51,6 @@ from licensing import (
     get_license_plan,
     get_license_plans,
     is_access_expired,
-    is_valid_user_plan,
     license_expires_at,
     model_access_status,
     model_file_limit_error,
@@ -60,7 +59,6 @@ from licensing import (
     normalize_license_type,
     refresh_license_plan_cache,
 )
-from licensing import paper_is_expired as licensing_paper_is_expired
 from blog_content import code_post_slugs, get_all_posts, get_post, render_body
 from discipline_content import all_disciplines, discipline_slugs, get_discipline, related_disciplines
 from institution_panel import institution_bp
@@ -1162,10 +1160,6 @@ def validate_paper_form(form) -> tuple[dict, list[str]]:
         },
         errors,
     )
-
-
-def paper_is_expired(paper: Paper) -> bool:
-    return licensing_paper_is_expired(paper)
 
 
 def paper_is_deleted(paper: Paper | None) -> bool:
@@ -3221,8 +3215,6 @@ def register_routes(app: Flask) -> None:
             abort(404)
         if not model.paper:
             abort(404)
-        if paper_is_expired(model.paper):
-            abort(404)
         if not _paper_visible_to_request(model.paper):
             abort(404)
         qr_name = os.path.basename(model.qr_code_path)
@@ -3236,8 +3228,6 @@ def register_routes(app: Flask) -> None:
         if not model:
             abort(404)
         if not model.paper:
-            abort(404)
-        if paper_is_expired(model.paper):
             abort(404)
         if model.user_id != current_user.id:
             abort(403)
@@ -3268,8 +3258,6 @@ def register_routes(app: Flask) -> None:
         paper = db.session.get(Paper, paper_id)
         if not paper:
             abort(404)
-        if paper_is_expired(paper):
-            abort(404)
         if not _paper_visible_to_request(paper):
             abort(404)
         filename = ensure_paper_qr(paper)
@@ -3289,8 +3277,6 @@ def register_routes(app: Flask) -> None:
     @app.route("/p/<slug>")
     def paper_public(slug):
         paper = active_paper_query().filter_by(slug=slug).first_or_404()
-        if paper_is_expired(paper):
-            abort(404)
         if not _paper_visible_to_request(paper):
             abort(404)
         return render_template("paper_public.html", paper=paper)
@@ -3298,8 +3284,6 @@ def register_routes(app: Flask) -> None:
     @app.route("/p/<slug>/pdf")
     def paper_public_pdf(slug):
         paper = active_paper_query().filter_by(slug=slug).first_or_404()
-        if paper_is_expired(paper):
-            abort(404)
         if not _paper_visible_to_request(paper):
             abort(404)
         if not paper.pdf_path:
@@ -3309,8 +3293,6 @@ def register_routes(app: Flask) -> None:
     @app.route("/p/<slug>/pdf/file")
     def paper_public_pdf_file(slug):
         paper = active_paper_query().filter_by(slug=slug).first_or_404()
-        if paper_is_expired(paper):
-            abort(404)
         if not _paper_visible_to_request(paper):
             abort(404)
         if not paper.pdf_path:
@@ -3382,7 +3364,6 @@ def register_routes(app: Flask) -> None:
             abort(404)
         page = max(request.args.get("page", type=int) or 1, 1)
         user_query_text = (request.args.get("user_q") or "").strip()
-        user_plan_filter = (request.args.get("user_plan") or "all").strip().lower()
         user_role_filter = (request.args.get("user_role") or "all").strip().lower()
         model_status_filter = (request.args.get("model_status") or "all").strip().lower()
         job_status_filter = (request.args.get("job_status") or "all").strip().lower()
@@ -3407,8 +3388,6 @@ def register_routes(app: Flask) -> None:
                     func.lower(User.username).like(pattern),
                 )
             )
-        if user_plan_filter in USER_SELECTABLE_PLAN_KEYS:
-            users_query = users_query.filter(User.plan == user_plan_filter)
         if user_role_filter == "admin":
             users_query = users_query.filter(User.is_admin.is_(True))
         elif user_role_filter == "member":
@@ -3610,10 +3589,6 @@ def register_routes(app: Flask) -> None:
             )
             .scalar()
         ) or 0
-        # paper_is_expired() is currently always False (publications do not
-        # expire), so this is 0 by definition. Kept as a named value so the
-        # template/stats stay stable if expiry logic returns later.
-        expired_public_papers = 0
         near_limit_models = (
             Model3D.query.filter(
                 Model3D.file_size.isnot(None),
@@ -3784,11 +3759,6 @@ def register_routes(app: Flask) -> None:
                 "text": f"{len(near_limit_models)} model(s) near storage limit",
                 "url": url_for("admin_dashboard", admin_page="models"),
             })
-        if expired_public_papers:
-            critical_alerts.append({
-                "text": f"{expired_public_papers} expired public publication(s)",
-                "url": url_for("admin_dashboard", admin_page="content"),
-            })
         if sum(orphan_counts.values()):
             critical_alerts.append({
                 "text": f"{sum(orphan_counts.values())} orphan file(s) detected",
@@ -3825,7 +3795,6 @@ def register_routes(app: Flask) -> None:
             "last_qr_resolved_at": last_qr_resolved.last_resolved_at if last_qr_resolved else None,
             "disabled_qr_count": disabled_qr_count,
             "expired_qr_count": expired_qr_count,
-            "expired_public_papers": expired_public_papers,
         }
         largest_models = (
             Model3D.query.filter(Model3D.file_size.isnot(None))
@@ -3955,7 +3924,6 @@ def register_routes(app: Flask) -> None:
             active_page=admin_page,
             filters={
                 "user_q": user_query_text,
-                "user_plan": user_plan_filter,
                 "user_role": user_role_filter,
                 "model_status": model_status_filter,
                 "job_status": job_status_filter,
@@ -3978,21 +3946,18 @@ def register_routes(app: Flask) -> None:
     def admin_users_export():
         require_admin()
         user_query_text = (request.args.get("user_q") or "").strip()
-        user_plan_filter = (request.args.get("user_plan") or "all").strip().lower()
         user_role_filter = (request.args.get("user_role") or "all").strip().lower()
         query = User.query
         if user_query_text:
             pattern = f"%{user_query_text.lower()}%"
             query = query.filter(or_(func.lower(User.email).like(pattern), func.lower(User.username).like(pattern)))
-        if user_plan_filter in USER_SELECTABLE_PLAN_KEYS:
-            query = query.filter(User.plan == user_plan_filter)
         if user_role_filter == "admin":
             query = query.filter(User.is_admin.is_(True))
         elif user_role_filter == "member":
             query = query.filter(User.is_admin.is_(False))
         rows = [
             {
-                "id": u.id, "email": u.email, "username": u.username, "plan": u.plan,
+                "id": u.id, "email": u.email, "username": u.username,
                 "is_admin": u.is_admin, "deactivated_at": u.deactivated_at,
                 "created_at": u.created_at,
             }
@@ -4000,7 +3965,7 @@ def register_routes(app: Flask) -> None:
         ]
         if len(rows) >= ADMIN_CSV_EXPORT_ROW_LIMIT:
             flash(f"Export truncated to the first {ADMIN_CSV_EXPORT_ROW_LIMIT} matching rows.", "warning")
-        return _csv_response(rows, ["id", "email", "username", "plan", "is_admin", "deactivated_at", "created_at"], "users.csv")
+        return _csv_response(rows, ["id", "email", "username", "is_admin", "deactivated_at", "created_at"], "users.csv")
 
     @app.route("/admin/content/export.csv")
     @login_required
@@ -4612,34 +4577,6 @@ def register_routes(app: Flask) -> None:
         flash(f"Admin access updated for {user.email}.", "success")
         return redirect(url_for("admin_dashboard", admin_page="users"))
 
-    @app.route("/admin/users/<int:user_id>/plan", methods=["POST"])
-    @login_required
-    def admin_user_plan_update(user_id):
-        require_admin()
-        user = db.session.get(User, user_id)
-        if not user:
-            abort(404)
-        new_plan = (request.form.get("plan") or "free").strip().lower()
-        if not is_valid_user_plan(new_plan):
-            flash("Invalid user plan.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="users"))
-        previous = user.plan
-        user.plan = new_plan
-        try:
-            db.session.commit()
-        except SQLAlchemyError:
-            db.session.rollback()
-            flash("Could not update. Please try again.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="users"))
-        log_audit(
-            "admin_user_plan_changed",
-            user_id=current_user.id,
-            resource_id=str(user.id),
-            details={"from": previous, "to": new_plan},
-        )
-        flash(f"Plan updated for {user.email}.", "success")
-        return redirect(url_for("admin_dashboard", admin_page="users"))
-
     @app.route("/admin/papers/<int:paper_id>/visibility", methods=["POST"])
     @login_required
     def admin_paper_visibility_update(paper_id):
@@ -5021,16 +4958,6 @@ def register_routes(app: Flask) -> None:
                 return _admin_paper_redirect(next_hint, paper)
         else:
             year_value = None
-        expires_raw = (request.form.get("expires_at") or "").strip()
-        expires_value = paper.expires_at
-        if expires_raw:
-            try:
-                expires_value = datetime.strptime(expires_raw, "%Y-%m-%d")
-            except ValueError:
-                flash("Expiry date must be YYYY-MM-DD.", "danger")
-                return _admin_paper_redirect(next_hint, paper)
-        else:
-            expires_value = None
         # slug is intentionally NOT editable (public URL stability).
         new_values = {
             "title": title[:500],
@@ -5040,7 +4967,6 @@ def register_routes(app: Flask) -> None:
             "doi": (request.form.get("doi") or "").strip()[:200] or None,
             "pmid": (request.form.get("pmid") or "").strip()[:100] or None,
             "institution": (request.form.get("institution") or "").strip()[:300] or None,
-            "expires_at": expires_value,
         }
         changed = {}
         for attr, value in new_values.items():
@@ -5623,9 +5549,8 @@ def register_routes(app: Flask) -> None:
             .all()
         )
         paper_count = len(user_papers)
-        # BUG-1: plans live at the model level (license_type drives real AR/QR
-        # access), so report the model license distribution rather than the
-        # legacy paper.package_type which is always "model_based".
+        # Licensing lives at the model level (license_type drives real AR/QR
+        # access), so report the model license distribution.
         user_models = [m for p in user_papers for m in p.models]
         free_model_count = sum(1 for m in user_models if (m.license_type or "free") == "free")
         academic_model_count = sum(1 for m in user_models if m.license_type == "academic")
@@ -6013,9 +5938,8 @@ def register_routes(app: Flask) -> None:
                 flash(" ".join(paper_errors), "danger")
                 return render_template("paper_new.html", form=request.form)
 
-            # Plan is now a user-level setting (managed on /profile). New
-            # papers inherit the user's current plan as a snapshot — this is
-            # what determines expiration and multi-model upload limits.
+            # Licensing is per-model (Model3D.license_type); papers carry no
+            # plan/package and never expire on their own.
             paper = Paper(
                 title=paper_data["title"],
                 authors=paper_data["authors"],
@@ -6025,10 +5949,7 @@ def register_routes(app: Flask) -> None:
                 doi=paper_data["doi"],
                 institution=paper_data["institution"],
                 pmid=paper_data["pmid"],
-                package_type="model_based",
                 is_public=paper_data["is_public"],
-                payment_status="model_based",
-                expires_at=None,
                 slug=make_slug(paper_data["title"]),
                 user_id=current_user.id,
             )
@@ -6126,10 +6047,7 @@ def register_routes(app: Flask) -> None:
             paper.doi = paper_data["doi"]
             paper.institution = paper_data["institution"]
             paper.pmid = paper_data["pmid"]
-            # paper.package_type is locked at creation (snapshot of the user's
-            # plan at that moment). Change the plan via /profile, not here.
             paper.is_public = paper_data["is_public"]
-            paper.expires_at = None
 
             saved_pdf_path = None
             old_pdf_path = None

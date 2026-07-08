@@ -1,25 +1,19 @@
 {% extends "admin/base.html" %}
 {% from "admin/_pagination.html" import render_pagination %}
 {% block admin_title %}Users{% endblock %}
-{% block admin_subtitle %}Manage account plans and admin access.{% endblock %}
+{% block admin_subtitle %}Manage accounts and admin access. Licensing is per-model (see Models).{% endblock %}
 
 {% block admin_body %}
   <section id="users" class="admin-section">
     <div class="admin-section-head">
       <div>
         <h2>Users</h2>
-        <p>Manage account plans and admin access.</p>
+        <p>Manage accounts and admin access. Licensing is per-model (see Models).</p>
       </div>
       <span>{% if users_pagination %}{{ users_pagination.total }} total{% else %}{{ users|length }} shown{% endif %}</span>
     </div>
     <form method="GET" action="{{ url_for('admin_dashboard', admin_page='users') }}" class="admin-filter-bar">
       <input name="user_q" class="field-input" value="{{ filters.user_q }}" placeholder="Search name or email">
-      <select name="user_plan" class="field-select compact-select">
-        <option value="all" {% if filters.user_plan == "all" %}selected{% endif %}>All plans</option>
-        <option value="free" {% if filters.user_plan == "free" %}selected{% endif %}>Free</option>
-        <option value="academic" {% if filters.user_plan == "academic" %}selected{% endif %}>Academic</option>
-        <option value="extended_archive" {% if filters.user_plan == "extended_archive" %}selected{% endif %}>Extended Archive</option>
-      </select>
       <select name="user_role" class="field-select compact-select">
         <option value="all" {% if filters.user_role == "all" %}selected{% endif %}>All roles</option>
         <option value="admin" {% if filters.user_role == "admin" %}selected{% endif %}>Admins</option>
@@ -34,7 +28,6 @@
         <thead>
           <tr>
             <th>User</th>
-            <th>Plan</th>
             <th>Role</th>
             <th>Created</th>
             <th>Actions</th>
@@ -47,20 +40,10 @@
                 <strong><a href="{{ url_for('admin_user_detail', user_id=user.id) }}">{{ user.username }}</a></strong>
                 <small>{{ user.email }}</small>
               </td>
-              <td><span class="status-chip">{{ user.plan|title }}</span></td>
               <td><span class="status-chip">{{ "Admin" if user.is_admin else "Member" }}</span></td>
               <td>{{ user.created_at.strftime("%Y-%m-%d") if user.created_at else "-" }}</td>
               <td>
                 <div class="admin-actions">
-                  <form method="POST" action="{{ url_for('admin_user_plan_update', user_id=user.id) }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <select name="plan" class="field-select compact-select">
-                      <option value="free" {% if user.plan == "free" %}selected{% endif %}>Free</option>
-                      <option value="academic" {% if user.plan == "academic" %}selected{% endif %}>Academic</option>
-                      <option value="extended_archive" {% if user.plan == "extended_archive" %}selected{% endif %}>Extended Archive</option>
-                    </select>
-                    <button type="submit" class="admin-btn admin-btn-secondary compact">Save plan</button>
-                  </form>
                   <form method="POST" action="{{ url_for('admin_user_role_update', user_id=user.id) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="is_admin" value="{{ '0' if user.is_admin else '1' }}">
@@ -72,7 +55,7 @@
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="5">No users yet.</td></tr>
+            <tr><td colspan="4">No users yet.</td></tr>
           {% endfor %}
         </tbody>
       </table>

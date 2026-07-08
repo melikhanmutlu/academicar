@@ -171,15 +171,12 @@ def get_license_plans() -> dict[str, LicensePlan]:
     return LICENSE_PLANS
 
 
-# Single source of truth for the plans a user can self-select / be assigned
-# (a subset of LICENSE_PLANS — "institutional" is provisioned manually, not
-# user-selectable). Used by the profile page and the admin plan controls so
-# they never drift apart.
+# Single source of truth for the MODEL license tiers a user can buy/select
+# (a subset of LICENSE_PLANS — "institutional" is provisioned via institution
+# contracts, never self-selected). Used by upgrade offers and the admin model
+# license dropdown so they never drift apart. Licensing is per-model only;
+# there is no account-level plan.
 USER_SELECTABLE_PLAN_KEYS: tuple[str, ...] = ("free", "academic", "extended_archive")
-
-
-def is_valid_user_plan(value: str | None) -> bool:
-    return (value or "").strip().lower() in USER_SELECTABLE_PLAN_KEYS
 
 
 def normalize_license_type(value: str | None) -> str:
@@ -245,10 +242,6 @@ def model_access_status(model) -> str:
 
 def model_is_accessible(model) -> bool:
     return model_access_status(model) == "active"
-
-
-def paper_is_expired(paper) -> bool:
-    return False
 
 
 def model_file_limit_error(file_size: int, license_type: str | None) -> str | None:

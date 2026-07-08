@@ -151,7 +151,6 @@
           class="pub-row publication-row"
           data-search="{{ ((p.title or '') ~ ' ' ~ (p.authors or '') ~ ' ' ~ (p.institution or '') ~ ' ' ~ (p.field or '') ~ ' ' ~ (p.year or '') ~ ' ' ~ (p.doi or '') ~ ' ' ~ (p.pmid or ''))|lower }}"
           data-title="{{ (p.title or '')|lower }}"
-          data-package="{{ p.package_type or 'temporary' }}"
           data-visibility="{{ 'public' if p.is_public else 'private' }}"
           data-models="{{ p.models|length }}"
           data-created="{{ p.created_at.timestamp() if p.created_at else 0 }}"
@@ -322,7 +321,6 @@
         const models = Number(row.dataset.models || 0);
         const fMatch =
           filter === 'all'
-          || row.dataset.package === filter
           || row.dataset.visibility === filter
           || (filter === 'with-models' && models > 0)
           || (filter === 'no-models' && models === 0);
