@@ -19,6 +19,18 @@
           Manage publications, model uploads, and public viewer links.
         {% endif %}
       </p>
+      {% if institution_membership is defined and institution_membership %}
+        <p class="dashboard-institution-badge">
+          <span class="status-chip">{{ institution_membership.institution.name }}</span>
+          <span class="dashboard-institution-note">
+            Institutional access
+            {%- if institution_membership.institution.contract_ends_at %} until {{ institution_membership.institution.contract_ends_at.strftime("%Y-%m-%d") }}{% else %} active{% endif %}
+          </span>
+          {% if institution_membership.role == "admin" %}
+            <a href="{{ url_for('institution.overview') }}" class="dashboard-institution-link">Manage institution &rarr;</a>
+          {% endif %}
+        </p>
+      {% endif %}
     </div>
     {% if admin_view is defined and admin_view %}
       <a href="{{ url_for('admin_user_detail', user_id=viewed_user.id) }}" class="btn-secondary shrink-0">User detail</a>

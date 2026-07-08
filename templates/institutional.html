@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Institutional licensing - AcademicAR{% endblock %}
+{% block meta_description %}Bring your university, lab, or institute to AcademicAR: contract-based institutional licensing with member invites, quota-funded 3D/AR model publishing, and procurement-friendly invoicing.{% endblock %}
+
+{% block content %}
+<div class="auth-shell">
+  <div class="max-w-2xl mx-auto w-full">
+    <section class="surface rounded-xl p-6 sm:p-8 lg:p-10">
+      <span class="landing-eyebrow">Institutional</span>
+      <h1 class="font-serif text-4xl font-bold text-[#111827] mt-3">Bring your institution to AcademicAR.</h1>
+      <p class="text-[#5c6473] mt-3 mb-7">
+        Universities, labs, and institutes run on an annual contract: members join with an invite link
+        (optionally restricted to your email domain), and their 3D/AR model uploads are covered by the
+        institutional license within your contract quota. Offline invoicing and procurement workflows supported.
+      </p>
+
+      <form method="POST" class="space-y-5">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div>
+          <label class="field-label" for="institution_name">Institution name</label>
+          <input class="field-input" id="institution_name" name="institution_name" required maxlength="200" placeholder="Bogazici University — Neuroscience Lab">
+        </div>
+        <div class="grid sm:grid-cols-2 gap-5">
+          <div>
+            <label class="field-label" for="contact_name">Your name</label>
+            <input class="field-input" id="contact_name" name="contact_name" required maxlength="120" placeholder="Prof. Ayşe Yılmaz">
+          </div>
+          <div>
+            <label class="field-label" for="email">Work email</label>
+            <input class="field-input" id="email" name="email" type="email" required maxlength="200" placeholder="ayse.yilmaz@boun.edu.tr">
+          </div>
+        </div>
+        <div>
+          <label class="field-label" for="estimated_members">Estimated members (optional)</label>
+          <input class="field-input" id="estimated_members" name="estimated_members" maxlength="40" placeholder="e.g. 25 researchers">
+        </div>
+        <div>
+          <label class="field-label" for="message">What do you need? (optional)</label>
+          <textarea class="field-input" id="message" name="message" rows="4" maxlength="5000" placeholder="Disciplines, expected model volume, procurement requirements..."></textarea>
+        </div>
+        <button type="submit" class="btn-primary w-full">Request institutional licensing</button>
+      </form>
+      <p class="text-xs text-[#828282] mt-4">
+        We reply with contract terms, quota options, and onboarding steps. Prefer email?
+        <a href="mailto:hello@academicar.com" class="underline">hello@academicar.com</a>
+      </p>
+    </section>
+  </div>
+</div>
+{% endblock %}

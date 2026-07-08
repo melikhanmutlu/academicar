@@ -2586,6 +2586,45 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("contact"))
         return render_template("contact.html")
 
+    @app.route("/institutional", methods=["GET", "POST"])
+    @limiter.limit("5 per hour", methods=["POST"])
+    def institutional_inquiry():
+        # Unlike /contact this is NOT gated by CONTACT_ENABLED: B2B leads are
+        # the point of the institutional offering, so the form stays live even
+        # while the general contact inbox is disabled.
+        if request.method == "POST":
+            institution_name = (request.form.get("institution_name") or "").strip()[:200]
+            contact_name = (request.form.get("contact_name") or "").strip()[:120]
+            email = (request.form.get("email") or "").strip()[:200]
+            estimated_members = (request.form.get("estimated_members") or "").strip()[:40]
+            message = (request.form.get("message") or "").strip()[:5000]
+            if not institution_name or not contact_name or not email:
+                flash("Please fill in the institution name, your name, and your work email.", "danger")
+                return redirect(url_for("institutional_inquiry"))
+            if "@" not in email or "." not in email.rsplit("@", 1)[-1]:
+                flash("Please enter a valid work email address.", "danger")
+                return redirect(url_for("institutional_inquiry"))
+            from utils.email import send_email
+
+            recipient = current_app.config.get("CONTACT_EMAIL") or "info@academicar.com"
+            send_email(
+                recipient,
+                "AcademicAR institutional inquiry",
+                (
+                    f"Institution: {institution_name}\n"
+                    f"Contact: {contact_name} <{email}>\n"
+                    f"Estimated members: {estimated_members or '-'}\n\n"
+                    f"{message or '(no message)'}"
+                ),
+            )
+            log_audit(
+                "institution_inquiry_submitted",
+                details={"institution_name": institution_name, "from_email": email},
+            )
+            flash("Thanks — we received your inquiry and will reach out shortly.", "success")
+            return redirect(url_for("institutional_inquiry"))
+        return render_template("institutional.html")
+
     @app.route("/blog")
     def blog_index():
         return render_template("blog_list.html", posts=merged_blog_posts())
@@ -3246,7 +3285,11 @@ def register_routes(app: Flask) -> None:
             .order_by(Paper.created_at.desc())
             .all()
         )
-        return render_template("dashboard.html", papers=papers)
+        return render_template(
+            "dashboard.html",
+            papers=papers,
+            institution_membership=get_active_membership(current_user.id),
+        )
 
     @app.route("/admin", defaults={"admin_page": "overview"})
     @app.route("/admin/<admin_page>")

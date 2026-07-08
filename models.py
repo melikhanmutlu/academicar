@@ -126,6 +126,7 @@ class Model3D(db.Model):
     # the member later leaves, so the model keeps counting against the
     # institution's quota — the institution paid for the storage.
     institution_id = db.Column(db.Integer, db.ForeignKey("institutions.id", ondelete="SET NULL"), nullable=True, index=True)
+    institution = db.relationship("Institution", backref=db.backref("funded_models", lazy=True))
     appearance_color = db.Column(db.String(20), nullable=True)
     appearance_roughness = db.Column(db.Float, nullable=True, default=0.35)
     appearance_metallic = db.Column(db.Float, nullable=True, default=0.05)

@@ -8960,3 +8960,12 @@ body.nav-menu-open {
 .inst-status-active { border-color: var(--color-light-pearl); }
 .inst-status-suspended { color: var(--color-sunset-orange); border-color: var(--color-orange-soft-border); }
 .inst-invite-revoked, .inst-invite-expired, .inst-invite-exhausted { opacity: 0.6; }
+.dashboard-institution-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.dashboard-institution-note { color: var(--color-silver-ash); font-size: 13px; }
+.dashboard-institution-link { color: var(--color-sunset-orange); font-size: 13px; font-weight: 500; }

@@ -795,6 +795,92 @@ def test_panel_member_management_and_models_list(client):
     assert f"/view/{model_id}".encode() in models_page.data
 
 
+# --- Lead capture & member UX ----------------------------------------------------
+
+
+def test_institutional_inquiry_sends_email_and_audits(client, monkeypatch):
+    sent = []
+
+    def fake_send_email(to_address, subject, body):
+        sent.append((to_address, subject, body))
+        return True
+
+    monkeypatch.setattr("utils.email.send_email", fake_send_email)
+
+    page = client.get("/institutional")
+    assert page.status_code == 200
+    assert b"Request institutional licensing" in page.data
+
+    response = client.post(
+        "/institutional",
+        data={
+            "institution_name": "Bogazici University",
+            "contact_name": "Prof. Ayse",
+            "email": "ayse@boun.edu.tr",
+            "estimated_members": "25",
+            "message": "Neuroscience lab, ~40 models/year.",
+        },
+        follow_redirects=True,
+    )
+    assert b"we received your inquiry" in response.data
+    assert len(sent) == 1
+    assert "Bogazici University" in sent[0][2]
+    assert "ayse@boun.edu.tr" in sent[0][2]
+    with client.application.app_context():
+        from models import AuditLog
+
+        row = AuditLog.query.filter_by(event_type="institution_inquiry_submitted").one()
+        assert row.details["institution_name"] == "Bogazici University"
+
+
+def test_institutional_inquiry_validates_required_fields(client, monkeypatch):
+    sent = []
+    monkeypatch.setattr("utils.email.send_email", lambda *a: sent.append(a) or True)
+
+    missing = client.post(
+        "/institutional",
+        data={"institution_name": "", "contact_name": "X", "email": "x@y.edu"},
+        follow_redirects=True,
+    )
+    assert b"Please fill in" in missing.data
+
+    bad_email = client.post(
+        "/institutional",
+        data={"institution_name": "Uni", "contact_name": "X", "email": "not-an-email"},
+        follow_redirects=True,
+    )
+    assert b"valid work email" in bad_email.data
+    assert sent == []
+
+
+def test_pricing_links_to_inquiry_instead_of_mailto(client):
+    response = client.get("/pricing")
+    assert response.status_code == 200
+    assert b'href="/institutional"' in response.data
+    assert b"mailto:hello@academicar.com?subject=AcademicAR%20Institutional" not in response.data
+
+
+def test_dashboard_shows_institution_badge(client):
+    from tests.conftest import register
+
+    register(client, email="dean@boun.edu.tr", username="Dean")
+
+    no_badge = client.get("/dashboard")
+    assert b"Institutional access" not in no_badge.data
+
+    with client.application.app_context():
+        from models import User
+
+        user = User.query.one()
+        institution = create_institution(contract_ends_at=datetime(2027, 1, 15))
+        add_member(institution, user, role="admin")
+
+    badge = client.get("/dashboard")
+    assert b"Test University" in badge.data
+    assert b"Institutional access until 2027-01-15" in badge.data
+    assert b"Manage institution" in badge.data
+
+
 def test_institution_usage_excludes_soft_deleted_papers(client):
     from tests.conftest import register
 

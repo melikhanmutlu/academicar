@@ -149,7 +149,13 @@
             <p>A model's license is a paid upgrade and keeps the same QR and resolver URL. Upgrade or renew from the publication page.</p>
           </div>
           <div class="model-meta-grid">
-            <div><span>Current plan</span><strong>{{ get_license_plan(model.license_type).label }}</strong></div>
+            <div><span>Current plan</span><strong>
+              {%- if model.license_type == 'institutional' and model.institution -%}
+                Institutional &mdash; {{ model.institution.name }}
+              {%- else -%}
+                {{ get_license_plan(model.license_type).label }}
+              {%- endif -%}
+            </strong></div>
             <div><span>Access</span><strong>
               {%- if model.access_expires_at -%}
                 {%- if model_access_status(model) == 'expired' %}Expired {{ model.access_expires_at.strftime('%b %d, %Y') }}{% else %}Until {{ model.access_expires_at.strftime('%b %d, %Y') }}{% endif -%}
