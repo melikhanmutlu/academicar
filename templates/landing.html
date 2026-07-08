@@ -20,6 +20,12 @@
         <a href="{{ url_for('auth.register') }}" class="lp-btn lp-btn-dark">Start Publishing</a>
         <a href="{{ url_for('demo_mitochondria_ar', source='hero_example') }}" class="lp-btn lp-btn-ghost">View Example Publication</a>
       </div>
+      <p class="lp-hero-examples">
+        Explore live examples:
+        <a href="{{ url_for('demo_dashboard', source='hero') }}">Researcher dashboard</a>
+        <span aria-hidden="true">·</span>
+        <a href="{{ url_for('demo_institution', source='hero') }}">Institution dashboard</a>
+      </p>
       <ul class="lp-hero-checks">
         {% for label in ['No coding required', 'Auto format conversion', 'QR generated automatically', 'Mobile AR ready'] %}
         <li>

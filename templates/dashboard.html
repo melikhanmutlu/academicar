@@ -2,6 +2,7 @@
 {% block title %}Dashboard - AcademicAR{% endblock %}
 
 {% block content %}
+{% set demo = demo_mode is defined and demo_mode %}
 {% set stats = namespace(total_models=0) %}
 {% for paper in papers %}
   {% set stats.total_models = stats.total_models + (paper.models|length) %}
@@ -9,6 +10,7 @@
 {% set papers_with_pdf = papers|selectattr('pdf_path')|list|length if papers else 0 %}
 
 <div class="app-shell dashboard-shell py-8">
+  {% if demo %}{% include "_demo_banner.html" %}{% endif %}
   <div class="dashboard-header reveal-up">
     <div>
       <h1>{{ viewed_user.username ~ "'s dashboard" if admin_view is defined and admin_view else "Dashboard" }}</h1>
@@ -91,10 +93,14 @@
     <div class="dashboard-upload-actions">
       {% if admin_view is defined and admin_view %}
         <a href="{{ url_for('admin_dashboard', admin_page='content') }}" class="btn-secondary">Manage publications</a>
+      {% elif demo %}
+        <a href="{{ url_for('auth.register') }}" class="btn-primary">New publication + model</a>
       {% else %}
         <a href="{{ url_for('paper_new') }}" class="btn-primary">New publication + model</a>
       {% endif %}
-      {% if papers and not (admin_view is defined and admin_view) %}
+      {% if papers and demo %}
+        <a href="{{ url_for('auth.register') }}" class="btn-secondary">Add model to latest</a>
+      {% elif papers and not (admin_view is defined and admin_view) %}
         <a href="{{ url_for('paper_detail', slug=papers[0].slug) }}#add-model" class="btn-secondary">Add model to latest</a>
       {% endif %}
     </div>
@@ -141,7 +147,7 @@
       </div>
 
       {% for p in papers %}
-        {% set paper_href = url_for('paper_public', slug=p.slug) if admin_view is defined and admin_view else url_for('paper_detail', slug=p.slug) %}
+        {% set paper_href = url_for('demo_mitochondria_ar', source='demo_dashboard') if demo else (url_for('paper_public', slug=p.slug) if admin_view is defined and admin_view else url_for('paper_detail', slug=p.slug)) %}
         {% set first_model = p.models[0] if p.models else none %}
         {% set clean_authors = (p.authors or '').replace('Dr. ','').replace('Prof. ','').replace('Dr.','').replace('Prof.','').strip() %}
         {% if clean_authors %}
@@ -182,23 +188,32 @@
           </div>
 
           <div class="publication-share">
-            {% if p.pdf_path %}
-              <a href="{{ url_for('paper_public_pdf', slug=p.slug) }}" target="_blank" rel="noopener noreferrer" class="dash-action dash-action-primary dash-action-pdf">PDF</a>
-            {% else %}
-              {% if not (admin_view is defined and admin_view) %}
-                <input type="file" id="pdf-input-{{ p.slug }}" accept=".pdf" style="display: none;" onchange="uploadDashboardPdf({{ p.slug|tojson }})">
-                <button type="button" class="dash-action dash-action-pdf" id="pdf-btn-{{ p.slug }}" onclick="document.getElementById('pdf-input-{{ p.slug }}').click()">Add PDF</button>
-              {% else %}
-                <button type="button" class="dash-action dash-action-muted dash-action-pdf" disabled title="No PDF uploaded">PDF missing</button>
+            {% if demo %}
+              {% if p.pdf_path %}
+                <a href="{{ url_for('auth.register') }}" class="dash-action dash-action-primary dash-action-pdf">PDF</a>
               {% endif %}
-            {% endif %}
-            {% if admin_view is defined and admin_view %}
-              <a href="{{ url_for('paper_public', slug=p.slug) }}" target="_blank" rel="noopener noreferrer" class="dash-action dash-action-details">Open</a>
-              <a href="{{ url_for('admin_dashboard', admin_page='content') }}" class="dash-action dash-action-edit">Manage</a>
+              <a href="{{ url_for('auth.register') }}" class="dash-action dash-action-edit">Edit</a>
+              <a href="{{ url_for('auth.register') }}" class="dash-action dash-action-add-model">Add model</a>
+              <a href="{{ paper_href }}" class="dash-action dash-action-details">Details</a>
             {% else %}
-              <a href="{{ url_for('paper_edit', slug=p.slug) }}" class="dash-action dash-action-edit">Edit</a>
-              <a href="{{ url_for('paper_detail', slug=p.slug) }}#add-model" class="dash-action dash-action-add-model">Add model</a>
-              <a href="{{ url_for('paper_detail', slug=p.slug) }}" class="dash-action dash-action-details">Details</a>
+              {% if p.pdf_path %}
+                <a href="{{ url_for('paper_public_pdf', slug=p.slug) }}" target="_blank" rel="noopener noreferrer" class="dash-action dash-action-primary dash-action-pdf">PDF</a>
+              {% else %}
+                {% if not (admin_view is defined and admin_view) %}
+                  <input type="file" id="pdf-input-{{ p.slug }}" accept=".pdf" style="display: none;" onchange="uploadDashboardPdf({{ p.slug|tojson }})">
+                  <button type="button" class="dash-action dash-action-pdf" id="pdf-btn-{{ p.slug }}" onclick="document.getElementById('pdf-input-{{ p.slug }}').click()">Add PDF</button>
+                {% else %}
+                  <button type="button" class="dash-action dash-action-muted dash-action-pdf" disabled title="No PDF uploaded">PDF missing</button>
+                {% endif %}
+              {% endif %}
+              {% if admin_view is defined and admin_view %}
+                <a href="{{ url_for('paper_public', slug=p.slug) }}" target="_blank" rel="noopener noreferrer" class="dash-action dash-action-details">Open</a>
+                <a href="{{ url_for('admin_dashboard', admin_page='content') }}" class="dash-action dash-action-edit">Manage</a>
+              {% else %}
+                <a href="{{ url_for('paper_edit', slug=p.slug) }}" class="dash-action dash-action-edit">Edit</a>
+                <a href="{{ url_for('paper_detail', slug=p.slug) }}#add-model" class="dash-action dash-action-add-model">Add model</a>
+                <a href="{{ url_for('paper_detail', slug=p.slug) }}" class="dash-action dash-action-details">Details</a>
+              {% endif %}
             {% endif %}
           </div>
         </div>

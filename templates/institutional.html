@@ -13,6 +13,9 @@
         (optionally restricted to your email domain), and their 3D/AR model uploads are covered by the
         institutional license within your contract quota. Offline invoicing and procurement workflows supported.
       </p>
+      <p class="mb-7">
+        <a href="{{ url_for('demo_institution', source='institutional') }}" class="underline underline-offset-4 text-[#111827]">See a live institution dashboard &rarr;</a>
+      </p>
 
       <form method="POST" class="space-y-5">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

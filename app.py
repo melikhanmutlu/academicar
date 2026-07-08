@@ -2506,6 +2506,80 @@ def register_routes(app: Flask) -> None:
             demo_mode=True,
         )
 
+    @app.route("/demo/dashboard")
+    def demo_dashboard():
+        """Public, no-login preview of a researcher's dashboard, populated with
+        fabricated sample publications. Mirrors the /demo/mitochondria/ar
+        pattern: SimpleNamespace stand-ins + the real dashboard.html rendered
+        with demo_mode=True (action links become sign-up CTAs)."""
+        log_audit("demo_dashboard_opened", details={"source": request.args.get("source") or "direct"})
+        now = datetime.now(UTC)
+
+        def _paper(title, authors, institution, field, year, doi, pmid, is_public, has_pdf, model_count, age_days):
+            return types.SimpleNamespace(
+                title=title, authors=authors, institution=institution, field=field,
+                year=year, doi=doi, pmid=pmid, is_public=is_public,
+                pdf_path=("demo.pdf" if has_pdf else None),
+                slug="demo-publication",
+                created_at=now - timedelta(days=age_days),
+                models=[None] * model_count,
+            )
+
+        demo_papers = [
+            _paper("Cellular Organelle Morphology in Human Hepatocytes",
+                   "Dr. Sarah Chen, Prof. James Miller", "ETH Zurich — Department of Biology",
+                   "Biology", 2025, "10.1234/cellbio.2025.mito", "39281047", True, True, 2, 3),
+            _paper("Cranial Suture Fusion Patterns in Archaeological Samples",
+                   "Dr. Elena Rossi", "University of Bologna — Archaeology",
+                   "Archaeology", 2025, "10.1234/archaeo.2025.0142", None, True, False, 1, 12),
+            _paper("Finite-Element Stress Model of a Cantilever Bracket",
+                   "Prof. Ahmet Kaya, M. Demir", "METU — Mechanical Engineering",
+                   "Engineering", 2024, None, None, False, True, 1, 27),
+            _paper("Occlusal Anatomy from Intraoral Optical Scans",
+                   "Dr. Laura Weber", "Charité — Department of Dentistry",
+                   "Dentistry", 2024, "10.1234/dent.2024.0077", None, True, False, 3, 41),
+        ]
+        return render_template(
+            "dashboard.html",
+            papers=demo_papers,
+            institution_membership=None,
+            demo_mode=True,
+            demo_cross_url=url_for("demo_institution"),
+            demo_cross_label="institution dashboard",
+        )
+
+    @app.route("/demo/institution")
+    def demo_institution():
+        """Public, no-login preview of the institution admin panel overview,
+        populated with a fabricated (unsaved) Institution so its domain_list()
+        / contract_is_current() methods behave exactly as in production."""
+        log_audit("demo_institution_opened", details={"source": request.args.get("source") or "direct"})
+        now = datetime.now(UTC)
+        demo_inst = Institution(
+            name="Bogazici University — Research Computing",
+            slug=None,  # no live public showcase for the demo; hides /i/<slug> links
+            email_domains="boun.edu.tr, std.boun.edu.tr",
+            status="active",
+            contract_starts_at=now - timedelta(days=95),
+            contract_ends_at=now + timedelta(days=270),
+            quota_model_count=200,
+            quota_storage_bytes=20 * 1024 * 1024 * 1024,
+            public_description="Interactive 3D & AR models from Bogazici University research groups.",
+            logo_path=None,
+        )
+        return render_template(
+            "institution/overview.html",
+            institution=demo_inst,
+            usage_models=63,
+            usage_bytes=int(6.8 * 1024 * 1024 * 1024),
+            member_count=28,
+            active_invites=3,
+            active_tab="overview",
+            demo_mode=True,
+            demo_cross_url=url_for("demo_dashboard"),
+            demo_cross_label="researcher dashboard",
+        )
+
     @app.route("/demo/mitochondria/qr.png")
     def demo_mitochondria_qr():
         import io
@@ -2750,6 +2824,8 @@ def register_routes(app: Flask) -> None:
             "privacy",
             "data_protection",
             "demo_mitochondria_ar",
+            "demo_dashboard",
+            "demo_institution",
         ):
             try:
                 urls.append(public_url(endpoint))

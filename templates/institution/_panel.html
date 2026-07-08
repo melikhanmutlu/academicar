@@ -22,6 +22,8 @@
 
   {% include "institution/_nav.html" %}
 
+  {% if demo_mode is defined and demo_mode %}{% include "_demo_banner.html" %}{% endif %}
+
   {% block panel_body %}{% endblock %}
 </div>
 {% endblock %}

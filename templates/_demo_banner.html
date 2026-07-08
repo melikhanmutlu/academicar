@@ -1,0 +1,15 @@
+{# Slim preview banner shown on public demo pages (demo_mode=True). Expects
+   optional demo_cross_url / demo_cross_label in context for the cross-link to
+   the other demo. Register CTA is the primary action. #}
+<div class="demo-banner reveal-up">
+  <div class="demo-banner-text">
+    <strong>This is a live example.</strong>
+    <span>Your own workspace looks like this once you sign in — the data below is sample content.</span>
+  </div>
+  <div class="demo-banner-actions">
+    {% if demo_cross_url %}
+      <a href="{{ demo_cross_url }}" class="demo-banner-cross">See the {{ demo_cross_label or 'other example' }} &rarr;</a>
+    {% endif %}
+    <a href="{{ url_for('auth.register') }}" class="btn-primary compact">Create free account</a>
+  </div>
+</div>
