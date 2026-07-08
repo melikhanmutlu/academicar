@@ -58,11 +58,15 @@ def make_invite(institution, **kw):
     return invite
 
 
-def upload_model_for(client, title="Inst Paper", filename="model.stl"):
-    """Create a paper and upload a valid STL to it; returns the Model3D id."""
+def upload_model_for(client, title="Inst Paper", filename="model.stl", visibility=None):
+    """Create a paper and upload a valid STL to it; returns the Model3D id.
+    visibility: None uses the form default (public), or "private"/"public"."""
     from tests.conftest import upload_file_bytes, valid_ascii_stl_bytes
 
-    client.post("/papers/new", data={"title": title}, follow_redirects=True)
+    paper_data = {"title": title}
+    if visibility is not None:
+        paper_data["visibility"] = visibility
+    client.post("/papers/new", data=paper_data, follow_redirects=True)
     with client.application.app_context():
         slug = Paper.query.filter_by(title=title).one().slug
     response = client.post(
@@ -879,6 +883,168 @@ def test_dashboard_shows_institution_badge(client):
     assert b"Test University" in badge.data
     assert b"Institutional access until 2027-01-15" in badge.data
     assert b"Manage institution" in badge.data
+
+
+# --- Showcase, attribution, monthly reports --------------------------------------
+
+
+def test_admin_create_generates_unique_slug(client):
+    make_admin(client)
+    client.post("/admin/institutions/create", data={"name": "Ege University"}, follow_redirects=True)
+    client.post("/admin/institutions/create", data={"name": "Ege  University!"}, follow_redirects=True)
+    with client.application.app_context():
+        slugs = sorted(i.slug for i in Institution.query.all())
+        assert slugs[0] == "ege-university"
+        assert slugs[1].startswith("ege-university-")
+
+
+def test_showcase_lists_only_public_funded_papers(client):
+    from tests.conftest import register
+
+    register(client, email="member@example.com", username="Member")
+    with client.application.app_context():
+        from models import User
+
+        user = User.query.one()
+        institution = create_institution(slug="test-university")
+        add_member(institution, user)
+
+    upload_model_for(client, title="Public Funded Paper", visibility="public")
+    upload_model_for(client, title="Private Funded Paper", visibility="private")
+
+    page = client.get("/i/test-university")
+    assert page.status_code == 200
+    assert b"Public Funded Paper" in page.data
+    assert b"Private Funded Paper" not in page.data
+    assert b"Test University" in page.data
+
+    assert client.get("/i/no-such-institution").status_code == 404
+
+
+def test_viewer_shows_supported_by_attribution(client):
+    from tests.conftest import register
+
+    register(client, email="member@example.com", username="Member")
+    with client.application.app_context():
+        from models import User
+
+        user = User.query.one()
+        institution = create_institution(slug="test-university")
+        add_member(institution, user)
+
+    funded_id = upload_model_for(client, title="Funded Paper")
+    viewer = client.get(f"/view/{funded_id}")
+    assert b"Supported by" in viewer.data
+    assert b"Test University" in viewer.data
+    assert b"/i/test-university" in viewer.data
+
+
+def test_viewer_has_no_attribution_for_free_models(client):
+    from tests.conftest import register
+
+    register(client)
+    model_id = upload_model_for(client)
+    viewer = client.get(f"/view/{model_id}")
+    assert b"Supported by" not in viewer.data
+
+
+def test_sitemap_includes_showcase_with_public_funded_paper(client):
+    from tests.conftest import register
+
+    register(client, email="member@example.com", username="Member")
+    with client.application.app_context():
+        from models import User
+
+        user = User.query.one()
+        institution = create_institution(slug="test-university")
+        add_member(institution, user)
+
+    upload_model_for(client, title="Public Funded Paper")
+    with client.application.app_context():
+        paper = Paper.query.one()
+        paper.is_public = True
+        db.session.commit()
+
+    sitemap = client.get("/sitemap.xml")
+    assert sitemap.status_code == 200
+    assert b"/i/test-university" in sitemap.data
+
+
+def test_monthly_usage_report_sends_once_per_month(client, monkeypatch):
+    from institutions import send_monthly_institution_reports
+
+    sent = []
+    monkeypatch.setattr(
+        "utils.email.send_email", lambda to, subject, body: sent.append((to, subject, body)) or True
+    )
+
+    from tests.conftest import register
+
+    register(client, email="dean@boun.edu.tr", username="Dean")
+    with client.application.app_context():
+        from models import User
+
+        user = User.query.one()
+        institution = create_institution(quota_model_count=100)
+        institution.created_at = datetime.now(UTC) - timedelta(days=40)
+        add_member(institution, user, role="admin")
+        db.session.commit()
+
+    model_id = upload_model_for(client)
+
+    with client.application.app_context():
+        count = send_monthly_institution_reports()
+        assert count == 1
+        assert len(sent) == 1
+        to, subject, body = sent[0]
+        assert to == "dean@boun.edu.tr"
+        assert "Test University" in subject
+        assert "Institution-funded models: 1 / 100" in body
+        assert "Members: 1" in body
+
+        institution = Institution.query.one()
+        assert institution.last_usage_report_at is not None
+        from models import AuditLog
+
+        assert AuditLog.query.filter_by(event_type="institution_usage_report_sent").count() == 1
+
+        # Same month: nothing more goes out.
+        assert send_monthly_institution_reports() == 0
+        assert len(sent) == 1
+
+
+def test_monthly_usage_report_skips_new_suspended_and_adminless(client, monkeypatch):
+    from institutions import send_monthly_institution_reports
+
+    sent = []
+    monkeypatch.setattr(
+        "utils.email.send_email", lambda to, subject, body: sent.append(to) or True
+    )
+
+    with client.application.app_context():
+        from models import User
+        from tests.conftest import create_user
+
+        # Created this month: not due yet.
+        create_institution(name="Fresh Uni")
+
+        # Suspended: skipped even though old.
+        suspended = create_institution(name="Suspended Uni", status="suspended")
+        suspended.created_at = datetime.now(UTC) - timedelta(days=40)
+
+        # Old and active but has only a plain member (no admin): composed for
+        # nobody — stamped, no email.
+        adminless = create_institution(name="Adminless Uni")
+        adminless.created_at = datetime.now(UTC) - timedelta(days=40)
+        plain_user = create_user(email="plain@example.com", username="Plain")
+        add_member(adminless, plain_user, role="member")
+        db.session.commit()
+
+        count = send_monthly_institution_reports()
+        assert count == 0
+        assert sent == []
+        assert Institution.query.filter_by(name="Adminless Uni").one().last_usage_report_at is not None
+        assert Institution.query.filter_by(name="Suspended Uni").one().last_usage_report_at is None
 
 
 def test_institution_usage_excludes_soft_deleted_papers(client):

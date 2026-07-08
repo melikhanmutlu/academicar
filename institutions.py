@@ -5,17 +5,21 @@ contract + invoicing). Members join via invite links (institution_panel.py).
 While the contract is current and the quota is not exhausted, a member's
 uploads are granted the "institutional" license plan; otherwise they fall
 back to the normal free flow. All quota math lives here so the upload hook
-in app.py stays a two-line decision.
+in app.py stays a two-line decision. The monthly usage report emails also
+live here (sent from the worker loop, never from a web request).
 """
 
 from __future__ import annotations
 
-from datetime import datetime
+import logging
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, or_
 
 from licensing import apply_model_license_defaults
-from models import Institution, InstitutionMember, Model3D, Paper, db
+from models import AuditLog, Institution, InstitutionMember, Model3D, Paper, db
+
+logger = logging.getLogger(__name__)
 
 
 def get_active_membership(user_id) -> InstitutionMember | None:
@@ -116,6 +120,101 @@ def renew_institution_contract(institution, new_ends_at: datetime | None) -> int
         .update({"access_expires_at": new_ends_at}, synchronize_session=False)
     )
     return int(updated or 0)
+
+
+def _month_key(value: datetime) -> tuple[int, int]:
+    return (value.year, value.month)
+
+
+def _report_is_due(institution, now: datetime) -> bool:
+    """A report goes out once per calendar month, starting the month AFTER
+    the institution was created (a creation-day report has nothing to say)."""
+    last = institution.last_usage_report_at
+    if last is not None:
+        return _month_key(last) < _month_key(now)
+    created = institution.created_at or now
+    return _month_key(created) < _month_key(now)
+
+
+def _compose_usage_report(institution, now: datetime) -> str:
+    model_count, bytes_used = institution_usage(institution.id)
+    member_count = InstitutionMember.query.filter_by(institution_id=institution.id).count()
+    added_last_30d = (
+        Model3D.query.filter(
+            Model3D.institution_id == institution.id,
+            Model3D.license_type == "institutional",
+            Model3D.created_at >= now - timedelta(days=30),
+        ).count()
+    )
+
+    def fmt_mb(num_bytes):
+        return f"{num_bytes / (1024 * 1024):.1f} MB"
+
+    lines = [
+        f"AcademicAR monthly usage report — {institution.name}",
+        f"Period: up to {now.strftime('%Y-%m-%d')}",
+        "",
+        f"Members: {member_count}",
+        f"Institution-funded models: {model_count}"
+        + (f" / {institution.quota_model_count}" if institution.quota_model_count is not None else ""),
+        f"Storage used: {fmt_mb(bytes_used)}"
+        + (f" / {fmt_mb(institution.quota_storage_bytes)}" if institution.quota_storage_bytes is not None else ""),
+        f"Models added in the last 30 days: {added_last_30d}",
+        "",
+        "Contract: "
+        + (institution.contract_starts_at.strftime("%Y-%m-%d") if institution.contract_starts_at else "—")
+        + " -> "
+        + (institution.contract_ends_at.strftime("%Y-%m-%d") if institution.contract_ends_at else "open-ended"),
+        f"Status: {institution.status}",
+        "",
+        "Manage members, invites, and models: see the Institution panel under your account.",
+    ]
+    return "\n".join(lines)
+
+
+def send_monthly_institution_reports(now: datetime | None = None) -> int:
+    """Email each active institution's admins a usage summary once per
+    calendar month. Called from the worker loop (never a web request).
+    Returns the number of institutions a report was composed for.
+
+    last_usage_report_at is stamped even if delivery fails or no mail
+    backend is configured — the report is best-effort and must not retry
+    every poll cycle.
+    """
+    from utils.email import send_email
+
+    now = now or datetime.now(UTC)
+    sent = 0
+    institutions = Institution.query.filter_by(status="active").all()
+    for institution in institutions:
+        if not _report_is_due(institution, now):
+            continue
+        admin_members = (
+            InstitutionMember.query.filter_by(institution_id=institution.id, role="admin").all()
+        )
+        recipients = [m.user.email for m in admin_members if m.user and m.user.email]
+        institution.last_usage_report_at = now
+        if not recipients:
+            continue
+        body = _compose_usage_report(institution, now)
+        delivered = False
+        for recipient in recipients:
+            try:
+                if send_email(recipient, f"AcademicAR usage report — {institution.name}", body):
+                    delivered = True
+            except Exception:
+                logger.exception("usage report email failed for institution %s", institution.id)
+        db.session.add(
+            AuditLog(
+                event_type="institution_usage_report_sent",
+                resource_id=str(institution.id),
+                details={"recipients": len(recipients), "delivered": delivered},
+            )
+        )
+        sent += 1
+    if institutions:
+        db.session.commit()
+    return sent
 
 
 def end_institution_access_now(institution, now: datetime) -> int:

@@ -8969,3 +8969,19 @@ body.nav-menu-open {
 }
 .dashboard-institution-note { color: var(--color-silver-ash); font-size: 13px; }
 .dashboard-institution-link { color: var(--color-sunset-orange); font-size: 13px; font-weight: 500; }
+.inst-showcase-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+.inst-showcase-card { display: block; padding: 20px; }
+.inst-showcase-card h2 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+.inst-showcase-card:hover h2 { color: var(--color-sunset-orange); }
+.inst-showcase-meta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: var(--color-silver-ash);
+  font-size: 12px;
+  margin-top: 10px;
+}

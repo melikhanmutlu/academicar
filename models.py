@@ -386,6 +386,10 @@ class Institution(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), unique=True, nullable=False, index=True)
+    # Public showcase slug for /i/<slug>. Generated from the name on create
+    # (kept stable on rename, like Paper.slug); nullable only for rows that
+    # predate the column — the admin update route self-heals those.
+    slug = db.Column(db.String(220), unique=True, nullable=True, index=True)
     # Comma-separated lowercase email domains without "@" (e.g.
     # "boun.edu.tr, metu.edu.tr"). When set, invite acceptance requires the
     # joining user's email to match one of them; empty = any email may join.
@@ -403,6 +407,11 @@ class Institution(db.Model):
     quota_storage_bytes = db.Column(db.BigInteger, nullable=True)
     quota_model_count = db.Column(db.Integer, nullable=True)
     notes = db.Column(db.Text, nullable=True)
+    # When the last monthly usage report email went out to the institution's
+    # admins (institutions.send_monthly_institution_reports, called from the
+    # worker loop). NULL = never sent. Stamped even when no mail backend is
+    # configured so an unconfigured deployment doesn't retry every poll.
+    last_usage_report_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=utc_now)
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
 

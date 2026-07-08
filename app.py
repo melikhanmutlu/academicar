@@ -1049,6 +1049,20 @@ def make_blog_slug(title: str, exclude_id: int | None = None) -> str:
         slug = f"{base}-{counter}"
 
 
+def make_institution_slug(name: str) -> str:
+    """Unique institution showcase slug (/i/<slug>) from the name."""
+    base = slugify(name)[:200] or "institution"
+    slug = base
+    counter = 1
+    while Institution.query.filter_by(slug=slug).first() is not None:
+        counter += 1
+        if counter > 10000:
+            slug = f"{base}-{uuid.uuid4().hex[:8]}"
+            break
+        slug = f"{base}-{counter}"
+    return slug
+
+
 def _db_blogpost_to_view(bp: BlogPost) -> dict:
     """Normalize a DB BlogPost to the dict shape the blog templates expect."""
     created = bp.created_at or datetime.now(UTC)
@@ -2643,6 +2657,38 @@ def register_routes(app: Flask) -> None:
             body_html=render_body(post["body"], cache_key=cache_key),
         )
 
+    @app.route("/i/<slug>")
+    def institution_showcase(slug):
+        """Public showcase for an institution: its public publications that
+        contain institution-funded models. Marketing surface for the B2B
+        side; no login required."""
+        institution = Institution.query.filter_by(slug=slug).first()
+        if institution is None:
+            abort(404)
+        papers = (
+            Paper.query.options(selectinload(Paper.models))
+            .join(Model3D, Model3D.paper_id == Paper.id)
+            .filter(
+                Model3D.institution_id == institution.id,
+                Model3D.license_type == "institutional",
+                Paper.is_public.is_(True),
+                or_(Paper.status.is_(None), Paper.status != "deleted"),
+            )
+            .distinct()
+            .order_by(Paper.created_at.desc())
+            .limit(200)
+            .all()
+        )
+        model_count, _bytes_used = institution_usage(institution.id)
+        member_count = InstitutionMember.query.filter_by(institution_id=institution.id).count()
+        return render_template(
+            "institution/showcase.html",
+            institution=institution,
+            papers=papers,
+            model_count=model_count,
+            member_count=member_count,
+        )
+
     @app.route("/blog-images/<path:filename>")
     def serve_blog_image(filename):
         safe = os.path.basename(filename)
@@ -2726,6 +2772,24 @@ def register_routes(app: Flask) -> None:
         for paper in public_papers:
             try:
                 urls.append(public_url("paper_public", slug=paper.slug))
+            except Exception:
+                continue
+        # Institution showcases with at least one public funded paper.
+        showcase_institutions = (
+            Institution.query.filter(Institution.slug.isnot(None))
+            .join(Model3D, Model3D.institution_id == Institution.id)
+            .join(Paper, Model3D.paper_id == Paper.id)
+            .filter(
+                Model3D.license_type == "institutional",
+                Paper.is_public.is_(True),
+                db.or_(Paper.status.is_(None), Paper.status != "deleted"),
+            )
+            .distinct()
+            .all()
+        )
+        for institution in showcase_institutions:
+            try:
+                urls.append(public_url("institution_showcase", slug=institution.slug))
             except Exception:
                 continue
         items = "".join(f"<url><loc>{escape(u)}</loc></url>" for u in urls)
@@ -4197,7 +4261,7 @@ def register_routes(app: Flask) -> None:
         if existing is not None:
             flash("An institution with that name already exists.", "danger")
             return redirect(url_for("admin_dashboard", admin_page="institutions"))
-        institution = Institution(**values)
+        institution = Institution(slug=make_institution_slug(values["name"]), **values)
         db.session.add(institution)
         try:
             db.session.commit()

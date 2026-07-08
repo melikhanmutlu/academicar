@@ -803,6 +803,16 @@
           <p class="text-xs uppercase tracking-[0.18em] text-white/55">Live spatial viewer</p>
           <h1 class="font-serif text-2xl sm:text-3xl font-semibold mt-1 line-clamp-1">{{ model.display_name or model.original_filename }}</h1>
           <p class="text-sm text-white/60 mt-1 line-clamp-1">{{ paper.title }}</p>
+          {% if model.license_type == 'institutional' and model.institution %}
+            <p class="text-xs text-white/45 mt-1 line-clamp-1">
+              Supported by
+              {%- if model.institution.slug %}
+                <a href="{{ url_for('institution_showcase', slug=model.institution.slug) }}" class="text-white/70 underline underline-offset-2 hover:text-white">{{ model.institution.name }}</a>
+              {%- else %}
+                <span class="text-white/70">{{ model.institution.name }}</span>
+              {%- endif %}
+            </p>
+          {% endif %}
         </div>
         <button id="panelToggle" type="button" class="flex-shrink-0 mt-1 rounded-full border border-white/10 w-8 h-8 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors" aria-label="Toggle panel">
           <svg id="panelChevron" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition:transform 200ms ease"><polyline points="3 5 7 9 11 5"/></svg>
@@ -918,6 +928,15 @@
         {% if paper.year %}<p><span class="text-white/40">Year:</span> {{ paper.year }}</p>{% endif %}
         {% if paper.field %}<p><span class="text-white/40">Field:</span> {{ paper.field }}</p>{% endif %}
         {% if paper.institution %}<p><span class="text-white/40">Institution:</span> {{ paper.institution }}</p>{% endif %}
+        {% if model.license_type == 'institutional' and model.institution %}
+          <p><span class="text-white/40">Supported by:</span>
+            {%- if model.institution.slug %}
+              <a href="{{ url_for('institution_showcase', slug=model.institution.slug) }}" class="text-white underline underline-offset-4">{{ model.institution.name }}</a>
+            {%- else %}
+              {{ model.institution.name }}
+            {%- endif %}
+          </p>
+        {% endif %}
         {% if paper.doi %}<p><span class="text-white/40">DOI:</span> <a href="https://doi.org/{{ paper.doi }}" target="_blank" rel="noopener noreferrer" class="text-white underline underline-offset-4">{{ paper.doi }}</a></p>{% endif %}
         {% if paper.pmid %}<p><span class="text-white/40">PMID:</span> {{ paper.pmid }}</p>{% endif %}
       </div>

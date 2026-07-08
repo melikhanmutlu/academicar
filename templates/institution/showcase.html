@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}{{ institution.name }} - 3D/AR publications - AcademicAR{% endblock %}
+{% block meta_description %}Interactive 3D and AR research models published by {{ institution.name }} members on AcademicAR.{% endblock %}
+
+{% block content %}
+<div class="app-shell dashboard-shell py-8">
+  <div class="dashboard-header reveal-up">
+    <div>
+      <span class="landing-eyebrow">Institution</span>
+      <h1>{{ institution.name }}</h1>
+      <p>Interactive 3D &amp; AR research models published under {{ institution.name }}'s institutional license.</p>
+    </div>
+  </div>
+
+  <div class="dashboard-metrics reveal-up">
+    <div class="metric-card">
+      <div class="metric-card-head">
+        <span class="metric-label" data-mobile-label="Publications">Public publications</span>
+        <strong class="metric-value-compact">{{ papers|length }}</strong>
+      </div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-card-head">
+        <span class="metric-label" data-mobile-label="Models">Funded 3D models</span>
+        <strong class="metric-value-compact">{{ model_count }}</strong>
+      </div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-card-head">
+        <span class="metric-label" data-mobile-label="Members">Members</span>
+        <strong class="metric-value-compact">{{ member_count }}</strong>
+      </div>
+    </div>
+  </div>
+
+  {% if papers %}
+    <div class="inst-showcase-grid reveal-up">
+      {% for paper in papers %}
+        <a href="{{ url_for('paper_public', slug=paper.slug) }}" class="surface inst-showcase-card">
+          <h2>{{ paper.title }}</h2>
+          {% if paper.authors %}<p class="inst-cell-sub">{{ paper.authors }}</p>{% endif %}
+          <p class="inst-showcase-meta">
+            {% if paper.year %}<span>{{ paper.year }}</span>{% endif %}
+            {% if paper.field %}<span>{{ paper.field }}</span>{% endif %}
+            <span>{{ paper.models|length }} 3D model{{ '' if paper.models|length == 1 else 's' }}</span>
+          </p>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <section class="surface reveal-up inst-section">
+      <h2>No public publications yet</h2>
+      <p class="inst-note">Publications appear here once {{ institution.name }} members publish them publicly with institution-funded 3D models.</p>
+    </section>
+  {% endif %}
+
+  <p class="inst-note reveal-up" style="margin-top: 24px">
+    Want your institution here? <a href="{{ url_for('institutional_inquiry') }}" class="dashboard-institution-link">Learn about institutional licensing &rarr;</a>
+  </p>
+</div>
+{% endblock %}
