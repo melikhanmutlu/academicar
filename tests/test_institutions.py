@@ -1288,6 +1288,32 @@ def test_renewal_reminder_once_per_contract_end(client, monkeypatch):
         assert send_contract_renewal_reminders() == 1
 
 
+def test_institution_recent_activity(client):
+    from tests.conftest import register
+    from institutions import institution_recent_activity
+
+    register(client, email="dean@example.com", username="Dean Contributor")
+    with client.application.app_context():
+        from models import User
+
+        user = User.query.one()
+        institution = create_institution()
+        add_member(institution, user, role="admin")
+        inst_id = institution.id
+
+    upload_model_for(client, title="Activity Paper A")
+    upload_model_for(client, title="Activity Paper B")
+
+    with client.application.app_context():
+        activity = institution_recent_activity(inst_id)
+        assert len(activity["recent_members"]) == 1
+        assert activity["recent_members"][0].user.email == "dean@example.com"
+        assert len(activity["recent_models"]) == 2
+        assert activity["models_last_30d"] == 2
+        assert activity["top_contributors"][0]["user"].email == "dean@example.com"
+        assert activity["top_contributors"][0]["model_count"] == 2
+
+
 def test_institution_usage_excludes_soft_deleted_papers(client):
     from tests.conftest import register
 

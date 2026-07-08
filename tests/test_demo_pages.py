@@ -34,6 +34,13 @@ def test_demo_institution_public_and_populated(client):
     assert "Funded models" in body
     assert "Quota usage" in body
     assert "This is a live example." in body
+    # Activity feed + contributors (rich overview)
+    assert "Recent activity" in body
+    assert "added in the last 30 days" in body
+    assert "Newest members" in body
+    assert "Recently added models" in body
+    assert "Top contributors" in body
+    assert "Elif Demir" in body
     # Nav tabs point to register in demo mode, not the protected panel routes
     assert "/institution/members" not in body
     assert "/institution/invites" not in body

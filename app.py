@@ -2568,6 +2568,43 @@ def register_routes(app: Flask) -> None:
             public_description="Interactive 3D & AR models from Bogazici University research groups.",
             logo_path=None,
         )
+
+        def _demo_member(name, email, age_days):
+            return types.SimpleNamespace(
+                user=types.SimpleNamespace(username=name, email=email),
+                joined_at=now - timedelta(days=age_days),
+            )
+
+        def _demo_model(title, paper_title, author, age_days):
+            return types.SimpleNamespace(
+                id="demo-model", display_name=title, original_filename=title,
+                paper=types.SimpleNamespace(title=paper_title),
+                user=types.SimpleNamespace(username=author),
+                created_at=now - timedelta(days=age_days),
+                poster_path=None, file_size=3_200_000,
+            )
+
+        recent_members = [
+            _demo_member("Elif Demir", "elif.demir@boun.edu.tr", 2),
+            _demo_member("Prof. Kenan Aksoy", "kenan.aksoy@boun.edu.tr", 5),
+            _demo_member("Zeynep Kaya", "zeynep.kaya@std.boun.edu.tr", 9),
+            _demo_member("Dr. Marco Rossi", "marco.rossi@boun.edu.tr", 14),
+            _demo_member("Ayşe Yıldız", "ayse.yildiz@boun.edu.tr", 21),
+        ]
+        recent_models = [
+            _demo_model("Hippocampal Neuron Reconstruction", "Dendritic Spine Density in Aging", "Elif Demir", 1),
+            _demo_model("Zeolite Framework Unit Cell", "Pore Geometry of Microporous Solids", "Prof. Kenan Aksoy", 3),
+            _demo_model("Trabecular Bone Microarchitecture", "Load-Bearing Trabeculae under Stress", "Dr. Marco Rossi", 6),
+            _demo_model("Fault Block Structural Model", "Extensional Tectonics in the Aegean", "Zeynep Kaya", 11),
+        ]
+        top_contributors = [
+            {"user": types.SimpleNamespace(username="Elif Demir"), "model_count": 14},
+            {"user": types.SimpleNamespace(username="Prof. Kenan Aksoy"), "model_count": 11},
+            {"user": types.SimpleNamespace(username="Dr. Marco Rossi"), "model_count": 9},
+            {"user": types.SimpleNamespace(username="Zeynep Kaya"), "model_count": 6},
+            {"user": types.SimpleNamespace(username="Ayşe Yıldız"), "model_count": 4},
+        ]
+
         return render_template(
             "institution/overview.html",
             institution=demo_inst,
@@ -2575,6 +2612,10 @@ def register_routes(app: Flask) -> None:
             usage_bytes=int(6.8 * 1024 * 1024 * 1024),
             member_count=28,
             active_invites=3,
+            recent_members=recent_members,
+            recent_models=recent_models,
+            models_last_30d=17,
+            top_contributors=top_contributors,
             active_tab="overview",
             demo_mode=True,
             demo_cross_url=url_for("demo_dashboard"),

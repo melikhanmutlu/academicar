@@ -5,29 +5,114 @@
   <div class="dashboard-metrics reveal-up">
     <div class="metric-card">
       <div class="metric-card-head">
+        <span class="metric-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 6a3 3 0 0 1 0 6M21 20a6 6 0 0 0-4-5.6"/></svg>
+        </span>
         <span class="metric-label" data-mobile-label="Members">Members</span>
         <strong class="metric-value-compact">{{ member_count }}</strong>
       </div>
     </div>
     <div class="metric-card">
       <div class="metric-card-head">
+        <span class="metric-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 4 6v12l8 4 8-4V6z"/><path d="M4 6l8 4 8-4"/><line x1="12" y1="22" x2="12" y2="10"/></svg>
+        </span>
         <span class="metric-label" data-mobile-label="Models">Funded models</span>
         <strong class="metric-value-compact">{{ usage_models }}{% if institution.quota_model_count is not none %}<small class="metric-divider">/{{ institution.quota_model_count }}</small>{% endif %}</strong>
       </div>
     </div>
     <div class="metric-card">
       <div class="metric-card-head">
+        <span class="metric-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>
+        </span>
         <span class="metric-label" data-mobile-label="Storage">Storage used</span>
         <strong class="metric-value-compact">{{ format_file_size(usage_bytes) }}</strong>
       </div>
     </div>
     <div class="metric-card">
       <div class="metric-card-head">
+        <span class="metric-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+        </span>
         <span class="metric-label" data-mobile-label="Invites">Active invites</span>
         <strong class="metric-value-compact">{{ active_invites }}</strong>
       </div>
     </div>
   </div>
+
+  <section class="surface reveal-up inst-section">
+    <div class="inst-section-head">
+      <h2>Recent activity</h2>
+      <span>{{ models_last_30d }} model{{ '' if models_last_30d == 1 else 's' }} added in the last 30 days</span>
+    </div>
+    <div class="inst-activity-grid">
+      <div class="inst-activity-col">
+        <h3 class="inst-activity-title">Newest members</h3>
+        {% if recent_members %}
+          <ul class="inst-activity-list">
+            {% for m in recent_members %}
+              {% set uname = m.user.username or m.user.email or 'User' %}
+              {% set parts = uname.split() %}
+              {% set init = ((parts[0][0] if parts else 'U') ~ (parts[1][0] if parts|length > 1 else ''))|upper %}
+              <li class="inst-activity-item">
+                <span class="inst-avatar">{{ init }}</span>
+                <span class="inst-activity-main">
+                  <strong>{{ m.user.username or m.user.email }}</strong>
+                  <small>{{ m.user.email }}</small>
+                </span>
+                <span class="inst-activity-meta">{{ m.joined_at.strftime("%Y-%m-%d") if m.joined_at else "" }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="inst-note">No members have joined yet.</p>
+        {% endif %}
+      </div>
+      <div class="inst-activity-col">
+        <h3 class="inst-activity-title">Recently added models</h3>
+        {% if recent_models %}
+          <ul class="inst-activity-list">
+            {% for md in recent_models %}
+              <li class="inst-activity-item">
+                {% if md.poster_path and not demo %}
+                  <span class="inst-model-thumb"><img src="{{ url_for('serve_poster', unique_id=md.id) }}" alt="" loading="lazy"></span>
+                {% else %}
+                  <span class="inst-model-thumb inst-model-thumb-empty" aria-hidden="true">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 4 6v12l8 4 8-4V6z"/><path d="M4 6l8 4 8-4"/><line x1="12" y1="22" x2="12" y2="10"/></svg>
+                  </span>
+                {% endif %}
+                <span class="inst-activity-main">
+                  <strong>{{ md.display_name or md.original_filename }}</strong>
+                  <small>{{ md.user.username if md.user else '' }}{% if md.paper %} &middot; {{ md.paper.title }}{% endif %}</small>
+                </span>
+                <span class="inst-activity-meta">{{ md.created_at.strftime("%Y-%m-%d") if md.created_at else "" }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="inst-note">No funded models yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  {% if top_contributors %}
+    <section class="surface reveal-up inst-section">
+      <h2>Top contributors</h2>
+      <p class="inst-note">Members with the most institution-funded models.</p>
+      {% set max_count = top_contributors[0].model_count or 1 %}
+      <div class="inst-contrib-list">
+        {% for c in top_contributors %}
+          <div class="inst-contrib-row">
+            <span class="inst-contrib-name">{{ c.user.username or c.user.email }}</span>
+            <span class="inst-contrib-bar"><span class="inst-contrib-fill" style="width: {{ [((c.model_count / max_count) * 100)|round|int, 4]|max }}%"></span></span>
+            <span class="inst-contrib-count">{{ c.model_count }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
 
   <section class="surface reveal-up inst-section">
     <h2>Contract</h2>
@@ -91,7 +176,7 @@
       <div class="inst-usage-row">
         <span>Models</span>
         <div class="inst-usage-bar"><div class="inst-usage-fill {% if model_pct >= 90 %}is-hot{% endif %}" style="width: {{ [model_pct, 100]|min }}%"></div></div>
-        <span>{{ usage_models }} / {{ institution.quota_model_count }}</span>
+        <span>{{ usage_models }} / {{ institution.quota_model_count }} <small class="inst-usage-pct">{{ [model_pct, 100]|min }}%</small></span>
       </div>
     {% else %}
       <div class="inst-usage-row"><span>Models</span><span>{{ usage_models }} (no quota)</span></div>
@@ -101,7 +186,7 @@
       <div class="inst-usage-row">
         <span>Storage</span>
         <div class="inst-usage-bar"><div class="inst-usage-fill {% if storage_pct >= 90 %}is-hot{% endif %}" style="width: {{ [storage_pct, 100]|min }}%"></div></div>
-        <span>{{ format_file_size(usage_bytes) }} / {{ format_file_size(institution.quota_storage_bytes) }}</span>
+        <span>{{ format_file_size(usage_bytes) }} / {{ format_file_size(institution.quota_storage_bytes) }} <small class="inst-usage-pct">{{ [storage_pct, 100]|min }}%</small></span>
       </div>
     {% else %}
       <div class="inst-usage-row"><span>Storage</span><span>{{ format_file_size(usage_bytes) }} (no quota)</span></div>

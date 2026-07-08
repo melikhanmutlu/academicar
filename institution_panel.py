@@ -17,7 +17,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import selectinload
 
 from extensions import limiter
-from institutions import institution_usage
+from institutions import institution_recent_activity, institution_usage
 from licensing import is_access_expired
 from models import Institution, InstitutionInvite, InstitutionMember, Model3D, Paper, db
 from url_helpers import public_url
@@ -81,6 +81,7 @@ def overview():
         for invite in InstitutionInvite.query.filter_by(institution_id=institution.id, revoked_at=None).all()
         if _invite_state(invite) == "active"
     )
+    activity = institution_recent_activity(institution.id)
     return render_template(
         "institution/overview.html",
         institution=institution,
@@ -90,6 +91,7 @@ def overview():
         member_count=member_count,
         active_invites=active_invites,
         active_tab="overview",
+        **activity,
     )
 
 

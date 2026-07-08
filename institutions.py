@@ -15,9 +15,10 @@ import logging
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, or_
+from sqlalchemy.orm import selectinload
 
 from licensing import apply_model_license_defaults
-from models import AuditLog, Institution, InstitutionMember, Model3D, Paper, db
+from models import AuditLog, Institution, InstitutionMember, Model3D, Paper, User, db
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,72 @@ def institution_usage(institution_id) -> tuple[int, int]:
         .one()
     )
     return int(count or 0), int(total or 0)
+
+
+def _funded_models_query(institution_id):
+    """Base query for an institution's funded, non-deleted models."""
+    return (
+        Model3D.query
+        .join(Paper, Model3D.paper_id == Paper.id)
+        .filter(
+            Model3D.institution_id == institution_id,
+            Model3D.license_type == "institutional",
+            or_(Paper.status.is_(None), Paper.status != "deleted"),
+        )
+    )
+
+
+def institution_recent_activity(institution_id, member_limit=5, model_limit=5, now=None) -> dict:
+    """Overview-page activity feed for an institution. A handful of small,
+    indexed queries (this feeds a panel page, not a hot request path):
+    recent members, recently funded models, models added in the last 30 days,
+    and the top model contributors."""
+    now = now or datetime.now(UTC)
+
+    recent_members = (
+        InstitutionMember.query.options(selectinload(InstitutionMember.user))
+        .filter_by(institution_id=institution_id)
+        .order_by(InstitutionMember.joined_at.desc())
+        .limit(member_limit)
+        .all()
+    )
+
+    recent_models = (
+        _funded_models_query(institution_id)
+        .options(selectinload(Model3D.paper), selectinload(Model3D.user))
+        .order_by(Model3D.created_at.desc())
+        .limit(model_limit)
+        .all()
+    )
+
+    models_last_30d = (
+        _funded_models_query(institution_id)
+        .filter(Model3D.created_at >= now - timedelta(days=30))
+        .count()
+    )
+
+    contributor_rows = (
+        db.session.query(User, func.count(Model3D.id).label("model_count"))
+        .join(Model3D, Model3D.user_id == User.id)
+        .join(Paper, Model3D.paper_id == Paper.id)
+        .filter(
+            Model3D.institution_id == institution_id,
+            Model3D.license_type == "institutional",
+            or_(Paper.status.is_(None), Paper.status != "deleted"),
+        )
+        .group_by(User.id)
+        .order_by(func.count(Model3D.id).desc())
+        .limit(5)
+        .all()
+    )
+    top_contributors = [{"user": user, "model_count": int(count)} for user, count in contributor_rows]
+
+    return {
+        "recent_members": recent_members,
+        "recent_models": recent_models,
+        "models_last_30d": models_last_30d,
+        "top_contributors": top_contributors,
+    }
 
 
 def institution_can_fund_upload(institution, file_size, usage=None) -> tuple[bool, str | None]:

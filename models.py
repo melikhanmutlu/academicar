@@ -148,6 +148,11 @@ class Model3D(db.Model):
     r2_mirror_failed_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=utc_now)
 
+    # Uploader. ORM-only relationship (user_id column already exists) — used to
+    # show the contributor on institution activity feeds. Explicit
+    # foreign_keys because Model3D also references users via other columns.
+    user = db.relationship("User", foreign_keys=[user_id])
+
     def __repr__(self) -> str:
         return f"<Model3D {self.id}>"
 
