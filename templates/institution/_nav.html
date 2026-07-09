@@ -1,7 +1,7 @@
 {% set inst_demo = demo_mode is defined and demo_mode %}
 <nav class="inst-nav reveal-up" aria-label="Institution panel sections">
-  <a href="{{ url_for('auth.register') if inst_demo else url_for('institution.overview') }}" class="{% if active_tab == 'overview' %}is-active{% endif %}" {% if active_tab == 'overview' %}aria-current="page"{% endif %}>Overview</a>
-  <a href="{{ url_for('auth.register') if inst_demo else url_for('institution.members') }}" class="{% if active_tab == 'members' %}is-active{% endif %}" {% if active_tab == 'members' %}aria-current="page"{% endif %}>Members</a>
-  <a href="{{ url_for('auth.register') if inst_demo else url_for('institution.invites') }}" class="{% if active_tab == 'invites' %}is-active{% endif %}" {% if active_tab == 'invites' %}aria-current="page"{% endif %}>Invites</a>
-  <a href="{{ url_for('auth.register') if inst_demo else url_for('institution.models_list') }}" class="{% if active_tab == 'models' %}is-active{% endif %}" {% if active_tab == 'models' %}aria-current="page"{% endif %}>Models</a>
+  <a href="{{ url_for('demo_institution') if inst_demo else url_for('institution.overview') }}" class="{% if active_tab == 'overview' %}is-active{% endif %}" {% if active_tab == 'overview' %}aria-current="page"{% endif %}>Overview</a>
+  <a href="{{ url_for('demo_institution', tab='members') if inst_demo else url_for('institution.members') }}" class="{% if active_tab == 'members' %}is-active{% endif %}" {% if active_tab == 'members' %}aria-current="page"{% endif %}>Members</a>
+  <a href="{{ url_for('demo_institution', tab='invites') if inst_demo else url_for('institution.invites') }}" class="{% if active_tab == 'invites' %}is-active{% endif %}" {% if active_tab == 'invites' %}aria-current="page"{% endif %}>Invites</a>
+  <a href="{{ url_for('demo_institution', tab='models') if inst_demo else url_for('institution.models_list') }}" class="{% if active_tab == 'models' %}is-active{% endif %}" {% if active_tab == 'models' %}aria-current="page"{% endif %}>Models</a>
 </nav>

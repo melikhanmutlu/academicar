@@ -9114,9 +9114,39 @@ body.nav-menu-open {
 }
 .inst-activity-meta {
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
   font-size: 12px;
   color: var(--color-silver-ash);
   white-space: nowrap;
+}
+.inst-activity-link {
+  color: var(--color-midnight-graphite);
+  text-decoration: none;
+}
+.inst-activity-link:hover { text-decoration: underline; }
+.inst-activity-sublink {
+  color: var(--color-silver-ash);
+  text-decoration: none;
+}
+.inst-activity-sublink:hover {
+  color: var(--color-midnight-graphite);
+  text-decoration: underline;
+}
+.inst-visibility-chip {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-silver-ash);
+  background: var(--color-cloud-whisper);
+  border: 1px solid var(--color-light-pearl);
+  border-radius: 4px;
+  padding: 1px 6px;
+  line-height: 1.6;
 }
 .inst-contrib-list { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
 .inst-contrib-row { display: flex; align-items: center; gap: 12px; }

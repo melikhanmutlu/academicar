@@ -74,6 +74,20 @@
         {% if recent_models %}
           <ul class="inst-activity-list">
             {% for md in recent_models %}
+              {# A funded model is linkable only when its publication is publicly
+                 visible (or owned by the viewer) — private uploads stay hidden,
+                 respecting the member's choice even inside the admin panel. #}
+              {% set _viewable = md.paper and (md.paper.is_public or (current_user.is_authenticated and md.paper.user_id == current_user.id)) %}
+              {% if demo and _viewable %}
+                {% set _model_href = url_for('demo_mitochondria_ar') %}
+                {% set _paper_href = url_for('auth.register') %}
+              {% elif _viewable %}
+                {% set _model_href = url_for('view_model', model_id=md.id) %}
+                {% set _paper_href = url_for('paper_public', slug=md.paper.slug) if md.paper.slug else none %}
+              {% else %}
+                {% set _model_href = none %}
+                {% set _paper_href = none %}
+              {% endif %}
               <li class="inst-activity-item">
                 {% if md.poster_path and not demo %}
                   <span class="inst-model-thumb"><img src="{{ url_for('serve_poster', unique_id=md.id) }}" alt="" loading="lazy"></span>
@@ -83,10 +97,17 @@
                   </span>
                 {% endif %}
                 <span class="inst-activity-main">
-                  <strong>{{ md.display_name or md.original_filename }}</strong>
-                  <small>{{ md.user.username if md.user else '' }}{% if md.paper %} &middot; {{ md.paper.title }}{% endif %}</small>
+                  {% if _model_href %}
+                    <strong><a class="inst-activity-link" href="{{ _model_href }}"{% if not demo %} target="_blank" rel="noopener"{% endif %}>{{ md.display_name or md.original_filename }}</a></strong>
+                  {% else %}
+                    <strong>{{ md.display_name or md.original_filename }}</strong>
+                  {% endif %}
+                  <small>{{ md.user.username if md.user else '' }}{% if md.paper %} &middot; {% if _paper_href %}<a class="inst-activity-sublink" href="{{ _paper_href }}"{% if not demo %} target="_blank" rel="noopener"{% endif %}>{{ md.paper.title }}</a>{% else %}{{ md.paper.title }}{% endif %}{% endif %}</small>
                 </span>
-                <span class="inst-activity-meta">{{ md.created_at.strftime("%Y-%m-%d") if md.created_at else "" }}</span>
+                <span class="inst-activity-meta">
+                  {% if md.paper and not md.paper.is_public %}<span class="inst-visibility-chip">Private</span>{% endif %}
+                  <span>{{ md.created_at.strftime("%Y-%m-%d") if md.created_at else "" }}</span>
+                </span>
               </li>
             {% endfor %}
           </ul>

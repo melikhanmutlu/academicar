@@ -2551,11 +2551,21 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/demo/institution")
     def demo_institution():
-        """Public, no-login preview of the institution admin panel overview,
-        populated with a fabricated (unsaved) Institution so its domain_list()
-        / contract_is_current() methods behave exactly as in production."""
-        log_audit("demo_institution_opened", details={"source": request.args.get("source") or "direct"})
+        """Public, no-login preview of the institution admin panel. All four
+        tabs (overview / members / invites / models) render from the *real*
+        panel templates with a fabricated (unsaved) Institution and sample
+        rows, so domain_list() / contract_is_current() behave exactly as in
+        production. ?tab= selects the section; sample counts are derived from
+        the same rows so every tab agrees with the overview metrics."""
+        tab = (request.args.get("tab") or "overview").lower()
+        if tab not in {"overview", "members", "invites", "models"}:
+            tab = "overview"
+        log_audit(
+            "demo_institution_opened",
+            details={"source": request.args.get("source") or "direct", "tab": tab},
+        )
         now = datetime.now(UTC)
+        MB = 1024 * 1024
         demo_inst = Institution(
             name="Bogazici University — Research Computing",
             slug=None,  # no live public showcase for the demo; hides /i/<slug> links
@@ -2563,64 +2573,131 @@ def register_routes(app: Flask) -> None:
             status="active",
             contract_starts_at=now - timedelta(days=95),
             contract_ends_at=now + timedelta(days=270),
-            quota_model_count=200,
-            quota_storage_bytes=20 * 1024 * 1024 * 1024,
+            quota_model_count=20,
+            quota_storage_bytes=8 * 1024 * MB,
             public_description="Interactive 3D & AR models from Bogazici University research groups.",
             logo_path=None,
         )
 
-        def _demo_member(name, email, age_days):
+        # --- Sample people (shared across members / contributors / authors) ---
+        def _person(uid, name, email, role, age_days):
             return types.SimpleNamespace(
-                user=types.SimpleNamespace(username=name, email=email),
+                id=uid, user_id=uid, role=role,
+                user=types.SimpleNamespace(id=uid, username=name, email=email),
                 joined_at=now - timedelta(days=age_days),
             )
 
-        def _demo_model(title, paper_title, author, age_days):
+        people = [
+            _person(101, "Elif Demir", "elif.demir@boun.edu.tr", "admin", 214),
+            _person(102, "Prof. Kenan Aksoy", "kenan.aksoy@boun.edu.tr", "admin", 176),
+            _person(103, "Dr. Marco Rossi", "marco.rossi@boun.edu.tr", "member", 132),
+            _person(104, "Zeynep Kaya", "zeynep.kaya@std.boun.edu.tr", "member", 61),
+            _person(105, "Ayşe Yıldız", "ayse.yildiz@boun.edu.tr", "member", 33),
+            _person(106, "Can Öztürk", "can.ozturk@boun.edu.tr", "member", 22),
+            _person(107, "Dr. Leyla Şahin", "leyla.sahin@boun.edu.tr", "member", 13),
+            _person(108, "Mehmet Arı", "mehmet.ari@std.boun.edu.tr", "member", 6),
+        ]
+        by_name = {p.user.username: p for p in people}
+        recent_members = sorted(people, key=lambda p: p.joined_at, reverse=True)[:5]
+
+        # --- Sample funded models. `is_public=False` rows demonstrate that a
+        #     member can keep an upload private: it still counts against quota
+        #     and shows here for the admin, but never links out or reaches the
+        #     public showcase. Private examples are patient/cadaver material,
+        #     the realistic reason a researcher withholds a model. ---
+        def _model(mid, title, paper_title, slug, author, age_days, is_public, size_mb):
+            person = by_name[author]
             return types.SimpleNamespace(
-                id="demo-model", display_name=title, original_filename=title,
-                paper=types.SimpleNamespace(title=paper_title),
-                user=types.SimpleNamespace(username=author),
+                id=mid, display_name=title,
+                original_filename=title.lower().replace(" ", "_") + ".glb",
+                paper=types.SimpleNamespace(
+                    title=paper_title, slug=slug, is_public=is_public,
+                    user_id=person.user_id,
+                ),
+                user=types.SimpleNamespace(id=person.user_id, username=author),
                 created_at=now - timedelta(days=age_days),
-                poster_path=None, file_size=3_200_000,
+                poster_path=None, file_size=size_mb * MB,
+                license_type="institutional",
+                access_expires_at=demo_inst.contract_ends_at,
             )
 
-        recent_members = [
-            _demo_member("Elif Demir", "elif.demir@boun.edu.tr", 2),
-            _demo_member("Prof. Kenan Aksoy", "kenan.aksoy@boun.edu.tr", 5),
-            _demo_member("Zeynep Kaya", "zeynep.kaya@std.boun.edu.tr", 9),
-            _demo_member("Dr. Marco Rossi", "marco.rossi@boun.edu.tr", 14),
-            _demo_member("Ayşe Yıldız", "ayse.yildiz@boun.edu.tr", 21),
+        models = [
+            _model("demo-m1", "Hippocampal Neuron Reconstruction", "Dendritic Spine Density in Aging", "dendritic-spine-density", "Elif Demir", 1, True, 340),
+            _model("demo-m2", "Zeolite Framework Unit Cell", "Pore Geometry of Microporous Solids", "pore-geometry-microporous", "Prof. Kenan Aksoy", 3, True, 180),
+            _model("demo-m3", "Patient-Specific Aortic Aneurysm", "Endovascular Repair Planning (Case Series)", None, "Dr. Marco Rossi", 5, False, 870),
+            _model("demo-m4", "Trabecular Bone Microarchitecture", "Load-Bearing Trabeculae under Stress", "load-bearing-trabeculae", "Dr. Marco Rossi", 8, True, 520),
+            _model("demo-m5", "Fault Block Structural Model", "Extensional Tectonics in the Aegean", "extensional-tectonics-aegean", "Zeynep Kaya", 12, True, 460),
+            _model("demo-m6", "Pre-op Mandible Reconstruction", "Reconstructive Surgery Workflow", None, "Dr. Leyla Şahin", 16, False, 690),
+            _model("demo-m7", "Ottoman Ceramic Sherd Assemblage", "Glaze Composition of Iznik Ware", "glaze-composition-iznik", "Ayşe Yıldız", 20, True, 305),
+            _model("demo-m8", "SARS-CoV-2 Spike Binding Pocket", "Inhibitor Docking at the RBD Interface", "inhibitor-docking-rbd", "Can Öztürk", 24, True, 270),
+            _model("demo-m9", "Cadaveric Knee Ligament Study", "Anatomy Teaching Collection", None, "Mehmet Arı", 28, False, 740),
+            _model("demo-m10", "Synaptic Vesicle Cryo-EM Density", "Presynaptic Architecture at Nanoscale", "presynaptic-architecture", "Elif Demir", 41, True, 610),
+            _model("demo-m11", "Coronary Artery Calcium Model", "CT-Derived Plaque Morphology", None, "Dr. Marco Rossi", 55, False, 820),
+            _model("demo-m12", "Microfluidic Chip Lattice", "Lab-on-Chip Flow Simulation", "lab-on-chip-flow", "Elif Demir", 72, True, 150),
         ]
-        recent_models = [
-            _demo_model("Hippocampal Neuron Reconstruction", "Dendritic Spine Density in Aging", "Elif Demir", 1),
-            _demo_model("Zeolite Framework Unit Cell", "Pore Geometry of Microporous Solids", "Prof. Kenan Aksoy", 3),
-            _demo_model("Trabecular Bone Microarchitecture", "Load-Bearing Trabeculae under Stress", "Dr. Marco Rossi", 6),
-            _demo_model("Fault Block Structural Model", "Extensional Tectonics in the Aegean", "Zeynep Kaya", 11),
-        ]
+        recent_models = models[:4]
+
+        # Counts are derived from the sample rows so tabs never contradict.
+        contrib_counts = {}
+        for m in models:
+            contrib_counts[m.user.username] = contrib_counts.get(m.user.username, 0) + 1
         top_contributors = [
-            {"user": types.SimpleNamespace(username="Elif Demir"), "model_count": 14},
-            {"user": types.SimpleNamespace(username="Prof. Kenan Aksoy"), "model_count": 11},
-            {"user": types.SimpleNamespace(username="Dr. Marco Rossi"), "model_count": 9},
-            {"user": types.SimpleNamespace(username="Zeynep Kaya"), "model_count": 6},
-            {"user": types.SimpleNamespace(username="Ayşe Yıldız"), "model_count": 4},
+            {"user": types.SimpleNamespace(username=name), "model_count": count}
+            for name, count in sorted(contrib_counts.items(), key=lambda kv: kv[1], reverse=True)[:5]
         ]
 
-        return render_template(
-            "institution/overview.html",
+        # --- Sample invite links ---
+        def _invite(iid, token, expires_days, use_count, max_uses, state):
+            return {
+                "invite": types.SimpleNamespace(
+                    id=iid, token=token,
+                    expires_at=(now + timedelta(days=expires_days)) if expires_days else None,
+                    use_count=use_count, max_uses=max_uses,
+                    revoked_at=(now - timedelta(days=2)) if state == "revoked" else None,
+                ),
+                "state": state,
+                "join_url": public_url("institution.join", token=token),
+            }
+
+        invites = [
+            _invite(1, "demo-lab-neuro-2026", 12, 3, 25, "active"),
+            _invite(2, "demo-open-seminar", None, 8, None, "active"),
+            _invite(3, "demo-old-cohort", -4, 5, 5, "revoked"),
+        ]
+
+        def _page(items):
+            # pages=1 keeps the pagination control hidden (its login-gated
+            # page links would 401 in the demo); the sample fits one page.
+            return types.SimpleNamespace(items=items, total=len(items), pages=1, page=1)
+
+        usage_bytes = sum(m.file_size for m in models)
+        common = dict(
             institution=demo_inst,
             logo_url=url_for("static", filename="images/demo-institution-logo.svg"),
-            usage_models=63,
-            usage_bytes=int(6.8 * 1024 * 1024 * 1024),
-            member_count=28,
-            active_invites=3,
-            recent_members=recent_members,
-            recent_models=recent_models,
-            models_last_30d=17,
-            top_contributors=top_contributors,
-            active_tab="overview",
+            active_tab=tab,
             demo_mode=True,
             demo_cross_url=url_for("demo_dashboard"),
             demo_cross_label="researcher dashboard",
+        )
+
+        if tab == "members":
+            return render_template("institution/members.html", members_pagination=_page(people), **common)
+        if tab == "invites":
+            return render_template("institution/invites.html", invites=invites, **common)
+        if tab == "models":
+            return render_template("institution/models.html", models_pagination=_page(models), **common)
+
+        return render_template(
+            "institution/overview.html",
+            usage_models=len(models),
+            usage_bytes=usage_bytes,
+            member_count=len(people),
+            active_invites=sum(1 for row in invites if row["state"] == "active"),
+            recent_members=recent_members,
+            recent_models=recent_models,
+            models_last_30d=sum(1 for m in models if (now - m.created_at).days < 30),
+            top_contributors=top_contributors,
+            **common,
         )
 
     @app.route("/demo/mitochondria/qr.png")

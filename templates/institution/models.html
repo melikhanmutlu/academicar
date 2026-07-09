@@ -2,6 +2,7 @@
 {% from "admin/_pagination.html" import render_pagination %}
 
 {% block panel_body %}
+  {% set demo = demo_mode is defined and demo_mode %}
   <section class="surface reveal-up inst-section">
     <div class="inst-section-head">
       <h2>Funded models</h2>
@@ -15,13 +16,29 @@
         </thead>
         <tbody>
           {% for model in models_pagination.items %}
+            {# Only publicly-visible (or owner-owned) uploads get live links; a
+               private model keeps its viewer hidden even from the admin list. #}
+            {% set _viewable = model.paper and (model.paper.is_public or (current_user.is_authenticated and model.paper.user_id == current_user.id)) %}
+            {% if demo and _viewable %}
+              {% set _model_href = url_for('demo_mitochondria_ar') %}
+              {% set _paper_href = url_for('auth.register') %}
+            {% elif _viewable %}
+              {% set _model_href = url_for('view_model', model_id=model.id) %}
+              {% set _paper_href = url_for('paper_public', slug=model.paper.slug) if (model.paper and model.paper.slug) else none %}
+            {% else %}
+              {% set _model_href = none %}
+              {% set _paper_href = none %}
+            {% endif %}
             <tr>
-              <td><strong>{{ model.display_name or model.original_filename or model.id }}</strong></td>
-              <td>{{ model.paper.title if model.paper else "-" }}</td>
+              <td>
+                {% if _model_href %}<strong><a class="dashboard-institution-link" href="{{ _model_href }}"{% if not demo %} target="_blank" rel="noopener"{% endif %}>{{ model.display_name or model.original_filename or model.id }}</a></strong>{% else %}<strong>{{ model.display_name or model.original_filename or model.id }}</strong>{% endif %}
+                {% if model.paper and not model.paper.is_public %}<small class="inst-cell-sub"><span class="inst-visibility-chip">Private</span></small>{% endif %}
+              </td>
+              <td>{% if _paper_href %}<a class="dashboard-institution-link" href="{{ _paper_href }}"{% if not demo %} target="_blank" rel="noopener"{% endif %}>{{ model.paper.title }}</a>{% elif model.paper %}{{ model.paper.title }}{% else %}-{% endif %}</td>
               <td>{{ format_file_size(model.file_size) }}</td>
               <td><span class="status-chip">{{ model.license_type|title }}</span></td>
               <td>{{ model.access_expires_at.strftime("%Y-%m-%d") if model.access_expires_at else "Open-ended" }}</td>
-              <td><a href="{{ url_for('view_model', model_id=model.id) }}" class="btn-secondary btn-compact" target="_blank" rel="noopener">View</a></td>
+              <td>{% if _model_href %}<a href="{{ _model_href }}" class="btn-secondary btn-compact"{% if not demo %} target="_blank" rel="noopener"{% endif %}>View</a>{% else %}<span class="inst-cell-sub">Private</span>{% endif %}</td>
             </tr>
           {% else %}
             <tr><td colspan="6">No institution-funded models yet.</td></tr>

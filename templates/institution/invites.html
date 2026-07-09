@@ -1,6 +1,7 @@
 {% extends "institution/_panel.html" %}
 
 {% block panel_body %}
+  {% set demo = demo_mode is defined and demo_mode %}
   <section class="surface reveal-up inst-section">
     <div class="inst-section-head">
       <h2>Create invite link</h2>
@@ -9,21 +10,25 @@
       Anyone with the link can request to join{% if institution.email_domains %} — but only accounts with a
       @{{ institution.domain_list()|join(", @") }} email can accept{% endif %}.
     </p>
-    <form method="POST" action="{{ url_for('institution.invite_create') }}" class="inst-invite-form">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <form method="POST" action="{{ url_for('auth.register') if demo else url_for('institution.invite_create') }}" class="inst-invite-form"{% if demo %} onsubmit="return false"{% endif %}>
+      {% if not demo %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
       <label>
         <span class="inst-field-label">Valid for (days)</span>
-        <input type="number" name="expires_days" min="1" max="365" value="14" placeholder="blank = no expiry">
+        <input type="number" name="expires_days" min="1" max="365" value="14" placeholder="blank = no expiry"{% if demo %} disabled{% endif %}>
       </label>
       <label>
         <span class="inst-field-label">Max uses</span>
-        <input type="number" name="max_uses" min="1" placeholder="blank = unlimited">
+        <input type="number" name="max_uses" min="1" placeholder="blank = unlimited"{% if demo %} disabled{% endif %}>
       </label>
       <label style="min-width:220px">
         <span class="inst-field-label">Email invite to (optional)</span>
-        <input type="email" name="send_to" maxlength="200" placeholder="colleague@boun.edu.tr" style="width:100%">
+        <input type="email" name="send_to" maxlength="200" placeholder="colleague@boun.edu.tr" style="width:100%"{% if demo %} disabled{% endif %}>
       </label>
-      <button type="submit" class="btn-primary">Create invite</button>
+      {% if demo %}
+        <a href="{{ url_for('auth.register') }}" class="btn-primary">Sign up to create invites</a>
+      {% else %}
+        <button type="submit" class="btn-primary">Create invite</button>
+      {% endif %}
     </form>
   </section>
 
@@ -51,7 +56,9 @@
               <td>{{ row.invite.use_count }}{% if row.invite.max_uses is not none %} / {{ row.invite.max_uses }}{% endif %}</td>
               <td><span class="status-chip inst-invite-{{ row.state }}">{{ row.state|title }}</span></td>
               <td>
-                {% if row.invite.revoked_at is none %}
+                {% if demo %}
+                  {% if row.state == "active" %}<a href="{{ url_for('auth.register') }}" class="dashboard-institution-link">Revoke</a>{% endif %}
+                {% elif row.invite.revoked_at is none %}
                   <form method="POST" action="{{ url_for('institution.invite_revoke', invite_id=row.invite.id) }}" onsubmit="return confirm('Revoke this invite link?')">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn-secondary btn-compact">Revoke</button>
