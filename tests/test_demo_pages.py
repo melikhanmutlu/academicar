@@ -41,6 +41,8 @@ def test_demo_institution_public_and_populated(client):
     assert "Recently added models" in body
     assert "Top contributors" in body
     assert "Elif Demir" in body
+    # Institution logo featured prominently in the panel header
+    assert "images/demo-institution-logo.svg" in body
     # Nav tabs point to register in demo mode, not the protected panel routes
     assert "/institution/members" not in body
     assert "/institution/invites" not in body

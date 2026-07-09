@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Sample institution logo">
+  <rect width="64" height="64" rx="12" fill="#202020"/>
+  <!-- classical building / campus mark -->
+  <g fill="none" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 27 L32 17 L50 27"/>
+    <line x1="17" y1="27" x2="17" y2="44"/>
+    <line x1="25" y1="27" x2="25" y2="44"/>
+    <line x1="39" y1="27" x2="39" y2="44"/>
+    <line x1="47" y1="27" x2="47" y2="44"/>
+    <line x1="12" y1="44" x2="52" y2="44"/>
+  </g>
+  <line x1="32" y1="27" x2="32" y2="44" stroke="#ff682c" stroke-width="2.6" stroke-linecap="round"/>
+</svg>

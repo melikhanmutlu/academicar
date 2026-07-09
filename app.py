@@ -2608,6 +2608,7 @@ def register_routes(app: Flask) -> None:
         return render_template(
             "institution/overview.html",
             institution=demo_inst,
+            logo_url=url_for("static", filename="images/demo-institution-logo.svg"),
             usage_models=63,
             usage_bytes=int(6.8 * 1024 * 1024 * 1024),
             member_count=28,

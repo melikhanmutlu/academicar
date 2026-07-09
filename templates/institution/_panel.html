@@ -6,11 +6,23 @@
 {% block title %}{{ institution.name }} - Institution panel - AcademicAR{% endblock %}
 
 {% block content %}
+{% set _inst_logo = logo_url if (logo_url is defined and logo_url) else (url_for('serve_institution_logo', filename=institution.logo_path) if institution.logo_path else None) %}
+{% set _name_words = (institution.name or 'Institution').split() %}
+{% set _monogram = ((_name_words[0][0] if _name_words else 'I') ~ (_name_words[1][0] if _name_words|length > 1 else ''))|upper %}
 <div class="app-shell dashboard-shell py-8">
   <div class="dashboard-header reveal-up">
-    <div>
-      <h1>{{ institution.name }}</h1>
-      <p>Institution panel &middot; manage members, invites, and contract usage.</p>
+    <div class="inst-head-brand">
+      <span class="inst-logomark{% if not _inst_logo %} inst-logomark-mono{% endif %}">
+        {% if _inst_logo %}
+          <img src="{{ _inst_logo }}" alt="{{ institution.name }} logo">
+        {% else %}
+          {{ _monogram }}
+        {% endif %}
+      </span>
+      <div>
+        <h1>{{ institution.name }}</h1>
+        <p>Institution panel &middot; manage members, invites, and contract usage.</p>
+      </div>
     </div>
     <div class="inst-head-side">
       {% if institution.slug %}
