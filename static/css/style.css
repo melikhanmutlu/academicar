@@ -7772,6 +7772,9 @@ label.rounded-xl input[type="checkbox"] {
   border-radius: 8px;
   background: var(--color-cloud-whisper);
 }
+.admin-bulk-action {
+  margin: 0 0 16px;
+}
 .upload-panel-prominent {
   border: 1px solid var(--color-light-pearl) !important;
   box-shadow: none;

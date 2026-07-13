@@ -5189,6 +5189,54 @@ def register_routes(app: Flask) -> None:
         flash("Payment status updated.", "success")
         return redirect(url_for("admin_dashboard", admin_page="revenue"))
 
+    @app.route("/admin/payments/<int:payment_id>/delete", methods=["POST"])
+    @login_required
+    def admin_payment_delete(payment_id):
+        """Remove a single billing record (e.g. test-run noise).
+
+        Deleting a Payment row does NOT change any license it granted — it only
+        removes the record. Adjust access via the model's license controls if
+        needed. Kept separate from status changes so an accidental "Save" never
+        deletes.
+        """
+        require_admin()
+        payment = db.session.get(Payment, payment_id)
+        if not payment:
+            abort(404)
+        invoice = payment.invoice_number or str(payment.id)
+        try:
+            db.session.delete(payment)
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not delete the payment. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="revenue"))
+        log_audit("admin_payment_deleted", user_id=current_user.id, resource_id=str(payment_id), details={"invoice": invoice})
+        flash(f"Payment record deleted: {invoice}.", "success")
+        return redirect(url_for("admin_dashboard", admin_page="revenue"))
+
+    @app.route("/admin/payments/delete-pending", methods=["POST"])
+    @login_required
+    def admin_payments_delete_pending():
+        """Bulk-delete every pending payment (abandoned checkouts / test noise).
+
+        Only ``pending`` rows are touched, never paid/refunded/failed records, so
+        the financial trail for money that actually moved is preserved. A pending
+        row deleted while a real checkout is still in flight is harmless: the
+        provider webhook reconstructs the payment when it settles.
+        """
+        require_admin()
+        try:
+            deleted = Payment.query.filter_by(status="pending").delete(synchronize_session=False)
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not clear pending payments. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="revenue"))
+        log_audit("admin_payments_pending_cleared", user_id=current_user.id, details={"count": deleted})
+        flash(f"Deleted {deleted} pending payment record(s).", "success")
+        return redirect(url_for("admin_dashboard", admin_page="revenue"))
+
     @app.route("/admin/jobs/<int:job_id>/retry", methods=["POST"])
     @login_required
     def admin_job_retry(job_id):

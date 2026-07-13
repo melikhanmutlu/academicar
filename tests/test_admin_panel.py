@@ -320,6 +320,62 @@ def test_manual_payment_rejects_unknown_user(client):
         assert Payment.query.count() == 0
 
 
+def _seed_payment(client, status="pending", provider="paytr", ref="ref-1"):
+    with client.application.app_context():
+        pay = Payment(
+            amount_kurus=990, currency="TRY", provider=provider,
+            provider_reference=ref, status=status,
+        )
+        db.session.add(pay)
+        db.session.commit()
+        return pay.id
+
+
+def test_admin_payment_delete_removes_row(client):
+    _make_admin(client)
+    pid = _seed_payment(client, status="pending", ref="del-pay-1")
+    resp = client.post(f"/admin/payments/{pid}/delete", follow_redirects=True)
+    assert resp.status_code == 200
+    with client.application.app_context():
+        assert db.session.get(Payment, pid) is None
+        assert AuditLog.query.filter_by(event_type="admin_payment_deleted").count() == 1
+
+
+def test_admin_payment_delete_keeps_license(client):
+    """Deleting a paid billing record must NOT revoke the license it granted."""
+    _make_admin(client)
+    model_id = _seed_model(client, license_type="academic")
+    with client.application.app_context():
+        model = db.session.get(Model3D, model_id)
+        pay = Payment(
+            user_id=model.user_id, paper_id=model.paper_id, model_id=model.id,
+            plan_key="academic", amount_kurus=990, currency="TRY",
+            provider="paytr", provider_reference="keep-lic-1", status="paid",
+        )
+        db.session.add(pay)
+        db.session.commit()
+        pid = pay.id
+
+    client.post(f"/admin/payments/{pid}/delete", follow_redirects=True)
+    with client.application.app_context():
+        assert db.session.get(Payment, pid) is None
+        assert db.session.get(Model3D, model_id).license_type == "academic"  # untouched
+
+
+def test_admin_payments_delete_pending_bulk_keeps_paid(client):
+    _make_admin(client)
+    _seed_payment(client, status="pending", ref="p1")
+    _seed_payment(client, status="pending", ref="p2")
+    _seed_payment(client, status="paid", ref="paid1")
+
+    resp = client.post("/admin/payments/delete-pending", follow_redirects=True)
+    assert resp.status_code == 200
+    with client.application.app_context():
+        assert Payment.query.filter_by(status="pending").count() == 0
+        assert Payment.query.filter_by(status="paid").count() == 1
+        assert AuditLog.query.filter_by(event_type="admin_payments_pending_cleared").count() == 1
+
+
 def _seed_member(client, email="target@example.com", google_id=None):
     with client.application.app_context():
         member = create_user(email=email, username="Target User")
@@ -484,6 +540,8 @@ NEW_POST_ROUTES = [
     ("/admin/users/1/deactivate", {}),
     ("/admin/users/1/reactivate", {}),
     ("/admin/users/1/delete", {}),
+    ("/admin/payments/1/delete", {}),
+    ("/admin/payments/delete-pending", {}),
 ]
 
 
