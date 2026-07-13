@@ -8656,10 +8656,10 @@ body.nav-menu-open {
   line-height: 1.55;
   color: var(--color-dark-shale);
   max-width: 520px;
-  margin: 0 0 28px;
+  margin: 0 0 32px;
 }
 .lp-hero-actions {
-  display: flex; gap: 14px; flex-wrap: nowrap; margin-bottom: 24px;
+  display: flex; gap: 14px; flex-wrap: nowrap; margin-bottom: 32px;
   align-items: center;
 }
 .lp-hero-checks {
@@ -9131,7 +9131,7 @@ body.nav-menu-open {
 .demo-banner-cross:hover { color: var(--color-orange-pressed); }
 
 .lp-hero-examples {
-  margin: -8px 0 24px;
+  margin: 0 0 28px;
   font-size: 14px;
   color: var(--color-silver-ash);
 }
