@@ -5635,6 +5635,54 @@ input[type="file"]::-webkit-file-upload-button {
 .upgrade-empty h2 { font-family: var(--font-serif, var(--font-inter)); font-size: 20px; font-weight: 600; color: var(--color-midnight-graphite); }
 .upgrade-empty p { margin: 8px 0 18px; font-family: var(--font-inter); font-size: 14px; color: #5c6473; }
 .upgrade-empty .upgrade-submit { width: auto; padding: 0 22px; }
+
+/* Post-payment success banner on the publication page (?upgraded=<id>). */
+.upgrade-success-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin: 14px 0 4px;
+  padding: 16px 18px;
+  background: #e7f6ed;
+  border: 1px solid #bfe6cd;
+  border-radius: 8px;
+  font-family: var(--font-inter);
+}
+.upgrade-success-icon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 200px;
+  background: #0a7a3a;
+  color: #fff;
+}
+.upgrade-success-body { flex: 1; min-width: 0; }
+.upgrade-success-body strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: #0a5c2e;
+}
+.upgrade-success-body p {
+  margin: 3px 0 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: #14663a;
+}
+.upgrade-success-dismiss {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+  color: #14663a;
+  opacity: 0.65;
+  padding: 0 2px;
+}
+.upgrade-success-dismiss:hover { opacity: 1; }
 @media (max-width: 1024px) {
   .model-registry-grid { grid-template-columns: 1fr; }
 }

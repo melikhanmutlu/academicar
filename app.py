@@ -3075,14 +3075,21 @@ def register_routes(app: Flask) -> None:
         try:
             db.session.flush()
             payment.invoice_number = build_invoice_number(payment.id)
-            success_url = public_url("view_model", model_id=model.id)
+            # Land the buyer back on the publication page (their management hub)
+            # with a success marker, NOT on the viewer: the license is granted by
+            # the async provider webhook, so a viewer landing can race ahead of it
+            # and render the 410 "access unavailable" state to someone who just
+            # paid. paper_detail always renders for the owner and shows the banner.
+            success_url = public_url("paper_detail", slug=model.paper.slug, upgraded=model.id)
+            # A cancelled/failed payment returns to the plan picker so they can retry.
+            cancel_url = public_url("model_upgrade_page", model_id=model.id)
             checkout_url = provider.create_checkout(
                 payment=payment,
                 model=model,
                 plan_key=plan_key,
                 user=current_user,
                 success_url=success_url,
-                cancel_url=success_url,
+                cancel_url=cancel_url,
             )
             db.session.commit()
         except SQLAlchemyError:
@@ -6349,7 +6356,23 @@ def register_routes(app: Flask) -> None:
         paper = active_paper_query().filter_by(slug=slug).first_or_404()
         if paper.user_id != current_user.id:
             abort(403)
-        return render_template("paper_detail.html", paper=paper)
+        # After a paid upgrade the provider redirects here with ?upgraded=<model_id>.
+        # Show a success banner; its wording is based on the model's ACTUAL access
+        # state (not just the URL param) so a webhook that hasn't landed yet reads
+        # as "activating" rather than a misleading hard "done".
+        upgraded_model = None
+        upgraded_active = False
+        upgraded_id = request.args.get("upgraded")
+        if upgraded_id:
+            upgraded_model = next((m for m in paper.models if m.id == upgraded_id), None)
+            if upgraded_model is not None:
+                upgraded_active = model_access_status(upgraded_model) == "active"
+        return render_template(
+            "paper_detail.html",
+            paper=paper,
+            upgraded_model=upgraded_model,
+            upgraded_active=upgraded_active,
+        )
 
     @app.route("/papers/<slug>/edit", methods=["GET", "POST"])
     @login_required

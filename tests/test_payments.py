@@ -57,6 +57,52 @@ def test_paid_upgrade_assigns_license_dev_provider(client, app):
         assert payment.currency == "USD"
 
 
+def test_upgrade_redirects_to_publication_with_success_marker(client, app):
+    """The buyer must land back on the publication page (not the viewer, which
+    can 410 while the async webhook is still in flight) with the ?upgraded marker
+    that drives the success banner."""
+    from tests.conftest import login, register
+
+    register(client)
+    login(client)
+    model_id = _make_model(app)
+
+    resp = client.post(f"/models/{model_id}/upgrade/academic", follow_redirects=False)
+    assert resp.status_code in (302, 303)
+    location = resp.headers["Location"]
+    assert "/papers/" in location
+    assert f"upgraded={model_id}" in location
+
+
+def test_publication_shows_success_banner_after_upgrade(client, app):
+    from tests.conftest import login, register
+
+    register(client)
+    login(client)
+    model_id = _make_model(app)
+    # Dev provider settles instantly, so the model is active on landing.
+    client.post(f"/models/{model_id}/upgrade/academic", follow_redirects=False)
+    with app.app_context():
+        slug = db.session.get(Model3D, model_id).paper.slug
+
+    body = client.get(f"/papers/{slug}?upgraded={model_id}").get_data(as_text=True)
+    assert "Payment successful" in body
+
+
+def test_publication_no_banner_without_marker(client, app):
+    from tests.conftest import login, register
+
+    register(client)
+    login(client)
+    model_id = _make_model(app)
+    with app.app_context():
+        slug = db.session.get(Model3D, model_id).paper.slug
+
+    body = client.get(f"/papers/{slug}").get_data(as_text=True)
+    assert "Payment successful" not in body
+    assert "Payment received" not in body
+
+
 def test_upgrade_rejects_non_buyable_plan(client, app):
     from tests.conftest import login, register
 

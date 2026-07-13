@@ -10,6 +10,24 @@
 <div class="app-shell paper-detail-shell">
   <a href="{{ url_for('dashboard') }}" class="detail-back-button">&larr; Dashboard</a>
 
+  {% if upgraded_model %}
+  <div class="upgrade-success-banner" role="status" data-upgrade-banner>
+    <span class="upgrade-success-icon" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+    </span>
+    <div class="upgrade-success-body">
+      {% if upgraded_active %}
+        <strong>Payment successful</strong>
+        <p>“{{ upgraded_model.display_name or upgraded_model.original_filename }}” now has {{ get_license_plan(upgraded_model.license_type).label }} access. Its QR code and viewer link stay exactly the same.</p>
+      {% else %}
+        <strong>Payment received</strong>
+        <p>We’re activating the upgrade for “{{ upgraded_model.display_name or upgraded_model.original_filename }}”. This usually takes a few seconds — refresh the page in a moment to see the new access window.</p>
+      {% endif %}
+    </div>
+    <button type="button" class="upgrade-success-dismiss" aria-label="Dismiss" data-upgrade-dismiss>&times;</button>
+  </div>
+  {% endif %}
+
   <section class="paper-detail-layout mb-5">
     <div class="surface paper-hero rounded-xl p-6 sm:p-7 reveal-up">
       <div class="paper-hero-toolbar">
@@ -385,6 +403,14 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+  // Dismiss the post-payment success banner.
+  (function () {
+    var banner = document.querySelector('[data-upgrade-banner]');
+    var dismiss = banner && banner.querySelector('[data-upgrade-dismiss]');
+    if (dismiss) dismiss.addEventListener('click', function () { banner.remove(); });
+  })();
+</script>
 <script>
   const uploadForm = document.querySelector('[data-upload-form]');
   if (uploadForm) {
