@@ -71,6 +71,24 @@ def test_about_page(client):
     assert "About AcademicAR" in resp.get_data(as_text=True)
 
 
+def test_refund_policy_page(client):
+    resp = client.get("/refund-policy")
+    assert resp.status_code == 200
+    assert "Delivery &amp; Refund Policy" in resp.get_data(as_text=True)
+
+
+def test_distance_sales_agreement_page(client):
+    resp = client.get("/distance-sales-agreement")
+    assert resp.status_code == 200
+    assert "Distance Sales Agreement" in resp.get_data(as_text=True)
+
+
+def test_sitemap_includes_new_legal_pages(client):
+    body = client.get("/sitemap.xml").get_data(as_text=True)
+    assert "/refund-policy" in body
+    assert "/distance-sales-agreement" in body
+
+
 def test_contact_hidden_by_default(client):
     # CONTACT_ENABLED defaults off — the page is hidden so we don't collect mail.
     assert client.get("/contact").status_code == 404

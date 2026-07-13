@@ -2740,6 +2740,14 @@ def register_routes(app: Flask) -> None:
     def data_protection():
         return render_template("legal/data_protection.html")
 
+    @app.route("/refund-policy")
+    def refund_policy():
+        return render_template("legal/refund_policy.html")
+
+    @app.route("/distance-sales-agreement")
+    def distance_sales_agreement():
+        return render_template("legal/distance_sales_agreement.html")
+
     @app.route("/faq")
     def faq():
         return render_template("faq.html", faqs=FAQ_ITEMS)
@@ -2943,6 +2951,8 @@ def register_routes(app: Flask) -> None:
             "terms",
             "privacy",
             "data_protection",
+            "refund_policy",
+            "distance_sales_agreement",
             "demo_mitochondria_ar",
             "demo_dashboard",
             "demo_institution",

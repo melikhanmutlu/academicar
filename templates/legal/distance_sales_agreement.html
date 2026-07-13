@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Distance Sales Agreement - AcademicAR{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+  <h1 class="font-serif text-4xl font-bold text-[#111827] mb-8">Distance Sales Agreement</h1>
+
+  <div class="prose prose-lg max-w-none space-y-8 text-[#374151]">
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">1. Parties</h2>
+      <p>This Distance Sales Agreement ("Agreement") is made between:</p>
+      <ul class="list-disc pl-6 space-y-2">
+        <li><strong>Provider ("AcademicAR," "we," "us," "our"):</strong> the operator of the AcademicAR platform at {{ config.SITE_URL }}, contactable at <a href="mailto:{{ config.CONTACT_EMAIL }}" class="underline">{{ config.CONTACT_EMAIL }}</a>.</li>
+        <li><strong>Customer ("you," "Buyer"):</strong> the individual completing a paid checkout on AcademicAR.</li>
+      </ul>
+      <p>By completing a paid checkout, the Customer accepts this Agreement.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">2. Subject</h2>
+      <p>This Agreement governs the online sale of digital license upgrades for 3D/AR model hosting on AcademicAR — single-model plans (for example Academic or Extended Archive access) shown on the <a href="{{ url_for('pricing') }}" class="underline">Pricing</a> page — purchased by card through our payment service provider, in accordance with applicable distance-selling and consumer-protection law. Offline institutional contract payments are arranged directly with the institution and are not card checkouts under this Agreement.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">3. Product / Service Description and Price</h2>
+      <p>The plan name, access duration, storage limit, and all-inclusive price are displayed to the Customer on the Pricing page and again at checkout before payment is submitted. The price and currency shown at checkout are final for that order and are incorporated into this Agreement by reference.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">4. Payment Method</h2>
+      <p>Payment is collected by card through iyzico, our payment service provider. AcademicAR does not receive or store full card numbers; iyzico processes the transaction on its own PCI-DSS compliant infrastructure. Any installment options shown at checkout are offered by iyzico and the card issuer, not by AcademicAR.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">5. Delivery / Performance</h2>
+      <p>AcademicAR delivers a digital license, not a physical product. Performance is immediate: once iyzico confirms payment as successful, the purchased license is applied to the Customer's model automatically, updating its access window, storage limit, and viewer watermark status. No shipping address, carrier, or delivery time applies.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">6. Right of Withdrawal</h2>
+      <p>Consumers ordinarily have a 14-day right of withdrawal from a distance contract. Because the Customer requests immediate activation and expressly acknowledges losing the withdrawal right once performance begins, that right ends as soon as the license is applied, consistent with the digital-content/service exception recognized under applicable distance-selling regulations. See the <a href="{{ url_for('refund_policy') }}" class="underline">Delivery &amp; Refund Policy</a> for how refunds are handled outside the withdrawal right, such as duplicate charges or activation failures.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">7. Customer Obligations</h2>
+      <ul class="list-disc pl-6 space-y-2">
+        <li>Provide accurate account, billing, and payment information.</li>
+        <li>Use the purchased license only for the model and account it was bought for.</li>
+        <li>Continue meeting the anonymization, rights, and ethics confirmations required at upload, as set out in the <a href="{{ url_for('terms') }}" class="underline">Terms of Use</a>.</li>
+        <li>Not dispute or charge back a payment for a license that was correctly delivered.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">8. Provider Obligations</h2>
+      <p>AcademicAR will apply the purchased license to the specified model promptly upon confirmed payment, keep the model's viewer link and QR resolver stable through the license window as described in the Terms of Use, and handle payment data only through its PCI-DSS compliant payment service provider.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">9. Force Majeure</h2>
+      <p>Neither party is liable for a delay or failure to perform caused by events beyond its reasonable control, including payment-provider outages, internet or hosting infrastructure failures, or other events of force majeure.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">10. Governing Law and Disputes</h2>
+      <p>This Agreement is governed by the laws of Turkey, consistent with the <a href="{{ url_for('terms') }}" class="underline">Terms of Use</a>, and is provided in English. Contact <a href="mailto:{{ config.CONTACT_EMAIL }}" class="underline">{{ config.CONTACT_EMAIL }}</a> first with any complaint about an order. Turkish consumers may also apply to the Consumer Arbitration Committee or Consumer Court with jurisdiction over their residence or the transaction, within the monetary limits announced annually by the Ministry of Trade.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">11. Contact</h2>
+      <p class="font-semibold text-[#111827]">
+        AcademicAR<br>
+        Email: <a href="mailto:{{ config.CONTACT_EMAIL }}" class="underline">{{ config.CONTACT_EMAIL }}</a>
+      </p>
+    </section>
+
+    <section class="mt-12 pt-8 border-t border-[#e5e7eb]">
+      <p class="text-sm text-[#6b7280]">Last updated: July 13, 2026</p>
+      <p class="text-sm text-[#6b7280]">Version: 1.0</p>
+    </section>
+
+  </div>
+</div>
+{% endblock %}

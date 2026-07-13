@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Delivery & Refund Policy - AcademicAR{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+  <h1 class="font-serif text-4xl font-bold text-[#111827] mb-8">Delivery &amp; Refund Policy</h1>
+
+  <div class="prose prose-lg max-w-none space-y-8 text-[#374151]">
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">1. Scope</h2>
+      <p>This policy explains how delivery and refunds work for paid purchases on AcademicAR: a single-model license upgrade (for example Academic or Extended Archive access) or an institutional contract payment. Publication workspaces on AcademicAR are always free; only per-model license upgrades and institutional contracts involve payment.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">2. Digital Delivery</h2>
+      <p>AcademicAR sells digital access, not physical goods, so there is no shipping, courier, or delivery address involved. "Delivery" means the purchased license is applied to your model automatically once payment is confirmed by our payment service provider, iyzico:</p>
+      <ul class="list-disc pl-6 space-y-2">
+        <li>Access starts immediately: the model's access window, storage limit, and public-viewer watermark status update as soon as the payment succeeds.</li>
+        <li>You can confirm activation on the model's page in your dashboard, or by reloading its public viewer or QR link.</li>
+        <li>If a payment is confirmed as successful but the license was not applied to your model because of a fault on our side, contact us and we will fix the license assignment or issue a full refund.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">3. Right of Withdrawal for Digital Content</h2>
+      <p>Under distance-selling regulations, consumers ordinarily have a 14-day right of withdrawal from a distance contract. That right does not apply once a service or digital content has been fully performed with the consumer's prior express consent and acknowledgment that the right of withdrawal is lost once performance begins. Because an AcademicAR license activates immediately at your request as soon as payment succeeds, completing checkout constitutes that consent, and the withdrawal right ends once the license has been applied.</p>
+      <p>This does not affect any refund you are entitled to under Section 4 below, or any right you have under mandatory consumer-protection law that cannot be waived by agreement.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">4. When a Refund Applies</h2>
+      <ul class="list-disc pl-6 space-y-2">
+        <li><strong>Duplicate or erroneous charge:</strong> full refund of the duplicate amount.</li>
+        <li><strong>Payment captured but license not activated</strong> due to a platform error: full refund, or the license applied, whichever you prefer.</li>
+        <li><strong>Abandoned or failed checkout:</strong> if a payment attempt fails or is cancelled before iyzico confirms it as successful, you are not charged, so there is nothing to refund.</li>
+        <li><strong>Institutional contract payments:</strong> handled under the terms agreed with your institution's contract; contact your institution admin or contact us directly.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">5. When a Refund Does Not Apply</h2>
+      <p>Because access is granted instantly and the model's public viewer link, QR code, and AR access become usable right away, we do not offer refunds simply for a change of mind once the license window has been activated and used, except where applicable law requires otherwise.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">6. How to Request a Refund</h2>
+      <p>Email <a href="mailto:{{ config.CONTACT_EMAIL }}" class="underline">{{ config.CONTACT_EMAIL }}</a> with the affected model or publication, the approximate date of payment, and the reason for your request. We aim to respond within 5 business days.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">7. Refund Processing Time</h2>
+      <p>Approved refunds are returned to the original payment method through iyzico. Once a refund is issued, your card issuer or bank typically reflects it within 5–10 business days, depending on the issuer.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">8. Changes to This Policy</h2>
+      <p>We may update this policy from time to time; the "Last updated" date below reflects the current version. Continued use of AcademicAR after a change constitutes acceptance of the update.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">9. Contact</h2>
+      <p class="font-semibold text-[#111827]">
+        AcademicAR<br>
+        Email: <a href="mailto:{{ config.CONTACT_EMAIL }}" class="underline">{{ config.CONTACT_EMAIL }}</a>
+      </p>
+    </section>
+
+    <section class="mt-12 pt-8 border-t border-[#e5e7eb]">
+      <p class="text-sm text-[#6b7280]">Last updated: July 13, 2026</p>
+      <p class="text-sm text-[#6b7280]">Version: 1.0</p>
+    </section>
+
+  </div>
+</div>
+{% endblock %}
