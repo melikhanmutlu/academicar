@@ -5,7 +5,11 @@ ownership enforcement, rejection of non-buyable plans, and idempotent webhook
 processing.
 """
 import uuid
+from datetime import UTC, datetime, timedelta
 
+import pytest
+
+import payments
 from models import Model3D, Paper, Payment, User, db
 
 
@@ -190,3 +194,127 @@ def test_unknown_provider_name_does_not_fall_back_to_dev_in_prod():
         json={"status": "paid", "plan_key": "extended_archive", "model_id": "x"},
     )
     assert resp.status_code == 404
+
+
+# --- TCMB USD/TRY conversion (PayTR settles in TRY) -------------------------
+
+_TCMB_XML = b"""<Tarih_Date Tarih="13.07.2026" Date="07/13/2026" Bulten_No="2026/133">
+<Currency CrossOrder="0" Kod="USD" CurrencyName="US DOLLAR">
+<Unit>1</Unit>
+<Isim>ABD DOLARI</Isim>
+<CurrencyName>US DOLLAR</CurrencyName>
+<ForexBuying>34.0000</ForexBuying>
+<ForexSelling>34.1000</ForexSelling>
+<BanknoteBuying>33.9000</BanknoteBuying>
+<BanknoteSelling>34.2000</BanknoteSelling>
+</Currency>
+</Tarih_Date>"""
+
+
+class _FakeResponse:
+    def __init__(self, content, status_code=200):
+        self.content = content
+        self.status_code = status_code
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code}")
+
+
+def _reset_fx_cache(monkeypatch):
+    monkeypatch.setattr(payments, "_fx_cache", {"rate": None, "fetched_at": None})
+
+
+def test_forex_rate_parses_tcmb_forex_selling(monkeypatch):
+    _reset_fx_cache(monkeypatch)
+    monkeypatch.setattr("requests.get", lambda *a, **k: _FakeResponse(_TCMB_XML))
+    assert payments.get_usd_try_forex_selling_rate() == pytest.approx(34.10)
+
+
+def test_forex_rate_is_cached_within_ttl(monkeypatch):
+    _reset_fx_cache(monkeypatch)
+    calls = []
+    monkeypatch.setattr("requests.get", lambda *a, **k: calls.append(1) or _FakeResponse(_TCMB_XML))
+    payments.get_usd_try_forex_selling_rate()
+    payments.get_usd_try_forex_selling_rate()
+    assert len(calls) == 1
+
+
+def test_forex_rate_falls_back_to_stale_cache_on_error(monkeypatch):
+    _reset_fx_cache(monkeypatch)
+    monkeypatch.setattr("requests.get", lambda *a, **k: _FakeResponse(_TCMB_XML))
+    first = payments.get_usd_try_forex_selling_rate()
+
+    # Expire the cache, then make the refetch fail — must fall back, not raise.
+    payments._fx_cache["fetched_at"] = datetime.now(UTC) - timedelta(hours=2)
+
+    def failing_get(*a, **k):
+        raise RuntimeError("network down")
+
+    monkeypatch.setattr("requests.get", failing_get)
+    assert payments.get_usd_try_forex_selling_rate() == first
+
+
+def test_forex_rate_raises_when_never_cached_and_fetch_fails(monkeypatch):
+    _reset_fx_cache(monkeypatch)
+
+    def failing_get(*a, **k):
+        raise RuntimeError("network down")
+
+    monkeypatch.setattr("requests.get", failing_get)
+    with pytest.raises(payments.ForexRateUnavailable):
+        payments.get_usd_try_forex_selling_rate()
+
+
+def test_plan_amount_minor_units_usd_unchanged():
+    assert payments.plan_amount_minor_units("academic", "USD") == 990
+    assert payments.plan_amount_minor_units("academic") == 990  # default currency
+
+
+def test_plan_amount_minor_units_try_uses_tcmb_rate(monkeypatch):
+    monkeypatch.setattr(payments, "get_usd_try_forex_selling_rate", lambda: 34.10)
+    # $9.90 * 34.10 TRY/USD = 337.59 TRY -> 33759 kurus
+    assert payments.plan_amount_minor_units("academic", "TRY") == 33759
+    assert payments.plan_amount_minor_units("academic", "TL") == 33759
+
+
+def test_upgrade_uses_try_conversion_when_configured(client, app, monkeypatch):
+    from tests.conftest import login, register
+
+    app.config["PAYMENT_CURRENCY"] = "TRY"
+    monkeypatch.setattr(payments, "get_usd_try_forex_selling_rate", lambda: 34.10)
+
+    register(client)
+    login(client)
+    model_id = _make_model(app)
+
+    resp = client.post(f"/models/{model_id}/upgrade/academic", follow_redirects=False)
+    assert resp.status_code in (302, 303)
+
+    with app.app_context():
+        payment = Payment.query.filter_by(model_id=model_id, status="paid").first()
+        assert payment is not None
+        assert payment.currency == "TRY"
+        assert payment.amount_kurus == 33759
+
+
+def test_upgrade_shows_friendly_error_when_fx_rate_unavailable(client, app, monkeypatch):
+    from tests.conftest import login, register
+
+    app.config["PAYMENT_CURRENCY"] = "TRY"
+    _reset_fx_cache(monkeypatch)
+
+    def failing_get(*a, **k):
+        raise RuntimeError("network down")
+
+    monkeypatch.setattr("requests.get", failing_get)
+
+    register(client)
+    login(client)
+    model_id = _make_model(app)
+
+    resp = client.post(f"/models/{model_id}/upgrade/academic", follow_redirects=True)
+    assert resp.status_code == 200
+    assert b"exchange rate" in resp.data
+    with app.app_context():
+        assert db.session.get(Model3D, model_id).license_type == "free"

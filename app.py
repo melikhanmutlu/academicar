@@ -75,6 +75,7 @@ from models import AuditLog, BlogPost, ConversionJob, Institution, InstitutionIn
 from services.r2_mirror import mirror_file, mirror_directory, mirror_directory_sync, mirror_delete, ensure_local
 from payments import (
     PAID_PLAN_KEYS,
+    ForexRateUnavailable,
     apply_successful_payment,
     get_payment_provider,
     plan_amount_minor_units,
@@ -3049,13 +3050,19 @@ def register_routes(app: Flask) -> None:
             return redirect(request.referrer or url_for("dashboard"))
 
         provider = get_payment_provider()
+        payment_currency = current_app.config.get("PAYMENT_CURRENCY", "USD")
+        try:
+            amount_kurus = plan_amount_minor_units(plan_key, payment_currency)
+        except ForexRateUnavailable:
+            flash("Could not start the upgrade: exchange rate unavailable. Please try again shortly.", "danger")
+            return redirect(request.referrer or url_for("dashboard"))
         payment = Payment(
             user_id=current_user.id,
             paper_id=model.paper_id,
             model_id=model.id,
             plan_key=plan_key,
-            amount_kurus=plan_amount_minor_units(plan_key),
-            currency=current_app.config.get("PAYMENT_CURRENCY", "USD"),
+            amount_kurus=amount_kurus,
+            currency=payment_currency,
             provider=provider.name,
             provider_reference=f"{provider.name}-{uuid.uuid4().hex[:12]}",
             status="pending",
@@ -3233,13 +3240,23 @@ def register_routes(app: Flask) -> None:
             model = db.session.get(Model3D, model_id) if model_id else (payment.model if payment else None)
 
         if payment is None:
+            payment_currency = current_app.config.get("PAYMENT_CURRENCY", "USD")
+            try:
+                amount_kurus = plan_amount_minor_units(effective_plan, payment_currency)
+            except ForexRateUnavailable:
+                current_app.logger.error(
+                    "FX rate unavailable while reconstructing an orphaned payment "
+                    "(provider=%s, ref=%s); returning 500 so the gateway retries.",
+                    provider.name, provider_reference,
+                )
+                return jsonify({"ok": False, "error": "fx_rate_unavailable"}), 500
             payment = Payment(
                 user_id=(model.user_id if model else None),
                 paper_id=(model.paper_id if model else None),
                 model_id=(model.id if model else None),
                 plan_key=effective_plan,
-                amount_kurus=plan_amount_minor_units(effective_plan),
-                currency=current_app.config.get("PAYMENT_CURRENCY", "USD"),
+                amount_kurus=amount_kurus,
+                currency=payment_currency,
                 provider=provider.name,
                 provider_reference=provider_reference,
                 status="pending",

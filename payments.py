@@ -38,10 +38,65 @@ logger = logging.getLogger(__name__)
 # Plans a user can pay to upgrade a single model to.
 PAID_PLAN_KEYS: tuple[str, ...] = ("academic", "extended_archive")
 
+_TCMB_TODAY_XML_URL = "https://www.tcmb.gov.tr/kurlar/today.xml"
+_FX_CACHE_TTL_SECONDS = 3600  # TCMB republishes once/business day; hourly refetch is plenty.
+_fx_cache: dict[str, object] = {"rate": None, "fetched_at": None}
 
-def plan_amount_minor_units(plan_key: str) -> int:
-    """Price for a plan in the smallest currency unit (e.g. cents)."""
-    return int(round(get_license_plan(plan_key).price_usd * 100))
+
+class ForexRateUnavailable(Exception):
+    """Raised when the USD/TRY rate cannot be determined and no previously
+    fetched (even stale) rate is cached to fall back on."""
+
+
+def get_usd_try_forex_selling_rate() -> float:
+    """USD/TRY "döviz satış" (foreign-exchange selling) rate from the Turkish
+    Central Bank (TCMB), used to convert USD-priced plans into TRY for
+    gateways (PayTR) that settle in TRY.
+
+    A transient TCMB outage must not block checkout, so a failed refetch
+    falls back to the last known-good rate; :class:`ForexRateUnavailable` is
+    raised only when no rate has ever been fetched successfully.
+    """
+    import xml.etree.ElementTree as ET
+
+    import requests
+
+    now = datetime.now(UTC)
+    cached_rate = _fx_cache["rate"]
+    fetched_at = _fx_cache["fetched_at"]
+    if cached_rate and fetched_at and (now - fetched_at).total_seconds() < _FX_CACHE_TTL_SECONDS:
+        return cached_rate
+
+    try:
+        resp = requests.get(_TCMB_TODAY_XML_URL, timeout=10)
+        resp.raise_for_status()
+        root = ET.fromstring(resp.content)
+        node = root.find(".//Currency[@Kod='USD']/ForexSelling")
+        rate = float((node.text or "").strip().replace(",", "."))
+        if rate <= 0:
+            raise ValueError(f"non-positive TCMB USD rate: {rate!r}")
+    except Exception as exc:
+        logger.error("TCMB USD/TRY rate fetch failed: %s", exc)
+        if cached_rate:
+            return cached_rate
+        raise ForexRateUnavailable("Could not determine the USD/TRY exchange rate") from exc
+
+    _fx_cache["rate"] = rate
+    _fx_cache["fetched_at"] = now
+    return rate
+
+
+def plan_amount_minor_units(plan_key: str, currency: str = "USD") -> int:
+    """Price for a plan in the smallest currency unit (e.g. cents/kurus).
+
+    TRY converts the USD list price using TCMB's daily selling rate (PayTR
+    settles in TRY); any other currency keeps the legacy USD-equivalent
+    behaviour (LemonSqueezy/Dev).
+    """
+    price_usd = get_license_plan(plan_key).price_usd
+    if (currency or "USD").strip().upper() in {"TRY", "TL"}:
+        return int(round(price_usd * get_usd_try_forex_selling_rate() * 100))
+    return int(round(price_usd * 100))
 
 
 def apply_successful_payment(payment, model, plan_key: str) -> None:
