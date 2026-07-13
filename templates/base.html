@@ -135,19 +135,48 @@
   {% if not (request.endpoint and request.endpoint.startswith('admin_')) %}
   <footer class="site-footer">
     <div class="site-footer-inner">
-      <nav class="site-footer-links" aria-label="Footer">
-        <a href="{{ url_for('about') }}" class="nav-link-muted">About</a>
-        <a href="{{ url_for('ar_for_index') }}" class="nav-link-muted">Use cases</a>
-        <a href="{{ url_for('pricing') }}" class="nav-link-muted">Pricing</a>
-        <a href="{{ url_for('blog_index') }}" class="nav-link-muted">Blog</a>
-        <a href="{{ url_for('faq') }}" class="nav-link-muted">FAQ</a>
-        {% if config.CONTACT_ENABLED %}<a href="{{ url_for('contact') }}" class="nav-link-muted">Contact</a>{% endif %}
-        <a href="{{ url_for('terms') }}" class="nav-link-muted">Terms</a>
-        <a href="{{ url_for('privacy') }}" class="nav-link-muted">Privacy</a>
-        <a href="{{ url_for('refund_policy') }}" class="nav-link-muted">Refund Policy</a>
-        <a href="{{ url_for('distance_sales_agreement') }}" class="nav-link-muted">Distance Sales Agreement</a>
-      </nav>
-      <div>&copy; {{ current_year }} AcademicAR - 3D and AR model sharing for academic publications</div>
+      <div class="site-footer-top">
+        <div class="site-footer-brand">
+          <a href="{{ url_for('landing') }}" class="site-footer-brand-link">
+            <div class="site-footer-brand-mark">A</div>
+            <span class="site-footer-brand-name">AcademicAR</span>
+          </a>
+          <p class="site-footer-tagline">3D and AR models for academic papers, theses, and posters — with a stable QR code for every model.</p>
+        </div>
+
+        <div class="site-footer-columns">
+          <nav class="site-footer-col" aria-label="Product">
+            <h3>Product</h3>
+            <a href="{{ url_for('ar_for_index') }}">Use cases</a>
+            <a href="{{ url_for('pricing') }}">Pricing</a>
+            <a href="{{ url_for('blog_index') }}">Blog</a>
+            <a href="{{ url_for('faq') }}">FAQ</a>
+          </nav>
+
+          <nav class="site-footer-col" aria-label="Company">
+            <h3>Company</h3>
+            <a href="{{ url_for('about') }}">About</a>
+            {% if config.CONTACT_ENABLED %}<a href="{{ url_for('contact') }}">Contact</a>{% endif %}
+            <a href="{{ url_for('institutional_inquiry') }}">Institutional</a>
+          </nav>
+
+          <nav class="site-footer-col" aria-label="Legal">
+            <h3>Legal</h3>
+            <a href="{{ url_for('terms') }}">Terms</a>
+            <a href="{{ url_for('privacy') }}">Privacy</a>
+            <a href="{{ url_for('data_protection') }}">Data Protection</a>
+            <a href="{{ url_for('refund_policy') }}">Refund Policy</a>
+            <a href="{{ url_for('distance_sales_agreement') }}">Distance Sales Agreement</a>
+          </nav>
+        </div>
+      </div>
+
+      <div class="site-footer-bottom">
+        <div>&copy; {{ current_year }} AcademicAR - 3D and AR model sharing for academic publications</div>
+        <div class="site-footer-payments">
+          <img src="{{ url_for('static', filename='images/footer-logo-band.png') }}" alt="Secure payments via iyzico — Visa, Mastercard, American Express, and Troy" loading="lazy" width="auto" height="22">
+        </div>
+      </div>
     </div>
   </footer>
   {% endif %}
