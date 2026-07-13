@@ -106,7 +106,11 @@ CONTENT_SECURITY_POLICY = "; ".join(
         "worker-src 'self' blob:",
         "object-src 'none'",
         "base-uri 'self'",
-        "form-action 'self'",
+        # PayTR hosted checkout: the upgrade form POSTs to our own route, which
+        # 302-redirects to https://www.paytr.com/odeme/... — browsers apply
+        # form-action to that redirect target, so PayTR must be allowlisted or
+        # the payment redirect is blocked.
+        "form-action 'self' https://www.paytr.com",
         # SEC-4: modern equivalent of X-Frame-Options: DENY for all pages. The
         # embeddable viewer relaxes this per-response (see set_security_headers).
         "frame-ancestors 'none'",

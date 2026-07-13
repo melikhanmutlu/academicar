@@ -167,6 +167,13 @@ def test_paytr_callback_is_idempotent(paytr_client, paytr_app):
         assert len(paid) == 1
 
 
+def test_csp_form_action_allows_paytr_redirect(paytr_client):
+    """The upgrade form 302-redirects to www.paytr.com; the CSP form-action
+    directive must allowlist it or the browser blocks the payment redirect."""
+    csp = paytr_client.get("/").headers.get("Content-Security-Policy", "")
+    assert "form-action 'self' https://www.paytr.com" in csp
+
+
 def test_paytr_callback_failed_status_does_not_grant(paytr_client, paytr_app):
     model_id, merchant_oid = _make_pending_payment(paytr_app)
     data = {
