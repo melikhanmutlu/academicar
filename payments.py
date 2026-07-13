@@ -68,7 +68,18 @@ def get_usd_try_forex_selling_rate() -> float:
         return cached_rate
 
     try:
-        resp = requests.get(_TCMB_TODAY_XML_URL, timeout=10)
+        # TCMB rejects requests with the default python-requests User-Agent
+        # (looks like a bot); a browser-like one is required for a 200.
+        resp = requests.get(
+            _TCMB_TODAY_XML_URL,
+            timeout=10,
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+                )
+            },
+        )
         resp.raise_for_status()
         root = ET.fromstring(resp.content)
         node = root.find(".//Currency[@Kod='USD']/ForexSelling")
