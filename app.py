@@ -196,6 +196,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             "format_model_dimensions_cm": format_model_dimensions_cm,
             "academic_fields": ACADEMIC_FIELDS,
             "admin_chip_class": admin_chip_class,
+            "user_is_configured_admin": user_is_configured_admin,
         }
 
     @app.after_request
@@ -5726,6 +5727,61 @@ def register_routes(app: Flask) -> None:
         log_audit("admin_user_reactivated", user_id=current_user.id, resource_id=str(user.id))
         flash(f"Account reactivated: {user.email}.", "success")
         return redirect(url_for("admin_user_detail", user_id=user.id))
+
+    @app.route("/admin/users/<int:user_id>/delete", methods=["POST"])
+    @login_required
+    def admin_user_delete(user_id):
+        """Permanently delete a user and everything they own.
+
+        Mirrors the self-serve /account/delete flow (files collected up front,
+        financial + audit rows detached rather than destroyed, then the User is
+        deleted so papers -> models cascade). Guards: an admin cannot delete
+        their own account here, and configured (env ADMIN_EMAILS) admins are
+        protected. This is irreversible; the reversible option is Deactivate.
+        """
+        require_admin()
+        user = db.session.get(User, user_id)
+        if not user:
+            abort(404)
+        if user.id == current_user.id:
+            flash("You cannot delete your own account from here.", "warning")
+            return redirect(url_for("admin_user_detail", user_id=user.id))
+        if user_is_configured_admin(user):
+            flash("Configured admin accounts cannot be deleted.", "warning")
+            return redirect(url_for("admin_user_detail", user_id=user.id))
+
+        # Collect on-disk files (GLB/USDZ/QR/poster/PDF) before the DB cascade
+        # removes the rows we'd need to locate them.
+        files_to_remove = []
+        for paper in user.papers:
+            files_to_remove.extend(collect_paper_file_paths(app, paper))
+
+        uid = user.id
+        user_email = user.email
+        try:
+            log_audit("admin_user_deleted", user_id=current_user.id, resource_id=str(uid), details={"email": user_email})
+            # Preserve the financial + audit trail: detach these rows (nullable
+            # user_id) instead of deleting them, so revenue/audit history survives.
+            ConversionJob.query.filter_by(user_id=uid).update({"user_id": None})
+            Payment.query.filter_by(user_id=uid).update({"user_id": None})
+            AuditLog.query.filter(AuditLog.user_id == uid).update({"user_id": None})
+            Paper.query.filter_by(deleted_by_user_id=uid).update({"deleted_by_user_id": None})
+            # InstitutionMember.user_id is NOT NULL, so the ORM can't null it out
+            # on the User cascade — remove the membership row explicitly first.
+            membership = InstitutionMember.query.filter_by(user_id=uid).first()
+            if membership is not None:
+                db.session.delete(membership)
+            db.session.delete(user)  # cascades papers -> models -> annotations/qr/versions
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            logger.exception("Admin user deletion failed")
+            flash("Could not delete the account. Please try again.", "danger")
+            return redirect(url_for("admin_user_detail", user_id=uid))
+
+        cleanup_paths(files_to_remove)
+        flash(f"Account permanently deleted: {user_email}.", "success")
+        return redirect(url_for("admin_dashboard", admin_page="users"))
 
     def _read_blog_form() -> dict:
         rm = (request.form.get("read_minutes") or "").strip()

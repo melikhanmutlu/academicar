@@ -409,6 +409,70 @@ def test_admin_cannot_deactivate_self(client):
         assert admin.deactivated_at is None  # blocked
 
 
+def test_admin_user_delete_removes_content_but_keeps_payment(client):
+    _make_admin(client)
+    with client.application.app_context():
+        member = create_user(email="doomed@example.com", username="Doomed")
+        paper = Paper(title="Doomed Paper", slug="doomed-paper", user_id=member.id)
+        db.session.add(paper)
+        db.session.flush()
+        model = Model3D(
+            id="doomed-model", paper_id=paper.id, user_id=member.id,
+            glb_path="model.glb", license_type="academic", processing_status="ready",
+        )
+        db.session.add(model)
+        db.session.add(Payment(
+            user_id=member.id, paper_id=paper.id, model_id=model.id,
+            plan_key="academic", amount_kurus=990, currency="TRY",
+            provider="paytr", provider_reference="del-keep-1", status="paid",
+        ))
+        db.session.commit()
+        member_id, paper_id = member.id, paper.id
+
+    resp = client.post(f"/admin/users/{member_id}/delete", follow_redirects=True)
+    assert resp.status_code == 200
+    with client.application.app_context():
+        assert db.session.get(User, member_id) is None
+        assert db.session.get(Paper, paper_id) is None
+        assert db.session.get(Model3D, "doomed-model") is None
+        # Financial trail preserved, but detached from the deleted user.
+        payment = Payment.query.filter_by(provider_reference="del-keep-1").one()
+        assert payment.status == "paid"
+        assert payment.user_id is None
+        assert AuditLog.query.filter_by(event_type="admin_user_deleted").count() == 1
+
+
+def test_admin_user_delete_removes_institution_member(client):
+    """A member's InstitutionMember.user_id is NOT NULL, so deletion must remove
+    that row explicitly or the cascade fails."""
+    from models import Institution, InstitutionMember
+
+    _make_admin(client)
+    with client.application.app_context():
+        member = create_user(email="insted@example.com", username="Insted")
+        inst = Institution(name="Test Inst", slug="test-inst-del", status="active")
+        db.session.add(inst)
+        db.session.flush()
+        db.session.add(InstitutionMember(institution_id=inst.id, user_id=member.id, role="member"))
+        db.session.commit()
+        member_id = member.id
+
+    resp = client.post(f"/admin/users/{member_id}/delete", follow_redirects=True)
+    assert resp.status_code == 200
+    with client.application.app_context():
+        assert db.session.get(User, member_id) is None
+        assert InstitutionMember.query.filter_by(user_id=member_id).count() == 0
+
+
+def test_admin_cannot_delete_self(client):
+    _make_admin(client)
+    with client.application.app_context():
+        admin_id = User.query.filter_by(email="admin@example.com").one().id
+    client.post(f"/admin/users/{admin_id}/delete", follow_redirects=True)
+    with client.application.app_context():
+        assert db.session.get(User, admin_id) is not None  # blocked
+
+
 NEW_POST_ROUTES = [
     ("/admin/jobs/1/retry", {}),
     ("/admin/jobs/1/cancel", {}),
@@ -419,6 +483,7 @@ NEW_POST_ROUTES = [
     ("/admin/users/1/email", {"email": "a@b.c"}),
     ("/admin/users/1/deactivate", {}),
     ("/admin/users/1/reactivate", {}),
+    ("/admin/users/1/delete", {}),
 ]
 
 

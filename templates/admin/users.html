@@ -51,6 +51,13 @@
                   </form>
                   <a href="{{ url_for('admin_user_detail', user_id=user.id) }}" class="admin-btn admin-btn-secondary compact">Manage</a>
                   <a href="{{ url_for('admin_user_dashboard', user_id=user.id) }}" class="admin-btn admin-btn-secondary compact">Dashboard</a>
+                  {% if user.id != current_user.id and not user_is_configured_admin(user) %}
+                  <form method="POST" action="{{ url_for('admin_user_delete', user_id=user.id) }}"
+                        onsubmit="return confirm('Permanently delete this user and ALL of their publications, models, and files? This cannot be undone. Payment records are kept but anonymized.');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="admin-btn admin-btn-danger compact">Delete</button>
+                  </form>
+                  {% endif %}
                 </div>
               </td>
             </tr>
