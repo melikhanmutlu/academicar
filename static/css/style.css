@@ -4416,7 +4416,7 @@ input[type="file"]::-webkit-file-upload-button {
 }
 .publication-table-head,
 .pub-row {
-  grid-template-columns: minmax(360px, 1fr) 112px 82px 340px;
+  grid-template-columns: minmax(320px, 1fr) 124px 108px 72px 256px;
   gap: 18px;
 }
 .publication-table-head {
@@ -4451,7 +4451,7 @@ input[type="file"]::-webkit-file-upload-button {
 .publication-share {
   gap: 8px;
   display: grid;
-  grid-template-columns: repeat(4, minmax(76px, auto));
+  grid-template-columns: repeat(3, minmax(72px, auto));
   justify-content: start;
   justify-items: stretch;
 }
@@ -4487,6 +4487,32 @@ input[type="file"]::-webkit-file-upload-button {
   background: var(--color-dark-shale);
   color: var(--color-canvas-white);
 }
+.publication-share .dash-action-share {
+  border-color: #b9d8cf;
+  background: #f1faf6;
+  color: #146c52;
+}
+.publication-share .dash-action-share:hover {
+  border-color: #146c52;
+  background: #e2f4ec;
+  color: #0d513d;
+}
+.project-model-thumb {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--color-light-pearl);
+  border-radius: 8px;
+  background: var(--color-cloud-whisper);
+  object-fit: cover;
+}
+.project-visibility {
+  display: flex;
+  align-items: center;
+}
+.status-chip-unlisted {
+  background: #fff4df;
+  color: #975c00;
+}
 .publication-share .dash-action-muted {
   background: var(--color-slate-mist);
   color: var(--color-silver-ash);
@@ -4515,7 +4541,7 @@ input[type="file"]::-webkit-file-upload-button {
 @media (max-width: 1180px) {
   .publication-table-head,
   .pub-row {
-    grid-template-columns: minmax(280px, 1fr) 96px 70px 200px;
+    grid-template-columns: minmax(240px, 1fr) 96px 94px 62px 200px;
   }
   .publication-share {
     grid-template-columns: repeat(2, minmax(92px, 1fr));
@@ -6578,7 +6604,8 @@ details[open] .upload-chevron { transform: rotate(45deg); }
     grid-template-columns: 1fr auto !important;
     grid-template-areas:
       "main main"
-      "status count"
+      "status visibility"
+      "count count"
       "actions actions";
     gap: 13px 12px;
     padding: 20px;
@@ -6635,11 +6662,16 @@ details[open] .upload-chevron { transform: rotate(45deg); }
     justify-content: flex-start;
   }
 
+  .project-visibility {
+    grid-area: visibility;
+    justify-content: flex-end;
+  }
+
   .publication-count {
     grid-area: count;
     display: inline-flex;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: flex-start;
     gap: 5px;
     min-height: 28px;
     color: var(--color-dark-shale);
