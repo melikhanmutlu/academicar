@@ -1,20 +1,20 @@
 {% extends "base.html" %}
 {% set is_edit = mode|default('new') == 'edit' %}
-{% block title %}{{ 'Edit Publication' if is_edit else 'New Publication' }} - AcademicAR{% endblock %}
+{% block title %}{{ 'Edit Project' if is_edit else 'New Project' }} - AcademicAR{% endblock %}
 
 {% block content %}
 <div class="app-shell py-10">
-  <a href="{{ url_for('paper_detail', slug=paper.slug) if is_edit else url_for('dashboard') }}" class="nav-link inline-flex mb-5">&larr; {{ 'Back to publication' if is_edit else 'Back to dashboard' }}</a>
+  <a href="{{ url_for('project_detail', slug=paper.slug) if is_edit else url_for('dashboard') }}" class="nav-link inline-flex mb-5">&larr; {{ 'Back to project' if is_edit else 'Back to dashboard' }}</a>
 
   <div class="paper-form-grid grid lg:grid-cols-[0.78fr_1.22fr] gap-6 items-start">
     <aside class="dark-surface rounded-xl p-7 lg:p-8 sticky top-24 overflow-hidden">
       <div class="absolute inset-0 volumetric-grid opacity-30"></div>
       <div class="relative">
-        <span class="eyebrow bg-white/10 text-white border-white/15">{{ 'Publication settings' if is_edit else 'Publication setup' }}</span>
-        <h1 class="font-serif text-4xl lg:text-5xl font-bold text-white mt-5 leading-tight">{{ 'Edit publication details.' if is_edit else 'Create a publication page.' }}</h1>
-        <p class="text-white/60 mt-4 leading-relaxed">{{ 'Update title, authors, institution, identifiers, or attached PDF.' if is_edit else 'Add academic metadata and optionally attach the first model in the same step.' }}</p>
+        <span class="eyebrow bg-white/10 text-white border-white/15">{{ 'Project settings' if is_edit else 'Project setup' }}</span>
+        <h1 class="font-serif text-4xl lg:text-5xl font-bold text-white mt-5 leading-tight">{{ 'Edit your project.' if is_edit else 'Create a project for your 3D work.' }}</h1>
+        <p class="text-white/60 mt-4 leading-relaxed">{{ 'Update the context, models, sharing and optional publication references.' if is_edit else 'Start with a title and add a model now; publication details can come later.' }}</p>
         <div class="mt-8 space-y-3 text-sm">
-          {% for item in ['Publication metadata', 'DOI / PMID fields', 'Public / Private visibility', 'Optional first model upload'] %}
+          {% for item in ['Project context', 'Optional publication references', 'Private / review / public sharing', 'Optional first model upload'] %}
             <div class="flex items-center gap-3 rounded-lg bg-white/[0.06] border border-white/10 p-3">
               <span class="w-2 h-2 rounded-full bg-white"></span>
               <span class="text-white/80">{{ item }}</span>
@@ -27,8 +27,34 @@
     <form method="POST" enctype="multipart/form-data" class="surface rounded-xl p-6 sm:p-8 space-y-6" data-upload-form>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-      <!-- Metadata Autofill Bar -->
-      <div class="rounded-xl border border-[#e8e8e8] bg-[#f8f8f8] p-5 space-y-3">
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div>
+          <label class="field-label">Project type <span class="text-red-500">*</span></label>
+          <select name="project_type" class="field-select" required>
+            <option value="research_project" {% if form.get('project_type', 'research_project') == 'research_project' %}selected{% endif %}>Research project</option>
+            <option value="publication" {% if form.get('project_type') == 'publication' %}selected{% endif %}>Publication / article</option>
+            <option value="thesis" {% if form.get('project_type') == 'thesis' %}selected{% endif %}>Thesis / dissertation</option>
+            <option value="teaching_training" {% if form.get('project_type') == 'teaching_training' %}selected{% endif %}>Teaching / training</option>
+            <option value="engineering_design" {% if form.get('project_type') == 'engineering_design' %}selected{% endif %}>Engineering / design</option>
+            <option value="collection_archive" {% if form.get('project_type') == 'collection_archive' %}selected{% endif %}>Collection / archive</option>
+            <option value="other" {% if form.get('project_type') == 'other' %}selected{% endif %}>Other</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label">Project stage <span class="text-red-500">*</span></label>
+          <select name="workflow_stage" class="field-select" required>
+            <option value="in_progress" {% if form.get('workflow_stage', 'in_progress') == 'in_progress' %}selected{% endif %}>In progress</option>
+            <option value="ready_for_review" {% if form.get('workflow_stage') == 'ready_for_review' %}selected{% endif %}>Ready for review</option>
+            <option value="published" {% if form.get('workflow_stage') == 'published' %}selected{% endif %}>Published</option>
+            <option value="archived" {% if form.get('workflow_stage') == 'archived' %}selected{% endif %}>Archived</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Optional publication metadata -->
+      <details class="rounded-xl border border-[#e8e8e8] bg-[#f8f8f8] p-5 space-y-3">
+        <summary class="cursor-pointer font-semibold text-[#111827]">Publication &amp; reference details (optional)</summary>
+        <div class="mt-4">
         <label class="block text-xs uppercase tracking-wider font-semibold text-[#64748b]">Autofill via DOI or PMID</label>
         <div class="flex flex-col sm:flex-row gap-3">
           <input type="text" id="autofillQuery" placeholder="Enter DOI (e.g. 10.1148/radiol.210408) or PMID" class="field-input !py-2 flex-1 text-sm bg-white" aria-label="DOI or PMID input">
@@ -39,7 +65,8 @@
         </div>
         <p class="text-xs text-[#5c6473]">Instantly populates Title, Authors, Year, Abstract, and identifiers using Crossref and PubMed APIs.</p>
         <div id="autofillStatus" class="hidden text-xs font-semibold"></div>
-      </div>
+        </div>
+      </details>
 
       <div>
         <label class="field-label">Title <span class="text-red-500">*</span></label>
@@ -47,9 +74,9 @@
       </div>
 
       <div>
-        <label class="field-label">Authors</label>
+        <label class="field-label">Contributors</label>
         <input type="text" name="authors" value="{{ form.get('authors', '') }}" maxlength="500" placeholder="Jane Doe, John Smith" class="field-input">
-        <p class="text-xs text-[#5c6473] mt-2">Separate authors with commas.</p>
+        <p class="text-xs text-[#5c6473] mt-2">Separate contributors with commas.</p>
       </div>
 
       <div class="grid sm:grid-cols-2 gap-4">
@@ -70,8 +97,8 @@
 
       <div class="grid sm:grid-cols-2 gap-4">
         <div>
-          <label class="field-label">Institution / Journal</label>
-          <input type="text" name="institution" value="{{ form.get('institution', '') }}" maxlength="300" placeholder="University, lab, journal, or conference" class="field-input">
+          <label class="field-label">Organization</label>
+          <input type="text" name="institution" value="{{ form.get('institution', '') }}" maxlength="300" placeholder="University, lab, company, museum, or publisher" class="field-input">
         </div>
         <div>
           <label class="field-label">DOI</label>
@@ -85,22 +112,27 @@
       </div>
 
       <div>
-        <label class="field-label">Description / Abstract</label>
-        <textarea name="abstract" rows="6" class="field-textarea" placeholder="Short description of the study, model, or publication context">{{ form.get('abstract', '') }}</textarea>
+        <label class="field-label">Project description</label>
+        <textarea name="abstract" rows="6" class="field-textarea" placeholder="What is this work, what do the models show, and who is it for?">{{ form.get('abstract', '') }}</textarea>
       </div>
 
       <div>
         <label class="field-label">Visibility</label>
-        <div class="grid sm:grid-cols-2 gap-3">
+        <div class="grid sm:grid-cols-3 gap-3">
           <label class="rounded-xl border border-[#111827]/15 bg-white/60 p-4 cursor-pointer">
-            <input type="radio" name="visibility" value="public" {% if form.get('visibility', 'public') == 'public' %}checked{% endif %}>
-            <span class="font-semibold text-[#111827] ml-2">Public</span>
-            <span class="block text-sm text-[#5c6473] mt-2">Anyone with the QR or link can view the paper page, read the PDF, and open 3D / AR models.</span>
+            <input type="radio" name="visibility" value="private" {% if form.get('visibility', 'private') == 'private' %}checked{% endif %}>
+            <span class="font-semibold text-[#111827] ml-2">Private</span>
+            <span class="block text-sm text-[#5c6473] mt-2">Only you and authorized workspace members can access this project.</span>
           </label>
           <label class="rounded-xl border border-[#111827]/15 bg-white/60 p-4 cursor-pointer">
-            <input type="radio" name="visibility" value="private" {% if form.get('visibility') == 'private' %}checked{% endif %}>
-            <span class="font-semibold text-[#111827] ml-2">Private</span>
-            <span class="block text-sm text-[#5c6473] mt-2">Only you (when signed in) can access the paper page. The QR and link will return Not Found for everyone else.</span>
+            <input type="radio" name="visibility" value="unlisted" {% if form.get('visibility') == 'unlisted' %}checked{% endif %}>
+            <span class="font-semibold text-[#111827] ml-2">Review link</span>
+            <span class="block text-sm text-[#5c6473] mt-2">Anyone with the private link can review it. It is not indexed or listed publicly.</span>
+          </label>
+          <label class="rounded-xl border border-[#111827]/15 bg-white/60 p-4 cursor-pointer">
+            <input type="radio" name="visibility" value="public" {% if form.get('visibility') == 'public' %}checked{% endif %}>
+            <span class="font-semibold text-[#111827] ml-2">Public</span>
+            <span class="block text-sm text-[#5c6473] mt-2">Anyone can discover and view the project, its models, and available documents.</span>
           </label>
         </div>
       </div>

@@ -18,7 +18,7 @@
         {% if admin_view is defined and admin_view %}
           Read-only dashboard view for {{ viewed_user.email }}. Use admin controls for logged changes.
         {% else %}
-          Manage publications, model uploads, and public viewer links.
+          Manage projects, model uploads, review links, and public viewer links.
         {% endif %}
       </p>
       {% if institution_membership is defined and institution_membership %}
@@ -85,9 +85,9 @@
 
   <section class="dashboard-upload-band surface reveal-up">
     <div>
-      <h2>Create a publication or add a model.</h2>
+      <h2>Create a project or add a model.</h2>
       <p>
-        Keep publication metadata, PDF files, models, QR resolvers, and viewer links in one workflow.
+        Keep project context, optional references, models, QR resolvers, and viewer links in one workflow.
       </p>
     </div>
     <div class="dashboard-upload-actions">
@@ -96,7 +96,7 @@
       {% elif demo %}
         <a href="{{ url_for('auth.register') }}" class="btn-primary">New publication + model</a>
       {% else %}
-        <a href="{{ url_for('paper_new') }}" class="btn-primary">New publication + model</a>
+        <a href="{{ url_for('project_new') }}" class="btn-primary">New project + model</a>
       {% endif %}
       {% if papers and demo %}
         <a href="{{ url_for('auth.register') }}" class="btn-secondary">Add model to latest</a>
@@ -111,13 +111,13 @@
     <div class="dashboard-list-header reveal-up">
       <div>
         <h2>Publications</h2>
-        <p>{{ papers|length }} publication{{ '' if papers|length == 1 else 's' }} in this workspace</p>
+        <p>{{ papers|length }} project{{ '' if papers|length == 1 else 's' }} in this workspace</p>
       </div>
       <form class="dashboard-search-form" role="search" onsubmit="return false;">
         <input
           id="pubSearch"
           type="search"
-          placeholder="Search publications..."
+          placeholder="Search projects..."
           autocomplete="off"
           class="field-input dashboard-search"
         >
@@ -140,14 +140,14 @@
 
     <div class="publication-table reveal-up" id="pubList">
       <div class="publication-table-head">
-        <span>Publication</span>
+        <span>Project</span>
         <span>Status</span>
         <span>Models</span>
         <span>Actions</span>
       </div>
 
       {% for p in papers %}
-        {% set paper_href = url_for('auth.register') if demo else (url_for('paper_public', slug=p.slug) if admin_view is defined and admin_view else url_for('paper_detail', slug=p.slug)) %}
+        {% set paper_href = url_for('auth.register') if demo else (url_for('paper_public', slug=p.slug) if admin_view is defined and admin_view else url_for('project_detail', slug=p.slug)) %}
         {% set first_model = p.models[0] if p.models else none %}
         {% set clean_authors = (p.authors or '').replace('Dr. ','').replace('Prof. ','').replace('Dr.','').replace('Prof.','').strip() %}
         {% if clean_authors %}
@@ -161,7 +161,7 @@
           class="pub-row publication-row"
           data-search="{{ ((p.title or '') ~ ' ' ~ (p.authors or '') ~ ' ' ~ (p.institution or '') ~ ' ' ~ (p.field or '') ~ ' ' ~ (p.year or '') ~ ' ' ~ (p.doi or '') ~ ' ' ~ (p.pmid or ''))|lower }}"
           data-title="{{ (p.title or '')|lower }}"
-          data-visibility="{{ 'public' if p.is_public else 'private' }}"
+          data-visibility="{{ project_visibility(p) }}"
           data-models="{{ p.models|length }}"
           data-created="{{ p.created_at.timestamp() if p.created_at else 0 }}"
         >
@@ -170,16 +170,17 @@
             <div class="min-w-0">
               <div class="publication-title-line">
                 <a href="{{ paper_href }}">{{ p.title }}</a>
+                <span class="detail-chip">{{ (p.project_type or 'publication')|replace('_', ' ')|title }}</span>
               </div>
               <p>
-                {{ p.authors if p.authors else '-' }}{% if p.institution %}<span> &middot; </span>{{ p.institution }}{% endif %}
+                {{ p.authors if p.authors else '-' }}{% if p.institution %}<span> &middot; </span>{{ p.institution }}{% endif %}<span> &middot; </span>{{ (p.workflow_stage or 'published')|replace('_', ' ')|title }}
                 {% if p.year %}<span class="publication-year">{{ p.year }}</span>{% endif %}
               </p>
             </div>
           </div>
 
           <div class="publication-status">
-            <span class="status-chip">{{ 'Public' if p.is_public else 'Private' }}</span>
+            <span class="status-chip">{{ project_visibility(p)|title }}</span>
           </div>
 
           <div class="publication-count">
@@ -210,8 +211,8 @@
                 <a href="{{ url_for('paper_public', slug=p.slug) }}" target="_blank" rel="noopener noreferrer" class="dash-action dash-action-details">Open</a>
                 <a href="{{ url_for('admin_dashboard', admin_page='content') }}" class="dash-action dash-action-edit">Manage</a>
               {% else %}
-                <a href="{{ url_for('paper_edit', slug=p.slug) }}" class="dash-action dash-action-edit">Edit</a>
-                <a href="{{ url_for('paper_detail', slug=p.slug) }}#add-model" class="dash-action dash-action-add-model">Add model</a>
+                <a href="{{ url_for('project_edit', slug=p.slug) }}" class="dash-action dash-action-edit">Edit</a>
+                <a href="{{ url_for('project_detail', slug=p.slug) }}#add-model" class="dash-action dash-action-add-model">Add model</a>
                 <a href="{{ url_for('paper_detail', slug=p.slug) }}" class="dash-action dash-action-details">Details</a>
               {% endif %}
             {% endif %}
@@ -221,7 +222,7 @@
     </div>
 
     <p id="pubNoResults" class="hidden text-center text-[#9ca3af] py-12 text-sm">
-      No publications match the current search or filters.
+      No projects match the current search or filters.
     </p>
   {% else %}
     <div class="dashboard-empty-state reveal-up">
@@ -232,9 +233,9 @@
         <div class="dashboard-empty-icon">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 4 6v12l8 4 8-4V6z"/><path d="M4 6l8 4 8-4"/><line x1="12" y1="22" x2="12" y2="10"/></svg>
         </div>
-        <h2 class="dashboard-empty-title">Publish your first 3D model.</h2>
-        <p class="dashboard-empty-subtitle">Upload STL, GLB, OBJ or FBX — AcademicAR converts it to an AR-ready viewer, generates a stable QR code, and lets you attach your paper PDF. Everything in one link, ready to embed in any manuscript or poster.</p>
-        <a href="{{ url_for('paper_new') }}" class="btn-primary dashboard-empty-cta">+ New Publication</a>
+        <h2 class="dashboard-empty-title">Start your first 3D project.</h2>
+        <p class="dashboard-empty-subtitle">Upload STL, GLB, OBJ or FBX — AcademicAR converts it to an AR-ready viewer, generates a stable QR code, and lets you share it privately, with reviewers, or publicly.</p>
+        <a href="{{ url_for('project_new') }}" class="btn-primary dashboard-empty-cta">+ New Project</a>
       </div>
 
       <!-- Workflow steps -->
@@ -242,8 +243,8 @@
         <div class="dashboard-empty-step">
           <div class="dashboard-empty-step-num">1</div>
           <div>
-            <p class="dashboard-empty-step-title">Add publication metadata</p>
-            <p class="dashboard-empty-step-body">Title, authors, institution, DOI or PMID — auto-fetch from Crossref or PubMed with one click.</p>
+            <p class="dashboard-empty-step-title">Create a project</p>
+            <p class="dashboard-empty-step-body">Start with a title and context. DOI, PMID and PDF are optional and can be added later.</p>
           </div>
         </div>
         <div class="dashboard-empty-step-divider"></div>
@@ -259,7 +260,7 @@
           <div class="dashboard-empty-step-num">3</div>
           <div>
             <p class="dashboard-empty-step-title">Share the link & QR</p>
-            <p class="dashboard-empty-step-body">Make the publication public — a persistent viewer URL and downloadable QR are instantly ready.</p>
+            <p class="dashboard-empty-step-body">Keep it private, create an unlisted review link, or publish it publicly when ready.</p>
           </div>
         </div>
       </div>

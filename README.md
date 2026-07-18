@@ -1,13 +1,13 @@
 # AcademicAR
 
-AcademicAR is a platform that empowers researchers to publish 3D and AR (Augmented Reality) models alongside their academic papers, posters, and presentations. It turns technical model files (STL, GLB, OBJ, FBX) into shareable academic assets accessible via browser-ready viewer links and QR codes.
+AcademicAR is a platform for sharing 3D and AR (Augmented Reality) work in research, review, teaching, design, collections, and academic publishing. It turns technical model files (STL, GLB, OBJ, FBX) into browser-ready viewer links and QR codes.
 
 ## Core Features
 
 - **3D Model Upload & Conversion**: Supports STL, GLB, OBJ, and FBX with automated conversion to AR-ready GLB formats.
 - **Web-Based Viewer**: A full-screen browser viewer with metadata, screenshot capabilities, and mobile AR controls.
 - **QR Code Generation**: Every model receives a persistent, shareable viewer URL and QR code.
-- **Publication Archive**: Project-based model records preserving context, identifiers (DOI/PMID), and supplementary materials (PDFs).
+- **Project Workspace**: Model records preserve project context, optional identifiers (DOI/PMID), supporting documents, and a private, unlisted-review, or public sharing state.
 - **Asynchronous Processing**: Background job queues for non-blocking file conversions.
 
 ## Project Structure

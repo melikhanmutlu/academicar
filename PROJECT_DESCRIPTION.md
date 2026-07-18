@@ -2,7 +2,7 @@
 
 ## 1. Product Vision
 
-AcademicAR is a web platform for sharing 3D and AR-ready models alongside academic publications, posters, presentations, theses, and research projects.
+AcademicAR is a web platform for sharing 3D and AR-ready models in research projects, review workflows, academic publications, posters, presentations, theses, teaching, collections, and professional work.
 
 The core idea is simple: an academic user uploads a segmentation or anatomical model, the platform converts or prepares it for browser-based 3D viewing, generates a public link and QR code, and lets readers inspect the model in 3D or AR from a phone, tablet, or desktop browser.
 
@@ -10,7 +10,7 @@ The MVP focuses on making academic 3D model sharing fast, reliable, and publicat
 
 - Upload an STL or GLB model.
 - Convert STL files to GLB for web and AR compatibility.
-- Create a publication/project page.
+- Create a project page, then add publication information only when relevant.
 - Generate a shareable link and QR code.
 - Capture standard model screenshots.
 - Allow external readers to view the model without logging in.
@@ -92,22 +92,21 @@ The current application is a Flask-based web app with server-side rendered pages
 - Optional Google login
 - User-specific dashboard
 
-### Publication / Project Management
+### Project Management
 
-Users can create a publication or project record with metadata such as:
+Users can create a project record with only a title and optional context such as:
 
 - Title
 - Authors
 - Year
 - Field
 - Institution
-- DOI
-- PMID
+- Optional DOI / PMID and publication details
 - Abstract or description
 - Optional PDF upload
 - Package type
 
-Each publication receives a unique slug and belongs to the authenticated user.
+Each project receives a unique slug, belongs to the authenticated user, and can be Private, Unlisted (review link), or Public.
 
 ### Model Upload
 

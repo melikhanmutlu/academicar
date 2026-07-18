@@ -13,7 +13,7 @@ import uuid
 import zipfile
 from datetime import UTC, datetime, timedelta
 
-from flask import Flask, Response, abort, current_app, flash, jsonify, redirect, render_template, request, send_from_directory, session, url_for
+from flask import Flask, Response, abort, current_app, flash, jsonify, make_response, redirect, render_template, request, send_from_directory, session, url_for
 from flask_limiter.errors import RateLimitExceeded
 from flask_login import LoginManager, current_user, login_required
 from flask_migrate import Migrate
@@ -195,6 +195,9 @@ def create_app(test_config: dict | None = None) -> Flask:
             "user_selectable_plan_keys": USER_SELECTABLE_PLAN_KEYS,
             "format_model_dimensions_cm": format_model_dimensions_cm,
             "academic_fields": ACADEMIC_FIELDS,
+            "project_types": PROJECT_TYPES,
+            "project_workflow_stages": PROJECT_WORKFLOW_STAGES,
+            "project_visibility": project_visibility,
             "admin_chip_class": admin_chip_class,
             "user_is_configured_admin": user_is_configured_admin,
         }
@@ -260,6 +263,13 @@ ACADEMIC_FIELDS = (
     "Medicine", "Dentistry", "Engineering", "Architecture", "Biology",
     "Archaeology", "Veterinary Medicine", "Chemistry", "Other",
 )
+
+PROJECT_TYPES = (
+    "research_project", "publication", "thesis", "teaching_training",
+    "engineering_design", "collection_archive", "other",
+)
+PROJECT_WORKFLOW_STAGES = ("in_progress", "ready_for_review", "published", "archived")
+PROJECT_VISIBILITIES = ("private", "unlisted", "public")
 
 SUPPORTED_MODEL_EXTENSIONS = {"stl", "glb", "obj", "fbx"}
 COMPANION_FILE_EXTENSIONS = {".mtl", ".png", ".jpg", ".jpeg", ".webp"}
@@ -1110,7 +1120,7 @@ def find_blog_post(slug: str) -> dict | None:
     return _code_blogpost_to_view(code_post) if code_post else None
 
 
-def validate_paper_form(form) -> tuple[dict, list[str]]:
+def validate_project_form(form) -> tuple[dict, list[str]]:
     title = (form.get("title") or "").strip()
     authors = (form.get("authors") or "").strip()
     field = (form.get("field") or "").strip()
@@ -1118,12 +1128,18 @@ def validate_paper_form(form) -> tuple[dict, list[str]]:
     doi = (form.get("doi") or "").strip()
     institution = (form.get("institution") or "").strip()
     pmid = (form.get("pmid") or "").strip()
-    visibility = (form.get("visibility") or "public").strip().lower()
+    visibility = (form.get("visibility") or "private").strip().lower()
+    project_type = (form.get("project_type") or "research_project").strip().lower()
+    workflow_stage = (form.get("workflow_stage") or "in_progress").strip().lower()
     year_raw = (form.get("year") or "").strip()
     errors = []
 
-    if visibility not in {"public", "private"}:
+    if visibility not in PROJECT_VISIBILITIES:
         errors.append("Invalid visibility option.")
+    if project_type not in PROJECT_TYPES:
+        errors.append("Invalid project type.")
+    if workflow_stage not in PROJECT_WORKFLOW_STAGES:
+        errors.append("Invalid project stage.")
 
     if not title:
         errors.append("Title is required.")
@@ -1166,14 +1182,36 @@ def validate_paper_form(form) -> tuple[dict, list[str]]:
             "doi": doi or None,
             "institution": institution or None,
             "pmid": pmid or None,
+            "project_type": project_type,
+            "workflow_stage": workflow_stage,
+            "visibility": visibility,
             "is_public": visibility == "public",
         },
         errors,
     )
 
 
+# Internal compatibility for routes and admin actions that have not yet been
+# renamed. All new user-facing flows call validate_project_form().
+validate_paper_form = validate_project_form
+
+
 def paper_is_deleted(paper: Paper | None) -> bool:
     return not paper or (paper.status or "active").lower() == "deleted"
+
+
+def project_visibility(project: Paper | None) -> str:
+    """Return v26 visibility while honouring pre-v26 ``is_public`` rows."""
+    if not project:
+        return "private"
+    return getattr(project, "visibility", None) or (
+        "public" if getattr(project, "is_public", False) else "private"
+    )
+
+
+def new_project_share_token() -> str:
+    """Opaque, stable identifier for an unlisted reviewer link."""
+    return secrets.token_urlsafe(24)
 
 
 def active_paper_query():
@@ -1592,7 +1630,13 @@ def ensure_paper_qr(paper: Paper) -> str:
     if os.path.exists(full_path):
         return filename
 
-    target_url = public_url("paper_public", slug=paper.slug)
+    if project_visibility(paper) == "unlisted":
+        if not paper.share_token:
+            paper.share_token = secrets.token_urlsafe(24)
+            db.session.commit()
+        target_url = public_url("project_share", share_token=paper.share_token)
+    else:
+        target_url = public_url("paper_public", slug=paper.slug)
     qr = qrcode.QRCode(
         version=1,
         error_correction=qrcode.constants.ERROR_CORRECT_M,
@@ -3501,10 +3545,10 @@ def register_routes(app: Flask) -> None:
         return send_from_directory(app.config["PDF_FOLDER"], pdf_name)
 
     def _paper_visible_to_request(paper: Paper) -> bool:
-        """A paper is visible if it is public, or if the current user is the owner."""
+        """A project is visible if shared publicly/unlisted, or owned by user."""
         if paper_is_deleted(paper):
             return False
-        if paper.is_public:
+        if project_visibility(paper) in {"public", "unlisted"}:
             return True
         return current_user.is_authenticated and current_user.id == paper.user_id
 
@@ -3532,9 +3576,24 @@ def register_routes(app: Flask) -> None:
     @app.route("/p/<slug>")
     def paper_public(slug):
         paper = active_paper_query().filter_by(slug=slug).first_or_404()
+        # Unlisted projects are intentionally not reachable through their
+        # human-readable slug; reviewers receive the opaque /share/ URL.
+        if project_visibility(paper) == "unlisted" and not (
+            current_user.is_authenticated and current_user.id == paper.user_id
+        ):
+            abort(404)
         if not _paper_visible_to_request(paper):
             abort(404)
         return render_template("paper_public.html", paper=paper)
+
+    @app.route("/share/<share_token>")
+    def project_share(share_token):
+        paper = active_paper_query().filter_by(share_token=share_token).first_or_404()
+        if project_visibility(paper) != "unlisted" and not _paper_visible_to_request(paper):
+            abort(404)
+        response = make_response(render_template("paper_public.html", paper=paper, unlisted_share=True))
+        response.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+        return response
 
     @app.route("/p/<slug>/pdf")
     def paper_public_pdf(slug):
@@ -3648,7 +3707,7 @@ def register_routes(app: Flask) -> None:
         elif user_role_filter == "member":
             users_query = users_query.filter(User.is_admin.is_(False))
 
-        # Publications list (admin sees deleted rows too, so it can restore them).
+        # Projects list (admin sees deleted rows too, so it can restore them).
         papers_query = Paper.query.options(selectinload(Paper.author))
         if paper_query_text:
             paper_pattern = f"%{paper_query_text.lower()}%"
@@ -3659,10 +3718,8 @@ def register_routes(app: Flask) -> None:
                     func.lower(User.email).like(paper_pattern),
                 )
             )
-        if paper_visibility_filter == "public":
-            papers_query = papers_query.filter(Paper.is_public.is_(True))
-        elif paper_visibility_filter == "private":
-            papers_query = papers_query.filter(Paper.is_public.is_(False))
+        if paper_visibility_filter in PROJECT_VISIBILITIES:
+            papers_query = papers_query.filter(Paper.visibility == paper_visibility_filter)
         if paper_status_filter == "active":
             papers_query = papers_query.filter(or_(Paper.status.is_(None), Paper.status != "deleted"))
         elif paper_status_filter == "deleted":
@@ -4921,8 +4978,19 @@ def register_routes(app: Flask) -> None:
         paper = db.session.get(Paper, paper_id)
         if not paper:
             abort(404)
-        previous = {"is_public": paper.is_public, "status": paper.status}
-        paper.is_public = request.form.get("is_public") == "1"
+        previous = {"visibility": project_visibility(paper), "status": paper.status}
+        # Accept legacy admin forms while v26 clients submit the explicit
+        # three-state visibility value.
+        visibility = (request.form.get("visibility") or (
+            "public" if request.form.get("is_public") == "1" else "private"
+        )).strip().lower()
+        if visibility not in PROJECT_VISIBILITIES:
+            flash("Invalid visibility value.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="content"))
+        paper.visibility = visibility
+        paper.is_public = visibility == "public"
+        if visibility == "unlisted" and not paper.share_token:
+            paper.share_token = new_project_share_token()
         new_status = (request.form.get("status") or "active").strip().lower()
         if new_status not in {"active", "deleted"}:
             flash("Invalid status value.", "danger")
@@ -4930,6 +4998,7 @@ def register_routes(app: Flask) -> None:
         paper.status = new_status
         if paper.status == "deleted":
             paper.is_public = False
+            paper.visibility = "private"
         try:
             db.session.commit()
         except SQLAlchemyError:
@@ -4940,9 +5009,9 @@ def register_routes(app: Flask) -> None:
             "admin_paper_visibility_changed",
             user_id=current_user.id,
             resource_id=str(paper.id),
-            details={"from": previous, "to": {"is_public": paper.is_public, "status": paper.status}},
+            details={"from": previous, "to": {"visibility": project_visibility(paper), "status": paper.status}},
         )
-        flash(f"Publication updated: {paper.title}.", "success")
+        flash(f"Project updated: {paper.title}.", "success")
         return redirect(url_for("admin_dashboard", admin_page="content"))
 
     @app.route("/admin/papers/<int:paper_id>/restore", methods=["POST"])
@@ -5344,6 +5413,11 @@ def register_routes(app: Flask) -> None:
         else:
             year_value = None
         # slug is intentionally NOT editable (public URL stability).
+        project_type = (request.form.get("project_type") or paper.project_type or "research_project").strip()
+        workflow_stage = (request.form.get("workflow_stage") or paper.workflow_stage or "in_progress").strip()
+        if project_type not in PROJECT_TYPES or workflow_stage not in PROJECT_WORKFLOW_STAGES:
+            flash("Invalid project type or stage.", "danger")
+            return _admin_paper_redirect(next_hint, paper)
         new_values = {
             "title": title[:500],
             "authors": (request.form.get("authors") or "").strip()[:500] or None,
@@ -5352,6 +5426,8 @@ def register_routes(app: Flask) -> None:
             "doi": (request.form.get("doi") or "").strip()[:200] or None,
             "pmid": (request.form.get("pmid") or "").strip()[:100] or None,
             "institution": (request.form.get("institution") or "").strip()[:300] or None,
+            "project_type": project_type,
+            "workflow_stage": workflow_stage,
         }
         changed = {}
         for attr, value in new_values.items():
@@ -6360,7 +6436,8 @@ def register_routes(app: Flask) -> None:
 
         return jsonify({"success": False, "error": "Could not parse query"}), 400
 
-    @app.route("/papers/new", methods=["GET", "POST"])
+    @app.route("/papers/new", methods=["GET", "POST"], endpoint="paper_new")
+    @app.route("/projects/new", methods=["GET", "POST"], endpoint="project_new")
     @login_required
     @limiter.limit(
         upload_rate_limit_value,
@@ -6371,9 +6448,9 @@ def register_routes(app: Flask) -> None:
             and request.files.get("model_file").filename
         ),
     )
-    def paper_new():
+    def project_new():
         if request.method == "POST":
-            paper_data, paper_errors = validate_paper_form(request.form)
+            paper_data, paper_errors = validate_project_form(request.form)
             if paper_errors:
                 flash(" ".join(paper_errors), "danger")
                 return render_template("paper_new.html", form=request.form)
@@ -6389,6 +6466,10 @@ def register_routes(app: Flask) -> None:
                 doi=paper_data["doi"],
                 institution=paper_data["institution"],
                 pmid=paper_data["pmid"],
+                project_type=paper_data["project_type"],
+                workflow_stage=paper_data["workflow_stage"],
+                visibility=paper_data["visibility"],
+                share_token=(new_project_share_token() if paper_data["visibility"] == "unlisted" else None),
                 is_public=paper_data["is_public"],
                 slug=make_slug(paper_data["title"]),
                 user_id=current_user.id,
@@ -6454,14 +6535,15 @@ def register_routes(app: Flask) -> None:
                 category = "success" if ok else "danger"
                 flash(message, category)
             else:
-                flash("Publication created.", "success")
-            return redirect(url_for("paper_detail", slug=paper.slug))
+                flash("Project created.", "success")
+            return redirect(url_for("project_detail", slug=paper.slug))
 
         return render_template("paper_new.html", form={})
 
-    @app.route("/papers/<slug>")
+    @app.route("/papers/<slug>", endpoint="paper_detail")
+    @app.route("/projects/<slug>", endpoint="project_detail")
     @login_required
-    def paper_detail(slug):
+    def project_detail(slug):
         paper = active_paper_query().filter_by(slug=slug).first_or_404()
         if paper.user_id != current_user.id:
             abort(403)
@@ -6483,14 +6565,15 @@ def register_routes(app: Flask) -> None:
             upgraded_active=upgraded_active,
         )
 
-    @app.route("/papers/<slug>/edit", methods=["GET", "POST"])
+    @app.route("/papers/<slug>/edit", methods=["GET", "POST"], endpoint="paper_edit")
+    @app.route("/projects/<slug>/edit", methods=["GET", "POST"], endpoint="project_edit")
     @login_required
     @require_paper_ownership
-    def paper_edit(slug):
+    def project_edit(slug):
         paper = active_paper_query().filter_by(slug=slug).first_or_404()
 
         if request.method == "POST":
-            paper_data, paper_errors = validate_paper_form(request.form)
+            paper_data, paper_errors = validate_project_form(request.form)
             if paper_errors:
                 flash(" ".join(paper_errors), "danger")
                 return render_template("paper_new.html", form=request.form, paper=paper, mode="edit")
@@ -6503,6 +6586,11 @@ def register_routes(app: Flask) -> None:
             paper.doi = paper_data["doi"]
             paper.institution = paper_data["institution"]
             paper.pmid = paper_data["pmid"]
+            paper.project_type = paper_data["project_type"]
+            paper.workflow_stage = paper_data["workflow_stage"]
+            paper.visibility = paper_data["visibility"]
+            if paper.visibility == "unlisted" and not paper.share_token:
+                paper.share_token = new_project_share_token()
             paper.is_public = paper_data["is_public"]
 
             saved_pdf_path = None
@@ -6543,8 +6631,8 @@ def register_routes(app: Flask) -> None:
                 return render_template("paper_new.html", form=request.form, paper=paper, mode="edit")
 
             cleanup_file(old_pdf_path)
-            flash("Publication updated.", "success")
-            return redirect(url_for("paper_detail", slug=paper.slug))
+            flash("Project updated.", "success")
+            return redirect(url_for("project_detail", slug=paper.slug))
 
         form = {
             "title": paper.title or "",
@@ -6555,7 +6643,9 @@ def register_routes(app: Flask) -> None:
             "doi": paper.doi or "",
             "pmid": paper.pmid or "",
             "abstract": paper.abstract or "",
-            "visibility": "public" if paper.is_public else "private",
+            "project_type": paper.project_type or "research_project",
+            "workflow_stage": paper.workflow_stage or "in_progress",
+            "visibility": paper.visibility or ("public" if paper.is_public else "private"),
         }
         return render_template("paper_new.html", form=form, paper=paper, mode="edit")
 

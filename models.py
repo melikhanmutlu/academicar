@@ -28,6 +28,9 @@ class User(UserMixin, db.Model):
     deactivated_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=utc_now)
 
+    # ``papers`` is the historical storage-facing name. New product surfaces
+    # call these records projects; keeping this relationship preserves existing
+    # integrations and makes the v26 schema migration non-destructive.
     papers = db.relationship(
         "Paper",
         backref="author",
@@ -70,6 +73,16 @@ class Paper(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     status = db.Column(db.String(30), nullable=False, default="active")
     is_public = db.Column(db.Boolean, nullable=False, default=False)
+    # v26: a Paper is now the backwards-compatible persistence record for a
+    # Project. Scholarly fields above remain optional reference metadata.
+    project_type = db.Column(db.String(40), nullable=False, default="research_project", index=True)
+    workflow_stage = db.Column(db.String(30), nullable=False, default="in_progress", index=True)
+    # ``is_public`` remains populated for legacy routes and integrations. New
+    # authorization decisions must use this three-level visibility field.
+    # Nullable at the ORM layer so rows created by legacy integrations retain
+    # their ``is_public`` semantics until the migration/backfill has run.
+    visibility = db.Column(db.String(20), nullable=True, index=True)
+    share_token = db.Column(db.String(64), unique=True, nullable=True, index=True)
     pmid = db.Column(db.String(100), nullable=True)
     deleted_at = db.Column(db.DateTime, nullable=True)
     deleted_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
@@ -85,7 +98,17 @@ class Paper(db.Model):
     )
 
     def __repr__(self) -> str:
-        return f"<Paper {self.title[:40]}>"
+        return f"<Project {self.title[:40]}>"
+
+    @property
+    def is_unlisted(self) -> bool:
+        return self.visibility == "unlisted"
+
+
+# Product-facing name. ``Paper`` deliberately remains available as an alias
+# until a later major-version storage migration, so existing jobs, payments,
+# audit records and third-party links continue to work unchanged.
+Project = Paper
 
 
 class Model3D(db.Model):

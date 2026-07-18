@@ -74,7 +74,7 @@
         {% if recent_models %}
           <ul class="inst-activity-list">
             {% for md in recent_models %}
-              {# A funded model is linkable only when its publication is publicly
+              {# A funded model is linkable only when its project is publicly
                  visible (or owned by the viewer) — private uploads stay hidden,
                  respecting the member's choice even inside the admin panel. #}
               {% set _viewable = md.paper and (md.paper.is_public or (current_user.is_authenticated and md.paper.user_id == current_user.id)) %}
@@ -169,7 +169,7 @@
       {% endif %}
     </div>
     <p class="inst-note">
-      Your public page lists {{ institution.name }}'s publicly visible publications with institution-funded models.
+      Your public page lists {{ institution.name }}'s publicly visible projects with institution-funded models.
       The short description below appears under your name there{% if not institution.logo_path %}; ask the AcademicAR team to add your logo{% endif %}.
     </p>
     {% if demo %}

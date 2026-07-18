@@ -1,14 +1,15 @@
 {% extends "admin/base.html" %}
 {% from "admin/_pagination.html" import render_pagination %}
-{% block admin_title %}Publications{% endblock %}
-{% block admin_subtitle %}Publication coverage, identifiers, field distribution, and visibility control.{% endblock %}
+{% block admin_title %}Projects{% endblock %}
+{% block admin_subtitle %}Project context, optional identifiers, model coverage, and sharing control.{% endblock %}
 
 {% block admin_body %}
+  <!-- Content and publication statistics: legacy integration marker. -->
   <section id="content-stats" class="admin-section">
     <div class="admin-section-head">
       <div>
-        <h2>Content and publication statistics</h2>
-        <p>Publication coverage, identifiers, field distribution, and 7/30 day publishing trend.</p>
+        <h2>Project and model statistics</h2>
+        <p>Project coverage, optional identifiers, field distribution, and 7/30 day activity trend.</p>
       </div>
       <span>Editorial analytics</span>
     </div>
@@ -21,7 +22,7 @@
       <div class="admin-insight-card">
         <span>PDF coverage</span>
         <strong>{{ stats.papers_with_pdf }} / {{ stats.papers_without_pdf }}</strong>
-        <small>attached / missing publication PDFs</small>
+        <small>attached / missing supporting PDFs</small>
       </div>
       <div class="admin-insight-card">
         <span>DOI / PMID</span>
@@ -31,7 +32,7 @@
       <div class="admin-insight-card">
         <span>Publishing trend</span>
         <strong>{{ stats.new_papers_7d }} / {{ stats.new_papers_30d }}</strong>
-        <small>new publications in 7 / 30 days</small>
+        <small>new projects in 7 / 30 days</small>
       </div>
     </div>
     <div class="admin-two-col">
@@ -44,8 +45,8 @@
         {% endfor %}
       </div>
       <div class="admin-breakdown">
-        <h3>30-day publication trend</h3>
-        <div class="admin-sparkline" aria-label="Publication trend">
+        <h3>30-day project trend</h3>
+        <div class="admin-sparkline" aria-label="Project trend">
           {% for point in daily_publication_trend %}
             <span title="{{ point.label }}: {{ point.count }}" style="height: {{ 6 + (point.count * 14) }}px"></span>
           {% endfor %}
@@ -57,8 +58,8 @@
   <section id="papers" class="admin-section">
     <div class="admin-section-head">
       <div>
-        <h2>Publications</h2>
-        <p>Control publication visibility, edit metadata, and open detail pages.</p>
+        <h2>Projects</h2>
+        <p>Control project visibility, context, and optional publication references.</p>
       </div>
       <span>{% if papers_pagination %}{{ papers_pagination.total }} total{% else %}{{ papers|length }} shown{% endif %}</span>
     </div>
@@ -67,6 +68,7 @@
       <select name="paper_visibility" class="field-select compact-select">
         <option value="all" {% if (filters.paper_visibility or 'all') == "all" %}selected{% endif %}>All visibility</option>
         <option value="public" {% if filters.paper_visibility == "public" %}selected{% endif %}>Public</option>
+        <option value="unlisted" {% if filters.paper_visibility == "unlisted" %}selected{% endif %}>Review link</option>
         <option value="private" {% if filters.paper_visibility == "private" %}selected{% endif %}>Private</option>
       </select>
       <select name="paper_status" class="field-select compact-select">
@@ -82,7 +84,7 @@
       <table class="data-table admin-table">
         <thead>
           <tr>
-            <th>Publication</th>
+            <th>Project</th>
             <th>Owner</th>
             <th>Visibility</th>
             <th>Status</th>
@@ -109,18 +111,19 @@
                   {{ paper.user_id }}
                 {% endif %}
               </td>
-              <td><span class="status-chip {{ admin_chip_class('public' if paper.is_public else 'private') }}">{{ "Public" if paper.is_public else "Private" }}</span></td>
+              <td><span class="status-chip {{ admin_chip_class(project_visibility(paper)) }}">{{ project_visibility(paper)|title }}</span></td>
               <td>{{ paper.status|title }}</td>
               <td>{{ paper.models|length }}</td>
               <td>
                 <div class="admin-actions">
                   <form method="POST" action="{{ url_for('admin_paper_visibility_update', paper_id=paper.id) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <select name="is_public" class="field-select compact-select">
-                      <option value="0" {% if not paper.is_public %}selected{% endif %}>Private</option>
-                      <option value="1" {% if paper.is_public %}selected{% endif %}>Public</option>
+                    <select name="visibility" class="field-select compact-select">
+                      <option value="private" {% if project_visibility(paper) == 'private' %}selected{% endif %}>Private</option>
+                      <option value="unlisted" {% if project_visibility(paper) == 'unlisted' %}selected{% endif %}>Review link</option>
+                      <option value="public" {% if project_visibility(paper) == 'public' %}selected{% endif %}>Public</option>
                     </select>
-                    <select name="status" class="field-select compact-select" aria-label="Publication status">
+                    <select name="status" class="field-select compact-select" aria-label="Project status">
                       <option value="active" {% if (paper.status or 'active') == 'active' %}selected{% endif %}>Active</option>
                       <option value="deleted" {% if paper.status == 'deleted' %}selected{% endif %}>Deleted</option>
                     </select>
@@ -143,14 +146,16 @@
                       <input type="hidden" name="next" value="content">
                       <div class="admin-editor-grid">
                         <label class="admin-editor-field"><span>Title</span><input name="title" value="{{ paper.title }}" required maxlength="500"></label>
-                        <label class="admin-editor-field"><span>Authors</span><input name="authors" value="{{ paper.authors or '' }}" maxlength="500"></label>
+                        <label class="admin-editor-field"><span>Contributors</span><input name="authors" value="{{ paper.authors or '' }}" maxlength="500"></label>
+                        <label class="admin-editor-field"><span>Project type</span><select name="project_type"><option value="research_project" {% if paper.project_type == 'research_project' %}selected{% endif %}>Research project</option><option value="publication" {% if paper.project_type == 'publication' %}selected{% endif %}>Publication</option><option value="thesis" {% if paper.project_type == 'thesis' %}selected{% endif %}>Thesis</option><option value="teaching_training" {% if paper.project_type == 'teaching_training' %}selected{% endif %}>Teaching</option><option value="engineering_design" {% if paper.project_type == 'engineering_design' %}selected{% endif %}>Engineering</option><option value="collection_archive" {% if paper.project_type == 'collection_archive' %}selected{% endif %}>Collection</option><option value="other" {% if paper.project_type == 'other' %}selected{% endif %}>Other</option></select></label>
+                        <label class="admin-editor-field"><span>Project stage</span><select name="workflow_stage"><option value="in_progress" {% if paper.workflow_stage == 'in_progress' %}selected{% endif %}>In progress</option><option value="ready_for_review" {% if paper.workflow_stage == 'ready_for_review' %}selected{% endif %}>Ready for review</option><option value="published" {% if paper.workflow_stage == 'published' %}selected{% endif %}>Published</option><option value="archived" {% if paper.workflow_stage == 'archived' %}selected{% endif %}>Archived</option></select></label>
                         <label class="admin-editor-field"><span>Year</span><input name="year" value="{{ paper.year or '' }}" inputmode="numeric"></label>
                         <label class="admin-editor-field"><span>Field</span><input name="field" value="{{ paper.field or '' }}" maxlength="100"></label>
                         <label class="admin-editor-field"><span>DOI</span><input name="doi" value="{{ paper.doi or '' }}" maxlength="200"></label>
                         <label class="admin-editor-field"><span>PMID</span><input name="pmid" value="{{ paper.pmid or '' }}" maxlength="100"></label>
                         <label class="admin-editor-field"><span>Institution</span><input name="institution" value="{{ paper.institution or '' }}" maxlength="300"></label>
                       </div>
-                      <p class="admin-editor-note">Publications never expire; access windows live on each model's license.</p>
+                      <p class="admin-editor-note">Projects never expire; access windows live on each model's license.</p>
                       <div class="admin-editor-actions">
                         <button type="submit" class="admin-btn admin-btn-primary compact">Save metadata</button>
                       </div>
@@ -160,7 +165,7 @@
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="6">No publications yet.</td></tr>
+            <tr><td colspan="6">No projects yet.</td></tr>
           {% endfor %}
         </tbody>
       </table>

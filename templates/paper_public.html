@@ -1,14 +1,15 @@
 {% extends "base.html" %}
 {% block title %}{{ paper.title }} - AcademicAR{% endblock %}
-{% block meta_description %}{{ (paper.abstract or 'Academic publication with interactive 3D models.')|striptags|truncate(160) }}{% endblock %}
+{% block meta_description %}{{ (paper.abstract or 'Interactive 3D project with browser and AR-ready models.')|striptags|truncate(160) }}{% endblock %}
 {% block head %}
-<meta property="og:type" content="article">
+<meta property="og:type" content="website">
 <meta property="og:title" content="{{ paper.title|striptags|truncate(120) }}">
-<meta property="og:description" content="{{ (paper.abstract or 'Academic publication with interactive 3D models.')|striptags|truncate(200) }}">
+<meta property="og:description" content="{{ (paper.abstract or 'Interactive 3D project with browser and AR-ready models.')|striptags|truncate(200) }}">
 <meta property="og:image" content="{{ url_for('static', filename='images/clinical-spatial-hero.png', _external=True) }}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{{ paper.title|striptags|truncate(120) }}">
-<meta name="twitter:description" content="{{ (paper.abstract or 'Academic publication with interactive 3D models.')|striptags|truncate(200) }}">
+<meta name="twitter:description" content="{{ (paper.abstract or 'Interactive 3D project with browser and AR-ready models.')|striptags|truncate(200) }}">
+{% if unlisted_share|default(false) %}<meta name="robots" content="noindex,nofollow,noarchive">{% endif %}
 <meta name="twitter:image" content="{{ url_for('static', filename='images/clinical-spatial-hero.png', _external=True) }}">
 <script type="module" src="https://unpkg.com/@google/model-viewer@4.3.0/dist/model-viewer.min.js" crossorigin="anonymous"></script>
 {% endblock %}
@@ -18,22 +19,23 @@
   <section class="grid lg:grid-cols-[minmax(0,1fr)_360px] gap-5 mb-8">
     <div class="surface paper-hero rounded-xl p-6 sm:p-7 reveal-up">
       <div class="flex flex-wrap gap-2 mb-4">
-        {% if paper.field %}<span class="detail-chip dark">{{ paper.field }}</span>{% endif %}
+        <span class="detail-chip dark">{{ (paper.project_type or 'research_project')|replace('_', ' ')|title }}</span>
+        {% if paper.field %}<span class="detail-chip">{{ paper.field }}</span>{% endif %}
         {% if paper.year %}<span class="detail-chip">{{ paper.year }}</span>{% endif %}
       </div>
 
       <h1 class="paper-title font-serif text-3xl lg:text-4xl font-bold leading-tight text-[#111827]">{{ paper.title }}</h1>
 
       <div class="paper-meta mt-5">
-        {% if paper.authors %}<div><span>Authors</span><strong>{{ paper.authors }}</strong></div>{% endif %}
-        {% if paper.institution %}<div><span>Institution</span><strong>{{ paper.institution }}</strong></div>{% endif %}
+        {% if paper.authors %}<div><span>Contributors</span><strong>{{ paper.authors }}</strong></div>{% endif %}
+        {% if paper.institution %}<div><span>Organization</span><strong>{{ paper.institution }}</strong></div>{% endif %}
         {% if paper.doi %}<div><span>DOI</span><strong><a href="https://doi.org/{{ paper.doi }}" target="_blank" rel="noopener noreferrer">{{ paper.doi }}</a></strong></div>{% endif %}
         {% if paper.pmid %}<div><span>PMID</span><strong>{{ paper.pmid }}</strong></div>{% endif %}
       </div>
 
       {% if paper.abstract %}
         <div class="abstract-block mt-5 pt-5 border-t border-[#141821]/10" data-collapsible-abstract>
-          <h3 class="font-semibold text-[#111827] mb-2">Description / Abstract</h3>
+          <h3 class="font-semibold text-[#111827] mb-2">Project description</h3>
           <p class="abstract-copy text-[#5c6473] leading-relaxed text-sm">{{ paper.abstract }}</p>
           <button type="button" class="abstract-toggle" data-abstract-toggle>Read more</button>
         </div>
@@ -41,7 +43,7 @@
     </div>
 
     <aside class="share-panel surface rounded-xl p-5 reveal-up delay-1">
-      <p class="text-xs uppercase tracking-[0.12em] text-[#9ca3af] font-bold">Paper Information</p>
+      <p class="text-xs uppercase tracking-[0.12em] text-[#9ca3af] font-bold">Project information</p>
       <h2 class="font-serif text-2xl font-semibold text-[#111827] mt-2">{{ paper.models|length }} model{{ '' if paper.models|length == 1 else 's' }} available</h2>
 
       <div class="mt-5 flex gap-4 share-identity">
@@ -50,13 +52,13 @@
         </div>
         <div class="min-w-0 flex-1">
           <p class="text-sm font-semibold text-[#111827]">Scan to revisit</p>
-          <p class="text-xs text-[#64748b] mt-1">Opens this paper page on any device.</p>
+          <p class="text-xs text-[#64748b] mt-1">Opens this project on any device.</p>
         </div>
       </div>
 
       <div class="share-actions mt-5">
         {% if paper.pdf_path %}
-          <a href="{{ url_for('paper_public_pdf', slug=paper.slug) }}" class="btn-primary compact">View the paper</a>
+          <a href="{{ url_for('paper_public_pdf', slug=paper.slug) }}" class="btn-primary compact">View document</a>
         {% else %}
           <span class="btn-secondary compact opacity-60 cursor-not-allowed" aria-disabled="true">PDF not available</span>
         {% endif %}
@@ -125,7 +127,7 @@
     {% else %}
       <div class="surface rounded-xl border border-dashed border-[#111827]/20 p-12 text-center reveal-up">
         <h3 class="font-serif text-2xl font-semibold text-[#111827]">No models available yet.</h3>
-        <p class="text-[#5c6473] mt-2">The authors have not published 3D models for this paper.</p>
+        <p class="text-[#5c6473] mt-2">No 3D models have been shared for this project yet.</p>
       </div>
     {% endif %}
   </section>

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ institution.name }} - 3D/AR publications - AcademicAR{% endblock %}
+{% block title %}{{ institution.name }} - 3D/AR projects - AcademicAR{% endblock %}
 {% block meta_description %}Interactive 3D and AR research models published by {{ institution.name }} members on AcademicAR.{% endblock %}
 
 {% block content %}
@@ -33,7 +33,7 @@
   <div class="dashboard-metrics reveal-up">
     <div class="metric-card">
       <div class="metric-card-head">
-        <span class="metric-label" data-mobile-label="Publications">Public publications</span>
+        <span class="metric-label" data-mobile-label="Projects">Public projects</span>
         <strong class="metric-value-compact">{{ papers|length }}</strong>
       </div>
     </div>
@@ -75,8 +75,8 @@
     </div>
   {% else %}
     <section class="surface reveal-up inst-section">
-      <h2>No public publications yet</h2>
-      <p class="inst-note">Publications appear here once {{ institution.name }} members publish them publicly with institution-funded 3D models.</p>
+      <h2>No public projects yet</h2>
+      <p class="inst-note">Projects appear here once {{ institution.name }} members share them publicly with institution-funded 3D models.</p>
     </section>
   {% endif %}
 
