@@ -13,7 +13,7 @@ import uuid
 import zipfile
 from datetime import UTC, datetime, timedelta
 
-from flask import Flask, Response, abort, current_app, flash, jsonify, make_response, redirect, render_template, request, send_from_directory, session, url_for
+from flask import Flask, Response, abort, current_app, flash, g, jsonify, make_response, redirect, render_template, request, send_from_directory, session, url_for
 from flask_limiter.errors import RateLimitExceeded
 from flask_login import LoginManager, current_user, login_required
 from flask_migrate import Migrate
@@ -71,7 +71,7 @@ from institutions import (
     reapply_model_license,
     renew_institution_contract,
 )
-from models import AuditLog, BlogPost, ConversionJob, Institution, InstitutionInvite, InstitutionMember, LicensePlanConfig, Model3D, ModelAnnotation, ModelVersion, Paper, Payment, QRLink, User, db
+from models import AnalyticsEvent, AuditLog, BlogPost, ConversionJob, Institution, InstitutionInvite, InstitutionMember, LicensePlanConfig, Model3D, ModelAnnotation, ModelVersion, Paper, Payment, QRLink, User, db
 from services.r2_mirror import mirror_file, mirror_directory, mirror_directory_sync, mirror_delete, ensure_local
 from payments import (
     PAID_PLAN_KEYS,
@@ -81,6 +81,7 @@ from payments import (
     plan_amount_minor_units,
 )
 from url_helpers import public_url
+from analytics import ALLOWED_BROWSER_EVENTS, analytics_snapshot, apply_analytics_cookie, track_event
 from utils.security import require_model_ownership, require_paper_ownership
 from services.storage_service import StorageError, safe_move_file, safe_save_file, save_companion_files
 
@@ -230,7 +231,7 @@ def create_app(test_config: dict | None = None) -> Flask:
                 ancestors = (app.config.get("EMBED_FRAME_ANCESTORS") or "*").strip()
                 policy = policy.replace("frame-ancestors 'none'", f"frame-ancestors {ancestors}")
             response.headers.setdefault(header_name, policy)
-        return response
+        return apply_analytics_cookie(response)
 
     register_error_handlers(app)
     register_routes(app)
@@ -1737,6 +1738,13 @@ def mark_model_failed(
         version.error = truncated
     try:
         db.session.commit()
+        track_event(
+            "model_conversion_failed",
+            owner_user_id=model.user_id,
+            project_id=model.paper_id,
+            model_id=model.id,
+            properties={"replacement": is_replacement},
+        )
     except SQLAlchemyError:
         db.session.rollback()
 
@@ -2022,6 +2030,13 @@ def process_model_upload_job(
                 )
             )
             db.session.commit()
+            track_event(
+                "model_conversion_completed",
+                owner_user_id=model.user_id,
+                project_id=model.paper_id,
+                model_id=model.id,
+                properties={"source_format": source_format, "replacement": is_replacement},
+            )
             # Mirror synchronously in the worker: the previous fire-and-forget
             # daemon threads could be killed when the worker exits/redeploys,
             # leaving a model marked "ready" whose files never reached R2 (then
@@ -2415,6 +2430,13 @@ def _create_model_for_paper(
         user_id=paper.user_id,
         resource_id=unique_id,
         details=audit_details or None,
+    )
+    track_event(
+        "model_uploaded",
+        owner_user_id=paper.user_id,
+        project_id=paper.id,
+        model_id=model.id,
+        properties={"source_format": source_format},
     )
     message = "Model upload accepted. Processing has started in the background."
     if funding_institution is not None:
@@ -3399,6 +3421,7 @@ def register_routes(app: Flask) -> None:
             abort(404)
         if not _paper_visible_to_request(model.paper):
             abort(404)
+        track_event("qr_scanned", owner_user_id=model.user_id, project_id=model.paper_id, model_id=model.id)
         status = model_access_status(model)
         is_owner = current_user.is_authenticated and current_user.id == model.user_id
         if status != "active":
@@ -3425,6 +3448,7 @@ def register_routes(app: Flask) -> None:
             details={"paper_id": model.paper_id, "public_id": model.public_id},
         )
         annotations = ModelAnnotation.query.filter_by(model_id=model.id).order_by(ModelAnnotation.order_index).all()
+        track_event("model_viewed", owner_user_id=model.user_id, project_id=model.paper_id, model_id=model.id)
         scale_ref = human_scale_reference(format_model_dimensions_cm(model))
         return render_template(
             "viewer.html", model=model, paper=model.paper, has_usdz=has_usdz,
@@ -3473,6 +3497,21 @@ def register_routes(app: Flask) -> None:
                 410,
             )
         return redirect(url_for("view_model", model_id=model.id))
+
+    @app.route("/analytics/event", methods=["POST"])
+    @csrf.exempt
+    def analytics_browser_event():
+        """Accept a very small allowlist of anonymous viewer interactions."""
+        payload = request.get_json(silent=True) or {}
+        event_name = (payload.get("event") or "").strip()
+        model_id = (payload.get("model_id") or "").strip()
+        if event_name not in ALLOWED_BROWSER_EVENTS or not is_uuid(model_id):
+            return jsonify({"ok": False}), 400
+        model = db.session.get(Model3D, model_id)
+        if not model or not _paper_visible_to_request(model.paper):
+            return jsonify({"ok": False}), 404
+        track_event(event_name, owner_user_id=model.user_id, project_id=model.paper_id, model_id=model.id)
+        return jsonify({"ok": True}), 202
 
     @app.route("/files/<unique_id>/<path:filename>")
     def serve_glb(unique_id, filename):
@@ -3602,6 +3641,7 @@ def register_routes(app: Flask) -> None:
             abort(404)
         if not _paper_visible_to_request(paper):
             abort(404)
+        track_event("project_viewed", owner_user_id=paper.user_id, project_id=paper.id)
         return render_template("paper_public.html", paper=paper)
 
     @app.route("/share/<share_token>")
@@ -3609,9 +3649,10 @@ def register_routes(app: Flask) -> None:
         paper = active_paper_query().filter_by(share_token=share_token).first_or_404()
         if project_visibility(paper) != "unlisted" and not _paper_visible_to_request(paper):
             abort(404)
+        track_event("review_link_opened", owner_user_id=paper.user_id, project_id=paper.id)
         response = make_response(render_template("paper_public.html", paper=paper, unlisted_share=True))
         response.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
-        return response
+        return apply_analytics_cookie(response)
 
     @app.route("/p/<slug>/pdf")
     def paper_public_pdf(slug):
@@ -3679,8 +3720,14 @@ def register_routes(app: Flask) -> None:
             "dashboard.html",
             papers=papers,
             latest_models=latest_models,
+            analytics=analytics_snapshot(current_user.id),
             institution_membership=get_active_membership(current_user.id),
         )
+
+    @app.route("/insights")
+    @login_required
+    def insights():
+        return render_template("insights.html", analytics=analytics_snapshot(current_user.id))
 
     @app.route("/admin", defaults={"admin_page": "overview"})
     @app.route("/admin/<admin_page>")
@@ -3704,6 +3751,7 @@ def register_routes(app: Flask) -> None:
             "backups",
             "blog",
             "institutions",
+            "analytics",
         }
         if admin_page not in admin_pages:
             abort(404)
@@ -4206,6 +4254,7 @@ def register_routes(app: Flask) -> None:
                     row[0]: {"models": int(row[1] or 0), "bytes": int(row[2] or 0)} for row in usage_rows
                 }
         system_health = _admin_system_health() if admin_page == "system" else {}
+        analytics = analytics_snapshot(days=30) if admin_page == "analytics" else None
         pricing_rows = []
         if admin_page == "pricing":
             # Self-heal on every visit — same precedent as
@@ -4265,6 +4314,7 @@ def register_routes(app: Flask) -> None:
             institution_member_counts=institution_member_counts,
             institution_usage_map=institution_usage_map,
             active_page=admin_page,
+            analytics=analytics,
             filters={
                 "user_q": user_query_text,
                 "user_role": user_role_filter,
@@ -4377,6 +4427,26 @@ def register_routes(app: Flask) -> None:
             "payments.csv",
         )
 
+    @app.route("/admin/analytics/export.csv")
+    @login_required
+    def admin_analytics_export():
+        require_admin()
+        snapshot = analytics_snapshot(days=30)
+        rows = [{
+            "period_days": snapshot["days"],
+            "model_views": snapshot["views"],
+            "unique_visitors": snapshot["unique_visitors"],
+            "qr_scans": snapshot["qr_scans"],
+            "review_visits": snapshot["review_visits"],
+            "ar_starts": snapshot["ar_starts"],
+            "projects_created": snapshot["projects_created"],
+            "models_uploaded": snapshot["models_uploaded"],
+            "active_creators": snapshot["active_creators"],
+            "conversions_completed": snapshot["conversion_completed"],
+            "conversions_failed": snapshot["conversion_failed"],
+        }]
+        return _csv_response(rows, list(rows[0]), "analytics_30_day_summary.csv")
+
     @app.route("/admin/logs/export.csv")
     @login_required
     def admin_logs_export():
@@ -4446,6 +4516,11 @@ def register_routes(app: Flask) -> None:
         if not user:
             abort(404)
         papers = active_paper_query().filter_by(user_id=user.id).order_by(Paper.created_at.desc()).all()
+        latest_models = (
+            Model3D.query.join(Paper).options(selectinload(Model3D.paper))
+            .filter(Model3D.user_id == user.id, Paper.deleted_at.is_(None))
+            .order_by(Model3D.created_at.desc()).limit(6).all()
+        )
         log_audit("admin_user_dashboard_viewed", user_id=current_user.id, resource_id=str(user.id))
         return render_template(
             "dashboard.html",
@@ -6561,6 +6636,7 @@ def register_routes(app: Flask) -> None:
             # MVP §11 / §8: optional first model upload during paper creation.
             # The model upload must NOT roll back the paper on failure — the
             # user can retry from the paper detail page.
+            track_event("project_created", owner_user_id=current_user.id, project_id=paper.id)
             first_model_file = request.files.get("model_file") or request.files.get("model")
             if first_model_file and first_model_file.filename:
                 ok, message = _create_model_for_paper(
@@ -6664,6 +6740,7 @@ def register_routes(app: Flask) -> None:
             try:
                 db.session.commit()
                 log_audit("paper_updated", user_id=current_user.id, resource_id=str(paper.id))
+                track_event("project_updated", owner_user_id=current_user.id, project_id=paper.id)
             except SQLAlchemyError:
                 db.session.rollback()
                 cleanup_file(saved_pdf_path)

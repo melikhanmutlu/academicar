@@ -38,6 +38,15 @@
   </div>
 
   {% if papers %}
+    {% if not (admin_view is defined and admin_view) %}
+      <section class="project-create-strip surface reveal-up">
+        <div>
+          <h2>Start a new project</h2>
+          <p>Add the project context first, then attach your 3D models when they are ready.</p>
+        </div>
+        <a href="{{ url_for('auth.register') if demo else url_for('project_new') }}" class="btn-primary">+ New project</a>
+      </section>
+    {% endif %}
     <div class="dashboard-list-header reveal-up">
       <div>
         <h2>Projects</h2>

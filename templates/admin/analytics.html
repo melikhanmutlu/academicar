@@ -1,0 +1,33 @@
+{% extends "admin/base.html" %}
+{% block admin_title %}Product analytics{% endblock %}
+{% block admin_subtitle %}Privacy-minimised engagement signals for product decisions and investor reporting.{% endblock %}
+{% block admin_actions %}<a href="{{ url_for('admin_analytics_export') }}" class="admin-btn admin-btn-secondary compact">Export 30-day CSV</a>{% endblock %}
+{% block admin_body %}
+  <section class="admin-metrics">
+    <div class="admin-metric"><span>Model views</span><strong>{{ analytics.views }}</strong><small>last {{ analytics.days }} days</small></div>
+    <div class="admin-metric"><span>Unique visitors</span><strong>{{ analytics.unique_visitors }}</strong><small>pseudonymous first-party visitors</small></div>
+    <div class="admin-metric"><span>QR scans</span><strong>{{ analytics.qr_scans }}</strong><small>resolver activity</small></div>
+    <div class="admin-metric"><span>AR starts</span><strong>{{ analytics.ar_starts }}</strong><small>viewer engagement</small></div>
+    <div class="admin-metric"><span>New projects</span><strong>{{ analytics.projects_created }}</strong><small>created in {{ analytics.days }} days</small></div>
+    <div class="admin-metric"><span>New models</span><strong>{{ analytics.models_uploaded }}</strong><small>{{ analytics.active_creators }} active creators</small></div>
+    <div class="admin-metric"><span>Conversion health</span><strong>{{ analytics.conversion_completed }}</strong><small>{{ analytics.conversion_failed }} failed</small></div>
+  </section>
+  <section class="admin-section">
+    <div class="admin-section-head"><div><h2>Most viewed models</h2><p>Use these signals to identify strong content and institutional traction.</p></div></div>
+    {% if analytics.top_models %}
+      <div class="admin-data-list">
+        {% for item in analytics.top_models %}
+          <div><span>{{ item.model.display_name or item.model.original_filename if item.model else 'Removed model' }}</span><strong>{{ item.count }} views</strong></div>
+        {% endfor %}
+      </div>
+    {% else %}<p class="admin-empty">No product analytics events have been collected yet.</p>{% endif %}
+  </section>
+  <section class="admin-breakdown-grid">
+    {% for title, rows in [('Devices', analytics.devices), ('Countries', analytics.countries), ('Traffic sources', analytics.sources)] %}
+      <div class="admin-section">
+        <div class="admin-section-head"><div><h2>{{ title }}</h2></div></div>
+        {% if rows %}<div class="admin-data-list">{% for row in rows %}<div><span>{{ row.label }}</span><strong>{{ row.count }}</strong></div>{% endfor %}</div>{% else %}<p class="admin-empty">No data yet.</p>{% endif %}
+      </div>
+    {% endfor %}
+  </section>
+{% endblock %}

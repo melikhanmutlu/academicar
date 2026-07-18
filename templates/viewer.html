@@ -1374,6 +1374,14 @@
     // device (Scene Viewer missing/erroring, Quick Look refused), fall back to
     // the QR so the visitor still has a path onto an AR-capable phone.
     viewer.addEventListener('ar-status', (event) => {
+      if (event.detail && event.detail.status === 'session-started') {
+        fetch('/analytics/event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event: 'viewer_ar_started', model_id: {{ model.id|tojson }} }),
+          keepalive: true,
+        }).catch(() => {});
+      }
       if (event.detail && event.detail.status === 'failed') showQrFallback();
     });
 

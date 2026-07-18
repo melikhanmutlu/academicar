@@ -340,6 +340,33 @@ class AuditLog(db.Model):
         return f"<AuditLog {self.event_type} @ {self.timestamp}>"
 
 
+class AnalyticsEvent(db.Model):
+    """Privacy-minimised product analytics event.
+
+    ``owner_user_id`` identifies the content owner, while ``actor_user_id`` is
+    set only for an authenticated actor. Visitors are represented by a random,
+    first-party pseudonymous id â€” never a stored raw IP address.
+    """
+    __tablename__ = "analytics_events"
+
+    id = db.Column(db.Integer, primary_key=True)
+    event_name = db.Column(db.String(64), nullable=False, index=True)
+    owner_user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    actor_user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    project_id = db.Column(db.Integer, db.ForeignKey("papers.id", ondelete="SET NULL"), nullable=True, index=True)
+    model_id = db.Column(db.String(36), db.ForeignKey("models.id", ondelete="SET NULL"), nullable=True, index=True)
+    visitor_hash = db.Column(db.String(64), nullable=True, index=True)
+    session_hash = db.Column(db.String(64), nullable=True, index=True)
+    country_code = db.Column(db.String(2), nullable=True, index=True)
+    device_type = db.Column(db.String(16), nullable=True)
+    referrer_domain = db.Column(db.String(255), nullable=True)
+    utm_source = db.Column(db.String(120), nullable=True)
+    utm_medium = db.Column(db.String(120), nullable=True)
+    utm_campaign = db.Column(db.String(120), nullable=True)
+    properties = db.Column(db.JSON, nullable=True)
+    occurred_at = db.Column(db.DateTime, default=utc_now, nullable=False, index=True)
+
+
 class BlogPost(db.Model):
     """Admin-authored blog post (Markdown body), managed from the admin panel.
 

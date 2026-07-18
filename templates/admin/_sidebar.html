@@ -108,6 +108,14 @@
         </span>
       </a>
     </li>
+    <li>
+      <a href="{{ url_for('admin_dashboard', admin_page='analytics') }}" class="{% if active_page == 'analytics' %}is-active{% endif %}" {% if active_page == 'analytics' %}aria-current="page"{% endif %}>
+        <span class="admin-sidenav-label">
+          <svg class="admin-sidenav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/><path d="m4 7 6-3 6 5 4-3"/></svg>
+          Analytics
+        </span>
+      </a>
+    </li>
 
     <li class="admin-sidenav-group">System</li>
     <li>

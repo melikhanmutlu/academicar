@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Insights - AcademicAR{% endblock %}
+{% block content %}
+<main class="app-shell py-8 insights-page">
+  <header class="dashboard-header">
+    <div>
+      <h1>Insights</h1>
+      <p>How visitors engage with your projects and 3D models in the last {{ analytics.days }} days.</p>
+    </div>
+  </header>
+
+  <section class="insights-metrics">
+    <div><span>Model views</span><strong>{{ analytics.views }}</strong></div>
+    <div><span>Unique visitors</span><strong>{{ analytics.unique_visitors }}</strong></div>
+    <div><span>QR scans</span><strong>{{ analytics.qr_scans }}</strong></div>
+    <div><span>AR starts</span><strong>{{ analytics.ar_starts }}</strong></div>
+    <div><span>Review visits</span><strong>{{ analytics.review_visits }}</strong></div>
+    <div><span>Link copies</span><strong>{{ analytics.shares }}</strong></div>
+  </section>
+
+  <section class="insights-section surface">
+    <div class="insights-section-head"><h2>Viewer activity</h2><span>Last {{ analytics.days }} days</span></div>
+    <div class="insights-trend" aria-label="Daily model views">
+      {% set max_views = analytics.trend|map(attribute='views')|max if analytics.trend else 0 %}
+      {% for point in analytics.trend %}
+        <div class="insights-bar-wrap" title="{{ point.label }}: {{ point.views }} views">
+          <i style="height: {{ ((point.views / max_views) * 100) if max_views else 0 }}%"></i>
+          {% if loop.index0 % 5 == 0 %}<small>{{ point.label }}</small>{% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="insights-section surface">
+    <div class="insights-section-head"><h2>Top models</h2><span>By views</span></div>
+    {% if analytics.top_models %}
+      <div class="insights-list">
+        {% for item in analytics.top_models %}
+          <div>
+            <span>{{ item.model.display_name or item.model.original_filename if item.model else 'Removed model' }}</span>
+            <strong>{{ item.count }} views</strong>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="insights-empty">Viewer activity will appear here after your models are visited.</p>
+    {% endif %}
+  </section>
+
+  <section class="insights-breakdowns">
+    {% for title, rows in [('Devices', analytics.devices), ('Countries', analytics.countries), ('Traffic sources', analytics.sources)] %}
+      <div class="insights-section surface">
+        <div class="insights-section-head"><h2>{{ title }}</h2></div>
+        {% if rows %}
+          <div class="insights-list">{% for row in rows %}<div><span>{{ row.label }}</span><strong>{{ row.count }}</strong></div>{% endfor %}</div>
+        {% else %}<p class="insights-empty">No data yet.</p>{% endif %}
+      </div>
+    {% endfor %}
+  </section>
+</main>
+{% endblock %}
