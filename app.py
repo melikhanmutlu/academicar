@@ -2567,14 +2567,26 @@ def register_routes(app: Flask) -> None:
         now = datetime.now(UTC)
 
         def _paper(title, authors, institution, field, year, doi, pmid, is_public, has_pdf, model_count, age_days):
-            return types.SimpleNamespace(
+            paper = types.SimpleNamespace(
                 title=title, authors=authors, institution=institution, field=field,
                 year=year, doi=doi, pmid=pmid, is_public=is_public,
                 pdf_path=("demo.pdf" if has_pdf else None),
                 slug="demo-publication",
                 created_at=now - timedelta(days=age_days),
-                models=[None] * model_count,
+                models=[],
             )
+            paper.models = [
+                types.SimpleNamespace(
+                    id=f"demo-model-{age_days}-{index}",
+                    display_name=f"{title.split()[0]} model {index + 1}",
+                    original_filename=None,
+                    poster_path=None,
+                    created_at=now - timedelta(days=age_days, minutes=index),
+                    paper=paper,
+                )
+                for index in range(model_count)
+            ]
+            return paper
 
         demo_papers = [
             _paper("Cellular Organelle Morphology in Human Hepatocytes",
@@ -2590,9 +2602,15 @@ def register_routes(app: Flask) -> None:
                    "Dr. Laura Weber", "Charité — Department of Dentistry",
                    "Dentistry", 2024, "10.1234/dent.2024.0077", None, True, False, 3, 41),
         ]
+        demo_models = sorted(
+            (model for paper in demo_papers for model in paper.models),
+            key=lambda model: model.created_at,
+            reverse=True,
+        )
         return render_template(
             "dashboard.html",
             papers=demo_papers,
+            latest_models=demo_models[:6],
             institution_membership=None,
             demo_mode=True,
             demo_cross_url=url_for("demo_institution"),
@@ -3645,9 +3663,22 @@ def register_routes(app: Flask) -> None:
             .order_by(Paper.created_at.desc())
             .all()
         )
+        latest_models = (
+            Model3D.query
+            .join(Paper)
+            .options(selectinload(Model3D.paper))
+            .filter(
+                Model3D.user_id == current_user.id,
+                Paper.deleted_at.is_(None),
+            )
+            .order_by(Model3D.created_at.desc())
+            .limit(6)
+            .all()
+        )
         return render_template(
             "dashboard.html",
             papers=papers,
+            latest_models=latest_models,
             institution_membership=get_active_membership(current_user.id),
         )
 
@@ -4382,6 +4413,15 @@ def register_routes(app: Flask) -> None:
         if not user:
             abort(404)
         papers = active_paper_query().filter_by(user_id=user.id).order_by(Paper.created_at.desc()).all()
+        latest_models = (
+            Model3D.query
+            .join(Paper)
+            .options(selectinload(Model3D.paper))
+            .filter(Model3D.user_id == user.id, Paper.deleted_at.is_(None))
+            .order_by(Model3D.created_at.desc())
+            .limit(6)
+            .all()
+        )
         models = Model3D.query.filter_by(user_id=user.id).order_by(Model3D.created_at.desc()).all()
         payments = Payment.query.filter_by(user_id=user.id).order_by(Payment.created_at.desc()).all()
         audit_events = AuditLog.query.filter_by(user_id=user.id).order_by(AuditLog.timestamp.desc()).limit(50).all()
@@ -4410,6 +4450,7 @@ def register_routes(app: Flask) -> None:
         return render_template(
             "dashboard.html",
             papers=papers,
+            latest_models=latest_models,
             admin_view=True,
             viewed_user=user,
         )
