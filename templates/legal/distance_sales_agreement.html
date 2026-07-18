@@ -11,7 +11,10 @@
       <h2 class="text-2xl font-bold text-[#111827] mb-4">1. Parties</h2>
       <p>This Distance Sales Agreement ("Agreement") is made between:</p>
       <ul class="list-disc pl-6 space-y-2">
-        <li><strong>Provider ("AcademicAR," "we," "us," "our"):</strong> the operator of the AcademicAR platform at {{ config.SITE_URL }}, contactable at <a href="mailto:{{ config.COMPANY_EMAIL }}" class="underline">{{ config.COMPANY_EMAIL }}</a>.</li>
+        <li><strong>Provider ("AcademicAR," "we," "us," "our"):</strong> the operator of the AcademicAR platform at {{ config.SITE_URL }}.
+          {% if config.COMPANY_ADDRESS %}Address: {{ config.COMPANY_ADDRESS }}.{% endif %}
+          {% if config.COMPANY_PHONE %}Phone: {{ config.COMPANY_PHONE }}.{% endif %}
+          Email: <a href="mailto:{{ config.COMPANY_EMAIL }}" class="underline">{{ config.COMPANY_EMAIL }}</a>.</li>
         <li><strong>Customer ("you," "Buyer"):</strong> the individual completing a paid checkout on AcademicAR.</li>
       </ul>
       <p>By completing a paid checkout, the Customer accepts this Agreement.</p>

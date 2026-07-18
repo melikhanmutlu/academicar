@@ -219,8 +219,16 @@ class Config:
     # CONTACT_ENABLED=1 to re-expose the /contact route, its links, and sitemap entry.
     CONTACT_ENABLED = os.environ.get("CONTACT_ENABLED", "0").lower() in {"1", "true", "yes", "on"}
 
-    # Public support/billing email shown on the Contact page and legal pages.
+    # Public seller contact details shown on the Contact page and the legal
+    # agreements. Required by PayTR (a gateway, not a Merchant of Record) and by
+    # Turkish distance-selling rules before live mode. Env-overridable; each
+    # renders only when non-empty so the page degrades gracefully if cleared.
     COMPANY_EMAIL = os.environ.get("COMPANY_EMAIL", "info.yolmed@gmail.com")
+    COMPANY_ADDRESS = os.environ.get(
+        "COMPANY_ADDRESS",
+        "Hacılar Meydanı Mah. Şehit Mustafa Rençber Sok. 24/2/4 Merkez/Amasya",
+    )
+    COMPANY_PHONE = os.environ.get("COMPANY_PHONE", "+90 539 326 21 45")
 
     # SEC-5: transactional email (e.g. email-change confirmation). If
     # MAIL_SERVER is unset the sender logs the message instead of delivering it

@@ -99,6 +99,19 @@ def test_contact_info_page_shows_email(client):
     assert client.application.config["COMPANY_EMAIL"] in body
 
 
+def test_contact_info_page_shows_address_and_phone(client):
+    body = client.get("/contact-info").get_data(as_text=True)
+    assert client.application.config["COMPANY_ADDRESS"] in body
+    assert client.application.config["COMPANY_PHONE"] in body
+
+
+def test_contact_info_hides_address_when_blank(client):
+    """Blanking COMPANY_ADDRESS must remove the row, not render an empty label."""
+    client.application.config["COMPANY_ADDRESS"] = ""
+    body = client.get("/contact-info").get_data(as_text=True)
+    assert "Address:" not in body
+
+
 def test_contact_hidden_by_default(client):
     # CONTACT_ENABLED defaults off — the page is hidden so we don't collect mail.
     assert client.get("/contact").status_code == 404

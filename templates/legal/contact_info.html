@@ -12,6 +12,12 @@
       <h2 class="text-2xl font-bold text-[#111827] mb-4">How to reach us</h2>
       <p>For questions about your account, a purchase, a licence upgrade, a refund, or anything else, email us and we’ll get back to you. We aim to respond within 5 business days.</p>
       <div class="not-prose mt-4 rounded-lg border border-[#e5e7eb] bg-[#f9fafb] p-5 space-y-2 text-[#111827]">
+        {% if config.COMPANY_ADDRESS %}
+          <div><span class="text-[#6b7280]">Address:</span> <strong>{{ config.COMPANY_ADDRESS }}</strong></div>
+        {% endif %}
+        {% if config.COMPANY_PHONE %}
+          <div><span class="text-[#6b7280]">Phone:</span> <strong><a href="tel:{{ config.COMPANY_PHONE|replace(' ', '') }}" class="underline">{{ config.COMPANY_PHONE }}</a></strong></div>
+        {% endif %}
         <div><span class="text-[#6b7280]">Email:</span> <strong><a href="mailto:{{ config.COMPANY_EMAIL }}" class="underline">{{ config.COMPANY_EMAIL }}</a></strong></div>
         <div><span class="text-[#6b7280]">Website:</span> <strong><a href="{{ config.SITE_URL }}" class="underline">{{ config.SITE_URL }}</a></strong></div>
       </div>
