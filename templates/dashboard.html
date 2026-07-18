@@ -7,12 +7,6 @@
 {% for paper in papers %}
   {% set stats.total_models = stats.total_models + (paper.models|length) %}
 {% endfor %}
-{% set visibility_counts = namespace(public=0, unlisted=0) %}
-{% for paper in papers %}
-  {% if project_visibility(paper) == 'public' %}{% set visibility_counts.public = visibility_counts.public + 1 %}{% endif %}
-  {% if project_visibility(paper) == 'unlisted' %}{% set visibility_counts.unlisted = visibility_counts.unlisted + 1 %}{% endif %}
-{% endfor %}
-
 <div class="app-shell dashboard-shell py-8">
   {% if demo %}{% include "_demo_banner.html" %}{% endif %}
   <div class="dashboard-header reveal-up">
@@ -22,7 +16,7 @@
         {% if admin_view is defined and admin_view %}
           Read-only dashboard view for {{ viewed_user.email }}. Use admin controls for logged changes.
         {% else %}
-          Manage projects, model uploads, review links, and public viewer links.
+          Keep your projects and 3D models organised in one place.
         {% endif %}
       </p>
       {% if institution_membership is defined and institution_membership %}
@@ -66,55 +60,12 @@
         <strong class="metric-value-compact">{{ stats.total_models }}</strong>
       </div>
     </div>
-    <div class="metric-card">
-      <div class="metric-card-head">
-        <span class="metric-icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="3" width="16" height="18" rx="1"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>
-        </span>
-        <span class="metric-label" data-mobile-label="Review Links">Review links</span>
-        <strong class="metric-value-compact">{{ visibility_counts.unlisted }}</strong>
-      </div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-card-head">
-        <span class="metric-icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18"/><path d="M12 3a14 14 0 0 0 0 18"/></svg>
-        </span>
-        <span class="metric-label" data-mobile-label="Public Projects">Public projects</span>
-        <strong class="metric-value-compact">{{ visibility_counts.public }}</strong>
-      </div>
-    </div>
   </div>
-
-  <section class="dashboard-upload-band surface reveal-up">
-    <div>
-      <h2>Start a project, then share it on your terms.</h2>
-      <p>
-        Begin privately, create an unlisted review link for editors or collaborators, or publish when the work is ready.
-      </p>
-    </div>
-    <div class="dashboard-upload-actions">
-      {% if admin_view is defined and admin_view %}
-        <a href="{{ url_for('admin_dashboard', admin_page='content') }}" class="btn-secondary">Manage projects</a>
-      {% elif demo %}
-        <a href="{{ url_for('auth.register') }}" class="btn-primary">+ New project</a>
-      {% else %}
-        <a href="{{ url_for('project_new') }}" class="btn-primary">+ New project</a>
-      {% endif %}
-      {% if papers and demo %}
-        <a href="{{ url_for('auth.register') }}" class="btn-secondary">Upload model</a>
-      {% elif papers and not (admin_view is defined and admin_view) %}
-        <a href="{{ url_for('project_detail', slug=papers[0].slug) }}#add-model" class="btn-secondary">Upload model</a>
-      {% endif %}
-    </div>
-  </section>
-
 
   {% if papers %}
     <div class="dashboard-list-header reveal-up">
       <div>
-        <h2>Recent projects</h2>
-        <p>{{ papers|length }} project{{ '' if papers|length == 1 else 's' }} in this workspace</p>
+        <h2>Projects</h2>
       </div>
       <form class="dashboard-search-form" role="search" onsubmit="return false;">
         <input
@@ -124,27 +75,6 @@
           autocomplete="off"
           class="field-input dashboard-search"
         >
-        <select id="pubStatusFilter" class="field-select compact-select" aria-label="Filter by status">
-          <option value="all">All visibility</option>
-          <option value="public">Public</option>
-          <option value="unlisted">Review link</option>
-          <option value="private">Private</option>
-          <option value="with-models">With models</option>
-          <option value="no-models">No models</option>
-        </select>
-        <select id="pubStageFilter" class="field-select compact-select" aria-label="Filter by project stage">
-          <option value="all">All stages</option>
-          <option value="in_progress">In progress</option>
-          <option value="ready_for_review">Ready for review</option>
-          <option value="published">Published</option>
-          <option value="archived">Archived</option>
-        </select>
-        <select id="pubSort" class="field-select compact-select" aria-label="Sort projects">
-          <option value="created-desc">Newest</option>
-          <option value="created-asc">Oldest</option>
-          <option value="title-asc">Title A-Z</option>
-          <option value="models-desc">Most models</option>
-        </select>
         <button type="button" class="btn-secondary compact" id="pubSearchClear" hidden>Clear</button>
       </form>
     </div>
@@ -152,10 +82,8 @@
     <div class="publication-table reveal-up" id="pubList">
       <div class="publication-table-head">
         <span>Project</span>
-        <span>Stage</span>
-        <span>Visibility</span>
         <span>Models</span>
-        <span>Actions</span>
+        <span></span>
       </div>
 
       {% for p in papers %}
@@ -173,10 +101,7 @@
           class="pub-row publication-row"
           data-search="{{ ((p.title or '') ~ ' ' ~ (p.authors or '') ~ ' ' ~ (p.institution or '') ~ ' ' ~ (p.field or '') ~ ' ' ~ (p.year or '') ~ ' ' ~ (p.doi or '') ~ ' ' ~ (p.pmid or ''))|lower }}"
           data-title="{{ (p.title or '')|lower }}"
-          data-visibility="{{ project_visibility(p) }}"
-          data-stage="{{ p.workflow_stage or 'published' }}"
           data-models="{{ p.models|length }}"
-          data-created="{{ p.created_at.timestamp() if p.created_at else 0 }}"
         >
           <div class="publication-main">
             {% if first_model and first_model.poster_path and not demo %}
@@ -187,21 +112,12 @@
             <div class="min-w-0">
               <div class="publication-title-line">
                 <a href="{{ paper_href }}">{{ p.title }}</a>
-                <span class="detail-chip">{{ (p.project_type or 'publication')|replace('_', ' ')|title }}</span>
               </div>
               <p>
-                {{ p.authors if p.authors else '-' }}{% if p.institution %}<span> &middot; </span>{{ p.institution }}{% endif %}<span> &middot; </span>{{ (p.workflow_stage or 'published')|replace('_', ' ')|title }}
+                {{ p.authors if p.authors else '-' }}{% if p.institution %}<span> &middot; </span>{{ p.institution }}{% endif %}
                 {% if p.year %}<span class="publication-year">{{ p.year }}</span>{% endif %}
               </p>
             </div>
-          </div>
-
-          <div class="publication-status">
-            <span class="detail-chip">{{ (p.workflow_stage or 'published')|replace('_', ' ')|title }}</span>
-          </div>
-
-          <div class="project-visibility">
-            <span class="status-chip status-chip-{{ project_visibility(p) }}">{{ 'Review link' if project_visibility(p) == 'unlisted' else project_visibility(p)|title }}</span>
           </div>
 
           <div class="publication-count">
@@ -210,24 +126,12 @@
           </div>
 
           <div class="publication-share">
-            {% if demo %}
+            {% if admin_view is defined and admin_view %}
+              <a href="{{ url_for('paper_public', slug=p.slug) }}" target="_blank" rel="noopener noreferrer" class="dash-action dash-action-details">Open</a>
+            {% elif demo %}
               <a href="{{ paper_href }}" class="dash-action dash-action-details">Open</a>
-              <a href="{{ url_for('auth.register') }}" class="dash-action dash-action-share">Share</a>
-              <a href="{{ url_for('auth.register') }}" class="dash-action dash-action-edit">Edit</a>
             {% else %}
-              {% if admin_view is defined and admin_view %}
-                <a href="{{ url_for('paper_public', slug=p.slug) }}" target="_blank" rel="noopener noreferrer" class="dash-action dash-action-details">Open</a>
-                <a href="{{ url_for('admin_dashboard', admin_page='content') }}" class="dash-action dash-action-edit">Manage</a>
-              {% else %}
-                {% set share_url = public_url('project_share', share_token=p.share_token) if project_visibility(p) == 'unlisted' else public_url('paper_public', slug=p.slug) %}
-                <a href="{{ url_for('project_detail', slug=p.slug) }}" class="dash-action dash-action-details">Open</a>
-                {% if project_visibility(p) == 'private' %}
-                  <a href="{{ url_for('project_edit', slug=p.slug) }}" class="dash-action dash-action-share">Set sharing</a>
-                {% else %}
-                  <button type="button" class="dash-action dash-action-share" data-copy-link="{{ share_url }}">Share</button>
-                {% endif %}
-                <a href="{{ url_for('project_edit', slug=p.slug) }}" class="dash-action dash-action-edit">Edit</a>
-              {% endif %}
+              <a href="{{ url_for('project_detail', slug=p.slug) }}" class="dash-action dash-action-details">Open</a>
             {% endif %}
           </div>
         </div>
@@ -235,7 +139,7 @@
     </div>
 
     <p id="pubNoResults" class="hidden text-center text-[#9ca3af] py-12 text-sm">
-      No projects match the current search or filters.
+      No projects match this search.
     </p>
   {% else %}
     <div class="dashboard-empty-state reveal-up">
@@ -335,12 +239,7 @@
 <script>
   (() => {
     const input = document.getElementById('pubSearch');
-    const form = document.querySelector('.dashboard-search-form');
     const clear = document.getElementById('pubSearchClear');
-    const statusFilter = document.getElementById('pubStatusFilter');
-    const stageFilter = document.getElementById('pubStageFilter');
-    const sortSelect = document.getElementById('pubSort');
-    const list = document.getElementById('pubList');
     const rows = [...document.querySelectorAll('.pub-row')];
     const noResults = document.getElementById('pubNoResults');
     if (!input) return;
@@ -351,47 +250,18 @@
       rows.forEach((row) => {
         const haystack = row.dataset.search || '';
         const qMatch = tokens.every((t) => haystack.includes(t));
-        const filter = statusFilter?.value || 'all';
-        const models = Number(row.dataset.models || 0);
-        const fMatch =
-          filter === 'all'
-          || row.dataset.visibility === filter
-          || (filter === 'with-models' && models > 0)
-          || (filter === 'no-models' && models === 0);
-        const stage = stageFilter?.value || 'all';
-        const stageMatch = stage === 'all' || row.dataset.stage === stage;
-        const match = qMatch && fMatch && stageMatch;
+        const match = qMatch;
         row.style.display = match ? 'grid' : 'none';
         if (match) visible++;
       });
       noResults.classList.toggle('hidden', visible > 0);
-      if (clear) clear.hidden = tokens.length === 0 && (statusFilter?.value || 'all') === 'all' && (stageFilter?.value || 'all') === 'all';
+      if (clear) clear.hidden = tokens.length === 0;
     };
 
-    const sortRows = () => {
-      const mode = sortSelect?.value || 'created-desc';
-      const sorted = [...rows].sort((a, b) => {
-        if (mode === 'created-asc') return Number(a.dataset.created) - Number(b.dataset.created);
-        if (mode === 'title-asc') return (a.dataset.title || '').localeCompare(b.dataset.title || '');
-        if (mode === 'models-desc') return Number(b.dataset.models) - Number(a.dataset.models);
-        return Number(b.dataset.created) - Number(a.dataset.created);
-      });
-      sorted.forEach((row) => list?.appendChild(row));
-    };
-
-    form?.addEventListener('submit', (e) => {
-      e.preventDefault();
-      apply();
-    });
     let _debounceTimer;
     input.addEventListener('input', () => { clearTimeout(_debounceTimer); _debounceTimer = setTimeout(apply, 250); });
-    statusFilter?.addEventListener('change', apply);
-    stageFilter?.addEventListener('change', apply);
-    sortSelect?.addEventListener('change', () => { sortRows(); apply(); });
     clear?.addEventListener('click', () => {
       input.value = '';
-      if (statusFilter) statusFilter.value = 'all';
-      if (stageFilter) stageFilter.value = 'all';
       apply();
       input.focus();
     });
@@ -400,19 +270,6 @@
       if (e.key === 'Escape') { input.value = ''; apply(); input.blur(); }
     });
   })();
-
-  document.querySelectorAll('[data-copy-link]').forEach((button) => {
-    button.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(button.dataset.copyLink);
-        const original = button.textContent;
-        button.textContent = 'Copied';
-        setTimeout(() => { button.textContent = original; }, 1400);
-      } catch (error) {
-        window.prompt('Copy this viewer link:', button.dataset.copyLink);
-      }
-    });
-  });
 
   window.uploadDashboardPdf = function(slug) {
     const fileInput = document.getElementById(`pdf-input-${slug}`);

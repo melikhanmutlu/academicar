@@ -4324,7 +4324,7 @@ input[type="file"]::-webkit-file-upload-button {
   margin-bottom: 44px;
 }
 .dashboard-metrics {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 36px;
 }
@@ -4416,7 +4416,7 @@ input[type="file"]::-webkit-file-upload-button {
 }
 .publication-table-head,
 .pub-row {
-  grid-template-columns: minmax(320px, 1fr) 124px 108px 72px 256px;
+  grid-template-columns: minmax(320px, 1fr) 72px 76px;
   gap: 18px;
 }
 .publication-table-head {
@@ -4449,11 +4449,8 @@ input[type="file"]::-webkit-file-upload-button {
   padding: 4px 10px;
 }
 .publication-share {
-  gap: 8px;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(72px, auto));
+  display: flex;
   justify-content: start;
-  justify-items: stretch;
 }
 .publication-share .dash-action {
   display: inline-flex;
@@ -4541,10 +4538,7 @@ input[type="file"]::-webkit-file-upload-button {
 @media (max-width: 1180px) {
   .publication-table-head,
   .pub-row {
-    grid-template-columns: minmax(240px, 1fr) 96px 94px 62px 200px;
-  }
-  .publication-share {
-    grid-template-columns: repeat(2, minmax(92px, 1fr));
+    grid-template-columns: minmax(240px, 1fr) 62px 72px;
   }
 }
 
@@ -6604,9 +6598,7 @@ details[open] .upload-chevron { transform: rotate(45deg); }
     grid-template-columns: 1fr auto !important;
     grid-template-areas:
       "main main"
-      "status visibility"
-      "count count"
-      "actions actions";
+      "count actions";
     gap: 13px 12px;
     padding: 20px;
     margin-bottom: 12px;
@@ -6656,17 +6648,6 @@ details[open] .upload-chevron { transform: rotate(45deg); }
     vertical-align: middle;
   }
 
-  .publication-status {
-    grid-area: status;
-    align-items: center;
-    justify-content: flex-start;
-  }
-
-  .project-visibility {
-    grid-area: visibility;
-    justify-content: flex-end;
-  }
-
   .publication-count {
     grid-area: count;
     display: inline-flex;
@@ -6692,12 +6673,8 @@ details[open] .upload-chevron { transform: rotate(45deg); }
 
   .publication-share {
     grid-area: actions;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-    width: 100%;
-    padding-top: 12px;
-    border-top: 1px solid var(--color-light-pearl);
+    display: flex;
+    justify-content: flex-end;
   }
 
   .publication-share .dash-action {
