@@ -2754,6 +2754,10 @@ def register_routes(app: Flask) -> None:
     def distance_sales_agreement():
         return render_template("legal/distance_sales_agreement.html")
 
+    @app.route("/contact-info")
+    def contact_info():
+        return render_template("legal/contact_info.html")
+
     @app.route("/faq")
     def faq():
         return render_template("faq.html", faqs=FAQ_ITEMS)
@@ -2959,6 +2963,7 @@ def register_routes(app: Flask) -> None:
             "data_protection",
             "refund_policy",
             "distance_sales_agreement",
+            "contact_info",
             "demo_mitochondria_ar",
             "demo_dashboard",
             "demo_institution",

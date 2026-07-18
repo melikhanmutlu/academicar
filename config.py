@@ -219,6 +219,9 @@ class Config:
     # CONTACT_ENABLED=1 to re-expose the /contact route, its links, and sitemap entry.
     CONTACT_ENABLED = os.environ.get("CONTACT_ENABLED", "0").lower() in {"1", "true", "yes", "on"}
 
+    # Public support/billing email shown on the Contact page and legal pages.
+    COMPANY_EMAIL = os.environ.get("COMPANY_EMAIL", "info.yolmed@gmail.com")
+
     # SEC-5: transactional email (e.g. email-change confirmation). If
     # MAIL_SERVER is unset the sender logs the message instead of delivering it
     # so local development still works without an SMTP provider.

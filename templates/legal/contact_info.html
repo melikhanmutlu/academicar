@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Contact - AcademicAR{% endblock %}
+{% block meta_description %}Contact AcademicAR by email for support, billing, licence, or refund enquiries.{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+  <h1 class="font-serif text-4xl font-bold text-[#111827] mb-8">Contact</h1>
+
+  <div class="prose prose-lg max-w-none space-y-8 text-[#374151]">
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">How to reach us</h2>
+      <p>For questions about your account, a purchase, a licence upgrade, a refund, or anything else, email us and we’ll get back to you. We aim to respond within 5 business days.</p>
+      <div class="not-prose mt-4 rounded-lg border border-[#e5e7eb] bg-[#f9fafb] p-5 space-y-2 text-[#111827]">
+        <div><span class="text-[#6b7280]">Email:</span> <strong><a href="mailto:{{ config.COMPANY_EMAIL }}" class="underline">{{ config.COMPANY_EMAIL }}</a></strong></div>
+        <div><span class="text-[#6b7280]">Website:</span> <strong><a href="{{ config.SITE_URL }}" class="underline">{{ config.SITE_URL }}</a></strong></div>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">Delivery of purchases</h2>
+      <p>AcademicAR sells digital access (per-model licence upgrades), not physical goods, so no shipping or courier is involved. Access is applied to your model automatically as soon as payment is confirmed. Full details are in the <a href="{{ url_for('refund_policy') }}" class="underline">Delivery &amp; Refund Policy</a>.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">Terms and policies</h2>
+      <ul class="list-disc pl-6 space-y-2">
+        <li><a href="{{ url_for('distance_sales_agreement') }}" class="underline">Distance Sales Agreement</a></li>
+        <li><a href="{{ url_for('refund_policy') }}" class="underline">Delivery &amp; Refund Policy</a> (cancellation and refunds)</li>
+        <li><a href="{{ url_for('terms') }}" class="underline">Terms of Use</a></li>
+        <li><a href="{{ url_for('privacy') }}" class="underline">Privacy Policy</a></li>
+      </ul>
+    </section>
+
+  </div>
+</div>
+{% endblock %}

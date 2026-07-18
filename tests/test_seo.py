@@ -87,6 +87,16 @@ def test_sitemap_includes_new_legal_pages(client):
     body = client.get("/sitemap.xml").get_data(as_text=True)
     assert "/refund-policy" in body
     assert "/distance-sales-agreement" in body
+    assert "/contact-info" in body
+
+
+def test_contact_info_page_shows_email(client):
+    resp = client.get("/contact-info")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Contact" in body
+    # The configured public email is rendered (default published address).
+    assert client.application.config["COMPANY_EMAIL"] in body
 
 
 def test_contact_hidden_by_default(client):

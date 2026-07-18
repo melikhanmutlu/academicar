@@ -156,7 +156,8 @@
           <nav class="site-footer-col" aria-label="Company">
             <h3>Company</h3>
             <a href="{{ url_for('about') }}">About</a>
-            {% if config.CONTACT_ENABLED %}<a href="{{ url_for('contact') }}">Contact</a>{% endif %}
+            <a href="{{ url_for('contact_info') }}">Contact</a>
+            {% if config.CONTACT_ENABLED %}<a href="{{ url_for('contact') }}">Contact form</a>{% endif %}
             <a href="{{ url_for('institutional_inquiry') }}">Institutional</a>
           </nav>
 
