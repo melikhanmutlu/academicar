@@ -12,9 +12,12 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from pathlib import Path
 
 import numpy as np
+
+from .glb_optimize import decompress_glb, glb_has_draco
 
 logger = logging.getLogger(__name__)
 
@@ -24,25 +27,48 @@ MESH_COLOR = (160, 170, 180, 255)
 
 
 def generate_poster(glb_path: str, png_path: str) -> bool:
-    """Generate a poster image from a GLB file. Returns True on success."""
+    """Generate a poster image from a GLB file. Returns True on success.
+
+    All three render backends load geometry via trimesh, which cannot decode
+    Draco-compressed meshes (see finalize_converted_glb / optimize_glb) — the
+    same limitation the Blender USDZ export path already works around. When
+    the stored GLB is Draco-compressed, render from a decompressed scratch
+    copy instead so poster generation doesn't silently fail for every
+    optimized model.
+    """
     if not os.path.isfile(glb_path):
         return False
+    render_path = glb_path
+    tmp_decompressed = None
+    if glb_has_draco(glb_path):
+        tmp_decompressed = f"{glb_path}.posterdecomp.{os.getpid()}.{threading.get_ident()}.glb"
+        if decompress_glb(glb_path, tmp_decompressed):
+            render_path = tmp_decompressed
+        else:
+            tmp_decompressed = None
     try:
-        if _try_pyrender(glb_path, png_path):
-            return True
-    except Exception:
-        logger.debug("pyrender poster failed", exc_info=True)
-    try:
-        if _try_trimesh_scene(glb_path, png_path):
-            return True
-    except Exception:
-        logger.debug("trimesh scene poster failed", exc_info=True)
-    try:
-        if _try_rasterize(glb_path, png_path):
-            return True
-    except Exception:
-        logger.debug("rasterize poster failed", exc_info=True)
-    return False
+        try:
+            if _try_pyrender(render_path, png_path):
+                return True
+        except Exception:
+            logger.debug("pyrender poster failed", exc_info=True)
+        try:
+            if _try_trimesh_scene(render_path, png_path):
+                return True
+        except Exception:
+            logger.debug("trimesh scene poster failed", exc_info=True)
+        try:
+            if _try_rasterize(render_path, png_path):
+                return True
+        except Exception:
+            logger.debug("rasterize poster failed", exc_info=True)
+        return False
+    finally:
+        if tmp_decompressed and os.path.exists(tmp_decompressed):
+            try:
+                os.remove(tmp_decompressed)
+            except OSError:
+                pass
 
 
 def _try_pyrender(glb_path: str, png_path: str) -> bool:
