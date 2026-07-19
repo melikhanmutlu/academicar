@@ -1577,19 +1577,6 @@ body {
   border-top: 1px solid rgba(255, 255, 255, 0.12);
   color: rgba(255, 255, 255, 0.55);
 }
-.site-footer-payments {
-  display: inline-flex;
-  align-items: center;
-  background: var(--color-canvas-white);
-  border-radius: 8px;
-  padding: 8px 16px;
-  line-height: 0;
-}
-.site-footer-payments img {
-  height: 22px;
-  width: auto;
-  display: block;
-}
 .blog-article {
   font-family: var(--font-inter, 'Inter', sans-serif);
   color: #2f2f2f;
