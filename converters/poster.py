@@ -19,6 +19,11 @@ import numpy as np
 
 from .glb_optimize import decompress_glb, glb_has_draco
 
+# Must be set before pyrender/PyOpenGL is imported anywhere in the process —
+# forces the OSMesa software backend instead of EGL (no GPU) or a windowed
+# GLUT/pyglet context (no display) on headless deployment hosts.
+os.environ.setdefault("PYOPENGL_PLATFORM", "osmesa")
+
 logger = logging.getLogger(__name__)
 
 POSTER_SIZE = (1024, 1024)

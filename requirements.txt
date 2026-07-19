@@ -10,6 +10,10 @@ email-validator==2.1.0
 authlib==1.4.1
 requests==2.32.3
 trimesh==4.12.2
+# Forked PyOpenGL enabling OSMesa contexts, required by pyrender for headless
+# offscreen rendering (see converters/poster.py, nixpacks.toml PYOPENGL_PLATFORM).
+PyOpenGL @ git+https://github.com/mmatl/pyopengl.git
+pyrender==0.1.45
 pygltflib==1.16.2
 scipy==1.13.1
 numpy==1.26.4
