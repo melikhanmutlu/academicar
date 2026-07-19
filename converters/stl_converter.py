@@ -530,8 +530,16 @@ class STLConverter(BaseConverter):
             )
 
             # SEC-6/PERF-3: reject meshes too large to process safely.
+            #
+            # STL is loaded UNWELDED (one vertex per triangle corner, see
+            # load_stl_mesh_without_normals) to keep flat per-face shading, so
+            # len(mesh.vertices) is always exactly 3x the triangle count and is
+            # NOT a meaningful complexity measure — it made the 2M vertex limit
+            # fire at only ~667k triangles. Measure the limit against UNIQUE
+            # (welded) vertices so it reflects real geometric detail; the
+            # triangle limit independently bounds worker memory.
             n_faces = len(mesh.faces)
-            n_verts = len(mesh.vertices)
+            n_verts = int(np.unique(mesh.vertices, axis=0).shape[0]) if len(mesh.vertices) else 0
             if (MAX_MESH_FACES and n_faces > MAX_MESH_FACES) or (
                 MAX_MESH_VERTICES and n_verts > MAX_MESH_VERTICES
             ):

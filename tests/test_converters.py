@@ -62,6 +62,80 @@ def test_fbx_converter_accepts_generated_glb_candidate(monkeypatch):
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
+# A tetrahedron: 4 triangles = 12 unwelded corner vertices, but only 4 UNIQUE
+# vertices. Exercises the STL complexity check, which must count unique (welded)
+# vertices, not the 3x-inflated unwelded representation the loader produces.
+_TETRA_STL = b"""solid tetra
+facet normal 0 0 1
+ outer loop
+  vertex 0 0 0
+  vertex 1 0 0
+  vertex 0 1 0
+ endloop
+endfacet
+facet normal 0 1 0
+ outer loop
+  vertex 0 0 0
+  vertex 0 0 1
+  vertex 1 0 0
+ endloop
+endfacet
+facet normal 1 0 0
+ outer loop
+  vertex 0 0 0
+  vertex 0 1 0
+  vertex 0 0 1
+ endloop
+endfacet
+facet normal 1 1 1
+ outer loop
+  vertex 1 0 0
+  vertex 0 0 1
+  vertex 0 1 0
+ endloop
+endfacet
+endsolid tetra
+"""
+
+
+def test_stl_vertex_limit_counts_unique_not_unwelded(monkeypatch):
+    """The tetra has 12 unwelded corner vertices but only 4 unique ones. A vertex
+    limit of 8 (below 12, above 4) must NOT reject it: the check counts unique
+    (welded) vertices so flat-shaded STLs aren't rejected at ~1/3 their real cap."""
+    from converters.stl_converter import STLConverter
+
+    monkeypatch.setattr("converters.stl_converter.MAX_MESH_VERTICES", 8)
+    monkeypatch.setattr("converters.stl_converter.MAX_MESH_FACES", 100)
+    tmp_dir = temp_converter_dir()
+    source = tmp_dir / "tetra.stl"
+    source.write_bytes(_TETRA_STL)
+    output = tmp_dir / "tetra.glb"
+    try:
+        converter = STLConverter()
+        assert converter.convert(str(source), str(output)) is True
+        assert output.exists()
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+def test_stl_rejects_when_triangle_limit_exceeded(monkeypatch):
+    """The triangle limit still guards worker memory: a 4-triangle mesh is
+    rejected when the cap is 2."""
+    from converters.stl_converter import STLConverter
+
+    monkeypatch.setattr("converters.stl_converter.MAX_MESH_FACES", 2)
+    tmp_dir = temp_converter_dir()
+    source = tmp_dir / "tetra.stl"
+    source.write_bytes(_TETRA_STL)
+    output = tmp_dir / "tetra.glb"
+    try:
+        converter = STLConverter()
+        assert converter.convert(str(source), str(output)) is False
+        assert any("too complex" in e for e in converter.errors)
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
 def test_glb_quality_rejects_invalid_output():
     tmp_dir = temp_converter_dir()
     bad_glb = tmp_dir / "bad.glb"
