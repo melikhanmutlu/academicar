@@ -22,7 +22,7 @@ ENV BLENDER_VERSION=4.3.2 \
     BLENDER_MAJOR=4.3
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        curl ca-certificates xz-utils nodejs npm postgresql-client libreoffice-impress \
+        curl ca-certificates git xz-utils nodejs npm postgresql-client libreoffice-impress \
         libgl1 libegl1 libxi6 libxxf86vm1 libxfixes3 libxrender1 libxkbcommon0 \
         libsm6 libx11-6 libxext6 libgomp1 \
     && ( curl -fsSL "https://download.blender.org/release/Blender${BLENDER_MAJOR}/blender-${BLENDER_VERSION}-linux-x64.tar.xz" -o /tmp/blender.tar.xz \
