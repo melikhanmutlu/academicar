@@ -39,6 +39,7 @@ from converters.glb_quality import (
     has_base_color_textures,
     mask_cutout_textures,
     repair_transparent_base_color,
+    set_base_color_factor,
     validate_glb_quality,
 )
 from converters.glb_optimize import normalize_specular_glossiness, optimize_glb
@@ -1491,6 +1492,63 @@ def _apply_model_appearance_change(model, form):
             except OSError:
                 logger.exception("Failed to restore appearance backup after DB error")
         return False, "The model appearance could not be updated.", "danger", None
+    finally:
+        if os.path.exists(backup_path):
+            cleanup_file(backup_path)
+
+
+def _bake_viewer_color(model, color):
+    """Persist a solid viewer-chosen colour into the model's GLB.
+
+    Sets ``baseColorFactor`` on every material — the persistent twin of the
+    public viewer's live ``setBaseColorFactor`` preview — so the saved GLB
+    matches exactly what the owner previewed, for textured and untextured models
+    alike. (The edit-page pipeline in ``_apply_model_appearance_change``
+    deliberately keeps a textured model's artwork and so never changes its
+    colour; the viewer's swatch flow is the opposite intent — apply the chosen
+    tint.) Backs up the GLB and restores it on failure, updates
+    ``appearance_color``/``file_size``, and re-mirrors to R2.
+
+    Returns (ok, message).
+    """
+    rgba = hex_to_rgba(color)
+    if rgba is None:
+        return False, "Invalid color value."
+
+    glb_path = model.glb_path
+    # Restore the working GLB from the R2 mirror if the local copy is gone.
+    ensure_local(glb_path, f"converted/{model.id}/model.glb")
+    backup_path = glb_path + APPEARANCE_BACKUP_SUFFIX
+    try:
+        if os.path.exists(glb_path):
+            shutil.copy2(glb_path, backup_path)
+        try:
+            set_base_color_factor(glb_path, rgba)
+        except Exception as exc:
+            logger.exception("Viewer color bake failed; restoring backup")
+            if os.path.exists(backup_path):
+                shutil.copy2(backup_path, glb_path)
+            glb_exists = os.path.exists(glb_path)
+            detail = f" ({type(exc).__name__}: {exc})" if glb_exists else ""
+            return False, f"The color could not be saved. The previous version is still active.{detail}"
+
+        model.appearance_color = color
+        try:
+            model.file_size = os.path.getsize(glb_path)
+        except OSError:
+            pass
+        db.session.commit()
+        # Re-mirror the rewritten GLB so R2 doesn't keep the pre-recolor copy.
+        mirror_file(glb_path, f"converted/{model.id}/model.glb")
+        return True, "Color saved to the model."
+    except SQLAlchemyError:
+        db.session.rollback()
+        if os.path.exists(backup_path):
+            try:
+                shutil.copy2(backup_path, glb_path)
+            except OSError:
+                logger.exception("Failed to restore GLB backup after DB error")
+        return False, "The color could not be saved."
     finally:
         if os.path.exists(backup_path):
             cleanup_file(backup_path)
@@ -7249,10 +7307,11 @@ def register_routes(app: Flask) -> None:
     def model_viewer_color(model_id):
         """Owner-only: bake a solid color chosen in the viewer into the model.
 
-        Reuses the appearance pipeline (recolors the GLB inline, preserving the
-        model's current roughness/metallic/name), then enqueues a worker job to
-        regenerate the iOS USDZ from the recolored GLB so Quick Look matches.
-        Returns JSON for the viewer's fetch() call."""
+        Sets ``baseColorFactor`` on every material — the persistent twin of the
+        viewer's live ``setBaseColorFactor`` preview — so the saved GLB matches
+        what the owner previewed for textured and untextured models alike, then
+        enqueues a worker job to regenerate the iOS USDZ from the recolored GLB
+        so Quick Look matches. Returns JSON for the viewer's fetch() call."""
         model = db.session.get(Model3D, model_id)
         if not model:
             abort(404)
@@ -7260,12 +7319,10 @@ def register_routes(app: Flask) -> None:
         color = (data.get("color") or "").strip()
         if HEX_COLOR_PATTERN.fullmatch(color) is None:
             return jsonify({"ok": False, "error": "Provide a valid hex color (#RRGGBB)."}), 400
-        # Only the color changes; roughness/metallic/name fall back to the model's
-        # current values inside _apply_model_appearance_change.
-        ok, message, category, changes = _apply_model_appearance_change(model, {"color": color})
+        ok, message = _bake_viewer_color(model, color)
         if not ok:
             return jsonify({"ok": False, "error": message}), 400
-        log_audit("model_viewer_color_updated", user_id=current_user.id, resource_id=model_id, details=changes)
+        log_audit("model_viewer_color_updated", user_id=current_user.id, resource_id=model_id, details={"color": color})
         # GLB now carries the color (web / desktop / Android AR). Regenerate the
         # iOS USDZ in the worker (Blender is heavy) so Quick Look matches too.
         usdz_path = os.path.join(app.config["CONVERTED_FOLDER"], model.id, "model.usdz")

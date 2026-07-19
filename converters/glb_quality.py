@@ -157,6 +157,49 @@ def apply_pbr_factors(glb_path: str, *, roughness: float | None = None, metallic
     return changed
 
 
+def set_base_color_factor(glb_path: str, rgba) -> bool:
+    """Set every material's ``baseColorFactor`` RGB to a chosen colour in place.
+
+    This is the persistent twin of model-viewer's ``setBaseColorFactor`` used by
+    the public viewer's live colour preview: on a textured material the factor
+    multiplies the texture (a tint); on an untextured material it *is* the
+    surface colour. Baking exactly what the viewer previewed guarantees the saved
+    GLB — and the USDZ regenerated from it — matches the preview for textured and
+    untextured models alike. Unlike ``apply_pbr_factors`` (leaves the colour
+    untouched, so a textured model's viewer colour was silently discarded) or
+    ``enrich_glb_for_ar`` (replaces the material with a flat colour, discarding
+    textures), this changes only the colour factor and keeps textures intact.
+
+    ``rgba`` is a 3- or 4-tuple of 0–1 floats. Each material keeps its own
+    existing baseColorFactor alpha (so cutout/transparent materials stay intact);
+    the tuple's own alpha (default 1.0) is used only when a material had none.
+
+    Returns True if at least one material was updated.
+    """
+    try:
+        r, g, b = float(rgba[0]), float(rgba[1]), float(rgba[2])
+    except (TypeError, ValueError, IndexError):
+        return False
+    fallback_a = float(rgba[3]) if len(rgba) > 3 else 1.0
+    try:
+        gltf = _load_glb(glb_path)
+    except GLBQualityError:
+        return False
+    changed = False
+    for material in gltf.materials or []:
+        pbr = material.pbrMetallicRoughness
+        if pbr is None:
+            pbr = PbrMetallicRoughness()
+            material.pbrMetallicRoughness = pbr
+        existing = pbr.baseColorFactor
+        alpha = existing[3] if existing and len(existing) == 4 else fallback_a
+        pbr.baseColorFactor = [r, g, b, alpha]
+        changed = True
+    if changed:
+        gltf.save(glb_path)
+    return changed
+
+
 def repair_transparent_base_color(glb_path: str) -> bool:
     """Repair FBX2glTF's broken opacity-to-alpha mapping.
 

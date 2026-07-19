@@ -7914,6 +7914,81 @@ label.rounded-xl input[type="checkbox"] {
 .admin-bulk-action {
   margin: 0 0 16px;
 }
+
+/* ===== New / Edit Project layout with sticky decorative aside ===== */
+.project-new-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 40px;
+  align-items: start;
+}
+.project-new-main {
+  min-width: 0;
+}
+.project-new-aside {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .project-new-layout {
+    grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  }
+  .project-new-aside {
+    display: block;
+  }
+}
+.project-new-aside-card {
+  position: sticky;
+  top: 88px;
+  overflow: hidden;
+  border-radius: 12px;
+  padding: 44px 32px;
+  min-height: 440px;
+  display: flex;
+}
+.project-new-aside-grid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.4;
+  pointer-events: none;
+}
+.project-new-aside-body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 20px;
+  margin: auto;
+}
+.project-new-aside-eyebrow {
+  font-family: var(--font-inter);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: rgba(255, 255, 255, 0.5);
+}
+.project-new-aside-title {
+  font-family: var(--font-polysans);
+  font-size: 26px;
+  line-height: 1.2;
+  font-weight: 600;
+  color: var(--color-canvas-white);
+  max-width: 300px;
+}
+.project-new-aside-art {
+  width: 200px;
+  height: 200px;
+}
+.project-new-aside-note {
+  font-family: var(--font-inter);
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.6);
+  max-width: 300px;
+}
 .upload-panel-prominent {
   border: 1px solid var(--color-light-pearl) !important;
   box-shadow: none;

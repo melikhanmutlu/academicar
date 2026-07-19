@@ -1115,10 +1115,10 @@
               </div>
             </div>
             <div class="viewer-color-swatches" data-color-swatches>
-              {% for c in ['#cccccc', '#e8e1d0', '#c8a97e', '#b5651d', '#c0504d', '#4f81bd', '#5b8c5a', '#c9a227'] %}
-                <button type="button" class="viewer-color-swatch" data-color-swatch="{{ c }}" style="background: {{ c }}" aria-label="Apply color {{ c }}"></button>
+              {% for hex, name in [('#cccccc', 'Silver'), ('#e8e1d0', 'Bone'), ('#c8a97e', 'Sand'), ('#b5651d', 'Terracotta'), ('#c0504d', 'Brick'), ('#4f81bd', 'Steel'), ('#5b8c5a', 'Sage'), ('#c9a227', 'Ochre')] %}
+                <button type="button" class="viewer-color-swatch" data-color-swatch="{{ hex }}" data-color-name="{{ name }}" style="background: {{ hex }}" title="{{ name }}" aria-label="Apply {{ name }} color"></button>
               {% endfor %}
-              <label class="viewer-color-custom" aria-label="Custom color">
+              <label class="viewer-color-custom" title="Custom color" aria-label="Custom color">
                 <input type="color" value="#cccccc" data-color-picker>
               </label>
             </div>
@@ -2402,6 +2402,16 @@
           });
           const data = await resp.json().catch(() => ({}));
           if (resp.ok && data.ok) {
+            // The saved colour is now the model's colour: fold it into the
+            // captured originals so a later "Original" resets to what was saved
+            // (and the Apply button disables — nothing is pending anymore).
+            const savedRgb = hexToRgb(currentHex);
+            if (savedRgb) originals.forEach((o) => {
+              o.factor = [savedRgb[0], savedRgb[1], savedRgb[2], (o.factor && o.factor[3]) ?? 1];
+            });
+            currentHex = null;
+            setActive(null);
+            setDirty(false);
             if (window.showToast) window.showToast(data.message || 'Color saved to the model.', 'success');
             if (hint) hint.hidden = true;
           } else {

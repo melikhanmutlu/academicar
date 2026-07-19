@@ -6,7 +6,8 @@
 <div class="app-shell py-10">
   <a href="{{ url_for('project_detail', slug=paper.slug) if is_edit else url_for('dashboard') }}" class="nav-link inline-flex mb-5">&larr; {{ 'Back to project' if is_edit else 'Back to dashboard' }}</a>
 
-  <div style="max-width: 768px;">
+  <div class="project-new-layout">
+    <div class="project-new-main">
     <h1 class="font-serif text-3xl lg:text-4xl font-bold text-[#111827]">{{ 'Edit your project.' if is_edit else 'Create a project for your 3D work.' }}</h1>
     <p class="text-[#5c6473] mt-2 mb-6">{{ 'Update the context, models, sharing and optional publication references.' if is_edit else 'Start with a title and add a model now; publication details can come later.' }}</p>
 
@@ -242,6 +243,39 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       </form>
     {% endif %}
+    </div>
+
+    <aside class="project-new-aside" aria-hidden="true">
+      <div class="project-new-aside-card dark-surface">
+        <span class="volumetric-grid project-new-aside-grid"></span>
+        <div class="project-new-aside-body">
+          <span class="project-new-aside-eyebrow">AcademicAR</span>
+          <h2 class="project-new-aside-title">One scan, an interactive model.</h2>
+          <svg class="project-new-aside-art" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="3D model, augmented reality, and QR code">
+            <!-- AR framing brackets -->
+            <g stroke="rgba(255,255,255,0.45)" stroke-width="2" stroke-linecap="round">
+              <path d="M40 58V44a4 4 0 0 1 4-4h14"/>
+              <path d="M182 40h14a4 4 0 0 1 4 4v14"/>
+              <path d="M200 182v14a4 4 0 0 1-4 4h-14"/>
+              <path d="M58 200H44a4 4 0 0 1-4-4v-14"/>
+            </g>
+            <!-- orbit -->
+            <ellipse cx="120" cy="126" rx="86" ry="30" transform="rotate(-18 120 126)" stroke="rgba(255,255,255,0.16)" stroke-width="1.5"/>
+            <!-- isometric cube -->
+            <g stroke="rgba(255,255,255,0.85)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+              <path d="M120 66 172 96V156L120 186 68 156V96Z"/>
+              <path d="M120 66V126"/>
+              <path d="M120 126 172 96"/>
+              <path d="M120 126 68 96"/>
+              <path d="M120 126V186"/>
+            </g>
+            <!-- accent node -->
+            <circle cx="120" cy="66" r="5" fill="#ff682c"/>
+          </svg>
+          <p class="project-new-aside-note">Every model you add gets a web viewer, mobile AR, and a QR code that keeps working after you replace or recolor it.</p>
+        </div>
+      </div>
+    </aside>
   </div>
 </div>
 {% endblock %}
