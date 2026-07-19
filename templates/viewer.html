@@ -725,20 +725,31 @@
        of the screen. Cap it to the space below the top header/toolbar and
        scroll internally instead; the mobile media query below overrides this
        with its own (shorter) cap for narrow widths. */
+    /* Fixed-header panel: the header (title + collapse button) stays pinned and
+       only the body scrolls, so it's reachable no matter how tall the tools are. */
     .viewer-control-panel {
       max-height: calc(100vh - 7rem);
       max-height: calc(100dvh - 7rem);
-      overflow-y: auto;
-      scrollbar-width: thin;
-      scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
-    .viewer-control-panel::-webkit-scrollbar { width: 6px; }
-    .viewer-control-panel::-webkit-scrollbar-track { background: transparent; }
-    .viewer-control-panel::-webkit-scrollbar-thumb {
+    .viewer-panel-header {
+      flex-shrink: 0;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+    }
+    .viewer-control-panel[data-collapsed="true"] .viewer-panel-header {
+      padding-bottom: 0;
+      border-bottom-color: transparent;
+    }
+    .viewer-panel-body::-webkit-scrollbar { width: 6px; }
+    .viewer-panel-body::-webkit-scrollbar-track { background: transparent; }
+    .viewer-panel-body::-webkit-scrollbar-thumb {
       background: rgba(255, 255, 255, 0.28);
       border-radius: 999px;
     }
-    .viewer-control-panel::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.42); }
+    .viewer-panel-body::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.42); }
     @media (max-width: 640px) {
       .viewer-tool-btn { min-height: 34px; min-width: 34px; padding: 0.45rem; font-size: 0; justify-content: center; }
       .viewer-tool-btn svg { display: block; }
@@ -753,7 +764,7 @@
         width: auto !important;
         max-height: 58vh;
         max-height: 58dvh;
-        overflow-y: auto;
+        overflow: hidden;
         padding: 0.85rem !important;
         border-radius: 0.85rem;
       }
@@ -778,11 +789,16 @@
       .viewer-control-panel[data-collapsed="true"] { max-height: none; overflow: visible; }
     }
     .viewer-panel-body {
-      overflow: hidden;
+      flex: 0 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
       transition: max-height 280ms ease, opacity 200ms ease;
     }
     .viewer-control-panel[data-collapsed="true"] .viewer-panel-body {
       max-height: 0 !important;
+      overflow: hidden;
       opacity: 0;
       pointer-events: none;
     }
@@ -953,11 +969,11 @@
       <p class="text-[10px] text-white/40 line-clamp-1">{{ paper.title }}</p>
     </div>
     {% else %}
-    <section id="controlPanel" class="viewer-control-panel absolute left-4 right-4 bottom-4 z-30 sm:left-6 sm:right-auto sm:w-[520px] rounded-xl border border-white/10 bg-[#111111]/76 p-4 backdrop-blur-2xl" data-collapsed="false">
-      <div class="flex items-start justify-between gap-3">
+    <section id="controlPanel" class="viewer-control-panel absolute left-4 right-4 bottom-4 z-30 sm:left-6 sm:right-auto sm:w-[380px] rounded-xl border border-white/10 bg-[#111111]/76 p-4 backdrop-blur-2xl" data-collapsed="false">
+      <div class="viewer-panel-header flex items-start justify-between gap-3">
         <div class="min-w-0">
-          <p class="text-xs uppercase tracking-[0.18em] text-white/55">Live spatial viewer</p>
-          <h1 class="font-serif text-2xl sm:text-3xl font-semibold mt-1 line-clamp-1">{{ model.display_name or model.original_filename }}</h1>
+          <p class="text-[11px] uppercase tracking-[0.18em] text-white/55">Live spatial viewer</p>
+          <h1 class="font-serif text-xl sm:text-2xl font-semibold mt-0.5 line-clamp-1">{{ model.display_name or model.original_filename }}</h1>
           <p class="text-sm text-white/60 mt-1 line-clamp-1">{{ paper.title }}</p>
           {% if model.license_type == 'institutional' and model.institution %}
             <p class="text-xs text-white/45 mt-1 line-clamp-1 flex items-center gap-1.5">
@@ -978,7 +994,7 @@
         </button>
       </div>
       <div id="panelBody" class="viewer-panel-body">
-        <div class="viewer-meta-grid mt-4 grid grid-cols-3 gap-2 text-xs">
+        <div class="viewer-meta-grid mt-3 grid grid-cols-3 gap-2 text-xs">
           <div class="rounded-lg bg-white/[0.06] p-3">
           <p class="text-white/40">Format</p>
             <p class="font-bold mt-1">GLB</p>
@@ -999,7 +1015,7 @@
           {% if scale_reference %}<p class="text-white/50 mt-0.5">{{ scale_reference }}</p>{% endif %}
         </div>
         {% endif %}
-        <div class="viewer-tool-stack mt-4 grid gap-3 text-xs">
+        <div class="viewer-tool-stack mt-3 grid gap-3 text-xs">
           <div class="viewer-rotation-tools" data-rotation-tools>
             <div class="viewer-tool-heading">
               <span>Preview rotation</span>
