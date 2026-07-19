@@ -222,6 +222,12 @@
                 </div>
                 {% if m.description %}<p class="model-card-desc">{{ m.description }}</p>{% endif %}
                 {% if model_status == 'failed' and m.processing_error %}<p class="text-sm text-red-600 mt-2">{{ m.processing_error }}</p>{% endif %}
+                {% if m.collage_path %}
+                  <a href="{{ url_for('serve_collage', unique_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-collage-link">
+                    <img src="{{ url_for('serve_collage', unique_id=m.id) }}" alt="Combined view of {{ m.display_name or m.original_filename }}" loading="lazy">
+                    <span>Combined view</span>
+                  </a>
+                {% endif %}
                 <dl class="model-meta-list">
                   <div>
                     <dt>Access</dt>

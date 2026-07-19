@@ -590,6 +590,130 @@
       max-height: 100%;
       object-fit: contain;
     }
+    #collageModal:not(.hidden) {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .viewer-collage-modal-card {
+      display: flex;
+      flex-direction: column;
+      max-height: calc(100vh - 2rem);
+      max-height: calc(100dvh - 2rem);
+      overflow-y: auto;
+    }
+    .viewer-collage-layout {
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr);
+      gap: 1rem;
+    }
+    .viewer-collage-picker-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: rgba(255,255,255,0.45);
+      margin-bottom: 0.5rem;
+    }
+    .viewer-collage-picker-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      max-height: 320px;
+      overflow-y: auto;
+      padding-right: 0.25rem;
+    }
+    .viewer-collage-picker-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 0.5rem;
+      padding: 0.35rem 0.5rem;
+      cursor: pointer;
+      font-size: 0.78rem;
+    }
+    .viewer-collage-picker-item:hover { background: rgba(255,255,255,0.06); }
+    .viewer-collage-picker-item img {
+      width: 34px;
+      height: 34px;
+      object-fit: cover;
+      border-radius: 0.3rem;
+      flex-shrink: 0;
+    }
+    .viewer-collage-qr-toggle { margin-top: 0.75rem; }
+    .viewer-collage-canvas-wrap { min-width: 0; }
+    .viewer-collage-frame {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      background: #ffffff;
+      border-radius: 0.5rem;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.12);
+      touch-action: none;
+    }
+    .viewer-collage-tile {
+      position: absolute;
+      box-sizing: border-box;
+      border: 1px dashed transparent;
+      cursor: grab;
+    }
+    .viewer-collage-tile:hover,
+    .viewer-collage-tile.is-active {
+      border-color: #ff682c;
+    }
+    .viewer-collage-tile img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      pointer-events: none;
+      user-select: none;
+    }
+    .viewer-collage-tile-handle {
+      position: absolute;
+      right: -6px;
+      bottom: -6px;
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      background: #ff682c;
+      border: 2px solid #fff;
+      cursor: nwse-resize;
+    }
+    .viewer-collage-qr-tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      background: #ffffff;
+      border-radius: 0.35rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+      padding: 6%;
+    }
+    .viewer-collage-qr-tile img { width: 70%; height: 70%; object-fit: contain; }
+    .viewer-collage-qr-tile span {
+      font-size: 0.5rem;
+      font-weight: 700;
+      color: #4d4d4d;
+      text-align: center;
+    }
+    .viewer-collage-hint {
+      margin-top: 0.5rem;
+      font-size: 0.72rem;
+      color: rgba(255,255,255,0.4);
+    }
+    .viewer-collage-status {
+      font-size: 0.78rem;
+      color: rgba(255,255,255,0.6);
+      min-height: 1.1em;
+    }
+    .viewer-collage-status.is-error { color: #ff8a65; }
+    .viewer-collage-status.is-success { color: #7ee0a8; }
+    @media (max-width: 640px) {
+      .viewer-collage-layout { grid-template-columns: 1fr; }
+      .viewer-collage-picker-list { max-height: 140px; }
+    }
     /* iOS Safari counts the area behind the bottom toolbar in 100vh, which
        pushed the bottom control panel off-screen. Use the dynamic viewport
        height (with a 100vh fallback) so h-screen tracks the visible area. */
@@ -912,7 +1036,10 @@
           <div class="viewer-shot-tools" data-screenshot-tools>
             <div class="viewer-tool-heading">
               <span>Screenshots</span>
-              <button type="button" data-download-zip disabled>Download ZIP</button>
+              <div class="flex items-center gap-2">
+                <button type="button" data-combine-shots disabled>Combine</button>
+                <button type="button" data-download-zip disabled>Download ZIP</button>
+              </div>
             </div>
             <div class="viewer-shot-actions">
               <button type="button" data-current-shot>Current view</button>
@@ -1024,6 +1151,41 @@
         </div>
       </div>
     </div>
+
+    <div id="collageModal" class="hidden fixed inset-0 z-50 bg-black/72 p-4 backdrop-blur-md" data-collage-modal>
+      <div class="viewer-collage-modal-card mx-auto w-full max-w-5xl rounded-xl border border-white/12 bg-[#111111] p-4 text-white shadow-2xl">
+        <div class="mb-3 flex items-center justify-between gap-4">
+          <div>
+            <p class="text-xs uppercase tracking-[0.18em] text-white/45">Combine screenshots</p>
+            <h2 class="mt-1 text-xl font-bold">Build a combined figure</h2>
+          </div>
+          <button id="closeCollageModal" type="button" class="rounded border border-white/10 px-3 py-2 text-sm text-white/70 hover:bg-white/10">Close</button>
+        </div>
+        <div class="viewer-collage-layout">
+          <div class="viewer-collage-picker">
+            <p class="viewer-collage-picker-label">Select screenshots</p>
+            <div class="viewer-collage-picker-list" data-collage-picker></div>
+            <label class="viewer-shot-qr-toggle viewer-collage-qr-toggle">
+              <input type="checkbox" data-collage-qr-toggle>
+              <span>Include QR code</span>
+            </label>
+          </div>
+          <div class="viewer-collage-canvas-wrap">
+            <div class="viewer-collage-frame" data-collage-frame></div>
+            <p class="viewer-collage-hint">Drag a tile to move it, drag its corner to resize.</p>
+          </div>
+        </div>
+        <div class="mt-4 flex items-center justify-between gap-3 flex-wrap">
+          <p class="viewer-collage-status" data-collage-status></p>
+          <div class="flex gap-2">
+            <button type="button" data-collage-download class="viewer-tool-btn">Download image</button>
+            {% if is_owner %}
+              <button type="button" data-collage-save class="viewer-tool-btn primary">Save to publication</button>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
   </main>
 
   <script>
@@ -1056,6 +1218,15 @@
     const shotModalTitle = document.getElementById('shotModalTitle');
     const shotModalImg = document.getElementById('shotModalImg');
     const shotModalDownload = document.getElementById('shotModalDownload');
+    const combineShotsButton = document.querySelector('[data-combine-shots]');
+    const collageModal = document.getElementById('collageModal');
+    const closeCollageModal = document.getElementById('closeCollageModal');
+    const collagePickerEl = document.querySelector('[data-collage-picker]');
+    const collageFrameEl = document.querySelector('[data-collage-frame]');
+    const collageQrToggle = document.querySelector('[data-collage-qr-toggle]');
+    const collageDownloadButton = document.querySelector('[data-collage-download]');
+    const collageSaveButton = document.querySelector('[data-collage-save]');
+    const collageStatusEl = document.querySelector('[data-collage-status]');
     const modelBaseName = {{ (model.display_name or model.original_filename or 'model')|tojson }};
     const qrOverlayToggle = document.querySelector('[data-qr-overlay]');
     const shareCardQrUrl = {{ (url_for('demo_mitochondria_qr') if demo_mode is defined and demo_mode else url_for('qr_image', model_id=model.id))|tojson }};
@@ -1077,6 +1248,8 @@
     // tighter distance (which ballooned the model to fill the screen).
     let initialCamera = null;
     let shotGallery = [];
+    let collageTiles = []; // { id, kind: 'shot'|'qr', shotKey, src, x, y, w, h, z } — x/y/w/h are fractions of the frame (0..1)
+    let collageNextZ = 1;
     let modelAnimationAvailable = false;
     let modelAnimationPlaying = true;
 
@@ -1682,6 +1855,7 @@
         downloadZipButton.disabled = shotGallery.length === 0;
         downloadZipButton.textContent = 'Download ZIP';
       }
+      if (combineShotsButton) combineShotsButton.disabled = shotGallery.length === 0;
     };
     const openShotModal = (shot) => {
       if (!shotModal || !shotModalImg || !shotModalTitle || !shotModalDownload) return;
@@ -1760,6 +1934,288 @@
         }, 1800);
       }
     };
+
+    // --- Combine screenshots: pick a few generated views (+ an optional QR
+    // badge) and arrange them into one figure via drag/resize, entirely
+    // client-side. "Download image" needs no backend; "Save to publication"
+    // (owner-only) uploads the rendered PNG to model_collage_save.
+    const COLLAGE_OUTPUT_W = 1600;
+    const COLLAGE_OUTPUT_H = 1200; // matches the .viewer-collage-frame 4:3 aspect ratio
+    const collageClamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+    const setCollageStatus = (text, kind) => {
+      if (!collageStatusEl) return;
+      collageStatusEl.textContent = text || '';
+      collageStatusEl.classList.remove('is-error', 'is-success');
+      if (kind) collageStatusEl.classList.add(kind);
+    };
+
+    const applyCollageTileStyle = (tile, el) => {
+      el.style.left = `${tile.x * 100}%`;
+      el.style.top = `${tile.y * 100}%`;
+      el.style.width = `${tile.w * 100}%`;
+      el.style.height = `${tile.h * 100}%`;
+      el.style.zIndex = String(tile.z);
+    };
+
+    const bringCollageTileToFront = (tile, el) => {
+      tile.z = collageNextZ++;
+      el.style.zIndex = String(tile.z);
+    };
+
+    const attachCollageTileInteractions = (tile, el, handleEl) => {
+      el.addEventListener('pointerdown', (e) => {
+        if (e.target === handleEl) return;
+        e.preventDefault();
+        el.classList.add('is-active');
+        bringCollageTileToFront(tile, el);
+        const frameRect = collageFrameEl.getBoundingClientRect();
+        const startX = e.clientX, startY = e.clientY;
+        const originX = tile.x, originY = tile.y;
+        const onMove = (ev) => {
+          const dx = (ev.clientX - startX) / frameRect.width;
+          const dy = (ev.clientY - startY) / frameRect.height;
+          tile.x = collageClamp(originX + dx, 0, 1 - tile.w);
+          tile.y = collageClamp(originY + dy, 0, 1 - tile.h);
+          applyCollageTileStyle(tile, el);
+        };
+        const onUp = () => {
+          el.classList.remove('is-active');
+          window.removeEventListener('pointermove', onMove);
+          window.removeEventListener('pointerup', onUp);
+        };
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+      });
+      handleEl.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        bringCollageTileToFront(tile, el);
+        const frameRect = collageFrameEl.getBoundingClientRect();
+        const startX = e.clientX, startY = e.clientY;
+        const originW = tile.w, originH = tile.h;
+        const minSize = 0.08;
+        const onMove = (ev) => {
+          const dw = (ev.clientX - startX) / frameRect.width;
+          const dh = (ev.clientY - startY) / frameRect.height;
+          tile.w = collageClamp(originW + dw, minSize, 1 - tile.x);
+          tile.h = collageClamp(originH + dh, minSize, 1 - tile.y);
+          applyCollageTileStyle(tile, el);
+        };
+        const onUp = () => {
+          window.removeEventListener('pointermove', onMove);
+          window.removeEventListener('pointerup', onUp);
+        };
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+      });
+    };
+
+    const renderCollageFrame = () => {
+      if (!collageFrameEl) return;
+      collageFrameEl.innerHTML = '';
+      collageTiles.forEach((tile) => {
+        const el = document.createElement('div');
+        el.className = 'viewer-collage-tile';
+        if (tile.kind === 'qr') {
+          const qrBox = document.createElement('div');
+          qrBox.className = 'viewer-collage-qr-tile';
+          const img = document.createElement('img');
+          img.src = shareCardQrUrl;
+          img.alt = 'QR code';
+          const label = document.createElement('span');
+          label.textContent = 'SCAN FOR 3D / AR';
+          qrBox.appendChild(img);
+          qrBox.appendChild(label);
+          el.appendChild(qrBox);
+        } else {
+          const img = document.createElement('img');
+          img.src = tile.src;
+          img.alt = tile.label || 'Screenshot';
+          el.appendChild(img);
+        }
+        const handle = document.createElement('div');
+        handle.className = 'viewer-collage-tile-handle';
+        el.appendChild(handle);
+        applyCollageTileStyle(tile, el);
+        attachCollageTileInteractions(tile, el, handle);
+        collageFrameEl.appendChild(el);
+      });
+    };
+
+    // Simple cascading 3-column starting grid; the user drags/resizes from there.
+    const defaultCollageTileRect = (index) => ({
+      x: 0.04 + (index % 3) * 0.32,
+      y: 0.04 + (Math.floor(index / 3) % 3) * 0.32,
+      w: 0.28,
+      h: 0.28,
+    });
+
+    const addCollageShotTile = (shot) => {
+      if (collageTiles.some((t) => t.kind === 'shot' && t.shotKey === shot.key)) return;
+      const rect = defaultCollageTileRect(collageTiles.filter((t) => t.kind === 'shot').length);
+      collageTiles.push({
+        id: `shot-${shot.key}`,
+        kind: 'shot',
+        shotKey: shot.key,
+        src: shot.rawDataUrl || shot.dataUrl,
+        label: shot.label,
+        z: collageNextZ++,
+        ...rect,
+      });
+      renderCollageFrame();
+    };
+
+    const removeCollageShotTile = (shotKey) => {
+      collageTiles = collageTiles.filter((t) => !(t.kind === 'shot' && t.shotKey === shotKey));
+      renderCollageFrame();
+    };
+
+    const setCollageQrTile = (enabled) => {
+      collageTiles = collageTiles.filter((t) => t.kind !== 'qr');
+      if (enabled) {
+        collageTiles.push({ id: 'qr', kind: 'qr', x: 0.70, y: 0.70, w: 0.24, h: 0.24, z: collageNextZ++ });
+      }
+      renderCollageFrame();
+    };
+
+    const renderCollagePicker = () => {
+      if (!collagePickerEl) return;
+      collagePickerEl.innerHTML = '';
+      shotGallery.forEach((shot) => {
+        const item = document.createElement('label');
+        item.className = 'viewer-collage-picker-item';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = collageTiles.some((t) => t.kind === 'shot' && t.shotKey === shot.key);
+        checkbox.addEventListener('change', () => {
+          if (checkbox.checked) addCollageShotTile(shot);
+          else removeCollageShotTile(shot.key);
+        });
+        const img = document.createElement('img');
+        img.src = shot.rawDataUrl || shot.dataUrl;
+        img.alt = shot.label;
+        const span = document.createElement('span');
+        span.textContent = shot.label;
+        item.appendChild(checkbox);
+        item.appendChild(img);
+        item.appendChild(span);
+        collagePickerEl.appendChild(item);
+      });
+    };
+
+    // Draws the QR badge tile the same way composeShot draws its QR card, but
+    // sized to the tile's own box (no source-shot-relative math needed here).
+    const drawCollageQrTile = async (ctx, x, y, w, h) => {
+      const radius = Math.round(Math.min(w, h) * 0.08);
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.18)';
+      ctx.shadowBlur = Math.round(Math.min(w, h) * 0.05);
+      ctx.fillStyle = '#ffffff';
+      roundRectPath(ctx, x, y, w, h, radius);
+      ctx.fill();
+      ctx.restore();
+      const qr = await getQrImage();
+      if (!qr) return;
+      const pad = Math.round(Math.min(w, h) * 0.10);
+      const labelH = Math.round(h * 0.16);
+      const qrSize = Math.max(0, Math.min(w - pad * 2, h - pad * 2 - labelH));
+      const qx = x + (w - qrSize) / 2;
+      const qy = y + pad;
+      ctx.drawImage(qr, qx, qy, qrSize, qrSize);
+      ctx.fillStyle = '#4d4d4d';
+      ctx.font = `700 ${Math.round(Math.min(w, h) * 0.09)}px Inter, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('SCAN FOR 3D / AR', x + w / 2, qy + qrSize + labelH / 2);
+    };
+
+    const renderCollageCanvas = async () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = COLLAGE_OUTPUT_W;
+      canvas.height = COLLAGE_OUTPUT_H;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, COLLAGE_OUTPUT_W, COLLAGE_OUTPUT_H);
+      const ordered = [...collageTiles].sort((a, b) => a.z - b.z);
+      for (const tile of ordered) {
+        const x = tile.x * COLLAGE_OUTPUT_W;
+        const y = tile.y * COLLAGE_OUTPUT_H;
+        const w = tile.w * COLLAGE_OUTPUT_W;
+        const h = tile.h * COLLAGE_OUTPUT_H;
+        if (tile.kind === 'qr') {
+          await drawCollageQrTile(ctx, x, y, w, h);
+        } else {
+          try {
+            const img = await loadImage(tile.src);
+            ctx.drawImage(img, x, y, w, h);
+          } catch (error) { /* skip a tile whose image failed to (re)load */ }
+        }
+      }
+      return canvas;
+    };
+
+    const downloadCollageImage = async () => {
+      if (!collageTiles.length) { setCollageStatus('Select at least one screenshot first.', 'is-error'); return; }
+      if (!collageDownloadButton) return;
+      collageDownloadButton.disabled = true;
+      collageDownloadButton.textContent = 'Rendering...';
+      try {
+        const canvas = await renderCollageCanvas();
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+        if (!blob) throw new Error('empty blob');
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${safeName(modelBaseName)}-combined-view.png`;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(link.href), 1200);
+        setCollageStatus('');
+      } catch (error) {
+        setCollageStatus('Could not render the combined image.', 'is-error');
+      } finally {
+        collageDownloadButton.disabled = false;
+        collageDownloadButton.textContent = 'Download image';
+      }
+    };
+
+    const saveCollageToPublication = async () => {
+      if (!collageTiles.length) { setCollageStatus('Select at least one screenshot first.', 'is-error'); return; }
+      if (!collageSaveButton) return;
+      collageSaveButton.disabled = true;
+      collageSaveButton.textContent = 'Saving...';
+      try {
+        const canvas = await renderCollageCanvas();
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+        if (!blob) throw new Error('empty blob');
+        const formData = new FormData();
+        formData.append('image', blob, 'combined-view.png');
+        const resp = await fetch(`/models/${modelId}/collage`, {
+          method: 'POST',
+          headers: { 'X-CSRFToken': csrfToken },
+          body: formData,
+        });
+        if (!resp.ok) throw new Error('save failed');
+        setCollageStatus('Saved — it now shows on your publication page.', 'is-success');
+      } catch (error) {
+        setCollageStatus('Could not save the combined figure. Please try again.', 'is-error');
+      } finally {
+        collageSaveButton.disabled = false;
+        collageSaveButton.textContent = 'Save to publication';
+      }
+    };
+
+    combineShotsButton?.addEventListener('click', () => {
+      if (!shotGallery.length) return;
+      renderCollagePicker();
+      renderCollageFrame();
+      setCollageStatus('');
+      collageModal?.classList.remove('hidden');
+    });
+    closeCollageModal?.addEventListener('click', () => collageModal?.classList.add('hidden'));
+    collageModal?.addEventListener('click', (e) => { if (e.target === collageModal) collageModal.classList.add('hidden'); });
+    collageQrToggle?.addEventListener('change', () => setCollageQrTile(collageQrToggle.checked));
+    collageDownloadButton?.addEventListener('click', downloadCollageImage);
+    collageSaveButton?.addEventListener('click', saveCollageToPublication);
 
     rotateInputs.forEach((input) => {
       input.addEventListener('input', async () => {

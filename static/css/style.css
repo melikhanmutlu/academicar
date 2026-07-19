@@ -5494,6 +5494,33 @@ input[type="file"]::-webkit-file-upload-button {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+/* Combined-screenshot figure (viewer "Combine screenshots" tool), shown next
+   to the model preview when the owner has saved one. */
+.model-collage-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 4px 8px 4px 4px;
+  border: 1px solid var(--color-light-pearl);
+  border-radius: 999px;
+  text-decoration: none;
+  transition: border-color 160ms ease;
+}
+.model-collage-link:hover { border-color: var(--color-silver-ash); }
+.model-collage-link img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  border-radius: 999px;
+  background: var(--color-cloud-whisper);
+}
+.model-collage-link span {
+  font-family: var(--font-inter);
+  font-size: 11.5px;
+  font-weight: 650;
+  color: var(--color-midnight-graphite);
+}
 /* Quiet, borderless key/value rows replace the old boxed meta tiles. */
 .model-meta-list {
   margin-top: 14px;

@@ -132,6 +132,10 @@ class Model3D(db.Model):
     # GLB with trimesh on every request.
     dimensions_cm = db.Column(db.String(50), nullable=True)
     poster_path = db.Column(db.String(500), nullable=True)
+    # User-composed figure combining several viewer screenshots (optionally with
+    # a QR badge) into one image, built client-side in the viewer and saved via
+    # model_collage_save(). Shown next to the poster on the publication pages.
+    collage_path = db.Column(db.String(500), nullable=True)
     public_id = db.Column(db.String(40), unique=True, nullable=True, index=True)
     license_type = db.Column(db.String(30), nullable=False, default="free", index=True)
     license_status = db.Column(db.String(30), nullable=False, default="active", index=True)

@@ -281,6 +281,8 @@ MAX_BLOG_IMAGE_BYTES = 10 * 1024 * 1024
 # Institution showcase logos: raster only (no SVG — script injection risk).
 ALLOWED_INSTITUTION_LOGO_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
 MAX_INSTITUTION_LOGO_BYTES = 2 * 1024 * 1024
+# Combined-screenshot figure, composited client-side and uploaded as a PNG.
+MAX_COLLAGE_IMAGE_BYTES = 8 * 1024 * 1024
 # Rows per page for paginated admin tables (users, papers, models, payments,
 # QR records, audit log, conversion jobs).
 ADMIN_PER_PAGE = 50
@@ -3579,6 +3581,94 @@ def register_routes(app: Flask) -> None:
         response = send_from_directory(directory, "poster.png", mimetype="image/png", conditional=True)
         response.headers["Cache-Control"] = "private, no-cache"
         return response
+
+    @app.route("/files/<unique_id>/collage.png")
+    def serve_collage(unique_id):
+        """Serve the user-composed "combined view" figure (see
+        model_collage_save). Same visibility rule as serve_poster: the owner
+        always sees it, everyone else only while the model is accessible."""
+        if not is_uuid(unique_id):
+            abort(404)
+        model = db.session.get(Model3D, unique_id)
+        if not model or not model.collage_path:
+            abort(404)
+        is_owner = current_user.is_authenticated and current_user.id == model.user_id
+        if not _paper_visible_to_request(model.paper) or not (is_owner or model_is_accessible(model)):
+            abort(404)
+        directory = os.path.join(app.config["CONVERTED_FOLDER"], unique_id)
+        collage = os.path.join(directory, "collage.png")
+        if not os.path.exists(collage):
+            if not ensure_local(collage, f"converted/{unique_id}/collage.png"):
+                abort(404)
+        response = send_from_directory(directory, "collage.png", mimetype="image/png", conditional=True)
+        response.headers["Cache-Control"] = "private, no-cache"
+        return response
+
+    @app.route("/models/<model_id>/collage", methods=["POST"])
+    @login_required
+    @require_model_ownership
+    def model_collage_save(model_id):
+        """Persist a client-composed "combined view" figure (several viewer
+        screenshots, optionally with a QR badge, merged into one PNG in the
+        browser — see the viewer's "Combine screenshots" tool). Owner-only:
+        require_model_ownership enforces this via the model_id kwarg."""
+        model = db.session.get(Model3D, model_id)
+        if not model:
+            abort(404)
+        file = request.files.get("image")
+        if not file or not file.filename:
+            return jsonify({"error": "No image provided."}), 400
+        directory = os.path.join(app.config["CONVERTED_FOLDER"], model_id)
+        collage_path = os.path.join(directory, "collage.png")
+        tmp_path = collage_path + ".upload"
+        try:
+            safe_save_file(file, tmp_path)
+        except StorageError as e:
+            return jsonify({"error": str(e)}), 500
+        try:
+            if os.path.getsize(tmp_path) > MAX_COLLAGE_IMAGE_BYTES:
+                cleanup_file(tmp_path)
+                return jsonify({"error": "Image is too large (max 8 MB)."}), 400
+            from PIL import Image, UnidentifiedImageError
+            try:
+                with Image.open(tmp_path) as img:
+                    img.verify()
+            except (UnidentifiedImageError, OSError):
+                cleanup_file(tmp_path)
+                return jsonify({"error": "Not a valid image file."}), 400
+        except OSError:
+            cleanup_file(tmp_path)
+            return jsonify({"error": "Could not read the uploaded image."}), 500
+        os.replace(tmp_path, collage_path)
+        model.collage_path = collage_path
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            return jsonify({"error": "Could not save the combined figure."}), 500
+        mirror_file(collage_path, f"converted/{model_id}/collage.png")
+        log_audit("model_collage_saved", user_id=current_user.id, resource_id=model_id)
+        return jsonify({"ok": True, "url": url_for("serve_collage", unique_id=model_id)})
+
+    @app.route("/models/<model_id>/collage", methods=["DELETE"])
+    @login_required
+    @require_model_ownership
+    def model_collage_delete(model_id):
+        model = db.session.get(Model3D, model_id)
+        if not model:
+            abort(404)
+        if model.collage_path:
+            old_path = model.collage_path
+            model.collage_path = None
+            try:
+                db.session.commit()
+            except SQLAlchemyError:
+                db.session.rollback()
+                return jsonify({"error": "Could not remove the combined figure."}), 500
+            cleanup_file(old_path)
+            mirror_delete(f"converted/{model_id}/collage.png")
+            log_audit("model_collage_removed", user_id=current_user.id, resource_id=model_id)
+        return jsonify({"ok": True})
 
     @app.route("/qr-image/<model_id>")
     def qr_image(model_id):

@@ -111,6 +111,12 @@
                   <span class="detail-chip">{{ format_file_size(m.file_size) }}</span>
                 </div>
                 {% if m.description %}<p class="text-sm text-[#64748b] mt-2 line-clamp-2">{{ m.description }}</p>{% endif %}
+                {% if m.collage_path %}
+                  <a href="{{ url_for('serve_collage', unique_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-collage-link">
+                    <img src="{{ url_for('serve_collage', unique_id=m.id) }}" alt="Combined view of {{ m.display_name or m.original_filename }}" loading="lazy">
+                    <span>Combined view</span>
+                  </a>
+                {% endif %}
                 <div class="model-actions mt-4">
                   <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="btn-primary compact">Open 3D / AR</a>
                   <button type="button" class="btn-secondary compact" data-copy-link="{{ public_url('view_model', model_id=m.id) }}" data-analytics-model-id="{{ m.id }}" aria-label="Copy viewer link">Copy link</button>
