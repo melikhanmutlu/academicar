@@ -156,6 +156,17 @@
       border-color: rgba(15, 23, 42, 0.10) !important;
       color: #1f2933;
     }
+    /* The scroll thumb defaults to translucent white, invisible on this light
+       surface — darken it to match the graphite text above. */
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-control-panel {
+      scrollbar-color: rgba(15, 23, 42, 0.25) transparent;
+    }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-control-panel::-webkit-scrollbar-thumb {
+      background: rgba(15, 23, 42, 0.25);
+    }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-control-panel::-webkit-scrollbar-thumb:hover {
+      background: rgba(15, 23, 42, 0.38);
+    }
     /* Muted white text -> graphite; translucent white surfaces/borders -> light
        equivalents. Solid bg-white (the QR holder) is intentionally left alone. */
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-control-panel [class*="text-white"],
@@ -583,6 +594,27 @@
        pushed the bottom control panel off-screen. Use the dynamic viewport
        height (with a 100vh fallback) so h-screen tracks the visible area. */
     main.h-screen { height: 100vh; height: 100dvh; }
+    /* The panel is bottom-anchored and grows upward with its content (title,
+       rotation sliders, and especially the "Generate 8 views" screenshot
+       grid). On a short viewport — a low-res or non-maximized desktop window,
+       not just narrow/mobile widths — uncapped growth pushes it off the top
+       of the screen. Cap it to the space below the top header/toolbar and
+       scroll internally instead; the mobile media query below overrides this
+       with its own (shorter) cap for narrow widths. */
+    .viewer-control-panel {
+      max-height: calc(100vh - 7rem);
+      max-height: calc(100dvh - 7rem);
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+    }
+    .viewer-control-panel::-webkit-scrollbar { width: 6px; }
+    .viewer-control-panel::-webkit-scrollbar-track { background: transparent; }
+    .viewer-control-panel::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.28);
+      border-radius: 999px;
+    }
+    .viewer-control-panel::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.42); }
     @media (max-width: 640px) {
       .viewer-tool-btn { min-height: 34px; min-width: 34px; padding: 0.45rem; font-size: 0; justify-content: center; }
       .viewer-tool-btn svg { display: block; }
