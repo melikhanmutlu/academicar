@@ -3552,7 +3552,11 @@ def register_routes(app: Flask) -> None:
         model = db.session.get(Model3D, unique_id)
         if not model:
             abort(404)
-        if not _paper_visible_to_request(model.paper) or not model_is_accessible(model):
+        # The owner's own dashboard/management pages show a thumbnail even once
+        # the model's access window has expired (the public/QR viewer still
+        # shows the graceful "unavailable" state via model_is_accessible below).
+        is_owner = current_user.is_authenticated and current_user.id == model.user_id
+        if not _paper_visible_to_request(model.paper) or not (is_owner or model_is_accessible(model)):
             abort(404)
         directory = os.path.join(app.config["CONVERTED_FOLDER"], unique_id)
         poster = os.path.join(directory, "poster.png")
