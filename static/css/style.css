@@ -7917,6 +7917,14 @@ label.rounded-xl input[type="checkbox"] {
 }
 
 /* ===== New / Edit Project layout with sticky decorative aside ===== */
+/* The global html+body `overflow-x: hidden` coerces overflow-y to `auto`, which
+   turns body into a second scroll container and breaks `position: sticky`
+   (the sticky aside would pin to the non-scrolling body and drift away). On this
+   page drop body's clip so there is a single scroll container; html keeps
+   clipping the page-level horizontal scrollbar. */
+body.project-form-page {
+  overflow-x: visible;
+}
 .project-new-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -7933,13 +7941,18 @@ label.rounded-xl input[type="checkbox"] {
   .project-new-layout {
     grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
   }
+  /* Sticky lives on the grid ITEM (not the card) so its containing block is
+     the full-height grid area — otherwise align-items:start shrinks the item
+     to the card and the panel scrolls away after ~440px. Mirrors the working
+     .plans-compare-copy pattern. */
   .project-new-aside {
     display: block;
+    position: sticky;
+    top: 88px;
+    align-self: start;
   }
 }
 .project-new-aside-card {
-  position: sticky;
-  top: 88px;
   overflow: hidden;
   border-radius: 12px;
   padding: 44px 32px;

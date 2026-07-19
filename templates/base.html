@@ -70,7 +70,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=asset_version) }}">
   {% block head %}{% endblock %}
 </head>
-<body class="font-sans min-h-screen flex flex-col" style="background: var(--color-canvas-white); color: var(--color-midnight-graphite);">
+<body class="font-sans min-h-screen flex flex-col {% block body_class %}{% endblock %}" style="background: var(--color-canvas-white); color: var(--color-midnight-graphite);">
 
   {% if not (request.endpoint and request.endpoint.startswith('admin_')) %}
   <header class="site-header">
