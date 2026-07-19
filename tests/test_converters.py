@@ -171,6 +171,7 @@ def test_repair_transparent_base_color_restores_invisible_textured_material():
 
     try:
         trimesh.creation.box().export(glb_path)
+        ensure_pbr_materials(str(glb_path))
         gltf = GLTF2.load(str(glb_path))
         pbr = gltf.materials[0].pbrMetallicRoughness
         # Simulate FBX2glTF's broken opacity mapping on a textured material.
@@ -199,6 +200,7 @@ def test_repair_transparent_base_color_leaves_untextured_transparent_material():
 
     try:
         trimesh.creation.box().export(glb_path)
+        ensure_pbr_materials(str(glb_path))
         gltf = GLTF2.load(str(glb_path))
         gltf.materials[0].pbrMetallicRoughness.baseColorTexture = None
         gltf.materials[0].pbrMetallicRoughness.baseColorFactor = [1.0, 1.0, 1.0, 0.0]

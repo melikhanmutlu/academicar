@@ -1,6 +1,5 @@
 {% extends "base.html" %}
 {% block title %}Dashboard - AcademicAR{% endblock %}
-
 {% block content %}
 {% set demo = demo_mode is defined and demo_mode %}
 <div class="app-shell dashboard-shell py-8">
@@ -138,7 +137,7 @@
             <article class="latest-model-card surface">
               <a href="{{ model_href }}" class="latest-model-preview" aria-label="Open {{ model.display_name or model.original_filename or '3D model' }}">
                 {% if not demo %}
-                  <img src="{{ url_for('serve_poster', unique_id=model.id) }}" alt="Preview of {{ model.display_name or model.original_filename or '3D model' }}" onerror="this.hidden=true; this.nextElementSibling.hidden=false;">
+                  <img src="{{ url_for('serve_poster', unique_id=model.id) }}?v={{ model_asset_token(model) }}" loading="lazy" decoding="async" alt="Preview of {{ model.display_name or model.original_filename or '3D model' }}" onerror="this.hidden=true; this.nextElementSibling.hidden=false;">
                   <svg hidden width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 4 6v12l8 4 8-4V6z"/><path d="M4 6l8 4 8-4"/><line x1="12" y1="22" x2="12" y2="10"/></svg>
                 {% else %}
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2 4 6v12l8 4 8-4V6z"/><path d="M4 6l8 4 8-4"/><line x1="12" y1="22" x2="12" y2="10"/></svg>

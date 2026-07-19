@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% set presentation_enabled = project_supports_feature(paper, 'presentation_library') %}
 {% block title %}{{ paper.title }} - AcademicAR{% endblock %}
 {% block meta_description %}{{ (paper.abstract or 'Interactive 3D project with browser and AR-ready models.')|striptags|truncate(160) }}{% endblock %}
 {% block head %}
@@ -27,10 +28,8 @@
       <h1 class="paper-title font-serif text-3xl lg:text-4xl font-bold leading-tight text-[#111827]">{{ paper.title }}</h1>
 
       <div class="paper-meta mt-5">
-        {% if paper.authors %}<div><span>Contributors</span><strong>{{ paper.authors }}</strong></div>{% endif %}
         {% if paper.institution %}<div><span>Organization</span><strong>{{ paper.institution }}</strong></div>{% endif %}
-        {% if paper.doi %}<div><span>DOI</span><strong><a href="https://doi.org/{{ paper.doi }}" target="_blank" rel="noopener noreferrer">{{ paper.doi }}</a></strong></div>{% endif %}
-        {% if paper.pmid %}<div><span>PMID</span><strong>{{ paper.pmid }}</strong></div>{% endif %}
+        {% if paper.department %}<div><span>Department</span><strong>{{ paper.department }}</strong></div>{% endif %}
       </div>
 
       {% if paper.abstract %}
@@ -57,8 +56,12 @@
       </div>
 
       <div class="share-actions mt-5">
-        {% if paper.pdf_path %}
-          <a href="{{ url_for('paper_public_pdf', slug=paper.slug) }}" class="btn-primary compact">View document</a>
+        {% if paper.articles and paper.articles[0].pdf_path %}
+          <a href="{{ url_for('project_article_reader', slug=paper.slug, article_id=paper.articles[0].id) }}" class="btn-primary compact">View first article</a>
+        {% elif presentation_enabled and paper.attachments %}
+          <a href="{{ url_for('project_attachment_reader', slug=paper.slug, attachment_id=paper.attachments[0].id) }}" class="btn-primary compact">Open materials</a>
+        {% elif paper.pdf_path %}
+          <a href="{{ url_for('paper_public_pdf', slug=paper.slug) }}" class="btn-primary compact">View legacy document</a>
         {% else %}
           <span class="btn-secondary compact opacity-60 cursor-not-allowed" aria-disabled="true">PDF not available</span>
         {% endif %}
@@ -66,10 +69,33 @@
 
       <div class="share-stats mt-5">
         <div><span>Models</span><strong>{{ paper.models|length }}</strong></div>
-        <div><span>PDF</span><strong>{{ 'Available' if paper.pdf_path else 'None' }}</strong></div>
+        <div><span>Articles</span><strong>{{ paper.articles|length }}</strong></div>
       </div>
     </aside>
   </section>
+
+  {% if paper.articles or (presentation_enabled and paper.attachments) %}
+  <section class="topic-library surface rounded-xl p-5 sm:p-6 mb-8">
+    <div class="section-heading-row"><div><p class="project-section-kicker">Topic library</p><h2>Articles &amp; presentation materials</h2></div><span>{{ paper.articles|length + (paper.attachments|length if presentation_enabled else 0) }} items</span></div>
+    {% if paper.articles %}
+      <div class="topic-document-grid">
+        {% for article in paper.articles %}
+          <article class="topic-document-card">
+            <span>Article {{ loop.index }}</span>
+            <h3>{{ article.title or 'Untitled related article' }}</h3>
+            {% if article.authors %}<p>{{ article.authors }}</p>{% endif %}
+            <div>{% if article.year %}<small>{{ article.year }}</small>{% endif %}{% if article.doi %}<a href="https://doi.org/{{ article.doi }}" target="_blank" rel="noopener noreferrer">DOI</a>{% endif %}{% if article.pdf_path %}<a href="{{ url_for('project_article_reader', slug=paper.slug, article_id=article.id) }}">Present PDF</a>{% endif %}</div>
+          </article>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% if presentation_enabled and paper.attachments %}
+      <div class="topic-material-row">
+        {% for material in paper.attachments %}<a href="{{ url_for('project_attachment_reader', slug=paper.slug, attachment_id=material.id) }}"><span>{{ material.file_type|upper }}</span><strong>{{ material.title or material.original_filename }}</strong><small>{{ 'PDF preview ready' if material.preview_pdf_path else 'Download original' }}</small></a>{% endfor %}
+      </div>
+    {% endif %}
+  </section>
+  {% endif %}
 
   <section class="mb-8">
     <div class="flex items-end justify-between gap-4 mb-5">

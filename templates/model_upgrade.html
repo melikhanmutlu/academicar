@@ -44,6 +44,11 @@
         {% endfor %}
       </div>
 
+      <div class="upgrade-coupon">
+        <div><label for="couponCode">Coupon code</label><p>The code is validated before PayTR opens; the discounted total is sent to the payment gateway.</p></div>
+        <input id="couponCode" name="coupon_code" maxlength="64" autocomplete="off" placeholder="Enter coupon">
+      </div>
+
       <div class="upgrade-actions">
         <button type="submit" class="upgrade-submit">Continue to payment</button>
         <p class="upgrade-secure">

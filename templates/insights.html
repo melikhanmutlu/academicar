@@ -18,6 +18,32 @@
     <div><span>Link copies</span><strong>{{ analytics.shares }}</strong></div>
   </section>
 
+  <section class="insights-section surface model-insights-section">
+    <div class="insights-section-head"><div><p class="project-section-kicker">Model-level performance</p><h2>Every model, side by side</h2></div><span>{{ analytics.model_metrics|length }} models</span></div>
+    {% if analytics.model_metrics %}
+      <div class="model-insights-table-wrap">
+        <table class="model-insights-table">
+          <thead><tr><th>Model</th><th>Views</th><th>Unique</th><th>QR</th><th>AR</th><th>Shares</th><th>Engagement</th><th>Leading segment</th><th>Last viewed</th></tr></thead>
+          <tbody>
+          {% for item in analytics.model_metrics %}
+            <tr>
+              <td><a href="{{ url_for('view_model', model_id=item.model.id) }}"><strong>{{ item.model.display_name or item.model.original_filename or '3D model' }}</strong><small>{{ item.model.paper.title }} · {{ get_license_plan(item.model.license_type).label }}</small></a></td>
+              <td>{{ item.views }}</td><td>{{ item.unique_visitors }}</td><td>{{ item.qr_scans }}</td><td>{{ item.ar_starts }}</td><td>{{ item.shares }}</td>
+              <td><strong>{{ item.engagement_rate }}%</strong><small>Unique visitors with AR or share activity</small></td>
+              {% if item.detailed %}
+                <td><span>{{ item.top_country.label if item.top_country else '—' }}</span><small>{{ item.top_device.label if item.top_device else 'No device data' }}{% if item.top_source %} · {{ item.top_source.label }}{% endif %}</small></td>
+              {% else %}
+                <td><span class="insight-locked">Disabled by plan</span><small>Enable detailed insights in Admin → Plans</small></td>
+              {% endif %}
+              <td>{{ item.last_viewed_at.strftime('%d %b %Y, %H:%M') if item.last_viewed_at else 'Never' }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}<p class="insights-empty">Upload a model to begin collecting model-level statistics.</p>{% endif %}
+  </section>
+
   <section class="insights-section surface">
     <div class="insights-section-head"><h2>Viewer activity</h2><span>Last {{ analytics.days }} days</span></div>
     <div class="insights-trend" aria-label="Daily model views">

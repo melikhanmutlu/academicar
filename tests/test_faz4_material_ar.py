@@ -139,7 +139,7 @@ class TestViewerMobileAr:
 
     def test_owner_annotate_button_keeps_mobile_icon(self):
         content = (TEMPLATES_DIR / "viewer.html").read_text()
-        assert '{% if is_owner %}<button id="annotateBtn"' in content
+        assert "{% if is_owner and 'annotations' in viewer_features %}<button id=\"annotateBtn\"" in content
         assert "viewer-icon-annotate" in content
 
     def test_quick_look_allows_chrome_ios(self):
@@ -154,7 +154,7 @@ class TestViewerMobileAr:
         assert 'type="model/vnd.usdz+zip"' in content
         assert 'rel="ar"' in content
 
-    def test_ios_uses_native_model_viewer_ar_button(self):
+    def test_ios_uses_safe_area_toolbar_ar_button(self):
         content = (TEMPLATES_DIR / "viewer.html").read_text()
         ar_handler = content.split(
             "if (arBtn && !useNativeIOSArButton && !useIOSAnchorButton) {", 1
@@ -162,16 +162,13 @@ class TestViewerMobileAr:
         assert "const isIOSChrome = isIOS && /CriOS/i.test(navigator.userAgent);" in content
         assert "const usdzUrl =" in content
         assert "const nativeArBtn = document.getElementById('nativeArBtn');" in content
-        # iOS Safari uses model-viewer's native Quick Look button; iOS Chrome
-        # (CriOS) surfaces a real <a rel="ar"> anchor the user taps (a programmatic
-        # Quick Look launch is unreliable in iOS Chrome); Android/desktop drive AR
-        # from the toolbar button.
-        assert "const useNativeIOSArButton = isIOS && !isIOSChrome && hasUsdz && nativeArBtn;" in content
-        assert "const useIOSAnchorButton = isIOS && !useNativeIOSArButton && hasUsdz && iosArButtons.length > 0;" in content
-        # iOS Safari branch hides our buttons and uses the native one.
-        assert "arButtons.forEach((button) => { button.hidden = true; });" in content
-        assert "iosArButtons.forEach((button) => { button.hidden = true; });" in content
-        # iOS Chrome branch reveals the real rel="ar" anchor instead.
+        # Both Safari and Chrome on iOS surface the real rel=ar anchor inside
+        # the responsive header. The slotted native button stays hidden so it
+        # cannot overlap QR/info controls (the reported Safari regression).
+        assert "const useNativeIOSArButton = false;" in content
+        assert "const useIOSAnchorButton = isIOS && hasUsdz && iosArButtons.length > 0;" in content
+        assert ".native-ar-button { display: none !important; }" in content
+        assert "env(safe-area-inset-right" in content
         assert "iosArButtons.forEach((button) => { button.hidden = false; });" in content
         assert "if (arBtn && !useNativeIOSArButton && !useIOSAnchorButton) {" in content
         # The toolbar handler still launches Quick Look on iOS without a usable anchor

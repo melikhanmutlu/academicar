@@ -34,6 +34,7 @@ tests_runtime/
 .pytest_cache/
 .test_tmp*/
 pytest-cache-files-*/
+.pytest-poster-*/
 # Ignore local Claude config, but track shared project skills.
 .claude/*
 !.claude/skills/

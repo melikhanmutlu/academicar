@@ -20,6 +20,8 @@ class LicensePlan:
     duration_days: int | None
     storage_limit_bytes: int
     feature_summary: tuple[str, ...]
+    max_models_per_project: int | None
+    features: frozenset[str]
     # Admin-editable via /admin/pricing. Additionally gates upgrade/renewal
     # offers on top of USER_SELECTABLE_PLAN_KEYS/PAID_PLAN_KEYS (which decide
     # which keys exist as buyable concepts at all) — this only narrows further,
@@ -32,6 +34,24 @@ class LicensePlan:
 
 
 MB = 1024 * 1024
+
+PLAN_FEATURES: tuple[tuple[str, str], ...] = (
+    ("ar", "Mobile AR"),
+    ("annotations", "Model annotations"),
+    ("screenshots", "Screenshot export"),
+    ("combined_view", "Combined view figures"),
+    ("video_recording", "Video recording"),
+    ("medical_colors", "Medical colour presets"),
+    ("presentation_library", "PDF / PowerPoint library"),
+    ("detailed_insights", "Detailed model insights"),
+)
+
+PLAN_RANK: dict[str, int] = {
+    "free": 0,
+    "academic": 1,
+    "extended_archive": 2,
+    "institutional": 3,
+}
 
 # Python-side fallback values, used to seed the license_plans DB table on
 # first run and as the cache's baseline whenever a key has no matching row
@@ -50,6 +70,8 @@ _DEFAULT_LICENSE_PLANS: dict[str, LicensePlan] = {
             "Video recording",
             "Watermarked viewer",
         ),
+        max_models_per_project=1,
+        features=frozenset(key for key, _ in PLAN_FEATURES),
     ),
     "academic": LicensePlan(
         key="academic",
@@ -65,6 +87,12 @@ _DEFAULT_LICENSE_PLANS: dict[str, LicensePlan] = {
             "No watermark",
             "Persistent QR and viewer URL",
         ),
+        max_models_per_project=5,
+        features=frozenset({
+            "ar", "annotations", "screenshots", "combined_view",
+            "video_recording", "medical_colors", "presentation_library",
+            "detailed_insights",
+        }),
     ),
     "extended_archive": LicensePlan(
         key="extended_archive",
@@ -80,6 +108,12 @@ _DEFAULT_LICENSE_PLANS: dict[str, LicensePlan] = {
             "Rich metadata fields",
             "Persistent QR and viewer URL",
         ),
+        max_models_per_project=20,
+        features=frozenset({
+            "ar", "annotations", "screenshots", "combined_view",
+            "video_recording", "medical_colors", "presentation_library",
+            "detailed_insights",
+        }),
     ),
     "institutional": LicensePlan(
         key="institutional",
@@ -94,6 +128,8 @@ _DEFAULT_LICENSE_PLANS: dict[str, LicensePlan] = {
             "Custom subdomain",
             "Dedicated support",
         ),
+        max_models_per_project=None,
+        features=frozenset(key for key, _ in PLAN_FEATURES),
         is_purchasable=False,
     ),
 }
@@ -117,7 +153,8 @@ def default_license_plans() -> dict[str, LicensePlan]:
 def _plan_from_row(row, base: LicensePlan | None) -> LicensePlan:
     fallback = base or LicensePlan(
         key=row.key, label=row.label, price_usd=0, duration_days=None,
-        storage_limit_bytes=0, feature_summary=(), is_purchasable=True,
+        storage_limit_bytes=0, feature_summary=(), max_models_per_project=None,
+        features=frozenset(), is_purchasable=True,
     )
     return dataclasses.replace(
         fallback,
@@ -126,6 +163,8 @@ def _plan_from_row(row, base: LicensePlan | None) -> LicensePlan:
         price_usd=row.price_usd_cents / 100.0,
         duration_days=row.duration_days,
         storage_limit_bytes=row.storage_limit_bytes,
+        max_models_per_project=row.max_models_per_project,
+        features=frozenset(row.features if row.features is not None else fallback.features),
         is_purchasable=row.is_purchasable,
     )
 
@@ -189,6 +228,48 @@ def get_license_plan(value: str | None) -> LicensePlan:
     return LICENSE_PLANS[normalize_license_type(value)]
 
 
+def plan_supports_feature(license_type: str | None, feature: str) -> bool:
+    """Return whether a viewer/product capability is enabled for a plan."""
+    return feature in get_license_plan(license_type).features
+
+
+def project_capacity_models(project) -> list:
+    """Models that consume a topic slot and may determine its active plan.
+
+    Failed conversions and expired/deleted access records remain visible for
+    recovery/audit, but must not consume capacity or keep a historical premium
+    plan attached to the topic forever. Queued/processing models do consume a
+    slot so parallel uploads cannot bypass the configured limit.
+    """
+    if project is None:
+        return []
+    excluded = {"failed", "expired", "deleted"}
+    return [model for model in project.models if model_access_status(model) not in excluded]
+
+
+def strongest_project_plan_key(project, *, intended_plan: str | None = None) -> str:
+    """Plan key governing topic-level features/capacity."""
+    plan_keys = [model.license_type or "free" for model in project_capacity_models(project)]
+    if intended_plan:
+        plan_keys.append(normalize_license_type(intended_plan))
+    if not plan_keys:
+        plan_keys = ["free"]
+    return max(plan_keys, key=lambda key: PLAN_RANK.get(normalize_license_type(key), 0))
+
+
+def project_supports_feature(
+    project,
+    feature: str,
+    *,
+    intended_plan: str | None = None,
+) -> bool:
+    """Whether the topic's strongest current plan enables ``feature``."""
+    return plan_supports_feature(
+        strongest_project_plan_key(project, intended_plan=intended_plan),
+        feature,
+    )
+
+
 def license_expires_at(license_type: str | None, starts_at: datetime | None = None) -> datetime | None:
     plan = get_license_plan(license_type)
     if plan.duration_days is None:
@@ -235,6 +316,8 @@ def model_access_status(model) -> str:
     if proc == "replacement_failed":
         # The previous working GLB is still served; treat as active for QR.
         return "active"
+    if (model.license_status or "").lower() == "expired":
+        return "expired"
     if is_access_expired(model.access_expires_at):
         return "expired"
     return "active"
@@ -275,6 +358,12 @@ def model_upgrade_options(model, within_days: int = 30) -> list[dict]:
     if model is None:
         return []
     current = get_license_plan(getattr(model, "license_type", None))
+    # Institutional and any future administratively provisioned plan are not
+    # self-service products. Price comparison is not a tier comparison: the
+    # institutional plan intentionally costs $0 in this table because it is
+    # invoiced offline, yet it is the strongest/sustained entitlement.
+    if not current.is_purchasable:
+        return []
     options: list[dict] = []
     # Upgrades: any user-selectable plan priced above the current one, in
     # ascending price order (USER_SELECTABLE_PLAN_KEYS is free -> academic ->
