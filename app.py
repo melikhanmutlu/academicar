@@ -3550,7 +3550,7 @@ def register_routes(app: Flask) -> None:
         if not is_uuid(unique_id):
             abort(404)
         model = db.session.get(Model3D, unique_id)
-        if not model or not model.poster_path:
+        if not model:
             abort(404)
         if not _paper_visible_to_request(model.paper) or not model_is_accessible(model):
             abort(404)
@@ -3559,7 +3559,19 @@ def register_routes(app: Flask) -> None:
         if not os.path.exists(poster):
             ensure_local(poster, f"converted/{unique_id}/poster.png")
         if not os.path.exists(poster):
-            abort(404)
+            glb_path = os.path.join(directory, "model.glb")
+            if not os.path.exists(glb_path):
+                ensure_local(glb_path, f"converted/{unique_id}/model.glb")
+            if not os.path.exists(glb_path) or not generate_poster(glb_path, poster):
+                abort(404)
+            model.poster_path = poster
+            try:
+                db.session.commit()
+            except SQLAlchemyError:
+                db.session.rollback()
+                abort(500)
+            mirror_file(poster, f"converted/{unique_id}/poster.png")
+            log_audit("model_poster_backfilled", user_id=model.user_id, resource_id=model.id)
         response = send_from_directory(directory, "poster.png", mimetype="image/png", conditional=True)
         response.headers["Cache-Control"] = "private, no-cache"
         return response
@@ -5733,6 +5745,51 @@ def register_routes(app: Flask) -> None:
         log_audit("admin_model_poster_regenerated", user_id=current_user.id, resource_id=model.id)
         flash("Poster regenerated.", "success")
         return redirect_target
+
+    @app.route("/admin/models/posters/generate-missing", methods=["POST"])
+    @login_required
+    def admin_generate_missing_posters():
+        """Backfill preview images for legacy models in a bounded admin batch."""
+        require_admin()
+        models = (
+            Model3D.query
+            .filter(or_(Model3D.poster_path.is_(None), Model3D.poster_path == ""))
+            .filter(Model3D.processing_status.in_(("ready", "replacement_failed")))
+            .order_by(Model3D.created_at.asc())
+            .limit(100)
+            .all()
+        )
+        generated = 0
+        failed = 0
+        for model in models:
+            try:
+                directory = os.path.join(app.config["CONVERTED_FOLDER"], model.id)
+                glb_path = os.path.join(directory, "model.glb")
+                if not os.path.exists(glb_path):
+                    ensure_local(glb_path, f"converted/{model.id}/model.glb")
+                poster_png = os.path.join(directory, "poster.png")
+                if not os.path.exists(glb_path) or not generate_poster(glb_path, poster_png):
+                    failed += 1
+                    continue
+                model.poster_path = poster_png
+                generated += 1
+                mirror_file(poster_png, f"converted/{model.id}/poster.png")
+            except Exception:
+                logger.exception("Poster backfill failed for model %s", model.id)
+                failed += 1
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not save generated preview records.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="models"))
+        log_audit(
+            "admin_model_posters_backfilled",
+            user_id=current_user.id,
+            details={"generated": generated, "failed": failed, "checked": len(models)},
+        )
+        flash(f"Generated {generated} missing preview(s)." + (f" {failed} could not be generated." if failed else ""), "success" if generated else "warning")
+        return redirect(url_for("admin_dashboard", admin_page="models"))
 
     @app.route("/admin/models/<model_id>/mirror/retry", methods=["POST"])
     @login_required
