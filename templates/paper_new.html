@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% set is_edit = mode|default('new') == 'edit' %}
 {% block title %}{{ 'Edit Project' if is_edit else 'New Project' }} - AcademicAR{% endblock %}
+{# Drop body's overflow-x clip so the sticky decorative aside has a single
+   scroll container (see body.project-form-page in style.css). #}
+{% block body_class %}project-form-page{% endblock %}
 
 {% block content %}
 <div class="app-shell py-10">
