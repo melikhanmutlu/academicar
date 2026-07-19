@@ -2071,6 +2071,58 @@ def process_model_upload_job(
                 cleanup_dir(converted_dir)
 
 
+def process_usdz_regen_job(
+    app: Flask,
+    *,
+    model_id: str,
+    glb_path: str,
+    usdz_path: str,
+    job_id: int | None = None,
+) -> None:
+    """Regenerate a model's iOS USDZ companion from its (already-recolored) GLB.
+
+    A viewer/edit recolor bakes the new color into the GLB inline (fast), but the
+    Blender USDZ export is heavy and must stay in the worker — the web request
+    only enqueues this. The GLB itself is not touched here.
+    """
+    with app.app_context():
+        model = db.session.get(Model3D, model_id)
+        job = db.session.get(ConversionJob, job_id) if job_id is not None else None
+        if job is not None and job.status != "processing":
+            # Inline path (tests / DEV_INLINE_JOBS) reaches here still "pending";
+            # the worker path already claimed it under the row lock.
+            job.status = "processing"
+            job.started_at = datetime.now(UTC)
+            job.attempts = (job.attempts or 0) + 1
+            db.session.commit()
+        if model is not None:
+            ensure_local(glb_path, f"converted/{model_id}/model.glb")
+            if not os.path.exists(glb_path):
+                logger.warning("USDZ regen skipped: GLB missing for model %s", model_id)
+            else:
+                # Drop the stale companion so the recolored GLB is re-exported;
+                # Quick Look would otherwise keep serving the old color.
+                if os.path.exists(usdz_path):
+                    cleanup_file(usdz_path)
+                try:
+                    convert_glb_to_usdz(glb_path, usdz_path)
+                    if os.path.exists(usdz_path):
+                        mirror_file(usdz_path, f"converted/{model_id}/model.usdz")
+                except Exception:  # USDZ is a best-effort companion.
+                    logger.exception(
+                        "USDZ regen failed for model %s (color is saved to the GLB regardless)",
+                        model_id,
+                    )
+        if job is not None:
+            job.status = "completed"
+            job.error = None
+            job.finished_at = datetime.now(UTC)
+            try:
+                db.session.commit()
+            except SQLAlchemyError:
+                db.session.rollback()
+
+
 def enqueue_conversion_job(
     app: Flask,
     *,
@@ -2097,7 +2149,10 @@ def enqueue_conversion_job(
     if app.config.get("TESTING") or app.config.get("DEV_INLINE_JOBS"):
         # Tests and explicit local dev (DEV_INLINE_JOBS=1) run conversion inline
         # so uploads appear immediately without a separate worker process.
-        process_model_upload_job(app, **job_kwargs)
+        if job_type == "usdz_regen":
+            process_usdz_regen_job(app, **job_kwargs)
+        else:
+            process_model_upload_job(app, **job_kwargs)
     # Otherwise the ConversionJob row stays "pending" for the isolated worker
     # (worker.py / run_next_conversion_job) to claim. Production web processes
     # MUST NOT run CPU/RAM-heavy 3D conversions inline; doing so here would also
@@ -2222,7 +2277,11 @@ def run_next_conversion_job(app: Flask) -> bool:
             return False
         payload = dict(job.payload or {})
         payload["job_id"] = job.id
-    process_model_upload_job(app, **payload)
+        job_kind = job.job_type
+    if job_kind == "usdz_regen":
+        process_usdz_regen_job(app, **payload)
+    else:
+        process_model_upload_job(app, **payload)
     return True
 
 
@@ -7183,6 +7242,46 @@ def register_routes(app: Flask) -> None:
             log_audit("model_appearance_updated", user_id=current_user.id, resource_id=model_id, details=changes)
         flash(message, category)
         return redirect(dest)
+
+    @app.route("/models/<model_id>/viewer-color", methods=["POST"])
+    @login_required
+    @require_model_ownership
+    def model_viewer_color(model_id):
+        """Owner-only: bake a solid color chosen in the viewer into the model.
+
+        Reuses the appearance pipeline (recolors the GLB inline, preserving the
+        model's current roughness/metallic/name), then enqueues a worker job to
+        regenerate the iOS USDZ from the recolored GLB so Quick Look matches.
+        Returns JSON for the viewer's fetch() call."""
+        model = db.session.get(Model3D, model_id)
+        if not model:
+            abort(404)
+        data = request.get_json(silent=True) or {}
+        color = (data.get("color") or "").strip()
+        if HEX_COLOR_PATTERN.fullmatch(color) is None:
+            return jsonify({"ok": False, "error": "Provide a valid hex color (#RRGGBB)."}), 400
+        # Only the color changes; roughness/metallic/name fall back to the model's
+        # current values inside _apply_model_appearance_change.
+        ok, message, category, changes = _apply_model_appearance_change(model, {"color": color})
+        if not ok:
+            return jsonify({"ok": False, "error": message}), 400
+        log_audit("model_viewer_color_updated", user_id=current_user.id, resource_id=model_id, details=changes)
+        # GLB now carries the color (web / desktop / Android AR). Regenerate the
+        # iOS USDZ in the worker (Blender is heavy) so Quick Look matches too.
+        usdz_path = os.path.join(app.config["CONVERTED_FOLDER"], model.id, "model.usdz")
+        try:
+            enqueue_conversion_job(
+                app,
+                model=model,
+                job_kwargs={"model_id": model.id, "glb_path": model.glb_path, "usdz_path": usdz_path},
+                job_type="usdz_regen",
+            )
+        except SQLAlchemyError:
+            db.session.rollback()
+            # The color is already saved to the GLB; a failed USDZ enqueue only
+            # delays the iOS companion refresh, so don't fail the whole request.
+            logger.exception("Could not enqueue USDZ regen after viewer recolor for %s", model_id)
+        return jsonify({"ok": True, "message": "Color saved to the model. Updating the AR file…"})
 
     @app.route("/models/<model_id>/rescale", methods=["POST"])
     @login_required

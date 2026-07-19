@@ -188,8 +188,13 @@
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-rotation-tools label {
       color: #52606d;
     }
-    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-rotation-tools span[data-rotate-value] {
-      color: #364152;
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-rotate-num {
+      color: #1f2933;
+      background: rgba(15, 23, 42, 0.05);
+      border-color: rgba(15, 23, 42, 0.15);
+    }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-color-hint {
+      color: #6b7280;
     }
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-rotation-tools input[type="range"] {
       accent-color: #1f2933;
@@ -467,10 +472,66 @@
       width: 100%;
       accent-color: #fff;
     }
-    .viewer-rotation-tools span[data-rotate-value] {
+    .viewer-rotate-num {
+      width: 100%;
+      min-width: 0;
       text-align: right;
-      color: rgba(255,255,255,0.72);
+      color: rgba(255,255,255,0.85);
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 0.4rem;
+      padding: 0.2rem 0.35rem;
       font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      -moz-appearance: textfield;
+    }
+    .viewer-rotate-num::-webkit-outer-spin-button,
+    .viewer-rotate-num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .viewer-rotate-num:focus { outline: none; border-color: rgba(255,255,255,0.45); }
+    /* Color swatches */
+    .viewer-color-swatches {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-top: 0.6rem;
+    }
+    .viewer-color-swatch,
+    .viewer-color-custom {
+      width: 1.6rem;
+      height: 1.6rem;
+      border-radius: 0.45rem;
+      border: 1px solid rgba(255,255,255,0.18);
+      cursor: pointer;
+      padding: 0;
+      position: relative;
+      overflow: hidden;
+      transition: transform 120ms ease, box-shadow 120ms ease;
+    }
+    .viewer-color-swatch:hover,
+    .viewer-color-custom:hover { transform: translateY(-1px); }
+    .viewer-color-swatch[aria-pressed="true"] {
+      box-shadow: 0 0 0 2px #fff, 0 0 0 3px rgba(0,0,0,0.35);
+    }
+    .viewer-color-custom {
+      display: grid;
+      place-items: center;
+      background:
+        conic-gradient(from 0deg, #ff5f6d, #ffc371, #47e5bc, #4f81bd, #c86dd7, #ff5f6d);
+    }
+    .viewer-color-custom input[type="color"] {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+      border: none;
+      padding: 0;
+    }
+    .viewer-color-hint {
+      margin-top: 0.55rem;
+      color: rgba(255,255,255,0.5);
+      line-height: 1.45;
     }
     .viewer-shot-actions {
       display: grid;
@@ -1016,39 +1077,6 @@
         </div>
         {% endif %}
         <div class="viewer-tool-stack mt-3 grid gap-3 text-xs">
-          <div class="viewer-rotation-tools" data-rotation-tools>
-            <div class="viewer-tool-heading">
-              <span>Preview rotation</span>
-              <div class="flex items-center gap-2">
-                <button class="viewer-auto-toggle" type="button" data-auto-rotate-toggle aria-pressed="false">Auto rotate off</button>
-                <button type="button" data-reset-rotation>Reset view</button>
-              </div>
-            </div>
-            <label> X <input type="range" min="0" max="360" step="1" value="0" data-rotate-axis="x"><span data-rotate-value="x">0deg</span></label>
-            <label> Y <input type="range" min="0" max="360" step="1" value="0" data-rotate-axis="y"><span data-rotate-value="y">0deg</span></label>
-            <label> Z <input type="range" min="0" max="360" step="1" value="0" data-rotate-axis="z"><span data-rotate-value="z">0deg</span></label>
-          </div>
-
-          <div class="viewer-bg-tools" data-bg-tools>
-            <div class="viewer-tool-heading">
-              <span>Background</span>
-              <div class="flex items-center gap-2" data-bg-options>
-                <button type="button" data-bg="dark" aria-pressed="true">Dark</button>
-                <button type="button" data-bg="light" aria-pressed="false">Light</button>
-                <button type="button" data-bg="white" aria-pressed="false">White</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="viewer-animation-tools" data-animation-tools hidden>
-            <div class="viewer-tool-heading">
-              <span>Model animation</span>
-              <div class="flex items-center gap-2">
-                <button class="viewer-animation-toggle" type="button" data-animation-toggle aria-pressed="true" disabled>Animation on</button>
-              </div>
-            </div>
-          </div>
-
           <div class="viewer-shot-tools" data-screenshot-tools>
             <div class="viewer-tool-heading">
               <span>Screenshots</span>
@@ -1076,6 +1104,62 @@
               </div>
             </div>
             <div class="viewer-shot-grid" data-shot-gallery aria-live="polite"></div>
+          </div>
+
+          <div class="viewer-color-tools" data-color-tools>
+            <div class="viewer-tool-heading">
+              <span>Color</span>
+              <div class="flex items-center gap-2">
+                <button type="button" data-color-reset>Original</button>
+                {% if is_owner %}<button type="button" data-color-apply disabled>Apply to model</button>{% endif %}
+              </div>
+            </div>
+            <div class="viewer-color-swatches" data-color-swatches>
+              {% for c in ['#cccccc', '#e8e1d0', '#c8a97e', '#b5651d', '#c0504d', '#4f81bd', '#5b8c5a', '#c9a227'] %}
+                <button type="button" class="viewer-color-swatch" data-color-swatch="{{ c }}" style="background: {{ c }}" aria-label="Apply color {{ c }}"></button>
+              {% endfor %}
+              <label class="viewer-color-custom" aria-label="Custom color">
+                <input type="color" value="#cccccc" data-color-picker>
+              </label>
+            </div>
+            {% if is_owner %}
+            <p class="viewer-color-hint" data-color-hint hidden>Previewing — press “Apply to model” to save this color to the model (and its AR file).</p>
+            {% else %}
+            <p class="viewer-color-hint">Preview only — the color isn’t saved.</p>
+            {% endif %}
+          </div>
+
+          <div class="viewer-bg-tools" data-bg-tools>
+            <div class="viewer-tool-heading">
+              <span>Background</span>
+              <div class="flex items-center gap-2" data-bg-options>
+                <button type="button" data-bg="dark" aria-pressed="true">Dark</button>
+                <button type="button" data-bg="light" aria-pressed="false">Light</button>
+                <button type="button" data-bg="white" aria-pressed="false">White</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="viewer-rotation-tools" data-rotation-tools>
+            <div class="viewer-tool-heading">
+              <span>Preview rotation</span>
+              <div class="flex items-center gap-2">
+                <button class="viewer-auto-toggle" type="button" data-auto-rotate-toggle aria-pressed="false">Auto rotate off</button>
+                <button type="button" data-reset-rotation>Reset view</button>
+              </div>
+            </div>
+            <label> X <input type="range" min="0" max="360" step="1" value="0" data-rotate-axis="x"><input type="number" class="viewer-rotate-num" min="0" max="360" step="1" value="0" data-rotate-num="x" aria-label="X rotation in degrees"></label>
+            <label> Y <input type="range" min="0" max="360" step="1" value="0" data-rotate-axis="y"><input type="number" class="viewer-rotate-num" min="0" max="360" step="1" value="0" data-rotate-num="y" aria-label="Y rotation in degrees"></label>
+            <label> Z <input type="range" min="0" max="360" step="1" value="0" data-rotate-axis="z"><input type="number" class="viewer-rotate-num" min="0" max="360" step="1" value="0" data-rotate-num="z" aria-label="Z rotation in degrees"></label>
+          </div>
+
+          <div class="viewer-animation-tools" data-animation-tools hidden>
+            <div class="viewer-tool-heading">
+              <span>Model animation</span>
+              <div class="flex items-center gap-2">
+                <button class="viewer-animation-toggle" type="button" data-animation-toggle aria-pressed="true" disabled>Animation on</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -2233,26 +2317,141 @@
     collageDownloadButton?.addEventListener('click', downloadCollageImage);
     collageSaveButton?.addEventListener('click', saveCollageToPublication);
 
+    // --- Color: live preview for everyone (setBaseColorFactor), owner can save ---
+    (() => {
+      const colorTools = document.querySelector('[data-color-tools]');
+      if (!colorTools || !viewer) return;
+      const swatches = [...colorTools.querySelectorAll('[data-color-swatch]')];
+      const picker = colorTools.querySelector('[data-color-picker]');
+      const resetBtn = colorTools.querySelector('[data-color-reset]');
+      const applyBtn = colorTools.querySelector('[data-color-apply]');   // owner-only (may be null)
+      const hint = colorTools.querySelector('[data-color-hint]');
+
+      let originals = [];       // [{ mat, factor:[r,g,b,a] }]
+      let capturedFor = null;   // capture once per loaded model src
+      let currentHex = null;    // last previewed hex (null = showing original)
+
+      const hexToRgb = (hex) => {
+        const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim());
+        if (!m) return null;
+        const n = parseInt(m[1], 16);
+        return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+      };
+      const materials = () => (viewer.model && viewer.model.materials) || [];
+      const captureOriginals = () => {
+        originals = [];
+        materials().forEach((mat) => {
+          try {
+            const f = mat.pbrMetallicRoughness && mat.pbrMetallicRoughness.baseColorFactor;
+            originals.push({ mat, factor: f ? [...f] : [1, 1, 1, 1] });
+          } catch (e) { /* model-viewer lazily loads materials; skip on throw */ }
+        });
+      };
+      const setActive = (hex) => {
+        swatches.forEach((b) => b.setAttribute('aria-pressed',
+          hex && b.dataset.colorSwatch.toLowerCase() === hex.toLowerCase() ? 'true' : 'false'));
+      };
+      const setDirty = (dirty) => {
+        if (applyBtn) applyBtn.disabled = !dirty;
+        if (hint && hint.hasAttribute('data-color-hint') && applyBtn) hint.hidden = !dirty;
+      };
+      const applyLive = (hex) => {
+        const rgb = hexToRgb(hex);
+        if (!rgb) return;
+        originals.forEach(({ mat }) => {
+          try {
+            const cur = mat.pbrMetallicRoughness.baseColorFactor || [1, 1, 1, 1];
+            mat.pbrMetallicRoughness.setBaseColorFactor([rgb[0], rgb[1], rgb[2], cur[3] ?? 1]);
+          } catch (e) { /* skip */ }
+        });
+        currentHex = hex;
+        if (picker) picker.value = hex;
+        setActive(hex);
+        setDirty(true);
+      };
+      const restoreOriginal = () => {
+        originals.forEach(({ mat, factor }) => {
+          try { mat.pbrMetallicRoughness.setBaseColorFactor(factor); } catch (e) { /* skip */ }
+        });
+        currentHex = null;
+        setActive(null);
+        setDirty(false);
+      };
+
+      viewer.addEventListener('load', () => {
+        if (capturedFor === viewer.src) return;   // one capture per model
+        capturedFor = viewer.src;
+        captureOriginals();
+        restoreOriginal();
+      });
+
+      swatches.forEach((b) => b.addEventListener('click', () => applyLive(b.dataset.colorSwatch)));
+      picker?.addEventListener('input', () => applyLive(picker.value));
+      resetBtn?.addEventListener('click', restoreOriginal);
+
+      applyBtn?.addEventListener('click', async () => {
+        if (!currentHex) return;
+        const label = applyBtn.textContent;
+        applyBtn.disabled = true;
+        applyBtn.textContent = 'Applying…';
+        try {
+          const resp = await fetch(`/models/${modelId}/viewer-color`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify({ color: currentHex }),
+          });
+          const data = await resp.json().catch(() => ({}));
+          if (resp.ok && data.ok) {
+            if (window.showToast) window.showToast(data.message || 'Color saved to the model.', 'success');
+            if (hint) hint.hidden = true;
+          } else {
+            if (window.showToast) window.showToast(data.error || 'Could not save the color. Please try again.', 'danger');
+            applyBtn.disabled = false;
+          }
+        } catch (e) {
+          if (window.showToast) window.showToast('Could not save the color. Please try again.', 'danger');
+          applyBtn.disabled = false;
+        } finally {
+          applyBtn.textContent = label;
+        }
+      });
+    })();
+
+    // The X/Y/Z value readouts are editable number inputs kept in two-way sync
+    // with the sliders, so a precise angle can be typed as well as dragged.
+    const rotateNums = [...document.querySelectorAll('[data-rotate-num]')];
+    const rotateNumFor = (axis) => document.querySelector(`[data-rotate-num="${axis}"]`);
+    const rotateSliderFor = (axis) => document.querySelector(`[data-rotate-axis="${axis}"]`);
+    const clampAngle = (n) => Math.min(360, Math.max(0, Math.round(Number(n) || 0)));
+    const applyRotationFromControls = async () => {
+      const values = { x: 0, y: 0, z: 0 };
+      rotateInputs.forEach((item) => { values[item.dataset.rotateAxis] = Number(item.value || 0); });
+      await applyModelOrientation(values);
+    };
     rotateInputs.forEach((input) => {
       input.addEventListener('input', async () => {
-        const values = { x: 0, y: 0, z: 0 };
-        rotateInputs.forEach((item) => {
-          values[item.dataset.rotateAxis] = Number(item.value || 0);
-          const valueEl = document.querySelector(`[data-rotate-value="${item.dataset.rotateAxis}"]`);
-          if (valueEl) valueEl.textContent = `${item.value}deg`;
-        });
-        await applyModelOrientation(values);
+        const num = rotateNumFor(input.dataset.rotateAxis);
+        if (num) num.value = input.value;
+        await applyRotationFromControls();
       });
+    });
+    rotateNums.forEach((num) => {
+      const sync = async () => {
+        const v = clampAngle(num.value);
+        num.value = v;
+        const slider = rotateSliderFor(num.dataset.rotateNum);
+        if (slider) slider.value = v;
+        await applyRotationFromControls();
+      };
+      num.addEventListener('change', sync);
+      num.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sync(); } });
     });
     resetRotation?.addEventListener('click', async () => {
       // Stop auto-rotate first — otherwise model-viewer keeps spinning the camera
       // (auto-rotate-delay=0) right after we set it, so "reset" never sticks.
       setAutoRotateState(false);
-      rotateInputs.forEach((input) => {
-        input.value = 0;
-        const valueEl = document.querySelector(`[data-rotate-value="${input.dataset.rotateAxis}"]`);
-        if (valueEl) valueEl.textContent = '0deg';
-      });
+      rotateInputs.forEach((input) => { input.value = 0; });
+      rotateNums.forEach((num) => { num.value = 0; });
       // Return the model to its identity pose WITHOUT calling updateFraming(): with
       // bounds="tight", re-framing here let the "auto" camera radius re-resolve to a
       // much smaller distance, which ballooned the model to fill the screen.
