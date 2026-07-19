@@ -4341,10 +4341,11 @@ input[type="file"]::-webkit-file-upload-button {
   border-radius: 8px;
 }
 .latest-model-preview {
-  display: grid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   height: 154px;
-  place-items: center;
   overflow: hidden;
   border-radius: 6px;
   background: var(--color-cloud-whisper);
