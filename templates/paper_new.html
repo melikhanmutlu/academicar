@@ -97,13 +97,17 @@
           {% for row in article_rows %}
             {% set from_form = row is number %}
             {% set article = none if from_form else row %}
-            <article class="article-entry" data-article-entry>
-              <div class="article-entry-head">
-                <strong>Article <span data-article-number>{{ loop.index }}</span></strong>
-                <button type="button" class="article-remove" data-remove-article {% if loop.first %}hidden{% endif %}>Remove</button>
-              </div>
+            <details class="article-entry" data-article-entry {% if loop.first %}open{% endif %}>
+              <summary class="article-entry-summary">
+                <span class="article-entry-avatar" data-article-number>{{ loop.index }}</span>
+                <span class="article-entry-summary-copy">
+                  <strong data-article-summary-title>{{ article_titles[row] if from_form and article_titles[row] else (article.title if article and article.title else 'New article') }}</strong>
+                  <small data-article-summary-meta>{{ article_authors[row] if from_form and row < article_authors|length and article_authors[row] else (article.authors if article and article.authors else 'Optional reference · add title, authors, DOI or PDF') }}</small>
+                </span>
+                <span class="article-entry-state">Edit <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4"/></svg></span>
+              </summary>
               <input type="hidden" name="article_id[]" value="{{ article_ids[row] if from_form and row < article_ids|length else (article.id if article else '') }}">
-              <div class="grid sm:grid-cols-2 gap-4">
+              <div class="article-entry-fields grid sm:grid-cols-2 gap-4">
                 <div class="sm:col-span-2">
                   <label class="field-label">Article title</label>
                   <input class="field-input" name="article_title[]" maxlength="500" value="{{ article_titles[row] if from_form else (article.title if article else '') }}" placeholder="Optional article title">
@@ -133,17 +137,21 @@
                   <span class="file-picker-control"><span>{{ 'Replace PDF' if article and article.pdf_path else 'Choose PDF' }}</span><small data-file-name>{{ article.pdf_path.split('_', 2)[-1] if article and article.pdf_path else 'No file selected' }}</small></span>
                   <input type="file" name="article_pdf[]" accept=".pdf" class="native-file-input" data-named-file-input>
                 </label>
+                <div class="article-entry-actions sm:col-span-2">
+                  <span>All article fields are optional.</span>
+                  <button type="button" class="article-remove" data-remove-article {% if loop.first %}hidden{% endif %}>Remove article</button>
+                </div>
               </div>
-            </article>
+            </details>
           {% endfor %}
         </div>
       </section>
 
       <template id="articleEntryTemplate">
-        <article class="article-entry" data-article-entry>
-          <div class="article-entry-head"><strong>Article <span data-article-number></span></strong><button type="button" class="article-remove" data-remove-article>Remove</button></div>
+        <details class="article-entry" data-article-entry open>
+          <summary class="article-entry-summary"><span class="article-entry-avatar" data-article-number></span><span class="article-entry-summary-copy"><strong data-article-summary-title>New article</strong><small data-article-summary-meta>Optional reference · add title, authors, DOI or PDF</small></span><span class="article-entry-state">Edit <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4"/></svg></span></summary>
           <input type="hidden" name="article_id[]" value="">
-          <div class="grid sm:grid-cols-2 gap-4">
+          <div class="article-entry-fields grid sm:grid-cols-2 gap-4">
             <div class="sm:col-span-2"><label class="field-label">Article title</label><input class="field-input" name="article_title[]" maxlength="500" placeholder="Optional article title"></div>
             <div><label class="field-label">Authors</label><input class="field-input" name="article_authors[]" maxlength="500" placeholder="Jane Doe, John Smith"></div>
             <div><label class="field-label">Year</label><input class="field-input" type="number" name="article_year[]" min="1900" max="2100"></div>
@@ -151,8 +159,9 @@
             <div><label class="field-label">PMID</label><input class="field-input" name="article_pmid[]" maxlength="100"></div>
             <div class="sm:col-span-2"><label class="field-label">Abstract / note</label><textarea class="field-textarea" name="article_abstract[]" rows="3"></textarea></div>
             <label class="article-pdf-field sm:col-span-2"><span class="field-label">Article PDF</span><span class="file-picker-control"><span>Choose PDF</span><small data-file-name>No file selected</small></span><input type="file" name="article_pdf[]" accept=".pdf" class="native-file-input" data-named-file-input></label>
+            <div class="article-entry-actions sm:col-span-2"><span>All article fields are optional.</span><button type="button" class="article-remove" data-remove-article>Remove article</button></div>
           </div>
-        </article>
+        </details>
       </template>
 
       <div>
@@ -494,18 +503,34 @@
   const articleList = document.querySelector('[data-article-list]');
   const articleTemplate = document.getElementById('articleEntryTemplate');
   const addArticleButton = document.querySelector('[data-add-article]');
+  const syncArticleSummary = (entry) => {
+    if (!entry) return;
+    const title = entry.querySelector('[name="article_title[]"]')?.value.trim();
+    const authors = entry.querySelector('[name="article_authors[]"]')?.value.trim();
+    const year = entry.querySelector('[name="article_year[]"]')?.value.trim();
+    const doi = entry.querySelector('[name="article_doi[]"]')?.value.trim();
+    const pdf = entry.querySelector('[name="article_pdf[]"]')?.files?.[0]?.name;
+    const titleNode = entry.querySelector('[data-article-summary-title]');
+    const metaNode = entry.querySelector('[data-article-summary-meta]');
+    if (titleNode) titleNode.textContent = title || 'New article';
+    if (metaNode) {
+      const metadata = [authors, year, doi ? `DOI ${doi}` : '', pdf].filter(Boolean);
+      metaNode.textContent = metadata.length ? metadata.join(' · ') : 'Optional reference · add title, authors, DOI or PDF';
+    }
+  };
   const renumberArticles = () => {
     if (!articleList) return;
     const entries = [...articleList.querySelectorAll('[data-article-entry]')];
     entries.forEach((entry, index) => {
-      const number = entry.querySelector('[data-article-number]');
-      if (number) number.textContent = String(index + 1);
+      entry.querySelectorAll('[data-article-number]').forEach((number) => { number.textContent = String(index + 1); });
       const remove = entry.querySelector('[data-remove-article]');
       if (remove) remove.hidden = index === 0;
+      syncArticleSummary(entry);
     });
   };
   if (addArticleButton && articleTemplate && articleList) {
     addArticleButton.addEventListener('click', () => {
+      articleList.querySelectorAll('[data-article-entry]').forEach((entry) => { entry.open = false; });
       articleList.appendChild(articleTemplate.content.cloneNode(true));
       renumberArticles();
       articleList.lastElementChild?.querySelector('[name="article_title[]"]')?.focus();
@@ -517,6 +542,9 @@
     remove.closest('[data-article-entry]')?.remove();
     renumberArticles();
   });
+  articleList?.addEventListener('input', (event) => {
+    syncArticleSummary(event.target.closest('[data-article-entry]'));
+  });
   document.addEventListener('change', (event) => {
     const input = event.target.closest('[data-named-file-input]');
     if (!input) return;
@@ -524,6 +552,7 @@
     if (!label) return;
     const files = Array.from(input.files || []);
     label.textContent = files.length ? files.map((file) => file.name).join(', ') : 'No file selected';
+    syncArticleSummary(input.closest('[data-article-entry]'));
   });
   renumberArticles();
 

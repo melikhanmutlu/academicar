@@ -963,11 +963,20 @@ def ensure_sqlite_schema(app: Flask) -> None:
             connection.execute(text("ALTER TABLE payments ADD COLUMN coupon_id INTEGER"))
         if payment_columns and "coupon_code" not in payment_columns:
             connection.execute(text("ALTER TABLE payments ADD COLUMN coupon_code VARCHAR(64)"))
+        if payment_columns and "coupon_reservation_active" not in payment_columns:
+            connection.execute(
+                text("ALTER TABLE payments ADD COLUMN coupon_reservation_active BOOLEAN NOT NULL DEFAULT 0")
+            )
         plan_columns = {row[1] for row in connection.execute(text("PRAGMA table_info(license_plans)")).fetchall()}
         if plan_columns and "max_models_per_project" not in plan_columns:
             connection.execute(text("ALTER TABLE license_plans ADD COLUMN max_models_per_project INTEGER"))
         if plan_columns and "features" not in plan_columns:
             connection.execute(text("ALTER TABLE license_plans ADD COLUMN features JSON"))
+        coupon_columns = {row[1] for row in connection.execute(text("PRAGMA table_info(coupons)")).fetchall()}
+        if coupon_columns and "reservation_count" not in coupon_columns:
+            connection.execute(
+                text("ALTER TABLE coupons ADD COLUMN reservation_count INTEGER NOT NULL DEFAULT 0")
+            )
         user_columns = {row[1] for row in connection.execute(text("PRAGMA table_info(users)")).fetchall()}
         if user_columns and "deactivated_at" not in user_columns:
             connection.execute(text("ALTER TABLE users ADD COLUMN deactivated_at DATETIME"))

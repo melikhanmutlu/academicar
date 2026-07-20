@@ -12,8 +12,11 @@
       <span>{{ pricing_rows|length }} plans</span>
     </div>
     {% for plan in pricing_rows %}
-      <div class="admin-breakdown" style="margin-bottom:16px">
-        <h3><code>{{ plan.key }}</code></h3>
+      <details class="admin-breakdown admin-plan-card" {% if loop.first %}open{% endif %}>
+        <summary class="admin-plan-summary">
+          <span><strong>{{ plan.label }}</strong><small><code>{{ plan.key }}</code> · {{ '$%.2f'|format(plan.price_usd_cents / 100) }} · {{ plan.max_models_per_project or 'Unlimited' }} models/topic</small></span>
+          <span class="admin-plan-summary-state">Configure <b aria-hidden="true">⌄</b></span>
+        </summary>
         <form method="POST" action="{{ url_for('admin_pricing_update', plan_key=plan.key) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="features_present" value="1">
@@ -45,7 +48,7 @@
             <button type="submit" class="admin-btn admin-btn-primary compact">Save {{ plan.label }}</button>
           </div>
         </form>
-      </div>
+      </details>
     {% else %}
       <p>No pricing rows yet — visit this page again in a moment to let the defaults seed.</p>
     {% endfor %}
@@ -53,7 +56,7 @@
 
   <section class="admin-section">
     <div class="admin-section-head"><div><h2>Checkout coupons</h2><p>Discounts are calculated before the PayTR token request, so the hosted checkout receives the exact discounted amount.</p></div><span>{{ coupons|length }} codes</span></div>
-    <form method="POST" action="{{ url_for('admin_coupon_create') }}" class="admin-breakdown">
+    <form method="POST" action="{{ url_for('admin_coupon_create') }}" class="admin-breakdown admin-coupon-create">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="admin-editor-grid">
         <label class="admin-editor-field"><span>Coupon code</span><input name="code" minlength="3" maxlength="64" placeholder="ACADEMIC25" required></label>

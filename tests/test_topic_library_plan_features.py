@@ -3,7 +3,10 @@ import uuid
 import zipfile
 from pathlib import Path
 
+from sqlalchemy import text
+
 from analytics import analytics_snapshot
+from app import ensure_sqlite_schema
 from licensing import (
     get_license_plan,
     model_upgrade_options,
@@ -37,6 +40,26 @@ def _pptx_bytes():
         archive.writestr("[Content_Types].xml", "<Types/>")
         archive.writestr("ppt/presentation.xml", "<p:presentation/>")
     return buffer.getvalue()
+
+
+def test_legacy_sqlite_coupon_reservation_columns_are_self_healed(app):
+    with app.app_context():
+        with db.engine.begin() as connection:
+            connection.execute(text("ALTER TABLE payments DROP COLUMN coupon_reservation_active"))
+            connection.execute(text("ALTER TABLE coupons DROP COLUMN reservation_count"))
+
+        ensure_sqlite_schema(app)
+
+        with db.engine.begin() as connection:
+            payment_columns = {
+                row[1] for row in connection.execute(text("PRAGMA table_info(payments)")).fetchall()
+            }
+            coupon_columns = {
+                row[1] for row in connection.execute(text("PRAGMA table_info(coupons)")).fetchall()
+            }
+
+        assert "coupon_reservation_active" in payment_columns
+        assert "reservation_count" in coupon_columns
 
 
 def _make_model(app, *, license_type="free", public=True, title="Topic"):

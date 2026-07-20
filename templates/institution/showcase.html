@@ -58,13 +58,12 @@
         {% for department, items in department_groups|dictsort %}
           <section class="inst-department-group">
             <div class="inst-department-heading"><h3>{{ department }}</h3><span>{{ items|length }} publication{{ '' if items|length == 1 else 's' }}</span></div>
-            <div class="inst-publication-grid">
+            <div class="inst-publication-list">
               {% for item in items %}
-                <article class="inst-publication-card">
-                  <span>{{ item.project.title }}</span>
-                  <h4>{{ item.article.title or 'Untitled institutional article' }}</h4>
-                  {% if item.article.authors %}<p>{{ item.article.authors }}</p>{% endif %}
-                  <div>{% if item.article.year %}<small>{{ item.article.year }}</small>{% endif %}{% if item.article.doi %}<a href="https://doi.org/{{ item.article.doi }}" target="_blank" rel="noopener noreferrer">DOI ↗</a>{% endif %}{% if item.article.pdf_path %}<a href="{{ url_for('project_article_reader', slug=item.project.slug, article_id=item.article.id) }}">Present PDF</a>{% endif %}<a href="{{ url_for('paper_public', slug=item.project.slug) }}">Open topic</a></div>
+                <article class="inst-publication-row">
+                  <span class="topic-document-avatar">{{ loop.index }}</span>
+                  <div class="inst-publication-main"><h4>{{ item.article.title or 'Untitled institutional article' }}</h4><p>{{ item.article.authors or 'No authors added' }}{% if item.article.year %}<span class="publication-year">{{ item.article.year }}</span>{% endif %}</p><small>{{ item.project.title }}</small></div>
+                  <div class="topic-document-actions">{% if item.article.doi %}<a href="https://doi.org/{{ item.article.doi }}" target="_blank" rel="noopener noreferrer">DOI</a>{% endif %}{% if item.article.pdf_path %}<a href="{{ url_for('project_article_reader', slug=item.project.slug, article_id=item.article.id) }}">PDF</a>{% endif %}<a href="{{ url_for('paper_public', slug=item.project.slug) }}" class="is-primary">Open topic</a></div>
                 </article>
               {% endfor %}
             </div>

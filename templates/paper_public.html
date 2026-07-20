@@ -78,20 +78,19 @@
   <section class="topic-library surface rounded-xl p-5 sm:p-6 mb-8">
     <div class="section-heading-row"><div><p class="project-section-kicker">Topic library</p><h2>Articles &amp; presentation materials</h2></div><span>{{ paper.articles|length + (paper.attachments|length if presentation_enabled else 0) }} items</span></div>
     {% if paper.articles %}
-      <div class="topic-document-grid">
+      <div class="topic-document-list">
         {% for article in paper.articles %}
-          <article class="topic-document-card">
-            <span>Article {{ loop.index }}</span>
-            <h3>{{ article.title or 'Untitled related article' }}</h3>
-            {% if article.authors %}<p>{{ article.authors }}</p>{% endif %}
-            <div>{% if article.year %}<small>{{ article.year }}</small>{% endif %}{% if article.doi %}<a href="https://doi.org/{{ article.doi }}" target="_blank" rel="noopener noreferrer">DOI</a>{% endif %}{% if article.pdf_path %}<a href="{{ url_for('project_article_reader', slug=paper.slug, article_id=article.id) }}">Present PDF</a>{% endif %}</div>
+          <article class="topic-document-row">
+            <span class="topic-document-avatar">{{ loop.index }}</span>
+            <div class="topic-document-main"><h3>{{ article.title or 'Untitled related article' }}</h3><p>{{ article.authors or 'No authors added' }}{% if article.year %}<span class="publication-year">{{ article.year }}</span>{% endif %}</p></div>
+            <div class="topic-document-actions">{% if article.doi %}<a href="https://doi.org/{{ article.doi }}" target="_blank" rel="noopener noreferrer">DOI</a>{% endif %}{% if article.pdf_path %}<a href="{{ url_for('project_article_reader', slug=paper.slug, article_id=article.id) }}" class="is-primary">Present PDF</a>{% endif %}</div>
           </article>
         {% endfor %}
       </div>
     {% endif %}
     {% if presentation_enabled and paper.attachments %}
-      <div class="topic-material-row">
-        {% for material in paper.attachments %}<a href="{{ url_for('project_attachment_reader', slug=paper.slug, attachment_id=material.id) }}"><span>{{ material.file_type|upper }}</span><strong>{{ material.title or material.original_filename }}</strong><small>{{ 'PDF preview ready' if material.preview_pdf_path else 'Download original' }}</small></a>{% endfor %}
+      <div class="topic-material-list">
+        {% for material in paper.attachments %}<a href="{{ url_for('project_attachment_reader', slug=paper.slug, attachment_id=material.id) }}"><span class="topic-material-type">{{ material.file_type|upper }}</span><span><strong>{{ material.title or material.original_filename }}</strong><small>{{ 'PDF preview ready' if material.preview_pdf_path else 'Download original' }}</small></span><span class="topic-material-open">Open</span></a>{% endfor %}
       </div>
     {% endif %}
   </section>
