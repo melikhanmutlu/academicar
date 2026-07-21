@@ -80,22 +80,41 @@ def _try_pyrender(glb_path: str, png_path: str) -> bool:
     import pyrender  # noqa: F811
     import trimesh
 
-    scene = pyrender.Scene(bg_color=[0.96, 0.96, 0.96, 1.0])
-    tmesh = trimesh.load(glb_path, force="mesh")
-    mesh = pyrender.Mesh.from_trimesh(tmesh)
-    scene.add(mesh)
+    # Load as a full scene so per-primitive materials, baseColor textures, and
+    # vertex colours survive. force="mesh" (the old approach) concatenates every
+    # primitive into one geometry and drops its materials, so pyrender rendered
+    # the whole model in one default grey material — the "flat grey thumbnail"
+    # bug — while the real viewer showed the textured GLB. from_trimesh_scene
+    # rebuilds the pyrender scene node-for-node, keeping each mesh's material.
+    loaded = trimesh.load(glb_path)
+    if isinstance(loaded, trimesh.Trimesh):
+        loaded = trimesh.Scene(loaded)
+    if not isinstance(loaded, trimesh.Scene) or not loaded.geometry:
+        return False
+
+    scene = pyrender.Scene.from_trimesh_scene(
+        loaded,
+        bg_color=[0.96, 0.96, 0.96, 1.0],
+        ambient_light=[0.35, 0.35, 0.35],
+    )
+
+    bounds = loaded.bounds
+    if bounds is None:
+        return False
+    center = (bounds[0] + bounds[1]) / 2.0
+    extent = float(np.ptp(bounds, axis=0).max())
+    if extent < 1e-9:
+        return False
 
     camera = pyrender.PerspectiveCamera(yfov=np.pi / 4.0)
-    bounds = tmesh.bounds
-    center = (bounds[0] + bounds[1]) / 2.0
-    extent = np.ptp(bounds, axis=0).max()
     cam_dist = extent * 1.8
-    cam_pos = np.eye(4)
-    cam_pos[:3, 3] = center + np.array([cam_dist * 0.5, cam_dist * 0.3, cam_dist * 0.8])
-    scene.add(camera, pose=cam_pos)
+    cam_pose = np.eye(4)
+    cam_pose[:3, 3] = center + np.array([cam_dist * 0.5, cam_dist * 0.3, cam_dist * 0.8])
+    scene.add(camera, pose=cam_pose)
 
-    light = pyrender.DirectionalLight(color=[1.0, 1.0, 1.0], intensity=3.0)
-    scene.add(light, pose=cam_pos)
+    # Key light aligned with the camera so the textured surface reads evenly;
+    # ambient (set above) keeps shadowed faces from crushing to black.
+    scene.add(pyrender.DirectionalLight(color=[1.0, 1.0, 1.0], intensity=3.0), pose=cam_pose)
 
     r = pyrender.OffscreenRenderer(*POSTER_SIZE)
     try:
