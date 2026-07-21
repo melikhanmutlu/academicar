@@ -10,11 +10,13 @@ AcademicAR bugün **satışa hazır ve tahsilat yapan bir ürün**: konvertör p
 bazlı lisanslama (Free / Academic $9.90 / Extended Archive $24.90 / Institutional), kalıcı
 QR çözümleyici, kurumsal (B2B) kontrat modülü, analytics, worker altyapısı ve **canlı PayTR
 ödeme entegrasyonu** (TCMB kuruyla USD→TRY çevrimi, imza + tutar doğrulamalı webhook)
-çalışır durumda. Büyümenin önündeki gerçek konular:
+çalışır durumda. Dosyalar R2'ye best-effort yansıtılıyor ve kayıpta `ensure_local` ile
+geri yükleniyor; e-posta gönderim altyapısı (`utils/email.py`, HTTP API/SMTP) hazır.
+Büyümenin önündeki gerçek konular:
 
-1. **Dosya depolama ephemeral** — Railway'de container yeniden başladığında GLB/QR
-   dosyaları kaybolur; "10 yıl arşiv" satan bir ürün için kabul edilemez. `services/r2_mirror`
-   mevcut, uçtan uca bağlanmalı. **Tek gerçek launch blocker budur.**
+1. **Dönüşüm döngüsü kapalı** — public viewer'daki free filigran rozeti tıklanabilir
+   değil; okuyucuya "sen de modelini yayınla" teklifi yapılmıyor. En yüksek kaldıraçlı
+   tek geliştirme budur.
 2. **Ölçülemeyen funnel** — `analytics.py` event altyapısı var ama kayıt → yükleme →
    yayınlama → ödeme dönüşüm hunisi tek ekranda izlenemiyor.
 3. **Yurtdışı satış deneyimi kapalı** — PayTR yurtiçini çözüyor; uluslararası alıcı için
@@ -69,7 +71,11 @@ satış için LemonSqueezy (MoR) checkout'u canlıya al.
 - Uluslararası ödeme: LemonSqueezy (MoR) `create_checkout` TODO (`payments.py:198`);
   yurtdışı alıcı bugün TRY'ye çevrilen PayTR akışından geçiyor — yabancı kart + TRY
   deneyimi dönüşümü düşürür, USD/MoR checkout açılmalı.
-- Depolama: dosyalar lokal dizinlerde; R2 mirror uçtan uca devrede değil.
+- Depolama izleme: R2 aynası uçtan uca bağlı (yazımda mirror, kayıpta `ensure_local`,
+  `r2_mirror_failed_at` ile hata takibi) ama best-effort; prod env değişkenlerinin dolu
+  olduğu teyit edilmeli ve ayna hataları için uyarı yok.
+- Viewer dönüşüm CTA'sı yok: filigran `aria-hidden`, tıklanamaz — en değerli trafik
+  (yayın okuyucusu) hiç dönüştürülmüyor.
 - Onboarding: kayıt sonrası kullanıcıyı "ilk modelini 5 dakikada yayınla"ya taşıyan
   güdümlü akış yok.
 - E-posta: transactional/lifecycle e-posta altyapısı yok (şifre sıfırlama hariç).
@@ -110,20 +116,22 @@ otomatik sinyal üret (bkz. §6, lead scoring) ve o departmana kurumsal teklif g
 
 ## 4. Teknik Yol Haritası (satışı açan sıra ile)
 
-### Faz 0 — Launch blocker'lar (Hafta 1–3)
-1. **R2 kalıcı depolama**: `services/r2_mirror`'ı upload/convert/serve akışına uçtan uca
-   bağla; `worker.py` dönüşüm çıktısını R2'ye yazsın, `/files/...` route'ları R2'den
-   (imzalı URL veya proxy) servis etsin. Mevcut lokal dosyalar için tek seferlik migrasyon
-   script'i (`scripts/`).
+### Faz 0 — Dönüşüm makinesi (Hafta 1–3)
+1. **Viewer viral döngüsü**: public viewer'a tasarım diline sadık ince bir bant —
+   "Bu model AcademicAR ile yayınlandı · Kendi modelini 5 dakikada yayınla"; free
+   filigranı tıklanabilir yap, UTM ile viewer→kayıt dönüşümünü ölç.
 2. **Funnel eventleri**: `track_event` ile `signup → paper_created → model_uploaded →
    conversion_done → published → checkout_started → paid` zincirini tamamla; admin'e
    basit huni ekranı (`analytics_snapshot` üstüne).
-3. **Uluslararası checkout (LemonSqueezy MoR)**: `LemonSqueezyProvider.create_checkout`
+3. **Depolama teyidi**: prod'da R2 env değişkenlerinin dolu olduğunu doğrula;
+   `r2_mirror_failed_at` dolu modeller için haftalık uyarı ekle (ayna zaten uçtan uca
+   bağlı, eksik olan izleme).
+4. **Uluslararası checkout (LemonSqueezy MoR)**: `LemonSqueezyProvider.create_checkout`
    doldur (checkout API, `custom={payment_id, model_id, plan_key}`), webhook imza
    doğrulaması zaten hazır; sandbox uçtan uca test → prod. Sağlayıcı seçimini kullanıcı
    coğrafyasına göre yap (TR → PayTR, diğerleri → MoR) — mevcut `PAYMENT_PROVIDER`
    tek-sağlayıcı yapısına küçük bir yönlendirme katmanı gerekir. Yurtdışı trafik
-   anlamlı değilse Faz 2'ye ertelenebilir.
+   anlamlı değilse Faz 1'in sonuna ertelenebilir.
 
 ### Faz 1 — Dönüşüm makinesi (Hafta 3–6)
 4. **Viewer viral döngüsü**: public viewer'a (tasarım diline sadık, ince bir bant)
@@ -229,16 +237,17 @@ API'si ile başla, hacim 1.000+ kullanıcıya gelince değerlendir.
 
 | Hafta | Teknik | Ticari |
 |---|---|---|
-| 1–2 | R2 uçtan uca + dosya migrasyonu | Konferans/dergi hedef listesi (20 kayıt) |
-| 3–4 | Funnel eventleri + admin huni ekranı, viewer CTA | İlk konferans taktiği: 10 yazar, elle onboarding |
+| 1–2 | Viewer CTA + tıklanabilir filigran, funnel eventleri | Konferans/dergi hedef listesi (20 kayıt) |
+| 3–4 | Admin huni ekranı, R2 izleme uyarısı | İlk konferans taktiği: 10 yazar, elle onboarding |
 | 5–6 | Güdümlü onboarding, lifecycle e-posta v1, LemonSqueezy (MoR) go-live | Haftalık blog + video ritmi başlar; 2 kullanıcı görüşmesi/hafta |
 | 7–8 | Paylaşım paketi (vektörel QR, figür altyazısı), lisans yenileme otomasyonu | 5 dergi editörü outreach; lead-scoring sinyali devrede |
 | 9–10 | Self-serve kurumsal pilot, dunning | İlk 2 kurumsal pilot başlat |
 | 11–12 | Dergi/etkinlik vitrin modu, haftalık digest | Pilot → teklif dönüşümü; fiyat denemesi kararı |
 
-**Riskler:** (1) Kalıcı depolama gecikirse "10 yıl arşiv" vaadi risktedir — ilk 2 hafta
-başka iş alınmaz. PayTR MoR olmadığı için yurtiçi/yurtdışı fatura-KDV yükümlülüğü satıcıda;
-hacim büyümeden mali müşavirle netleştirilmeli.
+**Riskler:** (1) "10 yıl arşiv" vaadi: R2 ayna hataları sessizce birikirse veri kaybı
+itibar krizi olur — Faz 0'da izleme uyarısı şart, sağlık metriği "ayna hatası = 0".
+PayTR MoR olmadığı için yurtiçi/yurtdışı fatura-KDV yükümlülüğü satıcıda; hacim
+büyümeden mali müşavirle netleştirilmeli.
 (2) Tıbbi veri hassasiyeti: uyum onayları zorunlu kalır, kurumsal satışta DPA/KVKK
 dokümanı erken hazırlanır. (3) Tek kurucu kapasitesi: haftalık ritimdeki her şey
 otomatik rapora bağlanır, elle veri toplama yasak.
