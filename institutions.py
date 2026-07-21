@@ -357,6 +357,9 @@ def end_institution_access_now(institution, now: datetime) -> int:
             Model3D.institution_id == institution.id,
             Model3D.license_type == "institutional",
         )
-        .update({"access_expires_at": now}, synchronize_session=False)
+        .update(
+            {"access_expires_at": now, "license_status": "expired"},
+            synchronize_session="fetch",
+        )
     )
     return int(updated or 0)

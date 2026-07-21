@@ -10,8 +10,8 @@ from flask import current_app, g, has_request_context, request
 from flask_login import current_user
 from sqlalchemy import func
 
-from models import AnalyticsEvent, Model3D, db
-
+from licensing import plan_supports_feature
+from models import AnalyticsEvent, Model3D, Paper, db
 
 ANALYTICS_COOKIE = "aar_vid"
 ALLOWED_BROWSER_EVENTS = {"viewer_ar_started", "viewer_fullscreen_opened", "share_link_copied"}
@@ -19,15 +19,39 @@ ALLOWED_BROWSER_EVENTS = {"viewer_ar_started", "viewer_fullscreen_opened", "shar
 
 def _hash(value: str) -> str:
     secret = current_app.config.get("SECRET_KEY", "academicar")
-    return hashlib.sha256(f"{secret}:{value}".encode("utf-8")).hexdigest()
+    return hashlib.sha256(f"{secret}:{value}".encode()).hexdigest()
 
 
 def visitor_hash() -> str:
-    token = request.cookies.get(ANALYTICS_COOKIE)
+    token = request.cookies.get(ANALYTICS_COOKIE) or getattr(g, "analytics_cookie_value", None)
     if not token or len(token) > 160:
         token = secrets.token_urlsafe(24)
         g.analytics_cookie_value = token
     return _hash(token)
+
+
+def browser_event_is_duplicate(
+    event_name: str,
+    model_id: str,
+    *,
+    within_seconds: int = 15,
+) -> bool:
+    """Suppress rapid repeats from the same pseudonymous visitor/model.
+
+    This is not the only abuse control (the route is also rate-limited), but it
+    prevents double-clicks, repeated lifecycle callbacks, and simple event
+    replay from inflating owner-facing engagement metrics.
+    """
+    cutoff = datetime.now(UTC) - timedelta(seconds=max(1, within_seconds))
+    return (
+        AnalyticsEvent.query.filter(
+            AnalyticsEvent.event_name == event_name,
+            AnalyticsEvent.model_id == model_id,
+            AnalyticsEvent.visitor_hash == visitor_hash(),
+            AnalyticsEvent.occurred_at >= cutoff,
+        ).first()
+        is not None
+    )
 
 
 def session_hash() -> str:
@@ -94,7 +118,7 @@ def apply_analytics_cookie(response):
     return response
 
 
-def analytics_snapshot(owner_user_id: int | None = None, days: int = 30) -> dict:
+def analytics_snapshot(owner_user_id: int | None = None, days: int = 30) -> dict:  # noqa: C901
     """Return a compact, role-safe dashboard payload from first-party events."""
     now = datetime.now(UTC)
     start = now - timedelta(days=days)
@@ -136,10 +160,99 @@ def analytics_snapshot(owner_user_id: int | None = None, days: int = 30) -> dict
             )
         ]
 
+    model_metrics = []
+    if owner_user_id is not None:
+        owned_models = (
+            Model3D.query.join(Paper)
+            .filter(Model3D.user_id == owner_user_id, Paper.deleted_at.is_(None))
+            .order_by(Model3D.created_at.desc())
+            .all()
+        )
+        owned_ids = [model.id for model in owned_models]
+        aggregate = {}
+        if owned_ids:
+            rows = (
+                query.with_entities(
+                    AnalyticsEvent.model_id,
+                    AnalyticsEvent.event_name,
+                    func.count(AnalyticsEvent.id),
+                    func.count(func.distinct(AnalyticsEvent.visitor_hash)),
+                    func.max(AnalyticsEvent.occurred_at),
+                )
+                .filter(AnalyticsEvent.model_id.in_(owned_ids))
+                .group_by(AnalyticsEvent.model_id, AnalyticsEvent.event_name)
+                .all()
+            )
+            for model_id, event_name, total, unique_count, last_at in rows:
+                aggregate.setdefault(model_id, {})[event_name] = {
+                    "count": int(total or 0), "unique": int(unique_count or 0), "last_at": last_at,
+                }
+
+        dimension_maps = {}
+        for dimension_name, column in (
+            ("country", AnalyticsEvent.country_code),
+            ("device", AnalyticsEvent.device_type),
+            ("source", AnalyticsEvent.referrer_domain),
+        ):
+            per_model = {}
+            if owned_ids:
+                dimension_rows = (
+                    query.with_entities(AnalyticsEvent.model_id, column, func.count(AnalyticsEvent.id))
+                    .filter(AnalyticsEvent.model_id.in_(owned_ids), column.isnot(None))
+                    .group_by(AnalyticsEvent.model_id, column)
+                    .order_by(func.count(AnalyticsEvent.id).desc())
+                    .all()
+                )
+                for model_id, label, count_value in dimension_rows:
+                    per_model.setdefault(model_id, {"label": label, "count": int(count_value)})
+            dimension_maps[dimension_name] = per_model
+
+        engaged_visitors: dict[str, set[str]] = {}
+        if owned_ids:
+            engagement_rows = (
+                query.with_entities(AnalyticsEvent.model_id, AnalyticsEvent.visitor_hash)
+                .filter(
+                    AnalyticsEvent.model_id.in_(owned_ids),
+                    AnalyticsEvent.event_name.in_(("viewer_ar_started", "share_link_copied")),
+                    AnalyticsEvent.visitor_hash.isnot(None),
+                )
+                .distinct()
+                .all()
+            )
+            for model_id, visitor in engagement_rows:
+                engaged_visitors.setdefault(model_id, set()).add(visitor)
+
+        for model in owned_models:
+            events = aggregate.get(model.id, {})
+            views = events.get("model_viewed", {}).get("count", 0)
+            unique_viewers = events.get("model_viewed", {}).get("unique", 0)
+            ar_starts = events.get("viewer_ar_started", {}).get("count", 0)
+            shares = events.get("share_link_copied", {}).get("count", 0)
+            engaged_unique = len(engaged_visitors.get(model.id, set()))
+            model_metrics.append({
+                "model": model,
+                "detailed": plan_supports_feature(model.license_type, "detailed_insights"),
+                "views": views,
+                "unique_visitors": unique_viewers,
+                "qr_scans": events.get("qr_scanned", {}).get("count", 0),
+                "ar_starts": ar_starts,
+                "shares": shares,
+                "fullscreen_opens": events.get("viewer_fullscreen_opened", {}).get("count", 0),
+                "engaged_visitors": engaged_unique,
+                "engagement_rate": round(min((engaged_unique / unique_viewers) * 100, 100), 1) if unique_viewers else 0,
+                "last_viewed_at": events.get("model_viewed", {}).get("last_at"),
+                "top_country": dimension_maps["country"].get(model.id),
+                "top_device": dimension_maps["device"].get(model.id),
+                "top_source": dimension_maps["source"].get(model.id),
+            })
+
     return {
         "days": days,
         "views": views_query.count(),
-        "unique_visitors": views_query.with_entities(AnalyticsEvent.visitor_hash).distinct().count(),
+        "unique_visitors": int(
+            views_query.with_entities(func.count(func.distinct(AnalyticsEvent.visitor_hash))).scalar()
+            or 0
+        ),
         "qr_scans": count("qr_scanned"),
         "review_visits": count("review_link_opened"),
         "shares": count("share_link_copied"),
@@ -155,4 +268,5 @@ def analytics_snapshot(owner_user_id: int | None = None, days: int = 30) -> dict
         "countries": breakdown(AnalyticsEvent.country_code),
         "devices": breakdown(AnalyticsEvent.device_type),
         "sources": breakdown(AnalyticsEvent.referrer_domain),
+        "model_metrics": model_metrics,
     }

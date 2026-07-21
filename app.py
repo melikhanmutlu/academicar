@@ -47,6 +47,7 @@ from converters.glb_scale import clamp_oversized_glb
 from converters.poster import generate_poster
 from converters.stl_converter import convert_glb_to_usdz, enrich_glb_for_ar
 from licensing import (
+    PLAN_FEATURES,
     USER_SELECTABLE_PLAN_KEYS,
     apply_model_license_defaults,
     get_license_plan,
@@ -58,7 +59,11 @@ from licensing import (
     model_is_accessible,
     model_upgrade_options,
     normalize_license_type,
+    plan_supports_feature,
+    project_capacity_models,
+    project_supports_feature,
     refresh_license_plan_cache,
+    strongest_project_plan_key,
 )
 from blog_content import code_post_slugs, get_all_posts, get_post, render_body
 from discipline_content import all_disciplines, discipline_slugs, get_discipline, related_disciplines
@@ -72,7 +77,7 @@ from institutions import (
     reapply_model_license,
     renew_institution_contract,
 )
-from models import AnalyticsEvent, AuditLog, BlogPost, ConversionJob, Institution, InstitutionInvite, InstitutionMember, LicensePlanConfig, Model3D, ModelAnnotation, ModelVersion, Paper, Payment, QRLink, User, db
+from models import AnalyticsEvent, AuditLog, BlogPost, ConversionJob, Coupon, Institution, InstitutionInvite, InstitutionMember, LicensePlanConfig, Model3D, ModelAnnotation, ModelVersion, Paper, Payment, ProjectArticle, ProjectAttachment, QRLink, User, db
 from services.r2_mirror import mirror_file, mirror_directory, mirror_directory_sync, mirror_delete, ensure_local
 from payments import (
     PAID_PLAN_KEYS,
@@ -82,7 +87,13 @@ from payments import (
     plan_amount_minor_units,
 )
 from url_helpers import public_url
-from analytics import ALLOWED_BROWSER_EVENTS, analytics_snapshot, apply_analytics_cookie, track_event
+from analytics import (
+    ALLOWED_BROWSER_EVENTS,
+    analytics_snapshot,
+    apply_analytics_cookie,
+    browser_event_is_duplicate,
+    track_event,
+)
 from utils.security import require_model_ownership, require_paper_ownership
 from services.storage_service import StorageError, safe_move_file, safe_save_file, save_companion_files
 
@@ -197,9 +208,12 @@ def create_app(test_config: dict | None = None) -> Flask:
             "user_selectable_plan_keys": USER_SELECTABLE_PLAN_KEYS,
             "format_model_dimensions_cm": format_model_dimensions_cm,
             "academic_fields": ACADEMIC_FIELDS,
+            "institution_departments": INSTITUTION_DEPARTMENTS,
             "project_types": PROJECT_TYPES,
             "project_workflow_stages": PROJECT_WORKFLOW_STAGES,
             "project_visibility": project_visibility,
+            "project_model_capacity": project_model_capacity,
+            "project_supports_feature": request_project_supports_feature,
             "admin_chip_class": admin_chip_class,
             "user_is_configured_admin": user_is_configured_admin,
         }
@@ -265,6 +279,33 @@ ACADEMIC_FIELDS = (
     "Medicine", "Dentistry", "Engineering", "Architecture", "Biology",
     "Archaeology", "Veterinary Medicine", "Chemistry", "Other",
 )
+INSTITUTION_DEPARTMENTS = (
+    "Plastic Surgery", "Orthopaedics", "General Surgery", "Radiology",
+    "Dentistry", "Civil Engineering", "Electrical Engineering",
+    "Mechanical Engineering", "Architecture", "Biomedical Engineering",
+)
+
+_DEPARTMENT_ALIASES = {
+    "orthopedics": "Orthopaedics",
+    "orthopedic surgery": "Orthopaedics",
+    "orthopaedic surgery": "Orthopaedics",
+    "plastic and reconstructive surgery": "Plastic Surgery",
+    "plastics": "Plastic Surgery",
+    "civil eng": "Civil Engineering",
+    "electrical and electronics engineering": "Electrical Engineering",
+    "electrical engineering and electronics": "Electrical Engineering",
+    "mechanical eng": "Mechanical Engineering",
+    "architecture and design": "Architecture",
+}
+
+
+def normalize_department(value: str | None) -> str | None:
+    """Collapse whitespace and map common department spelling variants."""
+    cleaned = " ".join((value or "").split())
+    if not cleaned:
+        return None
+    canonical = {name.casefold(): name for name in INSTITUTION_DEPARTMENTS}
+    return canonical.get(cleaned.casefold()) or _DEPARTMENT_ALIASES.get(cleaned.casefold()) or cleaned
 
 PROJECT_TYPES = (
     "research_project", "publication", "thesis", "teaching_training",
@@ -274,6 +315,7 @@ PROJECT_WORKFLOW_STAGES = ("in_progress", "ready_for_review", "published", "arch
 PROJECT_VISIBILITIES = ("private", "unlisted", "public")
 
 SUPPORTED_MODEL_EXTENSIONS = {"stl", "glb", "obj", "fbx"}
+SUPPORTED_DOCUMENT_EXTENSIONS = {"pdf", "ppt", "pptx"}
 COMPANION_FILE_EXTENSIONS = {".mtl", ".png", ".jpg", ".jpeg", ".webp"}
 # Blog post inline images (admin upload). SVG is excluded on purpose (it can
 # carry script). Raster formats only.
@@ -312,6 +354,10 @@ def allowed_model(filename: str) -> bool:
 
 def allowed_pdf(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() == "pdf"
+
+
+def allowed_project_document(filename: str) -> bool:
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in SUPPORTED_DOCUMENT_EXTENSIONS
 
 
 def client_ip() -> str | None:
@@ -574,7 +620,8 @@ def seed_license_plans(app: Flask) -> None:
     from licensing import default_license_plans, refresh_license_plan_cache
 
     try:
-        existing = {k for (k,) in db.session.query(LicensePlanConfig.key).all()}
+        existing_rows = {row.key: row for row in LicensePlanConfig.query.all()}
+        existing = set(existing_rows)
         to_insert = [
             LicensePlanConfig(
                 key=plan.key,
@@ -583,14 +630,24 @@ def seed_license_plans(app: Flask) -> None:
                 duration_days=plan.duration_days,
                 storage_limit_bytes=plan.storage_limit_bytes,
                 is_purchasable=plan.is_purchasable,
+                max_models_per_project=plan.max_models_per_project,
+                features=sorted(plan.features),
             )
             for key, plan in default_license_plans().items()
             if key not in existing
         ]
         if to_insert:
             db.session.add_all(to_insert)
-            db.session.commit()
             logger.info("Seeded %s license plan row(s): %s", len(to_insert), [p.key for p in to_insert])
+        # One-time compatibility backfill for rows created before capability
+        # controls existed. An explicit [] remains an intentional admin choice.
+        defaults = default_license_plans()
+        for key, row in existing_rows.items():
+            if row.features is None and key in defaults:
+                row.features = sorted(defaults[key].features)
+                row.max_models_per_project = defaults[key].max_models_per_project
+        if to_insert or any(row.features is not None for row in existing_rows.values()):
+            db.session.commit()
     except SQLAlchemyError:
         db.session.rollback()
         logger.exception("Could not seed license plan rows")
@@ -888,6 +945,8 @@ def ensure_sqlite_schema(app: Flask) -> None:
             connection.execute(text("ALTER TABLE papers ADD COLUMN deleted_at DATETIME"))
         if "deleted_by_user_id" not in columns:
             connection.execute(text("ALTER TABLE papers ADD COLUMN deleted_by_user_id INTEGER"))
+        if "department" not in columns:
+            connection.execute(text("ALTER TABLE papers ADD COLUMN department VARCHAR(120)"))
         model_columns = {row[1] for row in connection.execute(text("PRAGMA table_info(models)")).fetchall()}
         if model_columns and "dimensions_cm" not in model_columns:
             connection.execute(text("ALTER TABLE models ADD COLUMN dimensions_cm VARCHAR(50)"))
@@ -896,6 +955,28 @@ def ensure_sqlite_schema(app: Flask) -> None:
             connection.execute(text("ALTER TABLE payments ADD COLUMN model_id VARCHAR(36)"))
         if payment_columns and "plan_key" not in payment_columns:
             connection.execute(text("ALTER TABLE payments ADD COLUMN plan_key VARCHAR(30)"))
+        if payment_columns and "amount_before_discount" not in payment_columns:
+            connection.execute(text("ALTER TABLE payments ADD COLUMN amount_before_discount INTEGER"))
+        if payment_columns and "discount_amount" not in payment_columns:
+            connection.execute(text("ALTER TABLE payments ADD COLUMN discount_amount INTEGER NOT NULL DEFAULT 0"))
+        if payment_columns and "coupon_id" not in payment_columns:
+            connection.execute(text("ALTER TABLE payments ADD COLUMN coupon_id INTEGER"))
+        if payment_columns and "coupon_code" not in payment_columns:
+            connection.execute(text("ALTER TABLE payments ADD COLUMN coupon_code VARCHAR(64)"))
+        if payment_columns and "coupon_reservation_active" not in payment_columns:
+            connection.execute(
+                text("ALTER TABLE payments ADD COLUMN coupon_reservation_active BOOLEAN NOT NULL DEFAULT 0")
+            )
+        plan_columns = {row[1] for row in connection.execute(text("PRAGMA table_info(license_plans)")).fetchall()}
+        if plan_columns and "max_models_per_project" not in plan_columns:
+            connection.execute(text("ALTER TABLE license_plans ADD COLUMN max_models_per_project INTEGER"))
+        if plan_columns and "features" not in plan_columns:
+            connection.execute(text("ALTER TABLE license_plans ADD COLUMN features JSON"))
+        coupon_columns = {row[1] for row in connection.execute(text("PRAGMA table_info(coupons)")).fetchall()}
+        if coupon_columns and "reservation_count" not in coupon_columns:
+            connection.execute(
+                text("ALTER TABLE coupons ADD COLUMN reservation_count INTEGER NOT NULL DEFAULT 0")
+            )
         user_columns = {row[1] for row in connection.execute(text("PRAGMA table_info(users)")).fetchall()}
         if user_columns and "deactivated_at" not in user_columns:
             connection.execute(text("ALTER TABLE users ADD COLUMN deactivated_at DATETIME"))
@@ -1041,6 +1122,193 @@ def validate_pdf_file(file_path: str) -> list[str]:
     return []
 
 
+def validate_presentation_file(file_path: str, extension: str) -> list[str]:
+    """Lightweight signature validation for PPT/PPTX uploads."""
+    if not os.path.isfile(file_path) or os.path.getsize(file_path) == 0:
+        return ["Presentation file is empty."]
+    extension = extension.lower()
+    with open(file_path, "rb") as source:
+        signature = source.read(8)
+    if extension == "ppt" and signature != bytes.fromhex("D0CF11E0A1B11AE1"):
+        return ["PPT file does not have a valid PowerPoint signature."]
+    if extension == "pptx":
+        if not zipfile.is_zipfile(file_path):
+            return ["PPTX file is not a valid Office document."]
+        try:
+            with zipfile.ZipFile(file_path) as archive:
+                names = set(archive.namelist())
+                if "[Content_Types].xml" not in names or not any(name.startswith("ppt/") for name in names):
+                    return ["PPTX file does not contain a PowerPoint presentation."]
+        except (OSError, zipfile.BadZipFile):
+            return ["PPTX file could not be read."]
+    return []
+
+
+def convert_presentation_to_pdf(source_path: str, target_name: str) -> str | None:
+    """Best-effort LibreOffice conversion; the source stays downloadable if unavailable."""
+    executable = shutil.which("soffice") or shutil.which("libreoffice")
+    if not executable:
+        logger.info("LibreOffice is unavailable; skipping preview for %s", source_path)
+        return None
+    with tempfile.TemporaryDirectory(prefix="academicar-presentation-") as output_dir:
+        try:
+            result = subprocess.run(
+                [executable, "--headless", "--convert-to", "pdf", "--outdir", output_dir, source_path],
+                capture_output=True,
+                text=True,
+                timeout=120,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            logger.exception("PowerPoint preview conversion failed for %s", source_path)
+            return None
+        generated = os.path.join(output_dir, f"{os.path.splitext(os.path.basename(source_path))[0]}.pdf")
+        if result.returncode != 0 or not os.path.isfile(generated) or validate_pdf_file(generated):
+            logger.warning("LibreOffice did not produce a valid PDF preview: %s", result.stderr[-500:])
+            return None
+        destination = os.path.join(current_app.config["PDF_FOLDER"], target_name)
+        shutil.copy2(generated, destination)
+        return target_name
+
+
+def _article_form_rows(form, files) -> tuple[list[dict], list[str]]:
+    """Parse optional repeatable article inputs while preserving row order."""
+    field_names = ("article_id", "article_title", "article_authors", "article_year", "article_doi", "article_pmid", "article_abstract")
+    values = {name: list(form.getlist(f"{name}[]")) for name in field_names}
+    uploads = list(files.getlist("article_pdf[]"))
+    count = max([len(items) for items in values.values()] + [len(uploads), 1])
+    rows, errors = [], []
+    for index in range(count):
+        row_values = {
+            name: (items[index] if index < len(items) else "").strip()
+            for name, items in values.items()
+        }
+        upload = uploads[index] if index < len(uploads) else None
+        row = {
+            "id": row_values["article_id"],
+            "title": row_values["article_title"][:500] or None,
+            "authors": row_values["article_authors"][:500] or None,
+            "doi": row_values["article_doi"][:200] or None,
+            "pmid": row_values["article_pmid"][:100] or None,
+            "abstract": row_values["article_abstract"][:5000] or None,
+            "year": None,
+            "upload": upload if upload and upload.filename else None,
+        }
+        year_raw = row_values["article_year"]
+        if year_raw:
+            try:
+                row["year"] = int(year_raw)
+            except ValueError:
+                errors.append(f"Article {index + 1}: year must be numeric.")
+            else:
+                if row["year"] < 1900 or row["year"] > datetime.now(UTC).year + 1:
+                    errors.append(f"Article {index + 1}: year is outside the supported range.")
+        if row["upload"] and not allowed_pdf(row["upload"].filename):
+            errors.append(f"Article {index + 1}: only PDF files are accepted.")
+        row["has_content"] = any(row[key] for key in ("title", "authors", "doi", "pmid", "abstract", "year", "upload"))
+        rows.append(row)
+    return rows, errors
+
+
+def _store_pdf_upload(upload, prefix: str) -> tuple[str, str]:
+    filename = f"{prefix}_{uuid.uuid4().hex}_{secure_filename(upload.filename)}"
+    path = os.path.join(current_app.config["PDF_FOLDER"], filename)
+    safe_save_file(upload, path)
+    errors = validate_pdf_file(path)
+    if errors:
+        cleanup_file(path)
+        raise StorageError("Invalid PDF file: " + "; ".join(errors))
+    return filename, path
+
+
+def sync_project_articles(project: Paper, form, files) -> tuple[list[str], list[str]]:
+    """Create/update/delete article children. Returns (old paths, new paths)."""
+    rows, errors = _article_form_rows(form, files)
+    if errors:
+        raise ValueError(" ".join(errors))
+    existing = {str(article.id): article for article in project.articles}
+    old_paths, new_paths = [], []
+    for order_index, row in enumerate(rows):
+        article = existing.get(row["id"]) if row["id"] else None
+        if not row["has_content"]:
+            if article:
+                if article.pdf_path:
+                    old_paths.append(os.path.join(current_app.config["PDF_FOLDER"], os.path.basename(article.pdf_path)))
+                db.session.delete(article)
+            continue
+        if row["id"] and article is None:
+            raise ValueError("An article row does not belong to this topic.")
+        if article is None:
+            article = ProjectArticle(project=project)
+            db.session.add(article)
+        article.title = row["title"]
+        article.authors = row["authors"]
+        article.year = row["year"]
+        article.doi = row["doi"]
+        article.pmid = row["pmid"]
+        article.abstract = row["abstract"]
+        article.order_index = order_index
+        if row["upload"]:
+            try:
+                stored_name, stored_path = _store_pdf_upload(row["upload"], "article")
+            except (OSError, StorageError):
+                for created_path in new_paths:
+                    cleanup_file(created_path)
+                raise
+            new_paths.append(stored_path)
+            if article.pdf_path:
+                old_paths.append(os.path.join(current_app.config["PDF_FOLDER"], os.path.basename(article.pdf_path)))
+            article.pdf_path = stored_name
+    submitted_ids = {row["id"] for row in rows if row["id"]}
+    for article_id, article in existing.items():
+        if article_id not in submitted_ids:
+            if article.pdf_path:
+                old_paths.append(os.path.join(current_app.config["PDF_FOLDER"], os.path.basename(article.pdf_path)))
+            db.session.delete(article)
+    return old_paths, new_paths
+
+
+def add_project_attachments(project: Paper, form, files) -> list[str]:
+    uploads = [item for item in files.getlist("materials[]") if item and item.filename]
+    new_paths = []
+    if any(not allowed_project_document(upload.filename) for upload in uploads):
+        raise ValueError("Teaching materials must be PDF, PPT, or PPTX files.")
+    for index, upload in enumerate(uploads):
+        extension = upload.filename.rsplit(".", 1)[1].lower()
+        stored_name = f"material_{uuid.uuid4().hex}_{secure_filename(upload.filename)}"
+        stored_path = os.path.join(current_app.config["PDF_FOLDER"], stored_name)
+        new_paths.append(stored_path)
+        try:
+            safe_save_file(upload, stored_path)
+            errors = (
+                validate_pdf_file(stored_path)
+                if extension == "pdf"
+                else validate_presentation_file(stored_path, extension)
+            )
+            if errors:
+                raise ValueError("Invalid teaching material: " + "; ".join(errors))
+            preview_name = stored_name if extension == "pdf" else convert_presentation_to_pdf(
+                stored_path, f"preview_{uuid.uuid4().hex}.pdf"
+            )
+            if preview_name and preview_name != stored_name:
+                new_paths.append(os.path.join(current_app.config["PDF_FOLDER"], preview_name))
+            db.session.add(ProjectAttachment(
+                project=project,
+                title=os.path.splitext(secure_filename(upload.filename))[0][:300]
+                or "Presentation material",
+                original_filename=secure_filename(upload.filename)[:255],
+                file_type=extension,
+                source_path=stored_name,
+                preview_pdf_path=preview_name,
+                order_index=len(project.attachments) + index,
+            ))
+        except (OSError, StorageError, ValueError):
+            for created_path in new_paths:
+                cleanup_file(created_path)
+            raise
+    return new_paths
+
+
 def make_slug(title: str) -> str:
     base = slugify(title)[:200] or "paper"
     slug = base
@@ -1131,6 +1399,7 @@ def validate_project_form(form) -> tuple[dict, list[str]]:
     abstract = (form.get("abstract") or "").strip()
     doi = (form.get("doi") or "").strip()
     institution = (form.get("institution") or "").strip()
+    department = normalize_department(form.get("department")) or ""
     pmid = (form.get("pmid") or "").strip()
     visibility = (form.get("visibility") or "private").strip().lower()
     project_type = (form.get("project_type") or "research_project").strip().lower()
@@ -1156,6 +1425,7 @@ def validate_project_form(form) -> tuple[dict, list[str]]:
         "Abstract": (abstract, 5000),
         "DOI": (doi, 200),
         "Institution / Journal": (institution, 300),
+        "Department": (department, 120),
         "PMID": (pmid, 100),
     }
     for label, (value, limit) in length_limits.items():
@@ -1185,6 +1455,7 @@ def validate_project_form(form) -> tuple[dict, list[str]]:
             "abstract": abstract or None,
             "doi": doi or None,
             "institution": institution or None,
+            "department": department or None,
             "pmid": pmid or None,
             "project_type": project_type,
             "workflow_stage": workflow_stage,
@@ -1211,6 +1482,144 @@ def project_visibility(project: Paper | None) -> str:
     return getattr(project, "visibility", None) or (
         "public" if getattr(project, "is_public", False) else "private"
     )
+
+
+def project_model_capacity(project: Paper | None, *, intended_plan: str | None = None) -> dict:
+    """Return the strongest plan's topic-level model capacity and usage."""
+    selected_key = strongest_project_plan_key(project, intended_plan=intended_plan)
+    plan = get_license_plan(selected_key)
+    used = len(project_capacity_models(project))
+    return {
+        "plan": plan,
+        "used": used,
+        "limit": plan.max_models_per_project,
+        "can_add": plan.max_models_per_project is None or used < plan.max_models_per_project,
+    }
+
+
+def intended_project_plan_for_user(user_id: int | None) -> str:
+    """Plan context for a new topic before its first model exists."""
+    membership = get_active_membership(user_id)
+    if membership is not None:
+        can_fund, _reason = institution_can_fund_upload(membership.institution, 0)
+        if can_fund:
+            return "institutional"
+    return "free"
+
+
+def request_project_supports_feature(project: Paper | None, feature: str) -> bool:
+    """Template/request wrapper that handles a not-yet-created topic."""
+    intended_plan = None
+    if project is None and current_user.is_authenticated:
+        intended_plan = intended_project_plan_for_user(current_user.id)
+    return project_supports_feature(project, feature, intended_plan=intended_plan)
+
+
+def active_coupon(code: str | None, plan_key: str) -> tuple[Coupon | None, str | None]:
+    normalized = re.sub(r"[^A-Z0-9_-]", "", (code or "").strip().upper())[:64]
+    if not normalized:
+        return None, None
+    coupon = Coupon.query.filter(func.upper(Coupon.code) == normalized).first()
+    if not coupon or not coupon.is_active:
+        return None, "Coupon code is invalid or inactive."
+    error = coupon_validation_error(coupon, plan_key)
+    if error:
+        return None, error
+    return coupon, None
+
+
+def coupon_validation_error(coupon: Coupon, plan_key: str) -> str | None:
+    now = datetime.now(UTC)
+    starts_at = coupon.starts_at
+    expires_at = coupon.expires_at
+    if starts_at and starts_at.tzinfo is None:
+        starts_at = starts_at.replace(tzinfo=UTC)
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
+    if starts_at and starts_at > now:
+        return "Coupon is not active yet."
+    if expires_at and expires_at < now:
+        return "Coupon has expired."
+    if (
+        coupon.max_redemptions is not None
+        and coupon.redemption_count + coupon.reservation_count >= coupon.max_redemptions
+    ):
+        return "Coupon redemption limit has been reached."
+    applicable = coupon.applicable_plan_keys or []
+    if applicable and plan_key not in applicable:
+        return "Coupon does not apply to the selected plan."
+    return None
+
+
+def reserve_coupon(coupon_id: int, plan_key: str) -> tuple[Coupon | None, str | None]:
+    """Lock a coupon and reserve one checkout slot atomically."""
+    query = Coupon.query.filter_by(id=coupon_id)
+    lockable = db.engine.dialect.name in {"postgresql", "mysql"}
+    if lockable:
+        query = query.with_for_update()
+    coupon = query.first()
+    if coupon is None or not coupon.is_active:
+        return None, "Coupon code is invalid or inactive."
+
+    # Abandoned hosted checkouts must not hold a finite coupon forever.
+    stale_cutoff = datetime.now(UTC) - timedelta(hours=1)
+    stale_query = Payment.query.filter(
+        Payment.coupon_id == coupon.id,
+        Payment.coupon_reservation_active.is_(True),
+        Payment.status == "pending",
+        Payment.created_at < stale_cutoff,
+    )
+    if lockable:
+        stale_query = stale_query.with_for_update()
+    stale = stale_query.all()
+    for payment in stale:
+        payment.coupon_reservation_active = False
+    if stale:
+        coupon.reservation_count = max(0, coupon.reservation_count - len(stale))
+
+    error = coupon_validation_error(coupon, plan_key)
+    if error:
+        return None, error
+    coupon.reservation_count += 1
+    return coupon, None
+
+
+def settle_coupon_reservation(
+    payment: Payment,
+    *,
+    redeemed: bool,
+    count_unreserved: bool = False,
+) -> None:
+    """Release a checkout reservation and optionally record one redemption."""
+    if payment.coupon_id is None:
+        return
+    query = Coupon.query.filter_by(id=payment.coupon_id)
+    if db.engine.dialect.name in {"postgresql", "mysql"}:
+        query = query.with_for_update()
+    coupon = query.first()
+    if coupon is None:
+        payment.coupon_reservation_active = False
+        return
+    was_reserved = payment.coupon_reservation_active
+    if was_reserved:
+        coupon.reservation_count = max(0, coupon.reservation_count - 1)
+        payment.coupon_reservation_active = False
+    if redeemed and (was_reserved or count_unreserved):
+        coupon.redemption_count += 1
+
+
+def coupon_price(original_minor: int, coupon: Coupon | None, plan_key: str) -> tuple[int, int]:
+    if coupon is None:
+        return original_minor, 0
+    if coupon.percent_off:
+        discount = int(round(original_minor * min(max(coupon.percent_off, 0), 100) / 100))
+    elif coupon.fixed_discount_usd_cents:
+        base_usd_cents = max(int(round(get_license_plan(plan_key).price_usd * 100)), 1)
+        discount = int(round(original_minor * coupon.fixed_discount_usd_cents / base_usd_cents))
+    else:
+        discount = 0
+    discount = min(max(discount, 0), original_minor)
+    return original_minor - discount, discount
 
 
 def new_project_share_token() -> str:
@@ -1405,6 +1814,18 @@ def hex_to_rgba(hex_color: str | None) -> tuple[float, float, float, float] | No
     return (r, g, b, 1.0)
 
 
+def _refresh_model_poster(model) -> str | None:
+    """Regenerate a dashboard poster after a GLB material/colour change."""
+    glb_path = model.glb_path
+    if not glb_path or not os.path.exists(glb_path):
+        return None
+    poster_path = os.path.join(os.path.dirname(glb_path), "poster.png")
+    if not generate_poster(glb_path, poster_path):
+        return None
+    model.poster_path = poster_path
+    return poster_path
+
+
 def _apply_model_appearance_change(model, form):
     """Parse and apply an appearance/description change to a model's GLB.
 
@@ -1479,9 +1900,12 @@ def _apply_model_appearance_change(model, form):
             model.file_size = os.path.getsize(glb_path)
         except OSError:
             pass
+        refreshed_poster = _refresh_model_poster(model)
         db.session.commit()
         # Re-mirror the rewritten GLB so R2 doesn't keep the pre-recolor copy.
         mirror_file(glb_path, f"converted/{model.id}/model.glb")
+        if refreshed_poster:
+            mirror_file(refreshed_poster, f"converted/{model.id}/poster.png")
         changes = {"color": new_color, "roughness": roughness, "metallic": metallic, "ar_placement": ar_placement}
         return True, "Changes saved.", "success", changes
     except SQLAlchemyError:
@@ -1537,9 +1961,12 @@ def _bake_viewer_color(model, color):
             model.file_size = os.path.getsize(glb_path)
         except OSError:
             pass
+        refreshed_poster = _refresh_model_poster(model)
         db.session.commit()
         # Re-mirror the rewritten GLB so R2 doesn't keep the pre-recolor copy.
         mirror_file(glb_path, f"converted/{model.id}/model.glb")
+        if refreshed_poster:
+            mirror_file(refreshed_poster, f"converted/{model.id}/poster.png")
         return True, "Color saved to the model."
     except SQLAlchemyError:
         db.session.rollback()
@@ -1763,6 +2190,14 @@ def collect_paper_file_paths(app: Flask, paper: Paper) -> list[tuple[str, str]]:
         paths.extend(collect_model_file_paths(app, model))
     if paper.pdf_path:
         paths.append(("file", os.path.join(app.config["PDF_FOLDER"], os.path.basename(paper.pdf_path))))
+    for article in paper.articles:
+        if article.pdf_path:
+            paths.append(("file", os.path.join(app.config["PDF_FOLDER"], os.path.basename(article.pdf_path))))
+    for attachment in paper.attachments:
+        if attachment.source_path:
+            paths.append(("file", os.path.join(app.config["PDF_FOLDER"], os.path.basename(attachment.source_path))))
+        if attachment.preview_pdf_path and attachment.preview_pdf_path != attachment.source_path:
+            paths.append(("file", os.path.join(app.config["PDF_FOLDER"], os.path.basename(attachment.preview_pdf_path))))
     paths.append(("file", os.path.join(app.config["QR_FOLDER"], paper_qr_filename(paper.id))))
     return paths
 
@@ -2437,6 +2872,15 @@ def _create_model_for_paper(
         else:
             institutional_fallback_reason = reason
 
+    capacity = project_model_capacity(paper, intended_plan=license_normalized)
+    if not capacity["can_add"]:
+        cleanup_dir(upload_dir)
+        cleanup_dir(converted_dir)
+        return False, (
+            f"The {capacity['plan'].label} plan allows {capacity['limit']} model(s) "
+            "per topic. Upgrade an existing model or ask an admin to raise the plan limit."
+        )
+
     size_error = model_file_limit_error(file_size, license_normalized)
     if size_error:
         cleanup_dir(upload_dir)
@@ -3078,7 +3522,7 @@ def register_routes(app: Flask) -> None:
         if institution is None:
             abort(404)
         papers = (
-            Paper.query.options(selectinload(Paper.models))
+            Paper.query.options(selectinload(Paper.models), selectinload(Paper.articles), selectinload(Paper.attachments))
             .join(Model3D, Model3D.paper_id == Paper.id)
             .filter(
                 Model3D.institution_id == institution.id,
@@ -3093,12 +3537,31 @@ def register_routes(app: Flask) -> None:
         )
         model_count, _bytes_used = institution_usage(institution.id)
         member_count = InstitutionMember.query.filter_by(institution_id=institution.id).count()
+        normalized_department_groups = {}
+        for paper in papers:
+            if not paper.articles:
+                continue
+            department = normalize_department(paper.department or paper.field) or "Interdisciplinary"
+            # Group legacy rows case-insensitively as well as normalising known
+            # aliases, while retaining a human-readable canonical label.
+            group = normalized_department_groups.setdefault(
+                department.casefold(),
+                {"label": department, "items": []},
+            )
+            group["items"].extend(
+                {"article": article, "project": paper} for article in paper.articles
+            )
+        department_groups = {
+            group["label"]: group["items"]
+            for group in normalized_department_groups.values()
+        }
         return render_template(
             "institution/showcase.html",
             institution=institution,
             papers=papers,
             model_count=model_count,
             member_count=member_count,
+            department_groups=department_groups,
         )
 
     @app.route("/institution-logos/<path:filename>")
@@ -3250,11 +3713,20 @@ def register_routes(app: Flask) -> None:
             flash("Choose a valid paid plan to upgrade this model.", "danger")
             return redirect(request.referrer or url_for("dashboard"))
 
+        current_plan = get_license_plan(model.license_type)
+        if not current_plan.is_purchasable:
+            flash(
+                "This model is managed by an institution or administrator and "
+                "cannot be changed through self-service checkout.",
+                "info",
+            )
+            return redirect(url_for("model_upgrade_page", model_id=model.id))
+
         # Never let this paid route apply a downgrade (a plan cheaper than the
         # model already has) — that would charge the user to *reduce* access.
         # Renewing the same plan (equal price) and upgrading (higher price) are
         # both fine. Downgrades are an admin-only action via /models/<id>/license.
-        if get_license_plan(plan_key).price_usd < get_license_plan(model.license_type).price_usd:
+        if get_license_plan(plan_key).price_usd < current_plan.price_usd:
             flash(
                 "This model already has a higher-tier license. You can renew it "
                 "or upgrade to a longer plan, but not switch to a cheaper one here.",
@@ -3265,16 +3737,32 @@ def register_routes(app: Flask) -> None:
         provider = get_payment_provider()
         payment_currency = current_app.config.get("PAYMENT_CURRENCY", "USD")
         try:
-            amount_kurus = plan_amount_minor_units(plan_key, payment_currency)
+            amount_before_discount = plan_amount_minor_units(plan_key, payment_currency)
         except ForexRateUnavailable:
             flash("Could not start the upgrade: exchange rate unavailable. Please try again shortly.", "danger")
             return redirect(request.referrer or url_for("dashboard"))
+        coupon, coupon_error = active_coupon(request.form.get("coupon_code"), plan_key)
+        if coupon_error:
+            flash(coupon_error, "danger")
+            return redirect(url_for("model_upgrade_page", model_id=model.id))
+        if coupon is not None:
+            coupon, coupon_error = reserve_coupon(coupon.id, plan_key)
+            if coupon_error:
+                db.session.rollback()
+                flash(coupon_error, "danger")
+                return redirect(url_for("model_upgrade_page", model_id=model.id))
+        amount_kurus, discount_amount = coupon_price(amount_before_discount, coupon, plan_key)
         payment = Payment(
             user_id=current_user.id,
             paper_id=model.paper_id,
             model_id=model.id,
             plan_key=plan_key,
             amount_kurus=amount_kurus,
+            amount_before_discount=amount_before_discount,
+            discount_amount=discount_amount,
+            coupon_id=(coupon.id if coupon else None),
+            coupon_code=(coupon.code if coupon else None),
+            coupon_reservation_active=bool(coupon),
             currency=payment_currency,
             provider=provider.name,
             provider_reference=f"{provider.name}-{uuid.uuid4().hex[:12]}",
@@ -3292,14 +3780,25 @@ def register_routes(app: Flask) -> None:
             success_url = public_url("paper_detail", slug=model.paper.slug, upgraded=model.id)
             # A cancelled/failed payment returns to the plan picker so they can retry.
             cancel_url = public_url("model_upgrade_page", model_id=model.id)
-            checkout_url = provider.create_checkout(
-                payment=payment,
-                model=model,
-                plan_key=plan_key,
-                user=current_user,
-                success_url=success_url,
-                cancel_url=cancel_url,
-            )
+            was_paid = payment.status == "paid"
+            if amount_kurus == 0:
+                apply_successful_payment(payment, model, plan_key)
+                settle_coupon_reservation(payment, redeemed=bool(coupon))
+                checkout_url = success_url
+            else:
+                checkout_url = provider.create_checkout(
+                    payment=payment,
+                    model=model,
+                    plan_key=plan_key,
+                    user=current_user,
+                    success_url=success_url,
+                    cancel_url=cancel_url,
+                )
+            if amount_kurus != 0 and coupon and not was_paid and payment.status == "paid":
+                settle_coupon_reservation(payment, redeemed=True)
+            if not checkout_url and payment.coupon_reservation_active:
+                settle_coupon_reservation(payment, redeemed=False)
+                payment.status = "failed"
             db.session.commit()
         except SQLAlchemyError:
             db.session.rollback()
@@ -3318,7 +3817,11 @@ def register_routes(app: Flask) -> None:
             "model_upgrade_initiated",
             user_id=current_user.id,
             resource_id=model.id,
-            details={"plan": plan_key, "provider": provider.name, "payment_id": payment.id},
+            details={
+                "plan": plan_key, "provider": provider.name, "payment_id": payment.id,
+                "coupon": payment.coupon_code, "discount_minor": payment.discount_amount,
+                "amount_minor": payment.amount_kurus, "currency": payment.currency,
+            },
         )
         if payment.status == "paid":
             flash("Upgrade complete — this model's access window has been extended.", "success")
@@ -3373,7 +3876,38 @@ def register_routes(app: Flask) -> None:
             return jsonify({"ok": True, **payload}), 200
 
         event = provider.parse_event(request) or {}
-        if (event.get("status") or "").lower() != "paid":
+        event_status = (event.get("status") or "").lower()
+        if event_status != "paid":
+            # Release a finite-coupon reservation when the authenticated
+            # provider reports a failed/cancelled checkout. Duplicate failures
+            # are harmless because the active flag is cleared on first use.
+            provider_reference = event.get("provider_reference")
+            payment = None
+            payment_id = event.get("payment_id")
+            lockable = db.engine.dialect.name in {"postgresql", "mysql"}
+            if payment_id is not None:
+                try:
+                    payment = db.session.get(
+                        Payment,
+                        int(payment_id),
+                        with_for_update=lockable or None,
+                    )
+                except (TypeError, ValueError):
+                    payment = None
+            if payment is None and provider_reference:
+                query = Payment.query.filter_by(provider_reference=provider_reference)
+                if lockable:
+                    query = query.with_for_update()
+                payment = query.first()
+            if payment is not None and payment.coupon_reservation_active:
+                settle_coupon_reservation(payment, redeemed=False)
+                if event_status in {"failed", "cancelled", "canceled", "refunded"}:
+                    payment.status = "failed"
+                try:
+                    db.session.commit()
+                except SQLAlchemyError:
+                    db.session.rollback()
+                    return jsonify({"ok": False}), 500
             return ack(ignored=True)
 
         provider_reference = event.get("provider_reference")
@@ -3513,7 +4047,14 @@ def register_routes(app: Flask) -> None:
             db.session.rollback()
             return jsonify({"ok": False, "error": "amount_mismatch"}), 400
 
+        was_already_paid = payment.status == "paid"
         apply_successful_payment(payment, model, effective_plan)
+        if payment.coupon is not None and not was_already_paid:
+            settle_coupon_reservation(
+                payment,
+                redeemed=True,
+                count_unreserved=True,
+            )
         try:
             db.session.commit()
         except SQLAlchemyError:
@@ -3540,7 +4081,6 @@ def register_routes(app: Flask) -> None:
             abort(404)
         if not _paper_visible_to_request(model.paper):
             abort(404)
-        track_event("qr_scanned", owner_user_id=model.user_id, project_id=model.paper_id, model_id=model.id)
         status = model_access_status(model)
         is_owner = current_user.is_authenticated and current_user.id == model.user_id
         if status != "active":
@@ -3600,6 +4140,7 @@ def register_routes(app: Flask) -> None:
                 resource_id=qr_link.public_id,
                 details={"model_id": model.id, "target_type": qr_link.target_type},
             )
+        track_event("qr_scanned", owner_user_id=model.user_id, project_id=model.paper_id, model_id=model.id)
         if not _paper_visible_to_request(model.paper):
             abort(404)
         status = model_access_status(model)
@@ -3619,6 +4160,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/analytics/event", methods=["POST"])
     @csrf.exempt
+    @limiter.limit("30 per minute")
     def analytics_browser_event():
         """Accept a very small allowlist of anonymous viewer interactions."""
         payload = request.get_json(silent=True) or {}
@@ -3629,6 +4171,8 @@ def register_routes(app: Flask) -> None:
         model = db.session.get(Model3D, model_id)
         if not model or not _paper_visible_to_request(model.paper):
             return jsonify({"ok": False}), 404
+        if browser_event_is_duplicate(event_name, model_id):
+            return jsonify({"ok": True, "duplicate": True}), 202
         track_event(event_name, owner_user_id=model.user_id, project_id=model.paper_id, model_id=model.id)
         return jsonify({"ok": True}), 202
 
@@ -3641,6 +4185,8 @@ def register_routes(app: Flask) -> None:
             abort(404)
         if not _paper_visible_to_request(model.paper) or not model_is_accessible(model):
             abort(404)
+        if filename == "model.usdz" and not plan_supports_feature(model.license_type, "ar"):
+            abort(403)
         directory = os.path.join(app.config["CONVERTED_FOLDER"], unique_id)
         target = os.path.join(directory, filename)
         if not os.path.exists(target):
@@ -3732,6 +4278,8 @@ def register_routes(app: Flask) -> None:
         model = db.session.get(Model3D, model_id)
         if not model:
             abort(404)
+        if not plan_supports_feature(model.license_type, "combined_view"):
+            return jsonify({"error": "Combined view is disabled for this plan."}), 403
         file = request.files.get("image")
         if not file or not file.filename:
             return jsonify({"error": "No image provided."}), 400
@@ -3774,6 +4322,8 @@ def register_routes(app: Flask) -> None:
         model = db.session.get(Model3D, model_id)
         if not model:
             abort(404)
+        if not plan_supports_feature(model.license_type, "combined_view"):
+            return jsonify({"error": "Combined view is disabled for this plan."}), 403
         if model.collage_path:
             old_path = model.collage_path
             model.collage_path = None
@@ -3790,14 +4340,26 @@ def register_routes(app: Flask) -> None:
     @app.route("/qr-image/<model_id>")
     def qr_image(model_id):
         model = db.session.get(Model3D, model_id)
-        if not model or not model.qr_code_path:
+        if not model:
             abort(404)
         if not model.paper:
             abort(404)
         if not _paper_visible_to_request(model.paper):
             abort(404)
-        qr_name = os.path.basename(model.qr_code_path)
-        ensure_local(os.path.join(app.config["QR_FOLDER"], qr_name), f"qr_codes/{qr_name}")
+        ensure_model_qr_link(model)
+        qr_name = os.path.basename(model.qr_code_path or f"qr_{model.id}.png")
+        local_path = os.path.join(app.config["QR_FOLDER"], qr_name)
+        if not os.path.isfile(local_path):
+            ensure_local(local_path, f"qr_codes/{qr_name}")
+        if not os.path.isfile(local_path):
+            try:
+                qr_name = generate_model_qr(model, app.config["QR_FOLDER"])
+                model.qr_code_path = qr_name
+                db.session.commit()
+            except (OSError, SQLAlchemyError):
+                db.session.rollback()
+                logger.exception("Could not self-heal QR image for model %s", model.id)
+                abort(500)
         return send_from_directory(app.config["QR_FOLDER"], qr_name)
 
     @app.route("/qr-print/<model_id>")
@@ -3884,7 +4446,15 @@ def register_routes(app: Flask) -> None:
             abort(404)
         if not paper.pdf_path:
             abort(404)
-        return render_template("pdf_reader.html", paper=paper)
+        return render_template(
+            "pdf_reader.html",
+            paper=paper,
+            document_title=paper.title,
+            document_subtitle=paper.authors,
+            file_url=url_for("paper_public_pdf_file", slug=paper.slug),
+            download_url=url_for("paper_public_pdf_file", slug=paper.slug),
+            preview_available=True,
+        )
 
     @app.route("/p/<slug>/pdf/file")
     def paper_public_pdf_file(slug):
@@ -3914,6 +4484,95 @@ def register_routes(app: Flask) -> None:
         )
         response.headers["X-Frame-Options"] = "SAMEORIGIN"
         return response
+
+    def _project_document_response(project: Paper, stored_name: str, *, inline_pdf: bool = False):
+        if not _paper_visible_to_request(project):
+            abort(404)
+        safe_name = os.path.basename(stored_name or "")
+        if not safe_name:
+            abort(404)
+        path = os.path.join(app.config["PDF_FOLDER"], safe_name)
+        ensure_local(path, f"pdfs/{safe_name}")
+        if not os.path.isfile(path):
+            abort(404)
+        response = send_from_directory(
+            app.config["PDF_FOLDER"],
+            safe_name,
+            mimetype="application/pdf" if inline_pdf else None,
+            as_attachment=not inline_pdf,
+            download_name=safe_name,
+        )
+        response.headers["X-Robots-Tag"] = "noindex, nofollow"
+        if inline_pdf:
+            response.headers["Content-Disposition"] = f'inline; filename="{safe_name}"'
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'none'; img-src 'self' blob: data:; style-src 'unsafe-inline'; "
+                "object-src 'none'; script-src 'none'; frame-ancestors 'self'"
+            )
+            response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        return response
+
+    @app.route("/p/<slug>/articles/<int:article_id>")
+    def project_article_reader(slug, article_id):
+        project = active_paper_query().filter_by(slug=slug).first_or_404()
+        if not _paper_visible_to_request(project):
+            abort(404)
+        article = ProjectArticle.query.filter_by(id=article_id, project_id=project.id).first_or_404()
+        if not article.pdf_path:
+            abort(404)
+        track_event("article_viewed", owner_user_id=project.user_id, project_id=project.id)
+        return render_template(
+            "pdf_reader.html",
+            paper=project,
+            document_title=article.title or "Related article",
+            document_subtitle=article.authors,
+            file_url=url_for("project_article_file", slug=slug, article_id=article.id),
+            download_url=url_for("project_article_file", slug=slug, article_id=article.id, download=1),
+            preview_available=True,
+        )
+
+    @app.route("/p/<slug>/articles/<int:article_id>/file")
+    def project_article_file(slug, article_id):
+        project = active_paper_query().filter_by(slug=slug).first_or_404()
+        article = ProjectArticle.query.filter_by(id=article_id, project_id=project.id).first_or_404()
+        return _project_document_response(project, article.pdf_path, inline_pdf=request.args.get("download") != "1")
+
+    @app.route("/p/<slug>/materials/<int:attachment_id>")
+    def project_attachment_reader(slug, attachment_id):
+        project = active_paper_query().filter_by(slug=slug).first_or_404()
+        if not _paper_visible_to_request(project):
+            abort(404)
+        if not project_supports_feature(project, "presentation_library"):
+            abort(403)
+        attachment = ProjectAttachment.query.filter_by(id=attachment_id, project_id=project.id).first_or_404()
+        track_event("material_viewed", owner_user_id=project.user_id, project_id=project.id)
+        return render_template(
+            "pdf_reader.html",
+            paper=project,
+            document_title=attachment.title or attachment.original_filename,
+            document_subtitle=f"{attachment.file_type.upper()} presentation material",
+            file_url=(url_for("project_attachment_preview", slug=slug, attachment_id=attachment.id) if attachment.preview_pdf_path else None),
+            download_url=url_for("project_attachment_file", slug=slug, attachment_id=attachment.id),
+            preview_available=bool(attachment.preview_pdf_path),
+        )
+
+    @app.route("/p/<slug>/materials/<int:attachment_id>/preview")
+    def project_attachment_preview(slug, attachment_id):
+        project = active_paper_query().filter_by(slug=slug).first_or_404()
+        if not project_supports_feature(project, "presentation_library"):
+            abort(403)
+        attachment = ProjectAttachment.query.filter_by(id=attachment_id, project_id=project.id).first_or_404()
+        if not attachment.preview_pdf_path:
+            abort(404)
+        return _project_document_response(project, attachment.preview_pdf_path, inline_pdf=True)
+
+    @app.route("/p/<slug>/materials/<int:attachment_id>/file")
+    def project_attachment_file(slug, attachment_id):
+        project = active_paper_query().filter_by(slug=slug).first_or_404()
+        if not project_supports_feature(project, "presentation_library"):
+            abort(403)
+        attachment = ProjectAttachment.query.filter_by(id=attachment_id, project_id=project.id).first_or_404()
+        return _project_document_response(project, attachment.source_path, inline_pdf=False)
 
     @app.route("/dashboard")
     @login_required
@@ -4479,12 +5138,14 @@ def register_routes(app: Flask) -> None:
         system_health = _admin_system_health() if admin_page == "system" else {}
         analytics = analytics_snapshot(days=30) if admin_page == "analytics" else None
         pricing_rows = []
+        coupons = []
         if admin_page == "pricing":
             # Self-heal on every visit — same precedent as
             # `if admin_page == "backups": ensure_daily_backup(...)`.
             seed_license_plans(app)
             plan_order = {"free": 0, "academic": 1, "extended_archive": 2, "institutional": 3}
             pricing_rows = sorted(LicensePlanConfig.query.all(), key=lambda r: plan_order.get(r.key, 99))
+            coupons = Coupon.query.order_by(Coupon.created_at.desc()).all()
         return render_template(
             f"admin/{admin_page}.html",
             users=users,
@@ -4498,6 +5159,8 @@ def register_routes(app: Flask) -> None:
             annotations_pagination=annotations_pagination,
             system_health=system_health,
             pricing_rows=pricing_rows,
+            plan_features=PLAN_FEATURES,
+            coupons=coupons,
             users_pagination=users_pagination,
             papers_pagination=papers_pagination,
             models_pagination=models_pagination,
@@ -5454,6 +6117,25 @@ def register_routes(app: Flask) -> None:
             flash("Storage limit must be positive.", "danger")
             return redirect(url_for("admin_dashboard", admin_page="pricing"))
         is_purchasable = request.form.get("is_purchasable") == "1"
+        model_limit_supplied = "max_models_per_project" in request.form
+        model_limit_raw = (request.form.get("max_models_per_project") or "").strip()
+        max_models_per_project = plan_row.max_models_per_project
+        if model_limit_supplied and not model_limit_raw:
+            max_models_per_project = None
+        elif model_limit_raw:
+            try:
+                max_models_per_project = int(model_limit_raw)
+            except ValueError:
+                flash("Model limit must be a whole number, or blank for unlimited.", "danger")
+                return redirect(url_for("admin_dashboard", admin_page="pricing"))
+            if max_models_per_project <= 0:
+                flash("Model limit must be positive, or blank for unlimited.", "danger")
+                return redirect(url_for("admin_dashboard", admin_page="pricing"))
+        enabled_features = plan_row.features or []
+        if request.form.get("features_present") == "1":
+            submitted_features = request.form.getlist("features")
+            known_features = {key for key, _ in PLAN_FEATURES}
+            enabled_features = sorted({key for key in submitted_features if key in known_features})
 
         previous = {
             "label": plan_row.label,
@@ -5461,12 +6143,16 @@ def register_routes(app: Flask) -> None:
             "duration_days": plan_row.duration_days,
             "storage_limit_bytes": plan_row.storage_limit_bytes,
             "is_purchasable": plan_row.is_purchasable,
+            "max_models_per_project": plan_row.max_models_per_project,
+            "features": plan_row.features or [],
         }
         plan_row.label = label
         plan_row.price_usd_cents = int(round(price_major * 100))
         plan_row.duration_days = duration_days
         plan_row.storage_limit_bytes = storage_mb * 1024 * 1024
         plan_row.is_purchasable = is_purchasable
+        plan_row.max_models_per_project = max_models_per_project
+        plan_row.features = enabled_features
         try:
             db.session.commit()
         except SQLAlchemyError:
@@ -5488,10 +6174,89 @@ def register_routes(app: Flask) -> None:
                     "duration_days": plan_row.duration_days,
                     "storage_limit_bytes": plan_row.storage_limit_bytes,
                     "is_purchasable": plan_row.is_purchasable,
+                    "max_models_per_project": plan_row.max_models_per_project,
+                    "features": plan_row.features or [],
                 },
             },
         )
         flash(f"Pricing updated for {plan_row.label}.", "success")
+        return redirect(url_for("admin_dashboard", admin_page="pricing"))
+
+    @app.route("/admin/coupons", methods=["POST"])
+    @login_required
+    def admin_coupon_create():
+        require_admin()
+        code = re.sub(r"[^A-Z0-9_-]", "", (request.form.get("code") or "").strip().upper())[:64]
+        if len(code) < 3:
+            flash("Coupon code must contain at least 3 letters or numbers.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="pricing"))
+        discount_type = (request.form.get("discount_type") or "percent").strip()
+        try:
+            discount_value = float((request.form.get("discount_value") or "").strip())
+        except ValueError:
+            flash("Coupon discount must be a number.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="pricing"))
+        percent_off, fixed_discount_usd_cents = None, None
+        if discount_type == "percent":
+            if discount_value <= 0 or discount_value > 100 or not discount_value.is_integer():
+                flash("Percentage discount must be a whole number from 1 to 100.", "danger")
+                return redirect(url_for("admin_dashboard", admin_page="pricing"))
+            percent_off = int(discount_value)
+        elif discount_type == "fixed":
+            if discount_value <= 0:
+                flash("Fixed USD discount must be positive.", "danger")
+                return redirect(url_for("admin_dashboard", admin_page="pricing"))
+            fixed_discount_usd_cents = int(round(discount_value * 100))
+        else:
+            flash("Invalid coupon discount type.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="pricing"))
+        max_redemptions_raw = (request.form.get("max_redemptions") or "").strip()
+        max_redemptions = None
+        if max_redemptions_raw:
+            if not max_redemptions_raw.isdigit() or int(max_redemptions_raw) <= 0:
+                flash("Maximum redemptions must be positive or blank.", "danger")
+                return redirect(url_for("admin_dashboard", admin_page="pricing"))
+            max_redemptions = int(max_redemptions_raw)
+        expires_raw = (request.form.get("expires_at") or "").strip()
+        try:
+            expires_at = datetime.fromisoformat(expires_raw).replace(tzinfo=UTC) if expires_raw else None
+        except ValueError:
+            flash("Coupon expiry date is invalid.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="pricing"))
+        plan_keys = [key for key in request.form.getlist("plan_keys") if key in PAID_PLAN_KEYS]
+        if not plan_keys:
+            plan_keys = list(PAID_PLAN_KEYS)
+        coupon = Coupon(
+            code=code,
+            percent_off=percent_off,
+            fixed_discount_usd_cents=fixed_discount_usd_cents,
+            applicable_plan_keys=plan_keys,
+            max_redemptions=max_redemptions,
+            expires_at=expires_at,
+            is_active=True,
+        )
+        db.session.add(coupon)
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            flash("That coupon code already exists.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="pricing"))
+        log_audit("admin_coupon_created", user_id=current_user.id, resource_id=str(coupon.id), details={"code": code})
+        flash(f"Coupon {code} created.", "success")
+        return redirect(url_for("admin_dashboard", admin_page="pricing"))
+
+    @app.route("/admin/coupons/<int:coupon_id>/toggle", methods=["POST"])
+    @login_required
+    def admin_coupon_toggle(coupon_id):
+        require_admin()
+        coupon = db.session.get(Coupon, coupon_id)
+        if not coupon:
+            abort(404)
+        coupon.is_active = not coupon.is_active
+        db.session.commit()
+        log_audit("admin_coupon_toggled", user_id=current_user.id, resource_id=str(coupon.id), details={"active": coupon.is_active})
+        flash(f"Coupon {coupon.code} {'activated' if coupon.is_active else 'paused'}.", "success")
         return redirect(url_for("admin_dashboard", admin_page="pricing"))
 
     @app.route("/admin/models/<model_id>/processing", methods=["POST"])
@@ -6835,6 +7600,21 @@ def register_routes(app: Flask) -> None:
     def project_new():
         if request.method == "POST":
             paper_data, paper_errors = validate_project_form(request.form)
+            _article_rows, article_errors = _article_form_rows(request.form, request.files)
+            paper_errors.extend(article_errors)
+            material_uploads = [
+                item for item in request.files.getlist("materials[]")
+                if item and item.filename
+            ]
+            intended_plan = intended_project_plan_for_user(current_user.id)
+            if material_uploads and not project_supports_feature(
+                None,
+                "presentation_library",
+                intended_plan=intended_plan,
+            ):
+                paper_errors.append(
+                    "PDF / PowerPoint supporting materials are disabled for your current plan."
+                )
             if paper_errors:
                 flash(" ".join(paper_errors), "danger")
                 return render_template("paper_new.html", form=request.form)
@@ -6849,6 +7629,7 @@ def register_routes(app: Flask) -> None:
                 abstract=paper_data["abstract"],
                 doi=paper_data["doi"],
                 institution=paper_data["institution"],
+                department=paper_data["department"],
                 pmid=paper_data["pmid"],
                 project_type=paper_data["project_type"],
                 workflow_stage=paper_data["workflow_stage"],
@@ -6879,26 +7660,42 @@ def register_routes(app: Flask) -> None:
                     return render_template("paper_new.html", form=request.form)
                 paper.pdf_path = pdf_filename
 
+            # Persist the topic, related articles, and supporting materials in
+            # one database transaction. Files are staged first and removed if
+            # any validation/storage/DB step fails, so users never receive a
+            # half-created topic after an invalid PowerPoint or article PDF.
+            content_new_paths = []
             try:
                 db.session.add(paper)
-                db.session.commit()
-            except IntegrityError:
-                db.session.rollback()
-                paper.slug = make_slug(f"{paper_data['title']}-{uuid.uuid4().hex[:6]}")
-                db.session.add(paper)
                 try:
-                    db.session.commit()
-                except SQLAlchemyError:
+                    db.session.flush()
+                except IntegrityError:
+                    # A concurrent create may have claimed the preflighted slug.
+                    # Retry the row inside the same all-or-nothing workflow.
                     db.session.rollback()
-                    cleanup_file(saved_pdf_path)
-                    logger.exception("Paper create failed after slug retry")
-                    flash("The publication could not be saved. Please try again.", "danger")
-                    return render_template("paper_new.html", form=request.form)
-            except SQLAlchemyError:
+                    paper.slug = make_slug(f"{paper_data['title']}-{uuid.uuid4().hex[:6]}")
+                    db.session.add(paper)
+                    db.session.flush()
+                _old_paths, article_new_paths = sync_project_articles(paper, request.form, request.files)
+                content_new_paths.extend(article_new_paths)
+                content_new_paths.extend(add_project_attachments(paper, request.form, request.files))
+                first_article = next((article for article in paper.articles if article.title or article.authors or article.doi), None)
+                if first_article:
+                    # Keep old API/templates meaningful during the compatibility window.
+                    paper.authors = first_article.authors
+                    paper.year = first_article.year
+                    paper.doi = first_article.doi
+                    paper.pmid = first_article.pmid
+                db.session.commit()
+                for path in content_new_paths:
+                    mirror_file(path, f"pdfs/{os.path.basename(path)}")
+            except (StorageError, ValueError, SQLAlchemyError) as exc:
                 db.session.rollback()
                 cleanup_file(saved_pdf_path)
-                logger.exception("Paper create failed")
-                flash("The publication could not be saved. Please try again.", "danger")
+                for path in content_new_paths:
+                    cleanup_file(path)
+                logger.exception("Atomic project creation failed")
+                flash(f"The project could not be saved: {exc}", "danger")
                 return render_template("paper_new.html", form=request.form)
 
             # MVP §11 / §8: optional first model upload during paper creation.
@@ -6959,6 +7756,14 @@ def register_routes(app: Flask) -> None:
 
         if request.method == "POST":
             paper_data, paper_errors = validate_project_form(request.form)
+            material_uploads = [
+                item for item in request.files.getlist("materials[]")
+                if item and item.filename
+            ]
+            if material_uploads and not project_supports_feature(paper, "presentation_library"):
+                paper_errors.append(
+                    "PDF / PowerPoint supporting materials are disabled for this topic's plan."
+                )
             if paper_errors:
                 flash(" ".join(paper_errors), "danger")
                 return render_template("paper_new.html", form=request.form, paper=paper, mode="edit")
@@ -6970,6 +7775,7 @@ def register_routes(app: Flask) -> None:
             paper.abstract = paper_data["abstract"]
             paper.doi = paper_data["doi"]
             paper.institution = paper_data["institution"]
+            paper.department = paper_data["department"]
             paper.pmid = paper_data["pmid"]
             paper.project_type = paper_data["project_type"]
             paper.workflow_stage = paper_data["workflow_stage"]
@@ -7005,18 +7811,34 @@ def register_routes(app: Flask) -> None:
                     old_pdf_path = os.path.join(app.config["PDF_FOLDER"], os.path.basename(paper.pdf_path))
                     paper.pdf_path = None
 
+            content_old_paths, content_new_paths = [], []
             try:
+                article_old, article_new = sync_project_articles(paper, request.form, request.files)
+                content_old_paths.extend(article_old)
+                content_new_paths.extend(article_new)
+                content_new_paths.extend(add_project_attachments(paper, request.form, request.files))
+                first_article = next((article for article in paper.articles if article.title or article.authors or article.doi), None)
+                paper.authors = first_article.authors if first_article else None
+                paper.year = first_article.year if first_article else None
+                paper.doi = first_article.doi if first_article else None
+                paper.pmid = first_article.pmid if first_article else None
                 db.session.commit()
                 log_audit("paper_updated", user_id=current_user.id, resource_id=str(paper.id))
                 track_event("project_updated", owner_user_id=current_user.id, project_id=paper.id)
-            except SQLAlchemyError:
+            except (StorageError, ValueError, SQLAlchemyError) as exc:
                 db.session.rollback()
                 cleanup_file(saved_pdf_path)
+                for path in content_new_paths:
+                    cleanup_file(path)
                 logger.exception("Paper update failed")
-                flash("The publication could not be updated. Please try again.", "danger")
+                flash(f"The project could not be updated: {exc}", "danger")
                 return render_template("paper_new.html", form=request.form, paper=paper, mode="edit")
 
             cleanup_file(old_pdf_path)
+            for path in content_old_paths:
+                cleanup_file(path)
+            for path in content_new_paths:
+                mirror_file(path, f"pdfs/{os.path.basename(path)}")
             flash("Project updated.", "success")
             return redirect(url_for("project_detail", slug=paper.slug))
 
@@ -7026,6 +7848,7 @@ def register_routes(app: Flask) -> None:
             "year": paper.year or "",
             "field": paper.field or "",
             "institution": paper.institution or "",
+            "department": paper.department or "",
             "doi": paper.doi or "",
             "pmid": paper.pmid or "",
             "abstract": paper.abstract or "",
@@ -7103,6 +7926,29 @@ def register_routes(app: Flask) -> None:
             db.session.rollback()
             logger.exception("Paper PDF deletion failed")
             return jsonify({"success": False, "error": "Could not delete PDF"}), 500
+
+    @app.route("/projects/<slug>/attachments/<int:attachment_id>/delete", methods=["POST"])
+    @login_required
+    @require_paper_ownership
+    def project_attachment_delete(slug, attachment_id):
+        project = active_paper_query().filter_by(slug=slug).first_or_404()
+        attachment = ProjectAttachment.query.filter_by(id=attachment_id, project_id=project.id).first_or_404()
+        paths = [os.path.join(app.config["PDF_FOLDER"], os.path.basename(attachment.source_path))]
+        if attachment.preview_pdf_path and attachment.preview_pdf_path != attachment.source_path:
+            paths.append(os.path.join(app.config["PDF_FOLDER"], os.path.basename(attachment.preview_pdf_path)))
+        db.session.delete(attachment)
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Could not remove the supporting material.", "danger")
+            return redirect(url_for("project_edit", slug=slug))
+        for path in paths:
+            cleanup_file(path)
+            mirror_delete(f"pdfs/{os.path.basename(path)}")
+        log_audit("project_attachment_deleted", user_id=current_user.id, resource_id=str(attachment_id))
+        flash("Supporting material removed.", "success")
+        return redirect(url_for("project_edit", slug=slug))
 
     @app.route("/papers/<slug>/delete", methods=["POST"])
     @login_required
@@ -7315,6 +8161,8 @@ def register_routes(app: Flask) -> None:
         model = db.session.get(Model3D, model_id)
         if not model:
             abort(404)
+        if not plan_supports_feature(model.license_type, "medical_colors"):
+            return jsonify({"ok": False, "error": "Medical colours are disabled for this plan."}), 403
         data = request.get_json(silent=True) or {}
         color = (data.get("color") or "").strip()
         if HEX_COLOR_PATTERN.fullmatch(color) is None:
@@ -7528,6 +8376,8 @@ def register_routes(app: Flask) -> None:
             abort(404)
         if not _paper_visible_to_request(model.paper) or not model_is_accessible(model):
             abort(404)
+        if not plan_supports_feature(model.license_type, "annotations"):
+            return jsonify([])
         annotations = ModelAnnotation.query.filter_by(model_id=model_id).order_by(ModelAnnotation.order_index).all()
         return jsonify([a.to_dict() for a in annotations])
 
@@ -7539,6 +8389,8 @@ def register_routes(app: Flask) -> None:
         model = db.session.get(Model3D, model_id)
         if not model:
             abort(404)
+        if not plan_supports_feature(model.license_type, "annotations"):
+            return jsonify({"error": "Annotations are disabled for this plan."}), 403
         data = request.get_json(silent=True) or {}
         label = (data.get("label") or "").strip()
         if not label or len(label) > 120:
@@ -7586,6 +8438,9 @@ def register_routes(app: Flask) -> None:
         annotation = db.session.get(ModelAnnotation, annotation_id)
         if not annotation or annotation.model_id != model_id:
             abort(404)
+        model = db.session.get(Model3D, model_id)
+        if not model or not plan_supports_feature(model.license_type, "annotations"):
+            return jsonify({"error": "Annotations are disabled for this plan."}), 403
         try:
             db.session.delete(annotation)
             db.session.commit()

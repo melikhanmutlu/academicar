@@ -386,12 +386,10 @@
       transform: none;
       visibility: visible;
     }
-    .native-ar-button {
-      position: fixed;
-      top: calc(env(safe-area-inset-top, 0px) + 1.25rem);
-      right: 5.6rem;
-      z-index: 35;
-    }
+    /* The visible AR affordance lives in the responsive header toolbar. Keep
+       model-viewer's slotted native control hidden so Safari cannot place a
+       second button underneath QR/info controls (see the iPhone safe-area). */
+    .native-ar-button { display: none !important; }
     /* model-viewer reveals its slotted ar-button whenever canActivateAR is true
        (Android, and iOS Chrome now that a USDZ exists). When we instead drive AR
        from the toolbar button we suppress the native one to avoid a duplicate.
@@ -490,22 +488,40 @@
     .viewer-rotate-num:focus { outline: none; border-color: rgba(255,255,255,0.45); }
     /* Color swatches */
     .viewer-color-swatches {
-      display: flex;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 0.4rem;
       margin-top: 0.6rem;
     }
-    .viewer-color-swatch,
-    .viewer-color-custom {
-      width: 1.6rem;
-      height: 1.6rem;
+    .viewer-color-swatch {
+      min-width: 0;
+      height: 2rem;
       border-radius: 0.45rem;
       border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.05);
+      color: rgba(255,255,255,0.78);
       cursor: pointer;
-      padding: 0;
+      padding: 0.25rem 0.4rem;
       position: relative;
-      overflow: hidden;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.66rem;
+      font-weight: 700;
+      text-align: left;
       transition: transform 120ms ease, box-shadow 120ms ease;
+    }
+    .viewer-color-swatch i {
+      width: 1.1rem;
+      height: 1.1rem;
+      flex: 0 0 auto;
+      border-radius: 0.32rem;
+      border: 1px solid rgba(255,255,255,0.28);
+    }
+    .viewer-color-swatch span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .viewer-color-swatch:hover,
     .viewer-color-custom:hover { transform: translateY(-1px); }
@@ -513,10 +529,30 @@
       box-shadow: 0 0 0 2px #fff, 0 0 0 3px rgba(0,0,0,0.35);
     }
     .viewer-color-custom {
-      display: grid;
-      place-items: center;
-      background:
-        conic-gradient(from 0deg, #ff5f6d, #ffc371, #47e5bc, #4f81bd, #c86dd7, #ff5f6d);
+      grid-column: 1 / -1;
+      height: 2rem;
+      border-radius: 0.45rem;
+      border: 1px solid rgba(255,255,255,0.18);
+      color: rgba(255,255,255,0.78);
+      cursor: pointer;
+      padding: 0.25rem 0.4rem;
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.66rem;
+      font-weight: 700;
+      background: rgba(255,255,255,0.05);
+      overflow: hidden;
+      transition: transform 120ms ease, box-shadow 120ms ease;
+    }
+    .viewer-color-custom::before {
+      content: '';
+      width: 1.1rem;
+      height: 1.1rem;
+      flex: 0 0 auto;
+      border-radius: 0.32rem;
+      background: conic-gradient(from 0deg, #ff5f6d, #ffc371, #47e5bc, #4f81bd, #c86dd7, #ff5f6d);
     }
     .viewer-color-custom input[type="color"] {
       position: absolute;
@@ -532,6 +568,24 @@
       margin-top: 0.55rem;
       color: rgba(255,255,255,0.5);
       line-height: 1.45;
+    }
+    .viewer-shot-status,
+    .viewer-video-status {
+      min-height: 1.1em;
+      margin-top: 0.45rem;
+      color: rgba(255,255,255,0.58);
+      line-height: 1.35;
+    }
+    .viewer-shot-status.is-error,
+    .viewer-video-status.is-error { color: #ff9b7a; }
+    .viewer-video-actions { display: grid; grid-template-columns: 1fr; gap: 0.45rem; margin-top: 0.5rem; }
+    .viewer-video-actions button {
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 0.55rem;
+      background: rgba(255,255,255,0.06);
+      color: rgba(255,255,255,0.85);
+      padding: 0.5rem 0.65rem;
+      font-weight: 700;
     }
     .viewer-shot-actions {
       display: grid;
@@ -815,7 +869,7 @@
       .viewer-tool-btn { min-height: 34px; min-width: 34px; padding: 0.45rem; font-size: 0; justify-content: center; }
       .viewer-tool-btn svg { display: block; }
       .viewer-toolbar { gap: 0.35rem; flex-wrap: nowrap; }
-      .native-ar-button { top: calc(env(safe-area-inset-top, 0px) + 0.85rem); right: 4.2rem; }
+      header { padding-top: calc(0.75rem + env(safe-area-inset-top, 0px)) !important; padding-left: calc(0.75rem + env(safe-area-inset-left, 0px)) !important; padding-right: calc(0.75rem + env(safe-area-inset-right, 0px)) !important; }
       model-viewer { left: 0 !important; right: 0 !important; width: 100vw !important; transform: none !important; }
       .info-drawer { left: 0 !important; right: 0 !important; width: 100vw !important; max-width: 100vw !important; }
       .viewer-control-panel {
@@ -869,6 +923,7 @@
   </style>
 </head>
 <body class="bg-[#050505] text-white min-h-screen overflow-hidden max-w-[100vw]">
+  {% set viewer_features = get_license_plan(model.license_type).features %}
 
   <main class="relative h-screen w-screen">
     <div class="absolute inset-0 volumetric-grid opacity-25 z-0"></div>
@@ -884,11 +939,11 @@
       exposure="1.0"
       tone-mapping="neutral"
       environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
-      ar
+      {% if 'ar' in viewer_features %}ar
       ar-modes="scene-viewer quick-look"
       ar-scale="auto"
       ar-placement="{{ model.ar_placement or 'floor' }}"
-      quick-look-browsers="safari chrome"
+      quick-look-browsers="safari chrome"{% endif %}
       camera-controls
       touch-action="pan-y"
       camera-orbit="0deg 90deg auto"
@@ -900,7 +955,7 @@
       autoplay
       animation-crossfade-duration="300"
       reveal="auto">
-      <button
+      {% if 'ar' in viewer_features %}<button
         id="nativeArBtn"
         slot="ar-button"
         class="viewer-tool-btn primary native-ar-button"
@@ -908,8 +963,8 @@
         aria-label="View in AR">
         <svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1L14 4.5v7L8 15L2 11.5v-7z"/><path d="M8 1v6.5M8 7.5L14 4.5M8 7.5L2 4.5"/></svg>
         <span class="hidden sm:inline">View in AR</span>
-      </button>
-      {% for ann in annotations %}
+      </button>{% endif %}
+      {% if 'annotations' in viewer_features %}{% for ann in annotations %}
       <button class="annotation-hotspot" slot="hotspot-ann-{{ ann.id }}"
               data-position="{{ ann.position_x }} {{ ann.position_y }} {{ ann.position_z }}"
               data-normal="{{ ann.normal_x }} {{ ann.normal_y }} {{ ann.normal_z }}"
@@ -919,9 +974,9 @@
         <span class="annotation-label">{{ ann.label }}</span>
         <span class="annotation-delete-btn" data-delete-ann="{{ ann.id }}" title="Remove">×</span>
       </button>
-      {% endfor %}
+      {% endfor %}{% endif %}
     </model-viewer>
-    {% if has_usdz %}
+    {% if has_usdz and 'ar' in viewer_features %}
     <a
       id="iosQuickLookLink"
       style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none;"
@@ -937,7 +992,7 @@
     <div class="viewer-free-watermark" aria-hidden="true">AcademicAR · Free preview</div>
     {% endif %}
 
-    {% if is_owner %}
+    {% if is_owner and 'annotations' in viewer_features %}
     <div id="annotateHint" class="annotate-hint" hidden>
       <span class="annotate-hint-dot" aria-hidden="true"></span>
       <span class="annotate-hint-text">Tap the model to place a label</span>
@@ -960,7 +1015,7 @@
         <span class="font-serif font-semibold text-white/90 hidden sm:inline">AcademicAR</span>
       </div>
       <div class="pointer-events-auto flex items-center gap-2">
-        <button id="arBtn" data-ar-btn class="viewer-tool-btn primary !py-1.5 !px-4 !text-xs" type="button">
+        {% if 'ar' in viewer_features %}<button id="arBtn" data-ar-btn class="viewer-tool-btn primary !py-1.5 !px-4 !text-xs" type="button">
           <span class="hidden sm:inline">View in AR</span>
           <span class="sm:hidden">AR</span>
         </button>
@@ -970,7 +1025,7 @@
           <span class="hidden sm:inline">View in AR</span>
           <span class="sm:hidden">AR</span>
         </a>
-        {% endif %}
+        {% endif %}{% endif %}
       </div>
     </header>
     {% else %}
@@ -988,15 +1043,15 @@
           <svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="5" height="5" rx="0.5"/><rect x="9" y="2" width="5" height="5" rx="0.5"/><rect x="2" y="9" width="5" height="5" rx="0.5"/><rect x="10" y="10" width="3" height="3" rx="0.5"/></svg>
           <span class="hidden sm:inline">QR</span>
         </button>
-        {% if annotations %}<button id="annotationsBtn" class="viewer-tool-btn" type="button" aria-label="Toggle labels">
+        {% if annotations and 'annotations' in viewer_features %}<button id="annotationsBtn" class="viewer-tool-btn" type="button" aria-label="Toggle labels">
           <svg class="sm:hidden viewer-icon-labels" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h8M2 8h6M2 12h10"/><circle cx="13" cy="4" r="1.5"/></svg>
           <span class="hidden sm:inline">Labels</span>
         </button>{% endif %}
-        {% if is_owner %}<button id="annotateBtn" class="viewer-tool-btn" type="button" aria-label="Annotate">
+        {% if is_owner and 'annotations' in viewer_features %}<button id="annotateBtn" class="viewer-tool-btn" type="button" aria-label="Annotate">
           <svg class="sm:hidden viewer-icon-annotate" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 1.5l3 3L5 14H2v-3z"/></svg>
           <span class="hidden sm:inline">Annotate</span>
         </button>{% endif %}
-        <button id="arBtn" data-ar-btn class="viewer-tool-btn primary" type="button" aria-label="View in AR">
+        {% if 'ar' in viewer_features %}<button id="arBtn" data-ar-btn class="viewer-tool-btn primary" type="button" aria-label="View in AR">
           <svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1L14 4.5v7L8 15L2 11.5v-7z"/><path d="M8 1v6.5M8 7.5L14 4.5M8 7.5L2 4.5"/></svg>
           <span class="hidden sm:inline">View in AR</span>
         </button>
@@ -1006,7 +1061,7 @@
           <svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1L14 4.5v7L8 15L2 11.5v-7z"/><path d="M8 1v6.5M8 7.5L14 4.5M8 7.5L2 4.5"/></svg>
           <span class="hidden sm:inline">View in AR</span>
         </a>
-        {% endif %}
+        {% endif %}{% endif %}
         <button id="infoBtn" class="viewer-tool-btn" type="button" aria-label="Info">
           <svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M8 7v4M8 5v.5"/></svg>
           <span class="hidden sm:inline">Info</span>
@@ -1077,17 +1132,17 @@
         </div>
         {% endif %}
         <div class="viewer-tool-stack mt-3 grid gap-3 text-xs">
-          <div class="viewer-shot-tools" data-screenshot-tools>
+          {% if 'screenshots' in viewer_features %}<div class="viewer-shot-tools" data-screenshot-tools>
             <div class="viewer-tool-heading">
               <span>Screenshots</span>
               <div class="flex items-center gap-2">
-                <button type="button" data-combine-shots disabled>Combine</button>
+                {% if 'combined_view' in viewer_features %}<button type="button" data-combine-shots disabled>Combine</button>{% endif %}
                 <button type="button" data-download-zip disabled>Download ZIP</button>
               </div>
             </div>
             <div class="viewer-shot-actions">
-              <button type="button" data-current-shot>Current view</button>
-              <button type="button" data-generate-shot-set>Generate 8 views</button>
+              <button type="button" data-current-shot disabled>Loading model…</button>
+              <button type="button" data-generate-shot-set disabled>Loading model…</button>
             </div>
             <label class="viewer-shot-qr-toggle">
               <input type="checkbox" data-qr-overlay checked>
@@ -1104,9 +1159,16 @@
               </div>
             </div>
             <div class="viewer-shot-grid" data-shot-gallery aria-live="polite"></div>
-          </div>
+            <p class="viewer-shot-status" data-shot-status role="status" aria-live="polite">Screenshots will be available when the model finishes loading.</p>
+          </div>{% endif %}
 
-          <div class="viewer-color-tools" data-color-tools>
+          {% if 'video_recording' in viewer_features %}<div class="viewer-video-tools" data-video-tools>
+            <div class="viewer-tool-heading"><span>Video recording</span></div>
+            <div class="viewer-video-actions"><button type="button" data-video-record disabled>Loading model…</button></div>
+            <p class="viewer-video-status" data-video-status role="status" aria-live="polite">Record a WebM/MP4 clip of the interactive canvas.</p>
+          </div>{% endif %}
+
+          {% if 'medical_colors' in viewer_features %}<div class="viewer-color-tools" data-color-tools>
             <div class="viewer-tool-heading">
               <span>Color</span>
               <div class="flex items-center gap-2">
@@ -1115,19 +1177,20 @@
               </div>
             </div>
             <div class="viewer-color-swatches" data-color-swatches>
-              {% for hex, name in [('#cccccc', 'Silver'), ('#e8e1d0', 'Bone'), ('#c8a97e', 'Sand'), ('#b5651d', 'Terracotta'), ('#c0504d', 'Brick'), ('#4f81bd', 'Steel'), ('#5b8c5a', 'Sage'), ('#c9a227', 'Ochre')] %}
-                <button type="button" class="viewer-color-swatch" data-color-swatch="{{ hex }}" data-color-name="{{ name }}" style="background: {{ hex }}" title="{{ name }}" aria-label="Apply {{ name }} color"></button>
+              {% for hex, name in [('#E8D5B7', 'Bone'), ('#D62828', 'Artery'), ('#4A6FA5', 'Vein'), ('#A4133C', 'Blood'), ('#8B3A3A', 'Muscle'), ('#FFCBA4', 'Skin'), ('#D4E4E4', 'Cartilage'), ('#F4D35E', 'Nerve'), ('#F6E7B0', 'Adipose tissue'), ('#B56576', 'Soft tissue / organ'), ('#7B2CBF', 'Tumour'), ('#C0C0C0', 'Implant / steel')] %}
+                <button type="button" class="viewer-color-swatch" data-color-swatch="{{ hex }}" data-color-name="{{ name }}" title="{{ name }}" aria-label="Apply {{ name }} color"><i style="background: {{ hex }}" aria-hidden="true"></i><span>{{ name }}</span></button>
               {% endfor %}
               <label class="viewer-color-custom" title="Custom color" aria-label="Custom color">
+                <span>Custom colour</span>
                 <input type="color" value="#cccccc" data-color-picker>
               </label>
             </div>
             {% if is_owner %}
-            <p class="viewer-color-hint" data-color-hint hidden>Previewing — press “Apply to model” to save this color to the model (and its AR file).</p>
+            <p class="viewer-color-hint" data-color-hint hidden>Previewing - press "Apply to model" to save this color to the model (and its AR file).</p>
             {% else %}
             <p class="viewer-color-hint">Preview only — the color isn’t saved.</p>
             {% endif %}
-          </div>
+          </div>{% endif %}
 
           <div class="viewer-bg-tools" data-bg-tools>
             <div class="viewer-tool-heading">
@@ -1313,6 +1376,9 @@
     const generateShotSetButton = document.querySelector('[data-generate-shot-set]');
     const downloadZipButton = document.querySelector('[data-download-zip]');
     const shotGalleryEl = document.querySelector('[data-shot-gallery]');
+    const shotStatusEl = document.querySelector('[data-shot-status]');
+    const videoRecordButton = document.querySelector('[data-video-record]');
+    const videoStatusEl = document.querySelector('[data-video-status]');
     const shotModal = document.getElementById('shotModal');
     const closeShotModal = document.getElementById('closeShotModal');
     const shotModalTitle = document.getElementById('shotModalTitle');
@@ -1352,6 +1418,9 @@
     let collageNextZ = 1;
     let modelAnimationAvailable = false;
     let modelAnimationPlaying = true;
+    let videoRecorder = null;
+    let videoChunks = [];
+    let videoStopTimer = null;
 
     // --- Collapsible control panel ---
     const controlPanel = document.getElementById('controlPanel');
@@ -1589,12 +1658,12 @@
     // toolbar button there, iOS Chrome would have no AR button at all. So only
     // defer to the native button on iOS Safari; iOS Chrome uses the toolbar
     // button + the rel="ar" launcher below.
-    const useNativeIOSArButton = isIOS && !isIOSChrome && hasUsdz && nativeArBtn;
+    const useNativeIOSArButton = false;
     // iOS Chrome can't use model-viewer's native Quick Look button (canActivateAR is
     // false there) AND a *programmatic* rel="ar" click is unreliable in iOS Chrome —
     // Quick Look only opens from a genuine tap on a real <a rel="ar">. So on iOS
     // Chrome we surface the real anchor button and let the user tap it directly.
-    const useIOSAnchorButton = isIOS && !useNativeIOSArButton && hasUsdz && iosArButtons.length > 0;
+    const useIOSAnchorButton = isIOS && hasUsdz && iosArButtons.length > 0;
     if (useNativeIOSArButton) {
       // iOS Safari: use model-viewer's native Quick Look button, hide ours.
       arButtons.forEach((button) => { button.hidden = true; });
@@ -1693,6 +1762,25 @@
     viewer.addEventListener('load', async () => {
       viewer.classList.add('is-loaded');
       viewerStatus.classList.add('hidden');
+      if (currentShotButton) {
+        currentShotButton.disabled = false;
+        currentShotButton.textContent = 'Current view';
+      }
+      if (generateShotSetButton) {
+        generateShotSetButton.disabled = false;
+        generateShotSetButton.textContent = 'Generate 8 views';
+      }
+      if (shotStatusEl) shotStatusEl.textContent = '';
+      if (videoRecordButton) {
+        const canvas = viewer.shadowRoot?.querySelector('canvas');
+        const supported = Boolean(window.MediaRecorder && canvas && typeof canvas.captureStream === 'function');
+        videoRecordButton.disabled = !supported;
+        videoRecordButton.textContent = supported ? 'Start recording' : 'Recording unavailable';
+        if (!supported && videoStatusEl) {
+          videoStatusEl.textContent = 'This browser cannot record the 3D canvas.';
+          videoStatusEl.classList.add('is-error');
+        }
+      }
       initializeModelAnimation();
       // Capture the correctly-framed camera once, so Reset view can return to it
       // exactly (numeric orbit/target/fov — no "auto" re-resolution on reset).
@@ -1703,7 +1791,19 @@
     viewer.addEventListener('error', () => {
       viewerStatus.textContent = 'The model could not be loaded. The GLB file may be unavailable or invalid.';
       viewerStatus.classList.remove('hidden');
+      if (shotStatusEl) {
+        shotStatusEl.textContent = 'Screenshots are unavailable because the model failed to load.';
+        shotStatusEl.classList.add('is-error');
+      }
+      if (videoRecordButton) videoRecordButton.disabled = true;
     });
+    // A cached/local GLB can finish before this bottom-of-page script attaches
+    // its listener. Reconcile that state once without reloading the model.
+    setTimeout(() => {
+      if (viewer.loaded && !viewer.classList.contains('is-loaded')) {
+        viewer.dispatchEvent(new Event('load'));
+      }
+    }, 0);
 
     const waitFrame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const safeName = (value) => String(value || 'model').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'model';
@@ -1788,18 +1888,48 @@
       autoRotateToggle.setAttribute('aria-pressed', enabled ? 'true' : 'false');
       autoRotateToggle.textContent = enabled ? 'Auto rotate on' : 'Auto rotate off';
     };
+    const guardInactiveArSceneUpdate = () => {
+      // model-viewer 4.3's scene-graph mixin calls ARRenderer.onUpdateScene()
+      // for every runtime orientation change. The upstream implementation
+      // assumes an XR scene exists and dereferences `presentedScene` even when
+      // AR has never been opened, which removes the model after a rotation.
+      // Its renderer is intentionally private, so locate the exported Symbol
+      // by description and keep the original callback for real AR sessions.
+      let prototype = viewer;
+      let rendererKey = null;
+      while (prototype && !rendererKey) {
+        rendererKey = Object.getOwnPropertySymbols(prototype)
+          .find((symbol) => symbol.description === 'renderer') || null;
+        prototype = Object.getPrototypeOf(prototype);
+      }
+      const arRenderer = rendererKey ? viewer[rendererKey]?.arRenderer : null;
+      if (!arRenderer || arRenderer.__academicArSceneGuarded) return;
+      const originalUpdate = arRenderer.onUpdateScene;
+      arRenderer.onUpdateScene = (...args) => {
+        if (!arRenderer.isPresenting) return;
+        return originalUpdate(...args);
+      };
+      arRenderer.__academicArSceneGuarded = true;
+    };
     const applyModelOrientation = async (values) => {
       const x = Number(values.x || 0);
       const y = Number(values.y || 0);
       const z = Number(values.z || 0);
+      const cameraBeforeRotation = cameraState();
       // model-viewer orientation is roll/pitch/yaw, so map UI X/Y/Z to
       // pitch/yaw/roll instead of writing the sliders in display order.
       const orientation = `${z}deg ${x}deg ${y}deg`;
+      // setAttribute already updates model-viewer's reflected `orientation`
+      // property. Writing both back-to-back schedules two Lit updates and can
+      // make model-viewer 4.3 process the second one while its scene node is
+      // temporarily detached (the `onUpdateScene ... null.add` crash).
+      guardInactiveArSceneUpdate();
       viewer.setAttribute('orientation', orientation);
-      viewer.orientation = orientation;
-      if (typeof viewer.requestUpdate === 'function') viewer.requestUpdate('orientation', orientation);
       if (viewer.updateComplete) await viewer.updateComplete;
-      if (typeof viewer.updateFraming === 'function') await viewer.updateFraming();
+      // Do not call updateFraming() here. With bounds="tight" it can resolve an
+      // auto radius against a transient rotated bound and send the mesh out of
+      // frame. Rotation changes pose only; the user's numeric camera stays put.
+      await restoreCamera(cameraBeforeRotation);
       if (modelAnimationPlaying && typeof viewer.play === 'function') viewer.play();
     };
     const cameraState = () => ({
@@ -1818,7 +1948,7 @@
       if (modelAnimationPlaying && typeof viewer.play === 'function') viewer.play();
     };
     const captureShot = async (view) => {
-      if (!viewer.loaded || typeof viewer.toDataURL !== 'function') return;
+      if (!viewer.classList.contains('is-loaded') || typeof viewer.toDataURL !== 'function') return;
       const shouldResumeAnimation = modelAnimationAvailable && modelAnimationPlaying;
       if (typeof viewer.pause === 'function') viewer.pause();
       if (view?.orbit) {
@@ -1972,15 +2102,36 @@
     };
     const downloadCurrentShot = async () => {
       const raw = await captureShot(null);
-      if (!raw) return;
+      if (!raw) {
+        if (shotStatusEl) {
+          shotStatusEl.textContent = 'Wait for the model to finish loading, then try again.';
+          shotStatusEl.classList.add('is-error');
+        }
+        return;
+      }
+      if (shotStatusEl) {
+        shotStatusEl.textContent = '';
+        shotStatusEl.classList.remove('is-error');
+      }
       const out = await processShot(raw);
       // Preview the current view in the modal (with a Download button) rather than
       // pushing the file straight to the browser's downloads.
       openShotModal({ key: 'current-view', label: 'Current view', rawDataUrl: raw, dataUrl: out, qr: qrEnabled() });
     };
     const generateShotSet = async () => {
+      if (!viewer.classList.contains('is-loaded')) {
+        if (shotStatusEl) {
+          shotStatusEl.textContent = 'Wait for the model to finish loading, then try again.';
+          shotStatusEl.classList.add('is-error');
+        }
+        return;
+      }
       const state = cameraState();
       shotGallery = [];
+      if (shotStatusEl) {
+        shotStatusEl.textContent = 'Generating 8 views…';
+        shotStatusEl.classList.remove('is-error');
+      }
       if (generateShotSetButton) {
         generateShotSetButton.disabled = true;
         generateShotSetButton.textContent = 'Generating...';
@@ -1998,6 +2149,15 @@
       if (generateShotSetButton) {
         generateShotSetButton.disabled = false;
         generateShotSetButton.textContent = 'Generate 8 views';
+      }
+      if (shotStatusEl) {
+        if (shotGallery.length === shotViews.length) {
+          shotStatusEl.textContent = '8 views ready.';
+          shotStatusEl.classList.remove('is-error');
+        } else {
+          shotStatusEl.textContent = `Only ${shotGallery.length} of ${shotViews.length} views could be generated.`;
+          shotStatusEl.classList.add('is-error');
+        }
       }
     };
     const downloadShotZip = async () => {
@@ -2230,6 +2390,24 @@
       ctx.fillText('SCAN FOR 3D / AR', x + w / 2, qy + qrSize + labelH / 2);
     };
 
+    const drawImageContained = (ctx, img, x, y, w, h) => {
+      const sourceW = img.naturalWidth || img.width || 1;
+      const sourceH = img.naturalHeight || img.height || 1;
+      const scale = Math.min(w / sourceW, h / sourceH);
+      const drawW = sourceW * scale;
+      const drawH = sourceH * scale;
+      const drawX = x + (w - drawW) / 2;
+      const drawY = y + (h - drawH) / 2;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x, y, w, h);
+      ctx.clip();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(x, y, w, h);
+      ctx.drawImage(img, drawX, drawY, drawW, drawH);
+      ctx.restore();
+    };
+
     const renderCollageCanvas = async () => {
       const canvas = document.createElement('canvas');
       canvas.width = COLLAGE_OUTPUT_W;
@@ -2248,7 +2426,7 @@
         } else {
           try {
             const img = await loadImage(tile.src);
-            ctx.drawImage(img, x, y, w, h);
+            drawImageContained(ctx, img, x, y, w, h);
           } catch (error) { /* skip a tile whose image failed to (re)load */ }
         }
       }
@@ -2465,9 +2643,8 @@
       // Return the model to its identity pose WITHOUT calling updateFraming(): with
       // bounds="tight", re-framing here let the "auto" camera radius re-resolve to a
       // much smaller distance, which ballooned the model to fill the screen.
+      guardInactiveArSceneUpdate();
       viewer.setAttribute('orientation', defaultOrientation);
-      viewer.orientation = defaultOrientation;
-      if (typeof viewer.requestUpdate === 'function') viewer.requestUpdate('orientation', defaultOrientation);
       if (viewer.updateComplete) await viewer.updateComplete;
       // Restore the exact camera captured at load (numeric radius/target/fov) so the
       // result is deterministic; fall back to the defaults if it wasn't captured yet.
@@ -2519,6 +2696,64 @@
     }
     // Sync the buttons with the theme already applied by the head script.
     applyViewerBg(document.documentElement.getAttribute('data-viewer-bg') || 'dark');
+
+    const setVideoStatus = (message, error = false) => {
+      if (!videoStatusEl) return;
+      videoStatusEl.textContent = message;
+      videoStatusEl.classList.toggle('is-error', error);
+    };
+    const stopVideoRecording = () => {
+      if (videoRecorder && videoRecorder.state === 'recording') videoRecorder.stop();
+    };
+    const startVideoRecording = () => {
+      const canvas = viewer.shadowRoot?.querySelector('canvas');
+      if (!window.MediaRecorder || !canvas || typeof canvas.captureStream !== 'function') {
+        setVideoStatus('This browser cannot record the 3D canvas.', true);
+        return;
+      }
+      const stream = canvas.captureStream(30);
+      const preferredTypes = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+      const mimeType = preferredTypes.find((type) => MediaRecorder.isTypeSupported?.(type)) || '';
+      try {
+        videoRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      } catch (error) {
+        stream.getTracks().forEach((track) => track.stop());
+        setVideoStatus('Recording could not be started in this browser.', true);
+        return;
+      }
+      videoChunks = [];
+      videoRecorder.addEventListener('dataavailable', (event) => {
+        if (event.data && event.data.size) videoChunks.push(event.data);
+      });
+      videoRecorder.addEventListener('error', () => setVideoStatus('Recording failed.', true));
+      videoRecorder.addEventListener('stop', () => {
+        clearTimeout(videoStopTimer);
+        stream.getTracks().forEach((track) => track.stop());
+        const finalType = videoRecorder?.mimeType || mimeType || 'video/webm';
+        if (videoChunks.length) {
+          const blob = new Blob(videoChunks, { type: finalType });
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = `${safeName(modelBaseName)}-viewer-recording.${finalType.includes('mp4') ? 'mp4' : 'webm'}`;
+          link.click();
+          setTimeout(() => URL.revokeObjectURL(link.href), 1500);
+          setVideoStatus('Recording downloaded.');
+        } else {
+          setVideoStatus('No video frames were captured.', true);
+        }
+        if (videoRecordButton) videoRecordButton.textContent = 'Start recording';
+        videoRecorder = null;
+        videoChunks = [];
+      }, { once: true });
+      videoRecorder.start(250);
+      if (videoRecordButton) videoRecordButton.textContent = 'Stop & download';
+      setVideoStatus('Recording… interact with or rotate the model. Maximum 60 seconds.');
+      videoStopTimer = setTimeout(stopVideoRecording, 60000);
+    };
+    videoRecordButton?.addEventListener('click', () => {
+      if (videoRecorder?.state === 'recording') stopVideoRecording();
+      else startVideoRecording();
+    });
 
     currentShotButton?.addEventListener('click', downloadCurrentShot);
     generateShotSetButton?.addEventListener('click', generateShotSet);

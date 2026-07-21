@@ -8,7 +8,7 @@
 # launch in both Safari and Chrome on iOS, with correct real-world scale.
 # mesa.osmesa provides libOSMesa, the software (GPU-less) OpenGL backend used by
 # converters.poster._try_pyrender for offscreen PBR/texture thumbnail rendering.
-nixPkgs = ["python312", "python312Packages.pip", "python312Packages.virtualenv", "nodejs-18_x", "postgresql_16", "blender", "mesa.osmesa"]
+nixPkgs = ["python312", "python312Packages.pip", "python312Packages.virtualenv", "nodejs-18_x", "postgresql_16", "blender", "mesa.osmesa", "libreoffice"]
 
 [variables]
 # Forces pyrender/PyOpenGL onto the OSMesa software renderer instead of trying

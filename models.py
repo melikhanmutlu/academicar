@@ -2,9 +2,10 @@
 SQLAlchemy database models: User, Paper, Model3D.
 """
 from datetime import UTC, datetime
-from flask_sqlalchemy import SQLAlchemy
+
 from flask_login import UserMixin
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import check_password_hash, generate_password_hash
 
 db = SQLAlchemy()
 
@@ -84,6 +85,10 @@ class Paper(db.Model):
     visibility = db.Column(db.String(20), nullable=True, index=True)
     share_token = db.Column(db.String(64), unique=True, nullable=True, index=True)
     pmid = db.Column(db.String(100), nullable=True)
+    # Optional institutional showcase grouping. ``field`` remains the broad
+    # academic taxonomy; department is the more specific unit visible on an
+    # institution page (Orthopaedics, Mechanical Engineering, Architecture…).
+    department = db.Column(db.String(120), nullable=True, index=True)
     deleted_at = db.Column(db.DateTime, nullable=True)
     deleted_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = db.Column(db.DateTime, default=utc_now)
@@ -95,6 +100,20 @@ class Paper(db.Model):
         lazy=True,
         cascade="all, delete-orphan",
         order_by="Model3D.created_at",
+    )
+    articles = db.relationship(
+        "ProjectArticle",
+        backref="project",
+        lazy=True,
+        cascade="all, delete-orphan",
+        order_by="ProjectArticle.order_index",
+    )
+    attachments = db.relationship(
+        "ProjectAttachment",
+        backref="project",
+        lazy=True,
+        cascade="all, delete-orphan",
+        order_by="ProjectAttachment.order_index",
     )
 
     def __repr__(self) -> str:
@@ -109,6 +128,51 @@ class Paper(db.Model):
 # until a later major-version storage migration, so existing jobs, payments,
 # audit records and third-party links continue to work unchanged.
 Project = Paper
+
+
+class ProjectArticle(db.Model):
+    """A scholarly work related to a project/topic.
+
+    Projects used to expose one set of scholarly metadata directly on
+    ``Paper``. Those legacy columns remain readable, while this child table
+    allows any number of independently authored/identified PDF articles.
+    """
+
+    __tablename__ = "project_articles"
+
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey("papers.id", ondelete="CASCADE"), nullable=False, index=True)
+    title = db.Column(db.String(500), nullable=True)
+    authors = db.Column(db.String(500), nullable=True)
+    year = db.Column(db.Integer, nullable=True)
+    doi = db.Column(db.String(200), nullable=True)
+    pmid = db.Column(db.String(100), nullable=True)
+    abstract = db.Column(db.Text, nullable=True)
+    pdf_path = db.Column(db.String(500), nullable=True)
+    order_index = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, default=utc_now)
+    updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
+
+
+class ProjectAttachment(db.Model):
+    """Teaching/presentation material attached to a project.
+
+    PowerPoint sources are retained for download. When LibreOffice is
+    available a PDF preview is generated and rendered in the same reader used
+    by native PDFs.
+    """
+
+    __tablename__ = "project_attachments"
+
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey("papers.id", ondelete="CASCADE"), nullable=False, index=True)
+    title = db.Column(db.String(300), nullable=True)
+    original_filename = db.Column(db.String(255), nullable=False)
+    file_type = db.Column(db.String(12), nullable=False)
+    source_path = db.Column(db.String(500), nullable=False)
+    preview_pdf_path = db.Column(db.String(500), nullable=True)
+    order_index = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, default=utc_now)
 
 
 class Model3D(db.Model):
@@ -312,6 +376,14 @@ class Payment(db.Model):
     # Amount in the smallest currency unit (kurus for TRY, cents for USD/EUR).
     # The column name is historical; treat it as generic minor units.
     amount_kurus = db.Column(db.Integer, nullable=False)
+    amount_before_discount = db.Column(db.Integer, nullable=True)
+    discount_amount = db.Column(db.Integer, nullable=False, default=0)
+    coupon_id = db.Column(db.Integer, db.ForeignKey("coupons.id", ondelete="SET NULL"), nullable=True, index=True)
+    coupon_code = db.Column(db.String(64), nullable=True)
+    # True while this pending checkout holds one slot from
+    # Coupon.reservation_count. Paid/failed webhook handling clears it exactly
+    # once, making concurrent max-redemption enforcement deterministic.
+    coupon_reservation_active = db.Column(db.Boolean, nullable=False, default=False)
     currency = db.Column(db.String(3), nullable=False, default="TRY")
     provider = db.Column(db.String(50), nullable=False, default="manual")
     provider_reference = db.Column(db.String(200), nullable=True)
@@ -324,6 +396,7 @@ class Payment(db.Model):
     paper = db.relationship("Paper", backref=db.backref("payments", lazy=True))
     model = db.relationship("Model3D", backref=db.backref("payments", lazy=True))
     institution = db.relationship("Institution", backref=db.backref("payments", lazy=True))
+    coupon = db.relationship("Coupon", backref=db.backref("payments", lazy=True))
 
     def __repr__(self) -> str:
         return f"<Payment {self.status} {self.amount_kurus} {self.currency}>"
@@ -419,11 +492,41 @@ class LicensePlanConfig(db.Model):
     duration_days = db.Column(db.Integer, nullable=True)  # NULL = unlimited
     storage_limit_bytes = db.Column(db.Integer, nullable=False)
     is_purchasable = db.Column(db.Boolean, nullable=False, default=True)
+    # NULL means unlimited. The cap is evaluated at project/topic level using
+    # the strongest active model license already present in that project.
+    max_models_per_project = db.Column(db.Integer, nullable=True)
+    # Admin-managed capability allowlist. Stored as JSON so new viewer features
+    # can be introduced without another schema change; licensing.py supplies
+    # safe defaults for rows created by older releases.
+    features = db.Column(db.JSON, nullable=True)
     created_at = db.Column(db.DateTime, default=utc_now)
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
 
     def __repr__(self) -> str:
         return f"<LicensePlanConfig {self.key}>"
+
+
+class Coupon(db.Model):
+    """Admin-created coupon applied before a hosted checkout is requested."""
+
+    __tablename__ = "coupons"
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    percent_off = db.Column(db.Integer, nullable=True)
+    fixed_discount_usd_cents = db.Column(db.Integer, nullable=True)
+    applicable_plan_keys = db.Column(db.JSON, nullable=True)
+    max_redemptions = db.Column(db.Integer, nullable=True)
+    redemption_count = db.Column(db.Integer, nullable=False, default=0)
+    reservation_count = db.Column(db.Integer, nullable=False, default=0)
+    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    starts_at = db.Column(db.DateTime, nullable=True)
+    expires_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=utc_now)
+    updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
+
+    def __repr__(self) -> str:
+        return f"<Coupon {self.code}>"
 
 
 class Institution(db.Model):

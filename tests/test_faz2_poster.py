@@ -10,6 +10,7 @@ Validates:
 
 import os
 import shutil
+import uuid
 from pathlib import Path
 from unittest.mock import patch
 
@@ -23,7 +24,9 @@ from converters.glb_quality import ensure_pbr_materials
 
 
 def _tmp_dir():
-    path = Path.cwd() / f".pytest-poster-{os.getpid()}"
+    # A unique folder per test avoids Windows file-handle timing from making a
+    # prior Pillow image keep the next test's PID-based directory occupied.
+    path = Path.cwd() / f".pytest-poster-{os.getpid()}-{uuid.uuid4().hex}"
     shutil.rmtree(path, ignore_errors=True)
     path.mkdir()
     return path
@@ -163,3 +166,9 @@ class TestViewerPosterIntegration:
     def test_paper_public_has_poster(self):
         content = (self.TEMPLATES_DIR / "paper_public.html").read_text()
         assert "poster=" in content
+
+    def test_dashboard_uses_cached_poster_not_a_live_mini_viewer(self):
+        content = (self.TEMPLATES_DIR / "dashboard.html").read_text()
+        assert "url_for('serve_poster', unique_id=model.id)" in content
+        assert "loading=\"lazy\"" in content
+        assert "<model-viewer" not in content

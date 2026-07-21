@@ -109,7 +109,10 @@
                   {{ payment.user_id }}
                 {% endif %}
               </td>
-              <td>{{ "%.2f"|format(payment.amount_kurus / 100) }} {{ payment.currency }}</td>
+              <td>
+                {{ "%.2f"|format(payment.amount_kurus / 100) }} {{ payment.currency }}
+                {% if payment.discount_amount %}<small><s>{{ "%.2f"|format((payment.amount_before_discount or payment.amount_kurus) / 100) }}</s> · {{ payment.coupon_code or 'discount' }}</small>{% endif %}
+              </td>
               <td><span class="status-chip {{ admin_chip_class(payment.status) }}">{{ payment.status|title }}</span></td>
               <td>{{ payment.provider }}</td>
               <td>

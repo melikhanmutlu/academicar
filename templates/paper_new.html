@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% set is_edit = mode|default('new') == 'edit' %}
+{% set presentation_enabled = project_supports_feature(paper if is_edit else none, 'presentation_library') %}
 {% block title %}{{ 'Edit Project' if is_edit else 'New Project' }} - AcademicAR{% endblock %}
 {# Drop body's overflow-x clip so the sticky decorative aside has a single
    scroll container (see body.project-form-page in style.css). #}
@@ -41,39 +42,13 @@
         </div>
       </div>
 
-      <!-- Optional publication metadata -->
-      <details class="rounded-xl border border-[#e8e8e8] bg-[#f8f8f8] p-5 space-y-3">
-        <summary class="cursor-pointer font-semibold text-[#111827]">Publication &amp; reference details (optional)</summary>
-        <div class="mt-4">
-        <label class="block text-xs uppercase tracking-wider font-semibold text-[#64748b]">Autofill via DOI or PMID</label>
-        <div class="flex flex-col sm:flex-row gap-3">
-          <input type="text" id="autofillQuery" placeholder="Enter DOI (e.g. 10.1148/radiol.210408) or PMID" class="field-input !py-2 flex-1 text-sm bg-white" aria-label="DOI or PMID input">
-          <button type="button" id="autofillBtn" class="rounded bg-[#111827] text-white px-5 py-2 hover:bg-[#202020] text-sm font-semibold transition flex items-center justify-center gap-2">
-            <span id="autofillSpinner" class="hidden h-4.5 w-4.5 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
-            <span id="autofillText">Fetch Metadata</span>
-          </button>
-        </div>
-        <p class="text-xs text-[#5c6473]">Instantly populates Title, Authors, Year, Abstract, and identifiers using Crossref and PubMed APIs.</p>
-        <div id="autofillStatus" class="hidden text-xs font-semibold"></div>
-        </div>
-      </details>
-
       <div>
-        <label class="field-label">Title <span class="text-red-500">*</span></label>
-        <input type="text" name="title" value="{{ form.get('title', '') }}" required maxlength="500" class="field-input text-lg" placeholder="Full title of the publication or project">
-      </div>
-
-      <div>
-        <label class="field-label">Contributors</label>
-        <input type="text" name="authors" value="{{ form.get('authors', '') }}" maxlength="500" placeholder="Jane Doe, John Smith" class="field-input">
-        <p class="text-xs text-[#5c6473] mt-2">Separate contributors with commas.</p>
+        <label class="field-label">Topic title <span class="text-red-500">*</span></label>
+        <input type="text" name="title" value="{{ form.get('title', '') }}" required maxlength="500" class="field-input text-lg" placeholder="e.g. Cardiovascular anatomy teaching collection">
+        <p class="text-xs text-[#5c6473] mt-2">This is the shared subject that groups models, related articles, and presentation files.</p>
       </div>
 
       <div class="grid sm:grid-cols-2 gap-4">
-        <div>
-          <label class="field-label">Year</label>
-          <input type="number" name="year" value="{{ form.get('year', '') }}" min="1900" max="2100" class="field-input">
-        </div>
         <div>
           <label class="field-label">Field</label>
           <select name="field" class="field-select">
@@ -83,28 +58,146 @@
             {% endfor %}
           </select>
         </div>
-      </div>
-
-      <div class="grid sm:grid-cols-2 gap-4">
         <div>
           <label class="field-label">Organization</label>
           <input type="text" name="institution" value="{{ form.get('institution', '') }}" maxlength="300" placeholder="University, lab, company, museum, or publisher" class="field-input">
         </div>
         <div>
-          <label class="field-label">DOI</label>
-          <input type="text" name="doi" value="{{ form.get('doi', '') }}" maxlength="200" placeholder="10.1234/example.2026" class="field-input">
+          <label class="field-label">Department / unit</label>
+          <input type="text" name="department" list="departmentSuggestions" value="{{ form.get('department', '') }}" maxlength="120" placeholder="Orthopaedics, Mechanical Engineering, Architecture…" class="field-input">
+          <datalist id="departmentSuggestions">{% for department in institution_departments %}<option value="{{ department }}">{% endfor %}</datalist>
         </div>
       </div>
 
-      <div>
-        <label class="field-label">PMID</label>
-        <input type="text" name="pmid" value="{{ form.get('pmid', '') }}" maxlength="100" placeholder="Optional PubMed identifier" class="field-input">
-      </div>
+      <section class="article-collection" data-article-collection>
+        <div class="article-collection-head">
+          <div>
+            <p class="project-section-kicker">Related literature</p>
+            <h2>Articles about this topic</h2>
+            <p>The first article form stays open but is optional. Add as many independently authored articles as you need.</p>
+          </div>
+          <button type="button" class="btn-secondary compact" data-add-article>+ Article</button>
+        </div>
+
+        <div class="article-list" data-article-list>
+          {% if form.getlist is defined and form.getlist('article_title[]') %}
+            {% set article_titles = form.getlist('article_title[]') %}
+            {% set article_ids = form.getlist('article_id[]') %}
+            {% set article_authors = form.getlist('article_authors[]') %}
+            {% set article_years = form.getlist('article_year[]') %}
+            {% set article_dois = form.getlist('article_doi[]') %}
+            {% set article_pmids = form.getlist('article_pmid[]') %}
+            {% set article_abstracts = form.getlist('article_abstract[]') %}
+            {% set article_rows = range(article_titles|length) %}
+          {% elif is_edit and paper.articles %}
+            {% set article_rows = paper.articles %}
+          {% else %}
+            {% set article_rows = [none] %}
+          {% endif %}
+          {% for row in article_rows %}
+            {% set from_form = row is number %}
+            {% set article = none if from_form else row %}
+            <details class="article-entry" data-article-entry {% if loop.first %}open{% endif %}>
+              <summary class="article-entry-summary">
+                <span class="article-entry-avatar" data-article-number>{{ loop.index }}</span>
+                <span class="article-entry-summary-copy">
+                  <strong data-article-summary-title>{{ article_titles[row] if from_form and article_titles[row] else (article.title if article and article.title else 'New article') }}</strong>
+                  <small data-article-summary-meta>{{ article_authors[row] if from_form and row < article_authors|length and article_authors[row] else (article.authors if article and article.authors else 'Optional reference · add title, authors, DOI or PDF') }}</small>
+                </span>
+                <span class="article-entry-state">Edit <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4"/></svg></span>
+              </summary>
+              <input type="hidden" name="article_id[]" value="{{ article_ids[row] if from_form and row < article_ids|length else (article.id if article else '') }}">
+              <div class="article-entry-fields grid sm:grid-cols-2 gap-4">
+                <div class="sm:col-span-2">
+                  <label class="field-label">Article title</label>
+                  <input class="field-input" name="article_title[]" maxlength="500" value="{{ article_titles[row] if from_form else (article.title if article else '') }}" placeholder="Optional article title">
+                </div>
+                <div>
+                  <label class="field-label">Authors</label>
+                  <input class="field-input" name="article_authors[]" maxlength="500" value="{{ article_authors[row] if from_form and row < article_authors|length else (article.authors if article else '') }}" placeholder="Jane Doe, John Smith">
+                </div>
+                <div>
+                  <label class="field-label">Year</label>
+                  <input class="field-input" type="number" name="article_year[]" min="1900" max="2100" value="{{ article_years[row] if from_form and row < article_years|length else (article.year if article and article.year else '') }}">
+                </div>
+                <div>
+                  <label class="field-label">DOI</label>
+                  <input class="field-input" name="article_doi[]" maxlength="200" value="{{ article_dois[row] if from_form and row < article_dois|length else (article.doi if article else '') }}" placeholder="10.1234/example.2026">
+                </div>
+                <div>
+                  <label class="field-label">PMID</label>
+                  <input class="field-input" name="article_pmid[]" maxlength="100" value="{{ article_pmids[row] if from_form and row < article_pmids|length else (article.pmid if article else '') }}">
+                </div>
+                <div class="sm:col-span-2">
+                  <label class="field-label">Abstract / note</label>
+                  <textarea class="field-textarea" name="article_abstract[]" rows="3">{{ article_abstracts[row] if from_form and row < article_abstracts|length else (article.abstract if article else '') }}</textarea>
+                </div>
+                <label class="article-pdf-field sm:col-span-2">
+                  <span class="field-label">Article PDF {% if article and article.pdf_path %}<em>Current file retained unless replaced</em>{% endif %}</span>
+                  <span class="file-picker-control"><span>{{ 'Replace PDF' if article and article.pdf_path else 'Choose PDF' }}</span><small data-file-name>{{ article.pdf_path.split('_', 2)[-1] if article and article.pdf_path else 'No file selected' }}</small></span>
+                  <input type="file" name="article_pdf[]" accept=".pdf" class="native-file-input" data-named-file-input>
+                </label>
+                <div class="article-entry-actions sm:col-span-2">
+                  <span>All article fields are optional.</span>
+                  <button type="button" class="article-remove" data-remove-article {% if loop.first %}hidden{% endif %}>Remove article</button>
+                </div>
+              </div>
+            </details>
+          {% endfor %}
+        </div>
+      </section>
+
+      <template id="articleEntryTemplate">
+        <details class="article-entry" data-article-entry open>
+          <summary class="article-entry-summary"><span class="article-entry-avatar" data-article-number></span><span class="article-entry-summary-copy"><strong data-article-summary-title>New article</strong><small data-article-summary-meta>Optional reference · add title, authors, DOI or PDF</small></span><span class="article-entry-state">Edit <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4"/></svg></span></summary>
+          <input type="hidden" name="article_id[]" value="">
+          <div class="article-entry-fields grid sm:grid-cols-2 gap-4">
+            <div class="sm:col-span-2"><label class="field-label">Article title</label><input class="field-input" name="article_title[]" maxlength="500" placeholder="Optional article title"></div>
+            <div><label class="field-label">Authors</label><input class="field-input" name="article_authors[]" maxlength="500" placeholder="Jane Doe, John Smith"></div>
+            <div><label class="field-label">Year</label><input class="field-input" type="number" name="article_year[]" min="1900" max="2100"></div>
+            <div><label class="field-label">DOI</label><input class="field-input" name="article_doi[]" maxlength="200" placeholder="10.1234/example.2026"></div>
+            <div><label class="field-label">PMID</label><input class="field-input" name="article_pmid[]" maxlength="100"></div>
+            <div class="sm:col-span-2"><label class="field-label">Abstract / note</label><textarea class="field-textarea" name="article_abstract[]" rows="3"></textarea></div>
+            <label class="article-pdf-field sm:col-span-2"><span class="field-label">Article PDF</span><span class="file-picker-control"><span>Choose PDF</span><small data-file-name>No file selected</small></span><input type="file" name="article_pdf[]" accept=".pdf" class="native-file-input" data-named-file-input></label>
+            <div class="article-entry-actions sm:col-span-2"><span>All article fields are optional.</span><button type="button" class="article-remove" data-remove-article>Remove article</button></div>
+          </div>
+        </details>
+      </template>
 
       <div>
         <label class="field-label">Project description</label>
-        <textarea name="abstract" rows="6" class="field-textarea" placeholder="What is this work, what do the models show, and who is it for?">{{ form.get('abstract', '') }}</textarea>
+        <textarea name="abstract" rows="6" class="field-textarea" placeholder="What is this topic, what do the models show, and who is it for?">{{ form.get('abstract', '') }}</textarea>
       </div>
+
+      <section class="project-materials">
+        <div>
+          <p class="project-section-kicker">Teaching &amp; presentation files</p>
+          <h2>Supporting materials</h2>
+          <p>Add PDFs or PowerPoint files. PowerPoint is converted to an inline PDF preview when the server has LibreOffice; the original always remains downloadable.</p>
+        </div>
+        {% if is_edit and paper.attachments %}
+          <div class="material-current-list">
+            {% for material in paper.attachments %}
+              <div><span><strong>{{ material.title or material.original_filename }}</strong><small>{{ material.file_type|upper }}{% if material.preview_pdf_path %} · preview ready{% endif %}</small></span><button type="submit" class="article-remove" formaction="{{ url_for('project_attachment_delete', slug=paper.slug, attachment_id=material.id) }}" formmethod="post" name="csrf_token" value="{{ csrf_token() }}">Remove</button></div>
+            {% endfor %}
+          </div>
+        {% endif %}
+        {% if presentation_enabled %}
+          <label class="upload-dropzone compact-dropzone">
+            <span class="block text-[#111827] font-semibold">Add PDF or PowerPoint files</span>
+            <span class="file-picker-control mt-3"><span>Choose files</span><small data-file-name>No files selected</small></span>
+            <input type="file" name="materials[]" multiple accept=".pdf,.ppt,.pptx" class="native-file-input" data-named-file-input>
+          </label>
+        {% else %}
+          <p class="rounded-lg border border-[#e8e8e8] bg-[#f8f8f8] p-4 text-sm text-[#64748b]">Supporting PDF / PowerPoint uploads are disabled for this topic's current plan.</p>
+        {% endif %}
+      </section>
+
+      {# Legacy fields stay present for older integrations but are populated from the first child article server-side. #}
+      <input type="hidden" name="authors" value="">
+      <input type="hidden" name="year" value="">
+      <input type="hidden" name="doi" value="">
+      <input type="hidden" name="pmid" value="">
 
       <div>
         <label class="field-label">Visibility</label>
@@ -126,35 +219,6 @@
           </label>
         </div>
       </div>
-
-      {% if is_edit and paper.pdf_path %}
-        <div id="current-pdf-container" class="rounded-xl border border-[#e8e8e8] bg-[#fdfdfd] p-5 mb-4" style="border: 1px solid var(--color-light-pearl); background: rgba(255, 255, 255, 0.7); border-radius: 12px; margin-bottom: 16px;">
-          <span class="text-xs font-semibold uppercase tracking-wider text-[#d94e14] block" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #d94e14; display: block;">Current PDF File</span>
-          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-2 gap-4" style="display: flex; gap: 16px; margin-top: 8px;">
-            <div class="flex items-center gap-2" style="display: flex; align-items: center; gap: 8px; min-width: 0;">
-              <svg class="w-5 h-5 text-red-500 shrink-0" style="width: 20px; height: 20px; color: #ef4444; flex-shrink: 0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-              </svg>
-              <span class="text-sm font-medium text-[#111827] truncate" style="font-size: 14px; font-weight: 500; color: #111827; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                {{ paper.pdf_path.split('_', 1)[1] if '_' in paper.pdf_path else paper.pdf_path }}
-              </span>
-            </div>
-            <button type="button" onclick="deletePaperPdfAJAX({{ paper.slug|tojson }})" class="inline-flex items-center text-sm font-semibold text-[#ef4444] cursor-pointer hover:text-red-700 transition" style="background: none; border: none; padding: 0; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: #ef4444; font-size: 14px; font-weight: 600; transition: color 0.2s; outline: none; font-family: inherit;">
-              <svg class="w-4 h-4 shrink-0" style="width: 16px; height: 16px; color: #ef4444; flex-shrink: 0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-              </svg>
-              Remove PDF
-            </button>
-          </div>
-        </div>
-      {% endif %}
-
-      <label data-pdf-upload-card class="block rounded-xl border border-dashed border-[#111827]/25 bg-white/55 p-5 cursor-pointer hover:bg-white/75 transition">
-        <span class="block font-semibold text-[#111827]">{{ 'Replace PDF' if is_edit and paper.pdf_path else 'Attach PDF' }}</span>
-        <span class="block text-sm text-[#5c6473] mt-1">Optional PDF upload. PDF files are only downloadable by the publication owner.{% if is_edit and paper.pdf_path %} Leave empty to keep the current PDF.{% endif %}</span>
-        <span class="file-picker-control mt-4"><span>Choose PDF</span><small data-file-name>No file selected</small></span>
-        <input type="file" name="pdf" accept=".pdf" class="native-file-input" data-named-file-input>
-      </label>
 
       {% if not is_edit %}
         <section class="rounded-xl border border-[#e8e8e8] bg-[#f8f8f8] p-5 space-y-4">
@@ -435,6 +499,62 @@
       });
     }
   }
+
+  const articleList = document.querySelector('[data-article-list]');
+  const articleTemplate = document.getElementById('articleEntryTemplate');
+  const addArticleButton = document.querySelector('[data-add-article]');
+  const syncArticleSummary = (entry) => {
+    if (!entry) return;
+    const title = entry.querySelector('[name="article_title[]"]')?.value.trim();
+    const authors = entry.querySelector('[name="article_authors[]"]')?.value.trim();
+    const year = entry.querySelector('[name="article_year[]"]')?.value.trim();
+    const doi = entry.querySelector('[name="article_doi[]"]')?.value.trim();
+    const pdf = entry.querySelector('[name="article_pdf[]"]')?.files?.[0]?.name;
+    const titleNode = entry.querySelector('[data-article-summary-title]');
+    const metaNode = entry.querySelector('[data-article-summary-meta]');
+    if (titleNode) titleNode.textContent = title || 'New article';
+    if (metaNode) {
+      const metadata = [authors, year, doi ? `DOI ${doi}` : '', pdf].filter(Boolean);
+      metaNode.textContent = metadata.length ? metadata.join(' · ') : 'Optional reference · add title, authors, DOI or PDF';
+    }
+  };
+  const renumberArticles = () => {
+    if (!articleList) return;
+    const entries = [...articleList.querySelectorAll('[data-article-entry]')];
+    entries.forEach((entry, index) => {
+      entry.querySelectorAll('[data-article-number]').forEach((number) => { number.textContent = String(index + 1); });
+      const remove = entry.querySelector('[data-remove-article]');
+      if (remove) remove.hidden = index === 0;
+      syncArticleSummary(entry);
+    });
+  };
+  if (addArticleButton && articleTemplate && articleList) {
+    addArticleButton.addEventListener('click', () => {
+      articleList.querySelectorAll('[data-article-entry]').forEach((entry) => { entry.open = false; });
+      articleList.appendChild(articleTemplate.content.cloneNode(true));
+      renumberArticles();
+      articleList.lastElementChild?.querySelector('[name="article_title[]"]')?.focus();
+    });
+  }
+  articleList?.addEventListener('click', (event) => {
+    const remove = event.target.closest('[data-remove-article]');
+    if (!remove) return;
+    remove.closest('[data-article-entry]')?.remove();
+    renumberArticles();
+  });
+  articleList?.addEventListener('input', (event) => {
+    syncArticleSummary(event.target.closest('[data-article-entry]'));
+  });
+  document.addEventListener('change', (event) => {
+    const input = event.target.closest('[data-named-file-input]');
+    if (!input) return;
+    const label = input.closest('label')?.querySelector('[data-file-name]');
+    if (!label) return;
+    const files = Array.from(input.files || []);
+    label.textContent = files.length ? files.map((file) => file.name).join(', ') : 'No file selected';
+    syncArticleSummary(input.closest('[data-article-entry]'));
+  });
+  renumberArticles();
 
   document.querySelectorAll('[data-named-file-input]').forEach((input) => {
     const updateFileName = () => {

@@ -553,3 +553,22 @@
   color: #b91c1c;
   font-weight: 600;
 }
+
+.admin-plan-card { margin-bottom:10px; padding:0; overflow:hidden; }
+.admin-plan-summary { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:13px 15px; cursor:pointer; list-style:none; background:var(--color-canvas-white); }
+.admin-plan-summary::-webkit-details-marker { display:none; }
+.admin-plan-summary:hover { background:var(--color-cloud-whisper); }
+.admin-plan-summary > span:first-child { min-width:0; }
+.admin-plan-summary strong,.admin-plan-summary small { display:block; }
+.admin-plan-summary strong { color:var(--color-midnight-graphite); font-size:13px; }
+.admin-plan-summary small { margin-top:3px; color:var(--color-silver-ash); font-size:10px; }
+.admin-plan-summary-state { display:flex; align-items:center; gap:6px; color:var(--color-dark-shale); font-size:11px; font-weight:600; }
+.admin-plan-summary-state b { font-size:16px; font-weight:400; transition:transform 150ms ease; }
+.admin-plan-card[open] .admin-plan-summary-state b { transform:rotate(180deg); }
+.admin-plan-card > form { padding:14px 15px 15px; border-top:1px solid var(--color-light-pearl); background:var(--color-cloud-whisper); }
+.admin-coupon-create { padding:15px; }
+.admin-feature-matrix { margin-top:12px; padding:12px; border:1px solid var(--color-light-pearl); border-radius:8px; background:var(--color-canvas-white); }
+.admin-feature-matrix legend { padding:0 6px; color:var(--color-midnight-graphite); font-size:12px; font-weight:700; }
+.admin-feature-options { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:7px 12px; }
+.admin-feature-options label { display:flex; align-items:center; gap:8px; color:var(--color-dark-shale); font-size:12px; }
+.admin-feature-options input { accent-color:var(--color-sunset-orange); }

@@ -1,6 +1,6 @@
 {% extends "admin/base.html" %}
 {% block admin_title %}Pricing &amp; plans{% endblock %}
-{% block admin_subtitle %}Edit license plan price, duration, and storage limits without a deploy.{% endblock %}
+{% block admin_subtitle %}Edit pricing, quotas, and product capabilities without a deploy.{% endblock %}
 
 {% block admin_body %}
   <section class="admin-section">
@@ -12,15 +12,20 @@
       <span>{{ pricing_rows|length }} plans</span>
     </div>
     {% for plan in pricing_rows %}
-      <div class="admin-breakdown" style="margin-bottom:16px">
-        <h3><code>{{ plan.key }}</code></h3>
+      <details class="admin-breakdown admin-plan-card" {% if loop.first %}open{% endif %}>
+        <summary class="admin-plan-summary">
+          <span><strong>{{ plan.label }}</strong><small><code>{{ plan.key }}</code> · {{ '$%.2f'|format(plan.price_usd_cents / 100) }} · {{ plan.max_models_per_project or 'Unlimited' }} models/topic</small></span>
+          <span class="admin-plan-summary-state">Configure <b aria-hidden="true">⌄</b></span>
+        </summary>
         <form method="POST" action="{{ url_for('admin_pricing_update', plan_key=plan.key) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="features_present" value="1">
           <div class="admin-editor-grid">
             <label class="admin-editor-field"><span>Label</span><input name="label" value="{{ plan.label }}" required maxlength="80"></label>
             <label class="admin-editor-field"><span>Price (USD)</span><input type="number" name="price_usd" min="0" step="0.01" value="{{ '%.2f'|format(plan.price_usd_cents / 100) }}" required></label>
             <label class="admin-editor-field"><span>Duration (days, blank = unlimited)</span><input type="number" name="duration_days" min="1" value="{{ plan.duration_days or '' }}" placeholder="unlimited"></label>
             <label class="admin-editor-field"><span>Storage limit (MB)</span><input type="number" name="storage_limit_mb" min="1" value="{{ (plan.storage_limit_bytes / 1024 / 1024) | round(0, 'floor') | int }}" required></label>
+            <label class="admin-editor-field"><span>Models per topic (blank = unlimited)</span><input type="number" name="max_models_per_project" min="1" value="{{ plan.max_models_per_project or '' }}" placeholder="unlimited"></label>
             <label class="admin-editor-field"><span>Purchasable</span>
               <select name="is_purchasable">
                 <option value="1" {% if plan.is_purchasable %}selected{% endif %}>Yes</option>
@@ -28,13 +33,42 @@
               </select>
             </label>
           </div>
+          <fieldset class="admin-feature-matrix">
+            <legend>Enabled capabilities</legend>
+            <div class="admin-feature-options">
+              {% for feature_key, feature_label in plan_features %}
+                <label>
+                  <input type="checkbox" name="features" value="{{ feature_key }}" {% if feature_key in get_license_plan(plan.key).features %}checked{% endif %}>
+                  <span>{{ feature_label }}</span>
+                </label>
+              {% endfor %}
+            </div>
+          </fieldset>
           <div class="admin-editor-actions" style="margin-top:12px">
             <button type="submit" class="admin-btn admin-btn-primary compact">Save {{ plan.label }}</button>
           </div>
         </form>
-      </div>
+      </details>
     {% else %}
       <p>No pricing rows yet — visit this page again in a moment to let the defaults seed.</p>
     {% endfor %}
+  </section>
+
+  <section class="admin-section">
+    <div class="admin-section-head"><div><h2>Checkout coupons</h2><p>Discounts are calculated before the PayTR token request, so the hosted checkout receives the exact discounted amount.</p></div><span>{{ coupons|length }} codes</span></div>
+    <form method="POST" action="{{ url_for('admin_coupon_create') }}" class="admin-breakdown admin-coupon-create">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="admin-editor-grid">
+        <label class="admin-editor-field"><span>Coupon code</span><input name="code" minlength="3" maxlength="64" placeholder="ACADEMIC25" required></label>
+        <label class="admin-editor-field"><span>Discount type</span><select name="discount_type"><option value="percent">Percentage</option><option value="fixed">Fixed USD amount</option></select></label>
+        <label class="admin-editor-field"><span>Discount value</span><input type="number" name="discount_value" min="0.01" step="0.01" required placeholder="25"></label>
+        <label class="admin-editor-field"><span>Maximum redemptions</span><input type="number" name="max_redemptions" min="1" placeholder="unlimited"></label>
+        <label class="admin-editor-field"><span>Expires at</span><input type="datetime-local" name="expires_at"></label>
+      </div>
+      <fieldset class="admin-feature-matrix"><legend>Applicable plans (none selected = all paid plans)</legend><div class="admin-feature-options">{% for key in ['academic', 'extended_archive'] %}<label><input type="checkbox" name="plan_keys" value="{{ key }}" checked><span>{{ get_license_plan(key).label }}</span></label>{% endfor %}</div></fieldset>
+      <div class="admin-editor-actions" style="margin-top:12px"><button class="admin-btn admin-btn-primary compact" type="submit">Create coupon</button></div>
+    </form>
+
+    {% if coupons %}<div class="admin-table-wrap" style="margin-top:16px"><table class="admin-table"><thead><tr><th>Code</th><th>Discount</th><th>Plans</th><th>Usage</th><th>Expiry</th><th>Status</th><th></th></tr></thead><tbody>{% for coupon in coupons %}<tr><td><code>{{ coupon.code }}</code></td><td>{% if coupon.percent_off %}{{ coupon.percent_off }}%{% else %}${{ '%.2f'|format((coupon.fixed_discount_usd_cents or 0) / 100) }}{% endif %}</td><td>{{ (coupon.applicable_plan_keys or ['All paid'])|join(', ') }}</td><td>{{ coupon.redemption_count }} redeemed{% if coupon.reservation_count %} + {{ coupon.reservation_count }} pending{% endif %} / {{ coupon.max_redemptions or '∞' }}</td><td>{{ coupon.expires_at.strftime('%d %b %Y') if coupon.expires_at else 'No expiry' }}</td><td><span class="status-chip {{ 'is-ready' if coupon.is_active else 'is-failed' }}">{{ 'Active' if coupon.is_active else 'Paused' }}</span></td><td><form method="POST" action="{{ url_for('admin_coupon_toggle', coupon_id=coupon.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="admin-btn admin-btn-secondary compact" type="submit">{{ 'Pause' if coupon.is_active else 'Activate' }}</button></form></td></tr>{% endfor %}</tbody></table></div>{% endif %}
   </section>
 {% endblock %}

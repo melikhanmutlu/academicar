@@ -6,7 +6,9 @@
 
 {% block content %}
 {% set first_model = paper.models[0] if paper.models else none %}
-{% set can_upload_more = true %}
+{% set model_capacity = project_model_capacity(paper) %}
+{% set can_upload_more = model_capacity.can_add %}
+{% set presentation_enabled = project_supports_feature(paper, 'presentation_library') %}
 <div class="app-shell paper-detail-shell">
   <a href="{{ url_for('dashboard') }}" class="detail-back-button">&larr; Dashboard</a>
 
@@ -18,10 +20,10 @@
     <div class="upgrade-success-body">
       {% if upgraded_active %}
         <strong>Payment successful</strong>
-        <p>“{{ upgraded_model.display_name or upgraded_model.original_filename }}” now has {{ get_license_plan(upgraded_model.license_type).label }} access. Its QR code and viewer link stay exactly the same.</p>
+        <p>"{{ upgraded_model.display_name or upgraded_model.original_filename }}" now has {{ get_license_plan(upgraded_model.license_type).label }} access. Its QR code and viewer link stay exactly the same.</p>
       {% else %}
         <strong>Payment received</strong>
-        <p>We’re activating the upgrade for “{{ upgraded_model.display_name or upgraded_model.original_filename }}”. This usually takes a few seconds — refresh the page in a moment to see the new access window.</p>
+        <p>We're activating the upgrade for "{{ upgraded_model.display_name or upgraded_model.original_filename }}". This usually takes a few seconds - refresh the page in a moment to see the new access window.</p>
       {% endif %}
     </div>
     <button type="button" class="upgrade-success-dismiss" aria-label="Dismiss" data-upgrade-dismiss>&times;</button>
@@ -46,30 +48,15 @@
 
       <h1 class="paper-title font-serif text-3xl lg:text-4xl font-bold leading-tight text-[#111827]">{{ paper.title }}</h1>
       <div class="paper-meta mt-5">
-        {% if paper.authors %}
-          <div><span>Contributors</span><strong>{{ paper.authors }}</strong></div>
-        {% endif %}
         {% if paper.institution %}
           <div><span>Organization</span><strong>{{ paper.institution }}</strong></div>
         {% endif %}
-        {% if paper.doi %}
-          <div>
-            <span>DOI</span>
-            <strong>
-              <a href="https://doi.org/{{ paper.doi }}" target="_blank" rel="noopener noreferrer" class="meta-link-button">{{ paper.doi }}</a>
-            </strong>
-          </div>
-        {% endif %}
-        {% if paper.pmid %}
-          <div><span>PMID</span><strong>{{ paper.pmid }}</strong></div>
-        {% endif %}
-        {% if paper.pdf_path %}
-          <div>
-            <span>PDF</span>
-            <strong>
-              <a href="{{ url_for('serve_pdf', paper_id=paper.id) }}" target="_blank" rel="noopener noreferrer" class="meta-link-button">Download PDF</a>
-            </strong>
-          </div>
+        {% if paper.department %}<div><span>Department</span><strong>{{ paper.department }}</strong></div>{% endif %}
+        {% if not paper.articles %}
+          {% if paper.authors %}<div><span>Contributors</span><strong>{{ paper.authors }}</strong></div>{% endif %}
+          {% if paper.doi %}<div><span>DOI</span><strong><a href="https://doi.org/{{ paper.doi }}" target="_blank" rel="noopener noreferrer" class="meta-link-button">{{ paper.doi }}</a></strong></div>{% endif %}
+          {% if paper.pmid %}<div><span>PMID</span><strong>{{ paper.pmid }}</strong></div>{% endif %}
+          {% if paper.pdf_path %}<div><span>PDF</span><strong><a href="{{ url_for('serve_pdf', paper_id=paper.id) }}" target="_blank" rel="noopener noreferrer" class="meta-link-button">Download PDF</a></strong></div>{% endif %}
         {% endif %}
       </div>
 
@@ -105,8 +92,10 @@
       </div>
 
       <div class="share-actions mt-5">
-        {% if paper.pdf_path %}
-          <a href="{{ url_for('paper_public_pdf', slug=paper.slug) }}" target="_blank" rel="noopener noreferrer" class="detail-action detail-action-primary">View document</a>
+        {% if paper.articles and paper.articles[0].pdf_path %}
+          <a href="{{ url_for('project_article_reader', slug=paper.slug, article_id=paper.articles[0].id) }}" target="_blank" rel="noopener noreferrer" class="detail-action detail-action-primary">Present first article</a>
+        {% elif presentation_enabled and paper.attachments %}
+          <a href="{{ url_for('project_attachment_reader', slug=paper.slug, attachment_id=paper.attachments[0].id) }}" target="_blank" rel="noopener noreferrer" class="detail-action detail-action-primary">Open materials</a>
         {% else %}
           <a href="{{ url_for('project_edit', slug=paper.slug) }}" class="detail-action detail-action-primary">Add document</a>
         {% endif %}
@@ -124,12 +113,30 @@
           <strong>{{ paper.models|length }}</strong>
         </div>
         <div>
-          <span>PDF</span>
-          <strong>{{ 'Available' if paper.pdf_path else 'Missing' }}</strong>
+          <span>Articles</span>
+          <strong>{{ paper.articles|length }}</strong>
         </div>
       </div>
     </aside>
   </section>
+
+  {% if paper.articles or (presentation_enabled and paper.attachments) %}
+  <section class="topic-library surface rounded-xl p-5 sm:p-6 mb-5">
+    <div class="section-heading-row"><div><p class="project-section-kicker">Topic library</p><h2>Related articles &amp; supporting materials</h2></div><a href="{{ url_for('project_edit', slug=paper.slug) }}" class="detail-action">Manage library</a></div>
+    {% if paper.articles %}
+      <div class="topic-document-list">
+        {% for article in paper.articles %}
+          <article class="topic-document-row">
+            <span class="topic-document-avatar">{{ loop.index }}</span>
+            <div class="topic-document-main"><h3>{{ article.title or 'Untitled related article' }}</h3><p>{{ article.authors or 'No authors added' }}{% if article.year %}<span class="publication-year">{{ article.year }}</span>{% endif %}</p></div>
+            <div class="topic-document-actions">{% if article.doi %}<a href="https://doi.org/{{ article.doi }}" target="_blank" rel="noopener noreferrer">DOI</a>{% endif %}{% if article.pdf_path %}<a href="{{ url_for('project_article_reader', slug=paper.slug, article_id=article.id) }}" target="_blank" class="is-primary">Present PDF</a>{% endif %}</div>
+          </article>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% if presentation_enabled and paper.attachments %}<div class="topic-material-list">{% for material in paper.attachments %}<a href="{{ url_for('project_attachment_reader', slug=paper.slug, attachment_id=material.id) }}" target="_blank"><span class="topic-material-type">{{ material.file_type|upper }}</span><span><strong>{{ material.title or material.original_filename }}</strong><small>{{ 'PDF preview ready' if material.preview_pdf_path else 'Original download only' }}</small></span><span class="topic-material-open">Open</span></a>{% endfor %}</div>{% endif %}
+  </section>
+  {% endif %}
 
   <section class="mb-5" data-model-registry>
     <div class="section-heading-row">
@@ -295,6 +302,12 @@
   </section>
 
   <section id="add-model" class="mb-6 reveal-up">
+    {% if not can_upload_more %}
+      <div class="surface rounded-xl p-5 capacity-notice">
+        <div><p class="project-section-kicker">Plan capacity reached</p><h2>{{ model_capacity.used }} / {{ model_capacity.limit }} models</h2><p>{{ model_capacity.plan.label }} currently allows {{ model_capacity.limit }} model(s) per topic. Upgrade an existing model or ask an administrator to raise this limit.</p></div>
+        {% if paper.models %}<a class="detail-action detail-action-primary" href="{{ url_for('model_upgrade_page', model_id=paper.models[0].id) }}">Review upgrade options</a>{% endif %}
+      </div>
+    {% else %}
     {% if paper.models %}
       <details class="surface rounded-xl p-0 overflow-hidden upload-panel-prominent" data-upload-panel open>
         <summary class="upload-summary upload-summary-static">
@@ -366,7 +379,7 @@
                     <option value="m">Meters (m)</option>
                     <option value="embedded">Embedded units (FBX / GLB)</option>
                   </select>
-                  <p class="text-xs text-[#5c6473] mt-1">STL and OBJ files carry no unit — choose the unit your model was made in (e.g. cm in 3ds Max / SketchUp). FBX/GLB already include real units, so pick “Embedded”. You can change this later on the model’s edit page.</p>
+                  <p class="text-xs text-[#5c6473] mt-1">STL and OBJ files carry no unit - choose the unit your model was made in (e.g. cm in 3ds Max / SketchUp). FBX/GLB already include real units, so pick "Embedded". You can change this later on the model's edit page.</p>
                 </div>
                 <label class="flex items-start gap-3 rounded-xl border border-[#e2e8f0] bg-white p-4 text-sm text-[#475569]">
                   <input type="checkbox" name="compliance_confirm" value="yes" required class="mt-1">
@@ -405,6 +418,7 @@
       </details>
     {% else %}
       </div>
+    {% endif %}
     {% endif %}
   </section>
 </div>
