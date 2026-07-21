@@ -32,7 +32,19 @@ MESH_COLOR = (160, 170, 180, 255)
 
 
 def generate_poster(glb_path: str, png_path: str) -> bool:
-    """Generate a poster image from a GLB file. Returns True on success.
+    """Generate a poster image from a GLB file. Returns True on success."""
+    return generate_poster_backend(glb_path, png_path) is not None
+
+
+def generate_poster_backend(glb_path: str, png_path: str) -> str | None:
+    """Generate a poster and return the name of the backend that produced it.
+
+    Returns "pyrender" (full PBR + textures/vertex colours), "trimesh" (pyglet
+    software render), "rasterize" (flat-shaded no-material fallback), or None if
+    every backend failed. The backend name is what tells us on a live deploy
+    whether posters are the rich textured render or the flat-grey fallback —
+    surfaced by the admin regenerate flow so a grey thumbnail can be diagnosed
+    (OSMesa/pyrender unavailable) without guessing.
 
     All three render backends load geometry via trimesh, which cannot decode
     Draco-compressed meshes (see finalize_converted_glb / optimize_glb) — the
@@ -42,7 +54,7 @@ def generate_poster(glb_path: str, png_path: str) -> bool:
     optimized model.
     """
     if not os.path.isfile(glb_path):
-        return False
+        return None
     render_path = glb_path
     tmp_decompressed = None
     if glb_has_draco(glb_path):
@@ -52,22 +64,18 @@ def generate_poster(glb_path: str, png_path: str) -> bool:
         else:
             tmp_decompressed = None
     try:
-        try:
-            if _try_pyrender(render_path, png_path):
-                return True
-        except Exception:
-            logger.debug("pyrender poster failed", exc_info=True)
-        try:
-            if _try_trimesh_scene(render_path, png_path):
-                return True
-        except Exception:
-            logger.debug("trimesh scene poster failed", exc_info=True)
-        try:
-            if _try_rasterize(render_path, png_path):
-                return True
-        except Exception:
-            logger.debug("rasterize poster failed", exc_info=True)
-        return False
+        for name, backend in (
+            ("pyrender", _try_pyrender),
+            ("trimesh", _try_trimesh_scene),
+            ("rasterize", _try_rasterize),
+        ):
+            try:
+                if backend(render_path, png_path):
+                    logger.info("poster generated via %s backend for %s", name, glb_path)
+                    return name
+            except Exception:
+                logger.debug("%s poster backend failed", name, exc_info=True)
+        return None
     finally:
         if tmp_decompressed and os.path.exists(tmp_decompressed):
             try:
@@ -92,10 +100,15 @@ def _try_pyrender(glb_path: str, png_path: str) -> bool:
     if not isinstance(loaded, trimesh.Scene) or not loaded.geometry:
         return False
 
+    # Brighter ambient + a key/fill/back light rig approximate model-viewer's
+    # neutral studio environment: pyrender has no image-based lighting, so a
+    # single dim light left colourless models (STL exports carry no material)
+    # looking muddy grey next to the viewer. This lifts them toward a clean,
+    # evenly-lit look while still shaping textured/coloured models.
     scene = pyrender.Scene.from_trimesh_scene(
         loaded,
         bg_color=[0.96, 0.96, 0.96, 1.0],
-        ambient_light=[0.35, 0.35, 0.35],
+        ambient_light=[0.5, 0.5, 0.5],
     )
 
     bounds = loaded.bounds
@@ -112,9 +125,16 @@ def _try_pyrender(glb_path: str, png_path: str) -> bool:
     cam_pose[:3, 3] = center + np.array([cam_dist * 0.5, cam_dist * 0.3, cam_dist * 0.8])
     scene.add(camera, pose=cam_pose)
 
-    # Key light aligned with the camera so the textured surface reads evenly;
-    # ambient (set above) keeps shadowed faces from crushing to black.
-    scene.add(pyrender.DirectionalLight(color=[1.0, 1.0, 1.0], intensity=3.0), pose=cam_pose)
+    # Key from the camera, fill from the opposite side, soft back light — so
+    # shadowed faces stay legible instead of crushing to black.
+    for direction, intensity in (
+        ([0.5, 0.4, 0.8], 3.5),
+        ([-0.6, 0.2, 0.4], 2.0),
+        ([0.1, -0.5, -0.6], 1.5),
+    ):
+        light_pose = np.eye(4)
+        light_pose[:3, 3] = center + np.array(direction) * cam_dist
+        scene.add(pyrender.DirectionalLight(color=[1.0, 1.0, 1.0], intensity=intensity), pose=light_pose)
 
     r = pyrender.OffscreenRenderer(*POSTER_SIZE)
     try:

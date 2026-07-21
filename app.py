@@ -6725,18 +6725,28 @@ def register_routes(app: Flask) -> None:
     @app.route("/admin/models/posters/generate-missing", methods=["POST"])
     @login_required
     def admin_generate_missing_posters():
-        """Backfill preview images for legacy models in a bounded admin batch."""
+        """Backfill preview images for legacy models in a bounded admin batch.
+
+        With ``force`` set, regenerate posters for ALL ready models (not only the
+        ones missing a poster) — needed after a poster-render change, since
+        serve_poster keeps serving the stale cached poster.png otherwise. The
+        per-backend tally in the flash reveals whether the rebuilt posters came
+        from the rich "pyrender" render or the flat-grey "rasterize" fallback
+        (i.e. OSMesa/pyrender unavailable on the host).
+        """
         require_admin()
-        models = (
-            Model3D.query
-            .filter(or_(Model3D.poster_path.is_(None), Model3D.poster_path == ""))
-            .filter(Model3D.processing_status.in_(("ready", "replacement_failed")))
-            .order_by(Model3D.created_at.asc())
-            .limit(100)
-            .all()
+        from converters.poster import generate_poster_backend
+
+        force = bool((request.form.get("force") or "").strip())
+        query = Model3D.query.filter(
+            Model3D.processing_status.in_(("ready", "replacement_failed"))
         )
+        if not force:
+            query = query.filter(or_(Model3D.poster_path.is_(None), Model3D.poster_path == ""))
+        models = query.order_by(Model3D.created_at.asc()).limit(100).all()
         generated = 0
         failed = 0
+        backends: dict[str, int] = {}
         for model in models:
             try:
                 directory = os.path.join(app.config["CONVERTED_FOLDER"], model.id)
@@ -6744,11 +6754,13 @@ def register_routes(app: Flask) -> None:
                 if not os.path.exists(glb_path):
                     ensure_local(glb_path, f"converted/{model.id}/model.glb")
                 poster_png = os.path.join(directory, "poster.png")
-                if not os.path.exists(glb_path) or not generate_poster(glb_path, poster_png):
+                backend = generate_poster_backend(glb_path, poster_png) if os.path.exists(glb_path) else None
+                if not backend:
                     failed += 1
                     continue
                 model.poster_path = poster_png
                 generated += 1
+                backends[backend] = backends.get(backend, 0) + 1
                 mirror_file(poster_png, f"converted/{model.id}/poster.png")
             except Exception:
                 logger.exception("Poster backfill failed for model %s", model.id)
@@ -6762,9 +6774,13 @@ def register_routes(app: Flask) -> None:
         log_audit(
             "admin_model_posters_backfilled",
             user_id=current_user.id,
-            details={"generated": generated, "failed": failed, "checked": len(models)},
+            details={"generated": generated, "failed": failed, "checked": len(models), "force": force, "backends": backends},
         )
-        flash(f"Generated {generated} missing preview(s)." + (f" {failed} could not be generated." if failed else ""), "success" if generated else "warning")
+        backend_note = (" via " + ", ".join(f"{n}×{c}" for n, c in backends.items())) if backends else ""
+        flash(
+            f"Regenerated {generated} preview(s){backend_note}." + (f" {failed} could not be generated." if failed else ""),
+            "success" if generated else "warning",
+        )
         return redirect(url_for("admin_dashboard", admin_page="models"))
 
     @app.route("/admin/models/<model_id>/mirror/retry", methods=["POST"])
