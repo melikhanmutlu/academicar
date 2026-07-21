@@ -204,17 +204,131 @@ def _try_trimesh_scene(glb_path: str, png_path: str) -> bool:
     return True
 
 
-def _try_rasterize(glb_path: str, png_path: str) -> bool:
-    """Software rasterizer using only trimesh + Pillow — no GL needed."""
+def _vertex_colors_for(geom):
+    """Return an (N, 3) uint8 per-vertex colour array for a trimesh geometry.
+
+    Resolves colour from whatever the material carries, in priority order:
+    explicit vertex colours -> baseColorTexture sampled per vertex -> flat
+    baseColorFactor -> the neutral default. Lets the software rasterizer paint a
+    model in its real colours (the deployed host has no working OSMesa, so the
+    pyrender path never runs and this fallback is what actually renders posters).
+    """
+    import numpy as _np
     import trimesh
+
+    n = len(geom.vertices)
+    default = _np.tile(_np.array(MESH_COLOR[:3], dtype=_np.uint8), (n, 1))
+    visual = getattr(geom, "visual", None)
+    if visual is None:
+        return default
+
+    # Explicit vertex colours (ColorVisuals) win.
+    kind = getattr(visual, "kind", None)
+    if kind == "vertex":
+        try:
+            vc = _np.asarray(visual.vertex_colors)[:, :3].astype(_np.uint8)
+            if len(vc) == n:
+                return vc
+        except Exception:
+            pass
+
+    material = getattr(visual, "material", None)
+    # Sample a baseColorTexture per vertex.
+    if isinstance(visual, trimesh.visual.TextureVisuals) and getattr(visual, "uv", None) is not None and (
+        getattr(material, "baseColorTexture", None) is not None or getattr(material, "image", None) is not None
+    ):
+        try:
+            vc = _np.asarray(visual.to_color().vertex_colors)[:, :3].astype(_np.uint8)
+            if len(vc) == n:
+                return vc
+        except Exception:
+            pass
+
+    # Flat baseColorFactor. glTF stores it as 0..1 floats, but trimesh often
+    # returns it as 0..255 after a GLB round-trip — handle both scales.
+    bcf = getattr(material, "baseColorFactor", None)
+    if bcf is not None:
+        try:
+            arr = _np.asarray(bcf[:3], dtype=_np.float64)
+            if arr.max() <= 1.0:
+                arr = arr * 255.0
+            rgb = _np.clip(arr, 0, 255).astype(_np.uint8)
+            return _np.tile(rgb, (n, 1))
+        except Exception:
+            pass
+
+    # Trimesh's main colour (e.g. a single main_color) as a last resort.
+    main = getattr(material, "main_color", None)
+    if main is not None:
+        try:
+            rgb = _np.asarray(main[:3], dtype=_np.uint8)
+            return _np.tile(rgb, (n, 1))
+        except Exception:
+            pass
+    return default
+
+
+def _colored_mesh_from_glb(glb_path: str):
+    """Load a GLB as a single mesh with per-vertex colours and baked transforms.
+
+    Unlike ``trimesh.load(force="mesh")`` (which concatenates geometry and drops
+    per-material colour), this walks the scene, resolves each geometry's real
+    colours, bakes the node transforms, and concatenates — so the rasterizer sees
+    both correct world positions and correct colours.
+    """
+    import numpy as _np
+    import trimesh
+
+    loaded = trimesh.load(glb_path)
+    if isinstance(loaded, trimesh.Trimesh):
+        loaded = trimesh.Scene(loaded)
+    if not isinstance(loaded, trimesh.Scene) or not loaded.geometry:
+        return None
+
+    all_verts, all_faces, all_colors = [], [], []
+    offset = 0
+    for node_name in loaded.graph.nodes_geometry:
+        transform, geom_name = loaded.graph[node_name]
+        geom = loaded.geometry.get(geom_name)
+        if geom is None or len(geom.vertices) == 0 or len(geom.faces) == 0:
+            continue
+        verts = trimesh.transformations.transform_points(_np.asarray(geom.vertices), transform)
+        all_verts.append(verts)
+        all_faces.append(_np.asarray(geom.faces, dtype=_np.int64) + offset)
+        all_colors.append(_vertex_colors_for(geom))
+        offset += len(geom.vertices)
+
+    if not all_verts:
+        return None
+    mesh = trimesh.Trimesh(
+        vertices=_np.vstack(all_verts),
+        faces=_np.vstack(all_faces),
+        vertex_colors=_np.vstack(all_colors),
+        process=False,
+    )
+    return mesh
+
+
+def _try_rasterize(glb_path: str, png_path: str) -> bool:
+    """Software rasterizer using only trimesh + Pillow — no GL needed.
+
+    This is the reliable fallback (and, on hosts without a working OSMesa GL, the
+    ONLY backend): it renders the model in its real colours via per-vertex
+    colours resolved from materials/textures, shaded with a simple Lambertian
+    term — no OpenGL, so it works everywhere.
+    """
     from PIL import Image, ImageDraw
 
-    mesh = trimesh.load(glb_path, force="mesh")
-    if mesh.vertices.shape[0] == 0:
+    mesh = _colored_mesh_from_glb(glb_path)
+    if mesh is None or mesh.vertices.shape[0] == 0:
         return False
 
     verts = np.array(mesh.vertices, dtype=np.float64)
     faces = np.array(mesh.faces, dtype=np.int64)
+    try:
+        vertex_colors = np.asarray(mesh.visual.vertex_colors)[:, :3].astype(np.float64)
+    except Exception:
+        vertex_colors = np.tile(np.array(MESH_COLOR[:3], dtype=np.float64), (len(verts), 1))
 
     bounds = verts.min(axis=0), verts.max(axis=0)
     center = (bounds[0] + bounds[1]) / 2.0
@@ -238,8 +352,8 @@ def _try_rasterize(glb_path: str, png_path: str) -> bool:
     margin = 0.12
     usable = min(w, h) * (1 - 2 * margin)
     proj_extent = max(
-        verts_rot[:, 0].ptp(),
-        verts_rot[:, 1].ptp(),
+        np.ptp(verts_rot[:, 0]),
+        np.ptp(verts_rot[:, 1]),
     )
     if proj_extent < 1e-10:
         return False
@@ -267,15 +381,13 @@ def _try_rasterize(glb_path: str, png_path: str) -> bool:
         normals_rot = normals_rot / norms
 
     dots = np.clip(np.sum(normals_rot * light_dir, axis=1), 0, 1)
-    ambient = 0.35
+    ambient = 0.45
     intensity = ambient + (1.0 - ambient) * dots
 
-    base_r, base_g, base_b = MESH_COLOR[:3]
-    face_colors = np.column_stack([
-        np.clip(base_r * intensity, 0, 255).astype(np.uint8),
-        np.clip(base_g * intensity, 0, 255).astype(np.uint8),
-        np.clip(base_b * intensity, 0, 255).astype(np.uint8),
-    ])
+    # Per-face base colour = mean of its vertices' colours (the model's real
+    # material/texture colour), then shaded by the Lambertian term.
+    face_base = vertex_colors[faces].mean(axis=1)  # (F, 3) float
+    face_colors = np.clip(face_base * intensity[:, None], 0, 255).astype(np.uint8)
 
     img = Image.new("RGBA", POSTER_SIZE, BG_COLOR)
     draw = ImageDraw.Draw(img)
