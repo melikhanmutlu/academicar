@@ -6,18 +6,21 @@
 
 ## 1. Yönetici Özeti
 
-AcademicAR bugün **satılabilir bir ürüne %80 mesafede**: konvertör pipeline'ı, model bazlı
-lisanslama (Free / Academic $9.90 / Extended Archive $24.90 / Institutional), kalıcı QR
-çözümleyici, kurumsal (B2B) kontrat modülü, analytics ve worker altyapısı yazılmış durumda.
-Satışın önündeki gerçek engel pazarlama değil, **üç teknik launch blocker**:
+AcademicAR bugün **satışa hazır ve tahsilat yapan bir ürün**: konvertör pipeline'ı, model
+bazlı lisanslama (Free / Academic $9.90 / Extended Archive $24.90 / Institutional), kalıcı
+QR çözümleyici, kurumsal (B2B) kontrat modülü, analytics, worker altyapısı ve **canlı PayTR
+ödeme entegrasyonu** (TCMB kuruyla USD→TRY çevrimi, imza + tutar doğrulamalı webhook)
+çalışır durumda. Büyümenin önündeki gerçek konular:
 
-1. **Ödeme henüz canlı değil** — `payments.py` içindeki LemonSqueezy `create_checkout`
-   hâlâ TODO; tek bir kuruş bile tahsil edilemiyor.
-2. **Dosya depolama ephemeral** — Railway'de container yeniden başladığında GLB/QR
+1. **Dosya depolama ephemeral** — Railway'de container yeniden başladığında GLB/QR
    dosyaları kaybolur; "10 yıl arşiv" satan bir ürün için kabul edilemez. `services/r2_mirror`
-   mevcut, uçtan uca bağlanmalı.
-3. **Ölçülemeyen funnel** — `analytics.py` event altyapısı var ama kayıt → yükleme →
+   mevcut, uçtan uca bağlanmalı. **Tek gerçek launch blocker budur.**
+2. **Ölçülemeyen funnel** — `analytics.py` event altyapısı var ama kayıt → yükleme →
    yayınlama → ödeme dönüşüm hunisi tek ekranda izlenemiyor.
+3. **Yurtdışı satış deneyimi kapalı** — PayTR yurtiçini çözüyor; uluslararası alıcı için
+   USD checkout + KDV/fatura yükünü devralan Merchant-of-Record (LemonSqueezy iskeleti
+   hazır, `create_checkout` TODO) açılırsa hedef pazar küresel akademiye genişler. Bu bir
+   blocker değil, en hızlı gelir genişletme kaldıracı.
 
 **Strateji tek cümleyle:** Ürünün kendisi dağıtım kanalıdır. Yayınlanan her QR kod bir
 dergi sayfasında, poster panosunda veya sunum perdesinde **bizim reklamımızdır**; viewer
@@ -29,16 +32,17 @@ döngü), oradan gelen kullanıcı yoğunluğunu kurum/dergi/konferans anlaşmal
 
 | Metrik | 30. gün | 60. gün | 90. gün |
 |---|---|---|---|
-| Canlı ödeme + kalıcı depolama | ✅ | — | — |
+| Kalıcı depolama + funnel ekranı | ✅ | — | — |
+| Uluslararası (MoR) checkout canlı | — | ✅ | — |
 | Kayıtlı kullanıcı | 150 | 500 | 1.200 |
 | Yayınlanan aktif QR model (North Star) | 60 | 250 | 700 |
 | Ücretli model lisansı (kümülatif) | 5 | 40 | 120 |
 | B2B pilot kurum/dergi | 1 görüşme | 2 pilot | 1 ücretli kontrat |
 
-**En kritik 5 aksiyon (sıralı):** (1) LemonSqueezy'yi canlıya al, (2) R2 kalıcı depolamayı
-bitir, (3) viewer sayfasına "kendi modelini yayınla" dönüşüm döngüsünü ekle, (4) yaşam
-döngüsü e-posta otomasyonunu kur, (5) konferans-poster taktiğiyle ilk 100 gerçek
-kullanıcıyı elle getir.
+**En kritik 5 aksiyon (sıralı):** (1) R2 kalıcı depolamayı bitir, (2) viewer sayfasına
+"kendi modelini yayınla" dönüşüm döngüsünü ekle, (3) yaşam döngüsü e-posta otomasyonunu
+kur, (4) konferans-poster taktiğiyle ilk 100 gerçek kullanıcıyı elle getir, (5) uluslararası
+satış için LemonSqueezy (MoR) checkout'u canlıya al.
 
 ---
 
@@ -56,9 +60,15 @@ kullanıcıyı elle getir.
 - GLB/STL/OBJ/FBX pipeline'ı, Draco+webp optimizasyonu, USDZ (iOS AR) üretimi.
 - Blog, disiplin sayfaları (programatik SEO iskeleti), pricing, institutional landing
   şablonları mevcut; `analytics.py` first-party event takibi yapıyor.
+- **Ödeme canlı**: PayTR entegrasyonu eksiksiz (`payments.py` — iFrame token, callback
+  hash + tutar doğrulaması, `OK` ack); USD liste fiyatı TCMB döviz satış kuruyla TRY'ye
+  çevriliyor (saatlik cache, kesintide son bilinen kura fallback). Kurumsal kontratlar
+  için offline ödeme kaydı da mevcut.
 
 **Boşluklar**
-- Ödeme: LemonSqueezy `create_checkout` TODO (`payments.py:198`), PayTR TRY akışı iskelet.
+- Uluslararası ödeme: LemonSqueezy (MoR) `create_checkout` TODO (`payments.py:198`);
+  yurtdışı alıcı bugün TRY'ye çevrilen PayTR akışından geçiyor — yabancı kart + TRY
+  deneyimi dönüşümü düşürür, USD/MoR checkout açılmalı.
 - Depolama: dosyalar lokal dizinlerde; R2 mirror uçtan uca devrede değil.
 - Onboarding: kayıt sonrası kullanıcıyı "ilk modelini 5 dakikada yayınla"ya taşıyan
   güdümlü akış yok.
@@ -101,17 +111,19 @@ otomatik sinyal üret (bkz. §6, lead scoring) ve o departmana kurumsal teklif g
 ## 4. Teknik Yol Haritası (satışı açan sıra ile)
 
 ### Faz 0 — Launch blocker'lar (Hafta 1–3)
-1. **LemonSqueezy go-live**: `LemonSqueezyProvider.create_checkout` doldur (checkout API,
-   `custom={payment_id, model_id, plan_key}`), webhook imza doğrulaması zaten var; sandbox
-   uçtan uca test → prod. TR kullanıcılar için PayTR'ı Faz 1'e ertele — LemonSqueezy MoR
-   olarak KDV/faturayı da çözer, tek sağlayıcıyla başla.
-2. **R2 kalıcı depolama**: `services/r2_mirror`'ı upload/convert/serve akışına uçtan uca
+1. **R2 kalıcı depolama**: `services/r2_mirror`'ı upload/convert/serve akışına uçtan uca
    bağla; `worker.py` dönüşüm çıktısını R2'ye yazsın, `/files/...` route'ları R2'den
    (imzalı URL veya proxy) servis etsin. Mevcut lokal dosyalar için tek seferlik migrasyon
    script'i (`scripts/`).
-3. **Funnel eventleri**: `track_event` ile `signup → paper_created → model_uploaded →
+2. **Funnel eventleri**: `track_event` ile `signup → paper_created → model_uploaded →
    conversion_done → published → checkout_started → paid` zincirini tamamla; admin'e
    basit huni ekranı (`analytics_snapshot` üstüne).
+3. **Uluslararası checkout (LemonSqueezy MoR)**: `LemonSqueezyProvider.create_checkout`
+   doldur (checkout API, `custom={payment_id, model_id, plan_key}`), webhook imza
+   doğrulaması zaten hazır; sandbox uçtan uca test → prod. Sağlayıcı seçimini kullanıcı
+   coğrafyasına göre yap (TR → PayTR, diğerleri → MoR) — mevcut `PAYMENT_PROVIDER`
+   tek-sağlayıcı yapısına küçük bir yönlendirme katmanı gerekir. Yurtdışı trafik
+   anlamlı değilse Faz 2'ye ertelenebilir.
 
 ### Faz 1 — Dönüşüm makinesi (Hafta 3–6)
 4. **Viewer viral döngüsü**: public viewer'a (tasarım diline sadık, ince bir bant)
@@ -217,14 +229,16 @@ API'si ile başla, hacim 1.000+ kullanıcıya gelince değerlendir.
 
 | Hafta | Teknik | Ticari |
 |---|---|---|
-| 1–2 | LemonSqueezy go-live, R2 uçtan uca | Konferans/dergi hedef listesi (20 kayıt) |
+| 1–2 | R2 uçtan uca + dosya migrasyonu | Konferans/dergi hedef listesi (20 kayıt) |
 | 3–4 | Funnel eventleri + admin huni ekranı, viewer CTA | İlk konferans taktiği: 10 yazar, elle onboarding |
-| 5–6 | Güdümlü onboarding, lifecycle e-posta v1 (hoş geldin + upgrade) | Haftalık blog + video ritmi başlar; 2 kullanıcı görüşmesi/hafta |
+| 5–6 | Güdümlü onboarding, lifecycle e-posta v1, LemonSqueezy (MoR) go-live | Haftalık blog + video ritmi başlar; 2 kullanıcı görüşmesi/hafta |
 | 7–8 | Paylaşım paketi (vektörel QR, figür altyazısı), lisans yenileme otomasyonu | 5 dergi editörü outreach; lead-scoring sinyali devrede |
 | 9–10 | Self-serve kurumsal pilot, dunning | İlk 2 kurumsal pilot başlat |
 | 11–12 | Dergi/etkinlik vitrin modu, haftalık digest | Pilot → teklif dönüşümü; fiyat denemesi kararı |
 
-**Riskler:** (1) Ödeme/depolama gecikirse her şey kayar — ilk 3 hafta başka iş alınmaz.
+**Riskler:** (1) Kalıcı depolama gecikirse "10 yıl arşiv" vaadi risktedir — ilk 2 hafta
+başka iş alınmaz. PayTR MoR olmadığı için yurtiçi/yurtdışı fatura-KDV yükümlülüğü satıcıda;
+hacim büyümeden mali müşavirle netleştirilmeli.
 (2) Tıbbi veri hassasiyeti: uyum onayları zorunlu kalır, kurumsal satışta DPA/KVKK
 dokümanı erken hazırlanır. (3) Tek kurucu kapasitesi: haftalık ritimdeki her şey
 otomatik rapora bağlanır, elle veri toplama yasak.
