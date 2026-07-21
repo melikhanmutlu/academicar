@@ -84,6 +84,37 @@ def generate_poster_backend(glb_path: str, png_path: str) -> str | None:
                 pass
 
 
+def _bake_textures_to_vertex_colors(scene) -> None:
+    """Replace each textured geometry's visual with texture-sampled vertex colours.
+
+    OSMesa (the headless software GL backend) does not sample image textures, so
+    baseColorTexture-driven colour is lost in the pyrender poster. trimesh's
+    ``TextureVisuals.to_color()`` samples the texture at each vertex UV, producing
+    ColorVisuals that the software renderer CAN draw. Per-vertex sampling is
+    coarser than true texturing but captures the model's colours — enough for a
+    thumbnail. Best-effort per geometry: any failure leaves that mesh untouched.
+    """
+    import trimesh
+
+    for name, geom in list(scene.geometry.items()):
+        visual = getattr(geom, "visual", None)
+        if not isinstance(visual, trimesh.visual.TextureVisuals):
+            continue
+        material = getattr(visual, "material", None)
+        has_texture = getattr(visual, "uv", None) is not None and (
+            getattr(material, "baseColorTexture", None) is not None
+            or getattr(material, "image", None) is not None
+        )
+        if not has_texture:
+            continue
+        try:
+            colored = visual.to_color()
+            if getattr(colored, "vertex_colors", None) is not None and len(colored.vertex_colors):
+                geom.visual = colored
+        except Exception:
+            logger.debug("texture->vertex-colour bake failed for %s", name, exc_info=True)
+
+
 def _try_pyrender(glb_path: str, png_path: str) -> bool:
     import pyrender  # noqa: F811
     import trimesh
@@ -99,6 +130,16 @@ def _try_pyrender(glb_path: str, png_path: str) -> bool:
         loaded = trimesh.Scene(loaded)
     if not isinstance(loaded, trimesh.Scene) or not loaded.geometry:
         return False
+
+    # Bake image (baseColor) textures into per-vertex colours. pyrender's OSMesa
+    # software backend — the only GL available on the headless host — does not
+    # sample image textures (it falls back to the flat grey baseColorFactor), so
+    # a texture-coloured model rendered grey even though model-viewer shows it in
+    # full colour. Vertex colours DO render under OSMesa, and trimesh can sample
+    # the texture per vertex, so this transfers the artwork into a form the
+    # software renderer can draw. Untextured / vertex-colour / factor-only
+    # geometry is left untouched.
+    _bake_textures_to_vertex_colors(loaded)
 
     # Brighter ambient + a key/fill/back light rig approximate model-viewer's
     # neutral studio environment: pyrender has no image-based lighting, so a
