@@ -7,15 +7,18 @@ to :func:`apply_successful_payment`, which reuses the existing
 ``access_expires_at`` and ``storage_limit_bytes`` are recomputed exactly the
 same way the admin tools already do.
 
-Today two providers are wired:
+Three providers are wired:
 
 * ``development`` — no real gateway. ``create_checkout`` finalizes the payment
   immediately (mirrors the legacy ``ALLOW_DEV_PAYMENTS`` instant upgrade) so the
   full checkout -> license-assignment path is testable without a third party.
-* ``lemonsqueezy`` — reference skeleton (Merchant of Record, the recommended
-  primary provider). Signature verification is implemented; ``create_checkout``
-  is a documented TODO to fill in once a provider is chosen and Turkey seller
-  support is confirmed. See ``docs/MVP_ANALYSIS_AND_ROADMAP.md``.
+* ``paytr`` — live Turkish gateway (settles in TRY; USD list prices are
+  converted via the TCMB daily rate). iFrame-token checkout plus a
+  hash-verified, amount-checked callback that must be acknowledged with ``OK``.
+* ``lemonsqueezy`` — Merchant of Record for international (USD) sales. Both the
+  hosted checkout (``create_checkout``, gated on LEMONSQUEEZY_* config so it is
+  inert until credentials are set) and the signature-verified webhook are
+  implemented. See ``docs/MVP_ANALYSIS_AND_ROADMAP.md``.
 
 Keeping this module free of any ``app`` import avoids circular imports; route
 handlers in ``app.py`` orchestrate the HTTP side.
@@ -195,17 +198,91 @@ class LemonSqueezyProvider(PaymentProvider):
 
     name = "lemonsqueezy"
 
+    # plan_key -> config var holding that plan's LemonSqueezy variant id.
+    _VARIANT_CONFIG_KEYS = {
+        "academic": "LEMONSQUEEZY_VARIANT_ACADEMIC",
+        "extended_archive": "LEMONSQUEEZY_VARIANT_EXTENDED",
+    }
+
     def create_checkout(self, *, payment, model, plan_key, user, success_url, cancel_url):
-        # TODO(go-live): POST https://api.lemonsqueezy.com/v1/checkouts with
-        #   store_id, variant_id (mapped from plan_key via
-        #   LEMONSQUEEZY_VARIANT_* config), checkout_data.email = user.email and
-        #   checkout_data.custom = {payment_id, model_id, plan_key}; return the
-        #   hosted checkout URL from the response. See docs/MVP_ANALYSIS...md.
-        logger.warning(
-            "LemonSqueezyProvider.create_checkout is not implemented yet; "
-            "set PAYMENT_PROVIDER=development for local testing."
-        )
-        return None
+        """Create a hosted LemonSqueezy checkout and return its URL.
+
+        Gated by config exactly like PayTR: if the API key, store id, or the
+        plan's variant id is missing, this returns ``None`` (the route then
+        shows "online payment isn't configured yet"), so the provider is inert
+        and safe to ship until credentials are set.
+
+        ``custom`` carries payment_id/model_id/plan_key so :meth:`parse_event`
+        can map the webhook back to the right model. ``custom_price`` is sent so
+        an in-app coupon discount (already computed into ``payment.amount_kurus``)
+        is honoured at checkout rather than falling back to the variant's list
+        price.
+        """
+        import requests
+
+        cfg = current_app.config
+        api_key = cfg.get("LEMONSQUEEZY_API_KEY")
+        store_id = cfg.get("LEMONSQUEEZY_STORE_ID")
+        variant_id = cfg.get(self._VARIANT_CONFIG_KEYS.get(plan_key, ""))
+        if not (api_key and store_id and variant_id):
+            logger.warning(
+                "LemonSqueezy is not fully configured (need LEMONSQUEEZY_API_KEY, "
+                "LEMONSQUEEZY_STORE_ID and the variant id for plan %r); returning None.",
+                plan_key,
+            )
+            return None
+
+        attributes = {
+            "checkout_data": {
+                "email": user.email,
+                "custom": {
+                    "payment_id": str(payment.id),
+                    "model_id": str(model.id),
+                    "plan_key": plan_key,
+                },
+            },
+            "product_options": {
+                "redirect_url": success_url,
+            },
+        }
+        # Honour an in-app discount. amount_kurus is in USD cents for the
+        # LemonSqueezy (USD Merchant-of-Record) path; only override when it is a
+        # positive amount that differs from letting the variant price stand.
+        if payment.amount_kurus and int(payment.amount_kurus) > 0:
+            attributes["custom_price"] = int(payment.amount_kurus)
+
+        body = {
+            "data": {
+                "type": "checkouts",
+                "attributes": attributes,
+                "relationships": {
+                    "store": {"data": {"type": "stores", "id": str(store_id)}},
+                    "variant": {"data": {"type": "variants", "id": str(variant_id)}},
+                },
+            }
+        }
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/vnd.api+json",
+            "Content-Type": "application/vnd.api+json",
+        }
+        try:
+            resp = requests.post(
+                "https://api.lemonsqueezy.com/v1/checkouts",
+                json=body,
+                headers=headers,
+                timeout=20,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as exc:  # pragma: no cover - network dependent
+            logger.error("LemonSqueezy create-checkout request failed: %s", exc)
+            return None
+        url = (((data or {}).get("data") or {}).get("attributes") or {}).get("url")
+        if not url:
+            logger.error("LemonSqueezy checkout response had no URL: %s", data)
+            return None
+        return url
 
     def verify_webhook(self, request) -> bool:
         secret = current_app.config.get("LEMONSQUEEZY_WEBHOOK_SECRET")

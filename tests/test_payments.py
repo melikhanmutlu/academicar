@@ -364,3 +364,81 @@ def test_upgrade_shows_friendly_error_when_fx_rate_unavailable(client, app, monk
     assert b"exchange rate" in resp.data
     with app.app_context():
         assert db.session.get(Model3D, model_id).license_type == "free"
+
+
+# --- LemonSqueezy (Merchant of Record) hosted checkout ---------------------
+
+def test_lemonsqueezy_checkout_builds_request_and_returns_url(app, monkeypatch):
+    from types import SimpleNamespace
+    import requests
+
+    captured = {}
+
+    class _FakeResp:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"data": {"attributes": {"url": "https://store.lemonsqueezy.com/checkout/abc"}}}
+
+    def _fake_post(url, json=None, headers=None, timeout=None):
+        captured["url"] = url
+        captured["json"] = json
+        captured["headers"] = headers
+        return _FakeResp()
+
+    monkeypatch.setattr(requests, "post", _fake_post)
+
+    with app.app_context():
+        app.config.update(
+            LEMONSQUEEZY_API_KEY="key-123",
+            LEMONSQUEEZY_STORE_ID="99",
+            LEMONSQUEEZY_VARIANT_ACADEMIC="777",
+        )
+        provider = payments.LemonSqueezyProvider()
+        url = provider.create_checkout(
+            payment=SimpleNamespace(id=42, amount_kurus=990),
+            model=SimpleNamespace(id="model-xyz"),
+            plan_key="academic",
+            user=SimpleNamespace(email="buyer@example.com"),
+            success_url="https://site/ok",
+            cancel_url="https://site/cancel",
+        )
+
+    assert url == "https://store.lemonsqueezy.com/checkout/abc"
+    data = captured["json"]["data"]
+    attrs = data["attributes"]
+    # custom data lets parse_event map the webhook back to the right model.
+    assert attrs["checkout_data"]["custom"] == {
+        "payment_id": "42",
+        "model_id": "model-xyz",
+        "plan_key": "academic",
+    }
+    assert attrs["checkout_data"]["email"] == "buyer@example.com"
+    # An in-app discount is honoured via custom_price (USD cents).
+    assert attrs["custom_price"] == 990
+    # The plan maps to its configured variant, and the store is set.
+    assert data["relationships"]["variant"]["data"]["id"] == "777"
+    assert data["relationships"]["store"]["data"]["id"] == "99"
+    assert captured["headers"]["Authorization"] == "Bearer key-123"
+
+
+def test_lemonsqueezy_checkout_is_none_when_unconfigured(app):
+    from types import SimpleNamespace
+
+    with app.app_context():
+        app.config.update(
+            LEMONSQUEEZY_API_KEY="",
+            LEMONSQUEEZY_STORE_ID="",
+            LEMONSQUEEZY_VARIANT_ACADEMIC="",
+        )
+        provider = payments.LemonSqueezyProvider()
+        url = provider.create_checkout(
+            payment=SimpleNamespace(id=1, amount_kurus=990),
+            model=SimpleNamespace(id="m"),
+            plan_key="academic",
+            user=SimpleNamespace(email="e@example.com"),
+            success_url="s",
+            cancel_url="c",
+        )
+    assert url is None
