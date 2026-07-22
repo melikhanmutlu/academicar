@@ -106,6 +106,79 @@ def test_register_login_paper_create_and_delete(client):
     assert client.get(f"/papers/{slug}").status_code == 404
 
 
+def _create_public_model(client, *, model_id, license_type=None, user_email="viral@example.com"):
+    """Create a public paper + accessible model, returning (user_id, model_id)."""
+    with client.application.app_context():
+        user = User(email=user_email, username="Viral Owner")
+        user.set_password("password")
+        db.session.add(user)
+        db.session.commit()
+        user_id = user.id
+        paper = Paper(title="Viral Paper", slug=f"viral-{model_id[:8]}", user_id=user.id, is_public=True)
+        db.session.add(paper)
+        db.session.commit()
+        model_dir = Path(client.application.config["CONVERTED_FOLDER"]) / model_id
+        model_dir.mkdir(parents=True, exist_ok=True)
+        (model_dir / "model.glb").write_bytes(valid_glb_bytes())
+        model = Model3D(
+            id=model_id,
+            paper_id=paper.id,
+            user_id=user.id,
+            original_filename="viral.glb",
+            glb_path=str(model_dir / "model.glb"),
+            qr_code_path="qr.png",
+            file_size=28,
+            license_type=license_type,
+        )
+        db.session.add(model)
+        db.session.commit()
+    return user_id, model_id
+
+
+def test_public_viewer_shows_viral_publish_cta_to_anonymous_readers(client):
+    """Every published viewer is a distribution surface: an anonymous reader must
+    get a clickable path to publish their own model, tagged for attribution."""
+    _create_public_model(client, model_id="44444444-4444-4444-8444-444444444444")
+    viewer = client.get("/view/44444444-4444-4444-8444-444444444444")
+    assert viewer.status_code == 200
+    html = viewer.get_data(as_text=True)
+    # The viral CTA links to registration and carries UTM attribution.
+    assert "utm_source=viewer" in html
+    assert "/auth/register" in html
+    assert "Publish your" in html
+    # The free-tier watermark itself is now an actionable link, not an inert badge.
+    assert 'class="viewer-free-watermark"' in html
+    assert 'aria-hidden="true">AcademicAR · Free preview</div>' not in html
+
+
+def test_public_viewer_hides_viral_cta_from_owner(client):
+    """The owner viewing their own model should not be nagged to sign up."""
+    from tests.conftest import login, register
+
+    register(client, email="owner@example.com")
+    with client.application.app_context():
+        owner = User.query.filter_by(email="owner@example.com").one()
+        paper = Paper(title="Owner Paper", slug="owner-viral", user_id=owner.id, is_public=True)
+        db.session.add(paper)
+        db.session.commit()
+        model_id = "55555555-5555-4555-8555-555555555555"
+        model_dir = Path(client.application.config["CONVERTED_FOLDER"]) / model_id
+        model_dir.mkdir(parents=True, exist_ok=True)
+        (model_dir / "model.glb").write_bytes(valid_glb_bytes())
+        model = Model3D(
+            id=model_id, paper_id=paper.id, user_id=owner.id,
+            original_filename="owner.glb", glb_path=str(model_dir / "model.glb"),
+            qr_code_path="qr.png", file_size=28,
+        )
+        db.session.add(model)
+        db.session.commit()
+
+    viewer = client.get(f"/view/{model_id}")
+    assert viewer.status_code == 200
+    html = viewer.get_data(as_text=True)
+    assert "utm_campaign=viral_loop" not in html
+
+
 def test_landing_mitochondria_qr_and_ar_page(client):
     landing = client.get("/")
     assert landing.status_code == 200

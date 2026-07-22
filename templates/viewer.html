@@ -69,7 +69,35 @@
       background: #ff682c;
       flex: 0 0 auto;
     }
+    /* The watermark is a link (viral loop): a reader who taps it lands on sign-up. */
+    a.viewer-free-watermark {
+      pointer-events: auto;
+      text-decoration: none;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    a.viewer-free-watermark:hover,
+    a.viewer-free-watermark:focus-visible {
+      background: rgba(17, 17, 17, 0.72);
+      border-color: rgba(255, 255, 255, 0.30);
+    }
+    a.viewer-free-watermark:focus-visible { outline: 2px solid #ff682c; outline-offset: 2px; }
     @media (min-width: 640px) { .viewer-free-watermark { top: 84px; font-size: 13px; } }
+    /* Viral publish CTA inside the info panel — shown to readers, not the owner. */
+    .viewer-publish-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      margin-top: 8px;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.62);
+      text-decoration: none;
+      transition: color 0.15s ease;
+    }
+    .viewer-publish-cta:hover,
+    .viewer-publish-cta:focus-visible { color: #ff682c; }
+    .viewer-publish-cta:focus-visible { outline: 2px solid #ff682c; outline-offset: 2px; border-radius: 4px; }
+    .viewer-publish-cta .arrow { transition: transform 0.15s ease; }
+    .viewer-publish-cta:hover .arrow { transform: translateX(2px); }
     .font-serif { font-family: 'Inter', sans-serif; }
     model-viewer {
       width: 100%;
@@ -989,7 +1017,13 @@
     {% endif %}
 
     {% if (model.license_type or 'free') == 'free' %}
+      {% if is_owner or is_embed %}
     <div class="viewer-free-watermark" aria-hidden="true">AcademicAR · Free preview</div>
+      {% else %}
+    <a class="viewer-free-watermark"
+       href="{{ url_for('auth.register', utm_source='viewer', utm_medium='watermark', utm_campaign='viral_loop') }}"
+       aria-label="Publish your own 3D model with AcademicAR">AcademicAR · Free preview</a>
+      {% endif %}
     {% endif %}
 
     {% if is_owner and 'annotations' in viewer_features %}
@@ -1103,6 +1137,12 @@
                 <span class="text-white/70">{{ model.institution.name }}</span>
               {%- endif %}</span>
             </p>
+          {% endif %}
+          {% if not is_owner %}
+            <a class="viewer-publish-cta"
+               href="{{ url_for('auth.register', utm_source='viewer', utm_medium='viewer_panel', utm_campaign='viral_loop') }}">
+              Publish your own 3D model <span class="arrow" aria-hidden="true">&rarr;</span>
+            </a>
           {% endif %}
         </div>
         <button id="panelToggle" type="button" class="flex-shrink-0 mt-1 rounded-full border border-white/10 w-8 h-8 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors" aria-label="Toggle panel">
