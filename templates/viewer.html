@@ -1527,8 +1527,14 @@
         annotationNotePopover.className = 'annotation-note-popover';
         annotationNotePopover.innerHTML = '<button type="button" class="note-close" aria-label="Close">&times;</button><div class="note-title"></div><div class="note-desc"></div>';
         annotationNotePopover.querySelector('.note-close').addEventListener('click', hideAnnotationNote);
-        document.body.appendChild(annotationNotePopover);
       }
+      // The popover is position:fixed. Fullscreen is requested on <main>, and a
+      // fixed node that is NOT a descendant of the fullscreen element is not
+      // rendered while fullscreen is active. Re-parent it to the current
+      // fullscreen element (or back to <body> in normal mode) on every show, so
+      // annotation notes are visible both normally and in full screen.
+      const noteHost = document.fullscreenElement || document.webkitFullscreenElement || document.body;
+      if (annotationNotePopover.parentNode !== noteHost) noteHost.appendChild(annotationNotePopover);
       annotationNotePopover.querySelector('.note-title').textContent = label || 'Annotation';
       const descEl = annotationNotePopover.querySelector('.note-desc');
       descEl.textContent = desc || '';
@@ -1578,6 +1584,10 @@
         annotateBtn.setAttribute('aria-label', on ? 'Cancel annotate' : 'Annotate');
         annotateBtn.classList.toggle('is-active', on);
         if (on) {
+          // Precise placement is impossible while the model spins: a click's
+          // positionAndNormalFromPoint would land on whatever surface rotated
+          // under the cursor. Stop auto-rotate on entering annotate mode.
+          if (typeof setAutoRotateState === 'function') setAutoRotateState(false);
           container.classList.add('annotate-mode');
           if (annotateHint) annotateHint.hidden = false;
         } else {
@@ -2141,22 +2151,30 @@
       shotModalImg.src = '';
     };
     const downloadCurrentShot = async () => {
-      const raw = await captureShot(null);
-      if (!raw) {
-        if (shotStatusEl) {
-          shotStatusEl.textContent = 'Wait for the model to finish loading, then try again.';
-          shotStatusEl.classList.add('is-error');
+      // Suspend auto-rotate around the capture: otherwise the azimuth advances
+      // between jumpCameraToGoal and toDataURL and the shot is a few degrees off.
+      const wasAuto = viewer.hasAttribute('auto-rotate');
+      if (wasAuto) setAutoRotateState(false);
+      try {
+        const raw = await captureShot(null);
+        if (!raw) {
+          if (shotStatusEl) {
+            shotStatusEl.textContent = 'Wait for the model to finish loading, then try again.';
+            shotStatusEl.classList.add('is-error');
+          }
+          return;
         }
-        return;
+        if (shotStatusEl) {
+          shotStatusEl.textContent = '';
+          shotStatusEl.classList.remove('is-error');
+        }
+        const out = await processShot(raw);
+        // Preview the current view in the modal (with a Download button) rather than
+        // pushing the file straight to the browser's downloads.
+        openShotModal({ key: 'current-view', label: 'Current view', rawDataUrl: raw, dataUrl: out, qr: qrEnabled() });
+      } finally {
+        if (wasAuto) setAutoRotateState(true);
       }
-      if (shotStatusEl) {
-        shotStatusEl.textContent = '';
-        shotStatusEl.classList.remove('is-error');
-      }
-      const out = await processShot(raw);
-      // Preview the current view in the modal (with a Download button) rather than
-      // pushing the file straight to the browser's downloads.
-      openShotModal({ key: 'current-view', label: 'Current view', rawDataUrl: raw, dataUrl: out, qr: qrEnabled() });
     };
     const generateShotSet = async () => {
       if (!viewer.classList.contains('is-loaded')) {
@@ -2166,6 +2184,11 @@
         }
         return;
       }
+      // Suspend auto-rotate for the whole run so every labelled view ("Top",
+      // "Front"…) is captured at its exact intended orbit instead of drifting a
+      // few degrees between setting cameraOrbit and toDataURL.
+      const wasAuto = viewer.hasAttribute('auto-rotate');
+      if (wasAuto) setAutoRotateState(false);
       const state = cameraState();
       shotGallery = [];
       if (shotStatusEl) {
@@ -2176,27 +2199,31 @@
         generateShotSetButton.disabled = true;
         generateShotSetButton.textContent = 'Generating...';
       }
-      for (const view of shotViews) {
-        const raw = await captureShot(view);
-        if (raw) {
-          // Store the raw shot too, so toggling QR re-composites instantly
-          // (no re-capture / camera moves).
-          shotGallery.push({ ...view, rawDataUrl: raw, dataUrl: await processShot(raw), qr: qrEnabled() });
-          renderShotGallery();
+      try {
+        for (const view of shotViews) {
+          const raw = await captureShot(view);
+          if (raw) {
+            // Store the raw shot too, so toggling QR re-composites instantly
+            // (no re-capture / camera moves).
+            shotGallery.push({ ...view, rawDataUrl: raw, dataUrl: await processShot(raw), qr: qrEnabled() });
+            renderShotGallery();
+          }
         }
-      }
-      await restoreCamera(state);
-      if (generateShotSetButton) {
-        generateShotSetButton.disabled = false;
-        generateShotSetButton.textContent = 'Generate 8 views';
-      }
-      if (shotStatusEl) {
-        if (shotGallery.length === shotViews.length) {
-          shotStatusEl.textContent = '8 views ready.';
-          shotStatusEl.classList.remove('is-error');
-        } else {
-          shotStatusEl.textContent = `Only ${shotGallery.length} of ${shotViews.length} views could be generated.`;
-          shotStatusEl.classList.add('is-error');
+        await restoreCamera(state);
+        if (shotStatusEl) {
+          if (shotGallery.length === shotViews.length) {
+            shotStatusEl.textContent = '8 views ready.';
+            shotStatusEl.classList.remove('is-error');
+          } else {
+            shotStatusEl.textContent = `Only ${shotGallery.length} of ${shotViews.length} views could be generated.`;
+            shotStatusEl.classList.add('is-error');
+          }
+        }
+      } finally {
+        if (wasAuto) setAutoRotateState(true);
+        if (generateShotSetButton) {
+          generateShotSetButton.disabled = false;
+          generateShotSetButton.textContent = 'Generate 8 views';
         }
       }
     };
