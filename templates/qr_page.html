@@ -28,6 +28,13 @@
     h1 { font-family: 'Inter', sans-serif; letter-spacing: -0.055em; font-size: clamp(34px, 5vw, 58px); line-height: .95; margin-top: 18px; max-width: 520px; }
     .subtitle { color: #5c6473; line-height: 1.55; margin-top: 18px; max-width: 560px; }
     .url { font-family: 'Courier New', monospace; font-size: 13px; color: #111111; word-break: break-all; padding: 14px; background: white; border: 1px solid rgba(17,24,39,0.08); border-radius: 4px; margin-top: 26px; }
+    .share-block { margin-top: 22px; display: flex; flex-direction: column; gap: 12px; }
+    .share-item { background: white; border: 1px solid rgba(17,24,39,0.08); border-radius: 4px; padding: 14px; }
+    .share-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+    .share-label { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #5c6473; }
+    .share-copy { border: 1px solid rgba(17,17,17,0.16); background: #f7f7f5; color: #111111; border-radius: 4px; padding: 5px 11px; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .share-copy:hover { background: #eeeeea; }
+    .share-text { font-size: 13px; line-height: 1.6; color: #111111; white-space: pre-wrap; word-break: break-word; }
     .qr-panel { background: #111111; border-radius: 6px; padding: 22px; color: white; display: flex; flex-direction: column; justify-content: space-between; min-height: 440px; }
     .qr-wrap { background: white; border-radius: 4px; padding: 18px; }
     .qr-wrap img { display: block; width: 100%; height: auto; }
@@ -40,7 +47,7 @@
     @media print {
       body { background: white; padding: 0; }
       .sheet { width: 100%; display: block; box-shadow: none; border: none; border-radius: 0; }
-      .actions, .instructions { display: none; }
+      .actions, .instructions, .share-block { display: none; }
       .qr-panel { background: white; color: #111111; padding: 0; margin-top: 22px; }
       .qr-wrap { border: none; padding: 0; width: 320px; }
     }
@@ -57,6 +64,24 @@
         <a href="{{ url_for('qr_image', model_id=model.id) }}" download="qr_{{ model.id }}.png" class="btn btn-outline">Download PNG</a>
         <a href="{{ url_for('paper_detail', slug=paper.slug) }}" class="btn btn-outline">Back</a>
       </div>
+      {% if share %}
+      <div class="share-block">
+        <div class="share-item">
+          <div class="share-head">
+            <span class="share-label">Figure caption</span>
+            <button type="button" class="share-copy" data-copy-target="shareCaption">Copy</button>
+          </div>
+          <p class="share-text" id="shareCaption">{{ share.caption }}</p>
+        </div>
+        <div class="share-item">
+          <div class="share-head">
+            <span class="share-label">Citation</span>
+            <button type="button" class="share-copy" data-copy-target="shareCitation">Copy</button>
+          </div>
+          <p class="share-text" id="shareCitation">{{ share.citation }}</p>
+        </div>
+      </div>
+      {% endif %}
     </section>
 
     <aside class="qr-panel">
@@ -69,5 +94,29 @@
       </div>
     </aside>
   </main>
+  <script>
+    document.querySelectorAll('.share-copy').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var el = document.getElementById(btn.getAttribute('data-copy-target'));
+        if (!el) return;
+        var reset = function () {
+          var original = btn.textContent;
+          btn.textContent = 'Copied';
+          setTimeout(function () { btn.textContent = original; }, 1500);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(el.textContent).then(reset).catch(function () {});
+        } else {
+          var range = document.createRange();
+          range.selectNode(el);
+          var sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+          try { document.execCommand('copy'); reset(); } catch (e) {}
+          sel.removeAllRanges();
+        }
+      });
+    });
+  </script>
 </body>
 </html>

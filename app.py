@@ -1647,6 +1647,46 @@ def model_resolver_url(model: Model3D) -> str:
     return public_url("view_model", model_id=model.id)
 
 
+def build_share_snippets(model: Model3D, resolver_url: str) -> dict:
+    """Ready-to-paste figure caption and citation for a published model.
+
+    Pure string builder (takes the resolver URL as an argument) so it is
+    testable without a request context. Both strings carry the stable resolver
+    URL an author drops into a paper, poster or slide deck.
+    """
+    name = (getattr(model, "display_name", None) or getattr(model, "original_filename", None) or "3D model") if model else "3D model"
+    caption = (
+        f"Interactive 3D model of {name}. "
+        f"View in 3D and augmented reality: {resolver_url}"
+    )
+
+    paper = getattr(model, "paper", None) if model else None
+    parts: list[str] = []
+    if paper is not None:
+        authors = (paper.authors or "").strip().rstrip(".")
+        year = paper.year
+        if authors and year:
+            parts.append(f"{authors} ({year}).")
+        elif authors:
+            parts.append(f"{authors}.")
+        elif year:
+            parts.append(f"({year}).")
+        title = (paper.title or "").strip().rstrip(".")
+        if title:
+            parts.append(f"{title}.")
+    parts.append(f"Interactive 3D model [{name}]. AcademicAR.")
+    doi = (getattr(paper, "doi", None) or "").strip() if paper is not None else ""
+    if doi:
+        if doi.lower().startswith("http"):
+            parts.append(doi)
+        elif doi.lower().startswith("10."):
+            parts.append(f"https://doi.org/{doi}")
+        else:
+            parts.append(doi)
+    parts.append(f"Available at: {resolver_url}")
+    return {"caption": caption, "citation": " ".join(parts)}
+
+
 def ensure_model_qr_link(model: Model3D) -> QRLink:
     """Ensure the model has a stable public_id and an active QRLink record.
 
@@ -4400,7 +4440,8 @@ def register_routes(app: Flask) -> None:
             abort(404)
         if model.user_id != current_user.id:
             abort(403)
-        return render_template("qr_page.html", model=model, paper=model.paper)
+        share = build_share_snippets(model, model_resolver_url(model))
+        return render_template("qr_page.html", model=model, paper=model.paper, share=share)
 
     @app.route("/pdfs/<int:paper_id>")
     @login_required
