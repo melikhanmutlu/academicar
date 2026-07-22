@@ -216,6 +216,30 @@ def register():
             track_event("user_registered", owner_user_id=user.id)
         except Exception:
             pass  # Analytics must never block registration
+        # Lifecycle: best-effort welcome email. No-ops (logs) when mail is
+        # unconfigured, and never blocks or fails registration.
+        try:
+            from utils.email import send_email
+
+            dashboard_url = public_url("dashboard")
+            send_email(
+                user.email,
+                "Welcome to AcademicAR",
+                (
+                    f"Hi {user.username},\n\n"
+                    "Welcome to AcademicAR. You can publish your first interactive "
+                    "3D/AR model in a few minutes:\n\n"
+                    "  1. Create a project.\n"
+                    "  2. Upload a GLB, STL, OBJ or FBX model.\n"
+                    "  3. Share the generated link and QR code on your paper, "
+                    "poster or slides.\n\n"
+                    f"Start here: {dashboard_url}\n\n"
+                    "Readers open your model in 3D or AR straight from a phone — no "
+                    "app, no login."
+                ),
+            )
+        except Exception:
+            current_app.logger.exception("welcome email failed for user %s", user.id)
         flash("Registration successful. Welcome.", "success")
         # Same-site ?next= support (mirrors login): lets flows like an
         # institution invite send new users back to the join page. The URL —

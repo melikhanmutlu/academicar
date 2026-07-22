@@ -88,3 +88,31 @@ def test_reset_password_rejects_mismatched_confirmation(client, app):
     # Password unchanged: old one still logs in.
     good = login(client, email="mismatch@example.com", password="oldpassword1", follow_redirects=False)
     assert good.status_code == 302
+
+
+def test_registration_sends_welcome_email(client, monkeypatch):
+    """A new user gets a best-effort welcome email; failure never blocks signup."""
+    from tests.conftest import register
+    from utils import email as email_mod
+
+    sent: list[tuple[str, str]] = []
+    monkeypatch.setattr(email_mod, "send_email", lambda to, subject, body: sent.append((to, subject)) or True)
+
+    resp = register(client, email="welcome@example.com", username="New User")
+    assert resp.status_code == 200
+    assert any(to == "welcome@example.com" and "Welcome" in subject for to, subject in sent)
+
+
+def test_registration_survives_welcome_email_failure(client, monkeypatch):
+    from tests.conftest import register
+    from utils import email as email_mod
+
+    def _boom(*a, **k):
+        raise RuntimeError("mail backend down")
+
+    monkeypatch.setattr(email_mod, "send_email", _boom)
+    resp = register(client, email="resilient@example.com", username="Resilient User")
+    assert resp.status_code == 200
+    from models import User
+    with client.application.app_context():
+        assert User.query.filter_by(email="resilient@example.com").count() == 1
