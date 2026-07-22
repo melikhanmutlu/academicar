@@ -4,6 +4,29 @@
 
 ---
 
+## 0. Bu İterasyonda Teslim Edilenler (kodlandı + testlendi)
+
+Rapordaki teknik maddelerin ilk dalgası uygulanıp testleriyle birlikte teslim edildi:
+
+1. **Viewer viral döngüsü** — free watermark artık UTM'li kayıt linki; her okuyucuya
+   viewer panelinde "kendi modelini yayınla" CTA'sı (owner'a gösterilmez).
+2. **Dönüşüm hunisi** — `user_registered` / `checkout_started` / `payment_succeeded`
+   eventleri + admin panelinde adım adım funnel görünümü (`funnel_snapshot`).
+3. **R2 ayna alarmı** — worker'dan admin'e günde bir kez (dedup'lu) "mirror başarısız"
+   e-posta uyarısı; sessiz depolama hataları artık görünür.
+4. **Welcome e-postası** — kayıt sonrası best-effort karşılama (mail yoksa no-op).
+5. **Lisans yenileme hatırlatmaları** — ücretli modeller için 30/7/1 gün kala worker
+   e-postası, tek tıkla yenileme linkiyle.
+6. **Paylaşım paketi** — QR sayfasında hazır figür altyazısı + atıf metni (kopyala).
+7. **LemonSqueezy (MoR) checkout** — uluslararası USD satış için hosted checkout
+   (config-gated; kimlik bilgisi yoksa inert, PayTR yurtiçi akışı aynen korunur).
+
+Kalan maddeler (güdümlü onboarding, self-serve kurumsal deneme, dergi/etkinlik vitrin
+modu, REST API) sonraki iterasyonlara bırakıldı; API'nin talep gelmeden yapılmaması
+kararı korunuyor.
+
+---
+
 ## 1. Yönetici Özeti
 
 AcademicAR bugün **satışa hazır ve tahsilat yapan bir ürün**: konvertör pipeline'ı, model
