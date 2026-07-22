@@ -54,6 +54,15 @@ def main() -> None:
                         app.logger.warning("R2 mirror failure alert sent for %d model(s).", failed)
             except Exception:
                 app.logger.exception("Unexpected error in R2 mirror failure alert")
+            try:
+                with app.app_context():
+                    from lifecycle import send_model_renewal_reminders
+
+                    reminders = send_model_renewal_reminders()
+                    if reminders:
+                        app.logger.info("Sent %d model renewal reminder(s).", reminders)
+            except Exception:
+                app.logger.exception("Unexpected error in model renewal reminders")
         if processed:
             continue
         time.sleep(interval)
