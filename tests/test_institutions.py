@@ -993,6 +993,7 @@ def test_monthly_usage_report_sends_once_per_month(client, monkeypatch):
     model_id = upload_model_for(client)
 
     with client.application.app_context():
+        sent.clear()  # drop the registration welcome email; assert only on the report
         count = send_monthly_institution_reports()
         assert count == 1
         assert len(sent) == 1
@@ -1231,6 +1232,7 @@ def test_invite_create_sends_email_when_requested(client, monkeypatch):
         institution = create_institution(email_domains="boun.edu.tr")
         add_member(institution, User.query.one(), role="admin")
 
+    sent.clear()  # drop the registration welcome email; assert only on the invite
     response = client.post(
         "/institution/invites/create",
         data={"expires_days": "14", "send_to": "colleague@boun.edu.tr"},
