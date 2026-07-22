@@ -45,6 +45,15 @@ def main() -> None:
                         app.logger.info("Sent renewal reminders for %d institution(s).", reminded)
             except Exception:
                 app.logger.exception("Unexpected error in institution usage reports")
+            try:
+                with app.app_context():
+                    from ops_alerts import send_r2_mirror_failure_alert
+
+                    failed = send_r2_mirror_failure_alert()
+                    if failed:
+                        app.logger.warning("R2 mirror failure alert sent for %d model(s).", failed)
+            except Exception:
+                app.logger.exception("Unexpected error in R2 mirror failure alert")
         if processed:
             continue
         time.sleep(interval)

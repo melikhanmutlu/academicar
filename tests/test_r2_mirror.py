@@ -191,3 +191,59 @@ def test_serve_glb_404_when_missing_and_no_r2(client, app, monkeypatch):
         db.session.commit()
 
     assert client.get(f"/files/{model_id}/model.glb").status_code == 404
+
+
+def test_r2_mirror_failure_alert_emails_admins_and_dedupes(app, monkeypatch):
+    """When models are left un-mirrored, admins get one push alert per day."""
+    import uuid as _uuid
+    from datetime import UTC, datetime, timedelta
+
+    import ops_alerts
+    from models import AuditLog, Model3D, Paper, User, db
+
+    sent: list[tuple[str, str]] = []
+    monkeypatch.setattr(ops_alerts, "send_email", lambda to, subject, body: sent.append((to, subject)) or True, raising=False)
+    # send_email is imported lazily inside the function, so patch the source too.
+    from utils import email as email_mod
+    monkeypatch.setattr(email_mod, "send_email", lambda to, subject, body: sent.append((to, subject)) or True)
+
+    with app.app_context():
+        admin = User(email="ops-admin@example.com", username="Ops", is_admin=True)
+        admin.set_password("password123")
+        db.session.add(admin)
+        db.session.flush()
+        paper = Paper(title="T", slug=f"r2f-{_uuid.uuid4().hex[:6]}", user_id=admin.id, is_public=True)
+        db.session.add(paper)
+        db.session.flush()
+        model = Model3D(
+            id=str(_uuid.uuid4()), paper_id=paper.id, user_id=admin.id,
+            glb_path="x.glb", processing_status="ready",
+            r2_mirror_failed_at=datetime.now(UTC).replace(tzinfo=None),
+        )
+        db.session.add(model)
+        db.session.commit()
+
+        # First call: detects the failure, emails the admin, stamps an audit row.
+        failed = ops_alerts.send_r2_mirror_failure_alert()
+        assert failed == 1
+        assert any(to == "ops-admin@example.com" for to, _ in sent)
+        assert AuditLog.query.filter_by(event_type=ops_alerts.R2_ALERT_EVENT).count() == 1
+
+        # Second call within 24h: deduped, no new email or stamp.
+        sent.clear()
+        assert ops_alerts.send_r2_mirror_failure_alert() == 0
+        assert sent == []
+        assert AuditLog.query.filter_by(event_type=ops_alerts.R2_ALERT_EVENT).count() == 1
+
+        # A day later the alert re-arms.
+        later = datetime.now(UTC) + timedelta(hours=25)
+        assert ops_alerts.send_r2_mirror_failure_alert(now=later) == 1
+        assert AuditLog.query.filter_by(event_type=ops_alerts.R2_ALERT_EVENT).count() == 2
+
+
+def test_r2_mirror_failure_alert_noop_when_all_mirrored(app):
+    import ops_alerts
+
+    with app.app_context():
+        # No models with r2_mirror_failed_at set -> nothing to alert on.
+        assert ops_alerts.send_r2_mirror_failure_alert() == 0
