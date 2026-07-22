@@ -210,6 +210,12 @@ def register():
             log_audit("user_registered", user_id=user.id)
         except Exception:
             pass  # Fail silently if audit logging fails
+        # Funnel: the first stage of the acquisition→revenue journey.
+        try:
+            from analytics import track_event
+            track_event("user_registered", owner_user_id=user.id)
+        except Exception:
+            pass  # Analytics must never block registration
         flash("Registration successful. Welcome.", "success")
         # Same-site ?next= support (mirrors login): lets flows like an
         # institution invite send new users back to the join page. The URL —

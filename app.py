@@ -92,6 +92,7 @@ from analytics import (
     analytics_snapshot,
     apply_analytics_cookie,
     browser_event_is_duplicate,
+    funnel_snapshot,
     track_event,
 )
 from utils.security import require_model_ownership, require_paper_ownership
@@ -3823,7 +3824,24 @@ def register_routes(app: Flask) -> None:
                 "amount_minor": payment.amount_kurus, "currency": payment.currency,
             },
         )
+        # Funnel: purchase intent. Fires for a real hosted checkout; the instant
+        # dev/zero-amount settle below goes straight to payment_succeeded instead.
+        if payment.status != "paid":
+            track_event(
+                "checkout_started",
+                owner_user_id=model.user_id,
+                project_id=model.paper_id,
+                model_id=model.id,
+                properties={"plan": plan_key, "provider": provider.name},
+            )
         if payment.status == "paid":
+            track_event(
+                "payment_succeeded",
+                owner_user_id=model.user_id,
+                project_id=model.paper_id,
+                model_id=model.id,
+                properties={"plan": plan_key, "provider": provider.name, "instant": True},
+            )
             flash("Upgrade complete — this model's access window has been extended.", "success")
         return redirect(checkout_url)
 
@@ -4072,6 +4090,16 @@ def register_routes(app: Flask) -> None:
                 "provider_reference": provider_reference,
             },
         )
+        # Funnel: final revenue stage. The webhook has no acting user, so the
+        # owner is the funnel subject (funnel_snapshot coalesces to owner).
+        if not was_already_paid:
+            track_event(
+                "payment_succeeded",
+                owner_user_id=(model.user_id if model else None),
+                project_id=(model.paper_id if model else None),
+                model_id=(model.id if model else None),
+                properties={"provider": provider.name, "plan": effective_plan},
+            )
         return ack()
 
     @app.route("/view/<model_id>")
@@ -5137,6 +5165,7 @@ def register_routes(app: Flask) -> None:
                 }
         system_health = _admin_system_health() if admin_page == "system" else {}
         analytics = analytics_snapshot(days=30) if admin_page == "analytics" else None
+        funnel = funnel_snapshot(days=30) if admin_page == "analytics" else None
         pricing_rows = []
         coupons = []
         if admin_page == "pricing":
@@ -5158,6 +5187,7 @@ def register_routes(app: Flask) -> None:
             annotations=annotations,
             annotations_pagination=annotations_pagination,
             system_health=system_health,
+            funnel=funnel,
             pricing_rows=pricing_rows,
             plan_features=PLAN_FEATURES,
             coupons=coupons,

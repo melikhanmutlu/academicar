@@ -118,6 +118,57 @@ def apply_analytics_cookie(response):
     return response
 
 
+# Ordered acquisition/activation/revenue funnel. Each stage is an event the
+# product emits at a real transition, so the drop between two stages points at a
+# concrete step to fix rather than a vanity aggregate.
+FUNNEL_STAGES: tuple[tuple[str, str], ...] = (
+    ("user_registered", "Signed up"),
+    ("project_created", "Project created"),
+    ("model_uploaded", "Model uploaded"),
+    ("model_conversion_completed", "Conversion done"),
+    ("checkout_started", "Checkout started"),
+    ("payment_succeeded", "Paid"),
+)
+
+
+def funnel_snapshot(days: int = 30) -> dict:
+    """Distinct-user conversion funnel across the acquisition→revenue journey.
+
+    A stage counts distinct users (the acting user, or the owning user when the
+    event is fired server-side without an actor, e.g. a payment webhook), so the
+    numbers read as "how many people reached this step", not raw event volume.
+    """
+    now = datetime.now(UTC)
+    start = now - timedelta(days=days)
+    base = AnalyticsEvent.query.filter(AnalyticsEvent.occurred_at >= start)
+    user_expr = func.coalesce(AnalyticsEvent.actor_user_id, AnalyticsEvent.owner_user_id)
+
+    stages = []
+    top_count: int | None = None
+    prev_count: int | None = None
+    for event_name, label in FUNNEL_STAGES:
+        count = int(
+            base.filter(AnalyticsEvent.event_name == event_name)
+            .with_entities(func.count(func.distinct(user_expr)))
+            .scalar()
+            or 0
+        )
+        if top_count is None:
+            top_count = count
+        stages.append({
+            "event": event_name,
+            "label": label,
+            "count": count,
+            "pct_of_top": round((count / top_count) * 100, 1) if top_count else 0.0,
+            "pct_of_prev": (
+                100.0 if prev_count is None
+                else (round((count / prev_count) * 100, 1) if prev_count else None)
+            ),
+        })
+        prev_count = count
+    return {"days": days, "stages": stages}
+
+
 def analytics_snapshot(owner_user_id: int | None = None, days: int = 30) -> dict:  # noqa: C901
     """Return a compact, role-safe dashboard payload from first-party events."""
     now = datetime.now(UTC)

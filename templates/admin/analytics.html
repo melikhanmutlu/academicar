@@ -12,6 +12,37 @@
     <div class="admin-metric"><span>New models</span><strong>{{ analytics.models_uploaded }}</strong><small>{{ analytics.active_creators }} active creators</small></div>
     <div class="admin-metric"><span>Conversion health</span><strong>{{ analytics.conversion_completed }}</strong><small>{{ analytics.conversion_failed }} failed</small></div>
   </section>
+  {% if funnel %}
+  <section class="admin-section">
+    <div class="admin-section-head"><div><h2>Conversion funnel</h2><p>Distinct users reaching each step over the last {{ funnel.days }} days. The largest drop between two steps is where to run this week's experiment.</p></div></div>
+    <div class="admin-funnel">
+      {% for stage in funnel.stages %}
+        <div class="admin-funnel-row">
+          <div class="admin-funnel-label">{{ stage.label }}</div>
+          <div class="admin-funnel-track">
+            <div class="admin-funnel-bar" style="width: {{ stage.pct_of_top if stage.pct_of_top else 0 }}%"></div>
+          </div>
+          <div class="admin-funnel-count">{{ stage.count }}</div>
+          <div class="admin-funnel-step">
+            {%- if stage.pct_of_prev is none -%}—
+            {%- elif not loop.first -%}{{ stage.pct_of_prev }}% of prev
+            {%- else -%}top of funnel{%- endif -%}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+    <style>
+      .admin-funnel { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+      .admin-funnel-row { display: grid; grid-template-columns: 150px 1fr 64px 110px; align-items: center; gap: 12px; font-size: 13px; }
+      .admin-funnel-label { color: #202020; font-weight: 500; }
+      .admin-funnel-track { background: #efefef; border-radius: 999px; height: 12px; overflow: hidden; }
+      .admin-funnel-bar { background: #ff682c; height: 100%; border-radius: 999px; min-width: 2px; transition: width .3s ease; }
+      .admin-funnel-count { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; color: #202020; }
+      .admin-funnel-step { text-align: right; color: #828282; font-variant-numeric: tabular-nums; }
+      @media (max-width: 640px) { .admin-funnel-row { grid-template-columns: 110px 1fr 48px; } .admin-funnel-step { display: none; } }
+    </style>
+  </section>
+  {% endif %}
   <section class="admin-section">
     <div class="admin-section-head"><div><h2>Most viewed models</h2><p>Use these signals to identify strong content and institutional traction.</p></div></div>
     {% if analytics.top_models %}
