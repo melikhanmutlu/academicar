@@ -1001,7 +1001,7 @@
               data-annotation-desc="{{ ann.description or '' }}"
               {% if ann.camera_orbit %}data-camera-orbit="{{ ann.camera_orbit }}" data-camera-target="{{ ann.camera_target }}" data-camera-fov="{{ ann.camera_fov }}"{% endif %}>
         <span class="annotation-label">{{ ann.label }}</span>
-        <span class="annotation-delete-btn" data-delete-ann="{{ ann.id }}" title="Remove">×</span>
+        <span class="annotation-delete-btn" data-delete-ann="{{ ann.id }}" role="button" tabindex="0" title="Remove label" aria-label="Remove label {{ ann.label }}">×</span>
       </button>
       {% endfor %}{% endif %}
     </model-viewer>
@@ -1554,7 +1554,7 @@
       if (eyebrow) eyebrow.textContent = phoneNoAr ? 'AR on this device' : qrDefaults.eyebrow;
       if (title) title.textContent = phoneNoAr ? 'AR isn’t available here yet' : qrDefaults.title;
       if (note) note.textContent = phoneNoAr
-        ? 'This model can’t open in AR on this phone right now. You can still rotate and zoom it here, or share this QR code with someone on another phone.'
+        ? 'This model can’t open in AR on this device right now. You can still rotate and zoom it here, or share this QR code with someone on another phone or tablet.'
         : qrDefaults.note;
       if (image) image.classList.toggle('opacity-60', phoneNoAr);
     };
@@ -1619,6 +1619,9 @@
     };
     document.querySelectorAll('.annotation-hotspot').forEach(btn => {
       btn.addEventListener('click', (e) => {
+        // Opening a label must not also reach the viewer's click handler,
+        // which in annotate mode would start a brand-new label here.
+        e.stopPropagation();
         if (e.target.classList.contains('annotation-delete-btn')) return;
         flyCameraToAnnotation(btn);
         const desc = btn.dataset.annotationDesc;
@@ -1668,6 +1671,7 @@
 
       viewer.addEventListener('click', (e) => {
         if (!annotateMode) return;
+        if (e.target.closest && e.target.closest('.annotation-hotspot')) return;
         const rect = viewer.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
@@ -1691,8 +1695,17 @@
       document.getElementById('annCancelBtn').addEventListener('click', () => {
         annotateForm.style.display = 'none';
       });
+      // Escape steps back one level: close the open label form first, then
+      // leave annotate mode.
+      document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape' || !annotateMode) return;
+        if (annotateForm.style.display === 'block') annotateForm.style.display = 'none';
+        else setAnnotateMode(false);
+      });
 
-      document.getElementById('annSaveBtn').addEventListener('click', async () => {
+      const annSaveBtn = document.getElementById('annSaveBtn');
+      annSaveBtn.addEventListener('click', async () => {
+        if (annSaveBtn.disabled) return;
         const label = document.getElementById('annLabelInput').value.trim();
         if (!label) { document.getElementById('annLabelInput').focus(); return; }
         const body = {
@@ -1702,20 +1715,31 @@
           normal: [pendingNormal.x, pendingNormal.y, pendingNormal.z],
           camera: pendingCamera || undefined,
         };
+        // One save per click: a double click used to create the label twice.
+        annSaveBtn.disabled = true;
+        annSaveBtn.textContent = 'Saving…';
         try {
           const resp = await fetch('/models/' + modelId + '/annotations', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
             body: JSON.stringify(body),
           });
-          if (resp.ok) { location.reload(); }
-          else { const err = await resp.json(); alert(err.error || 'Failed'); }
-        } catch { alert('Network error'); }
+          if (resp.ok) { location.reload(); return; }
+          let message = 'The label could not be saved. Please try again.';
+          try { const err = await resp.json(); if (err && err.error) message = err.error; } catch (parseError) { /* keep default */ }
+          alert(message);
+        } catch { alert('The label could not be saved because the connection failed. Please try again.'); }
+        annSaveBtn.disabled = false;
+        annSaveBtn.textContent = 'Save';
       });
     }
 
     // --- Owner: delete annotation ---
     document.querySelectorAll('.annotation-delete-btn').forEach(btn => {
+      // Keyboard users reach the "×" with Tab; Enter/Space act like a click.
+      btn.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); btn.click(); }
+      });
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const annId = btn.dataset.deleteAnn;
@@ -1907,7 +1931,12 @@
       await waitFrame();
       initialCamera = cameraState();
     });
-    viewer.addEventListener('error', () => {
+    viewer.addEventListener('error', (event) => {
+      // model-viewer also emits "error" for a lost WebGL context (common on
+      // phones after returning from AR or a background tab). That is not a
+      // load failure: the model recovers, so do not show an error or lock AR.
+      const errorType = event && event.detail && event.detail.type;
+      if ((errorType && errorType !== 'loadfailure') || viewer.loaded) return;
       viewerStatus.textContent = 'The model could not be loaded. The GLB file may be unavailable or invalid.';
       viewerStatus.classList.remove('hidden');
       if (shotStatusEl) {

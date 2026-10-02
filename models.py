@@ -171,6 +171,11 @@ class ProjectAttachment(db.Model):
     file_type = db.Column(db.String(12), nullable=False)
     source_path = db.Column(db.String(500), nullable=False)
     preview_pdf_path = db.Column(db.String(500), nullable=True)
+    # PowerPoint -> PDF preview runs in the worker (never in the web request).
+    # None = legacy row / PDF upload (preview_pdf_path tells the story),
+    # "pending" / "processing" = queued for the worker, "ready", "failed",
+    # "unavailable" = no converter installed on the worker host.
+    preview_status = db.Column(db.String(20), nullable=True, index=True)
     order_index = db.Column(db.Integer, nullable=False, default=0)
     created_at = db.Column(db.DateTime, default=utc_now)
 

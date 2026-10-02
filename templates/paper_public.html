@@ -16,6 +16,7 @@
 {% endblock %}
 
 {% block content %}
+{% set viewable_models = active_models(paper) %}
 <div class="app-shell py-10 pb-10">
   <section class="grid lg:grid-cols-[minmax(0,1fr)_360px] gap-5 mb-8">
     <div class="surface paper-hero rounded-xl p-6 sm:p-7 reveal-up">
@@ -43,7 +44,7 @@
 
     <aside class="share-panel surface rounded-xl p-5 reveal-up delay-1">
       <p class="text-xs uppercase tracking-[0.12em] text-[#9ca3af] font-bold">Project information</p>
-      <h2 class="font-serif text-2xl font-semibold text-[#111827] mt-2">{{ paper.models|length }} model{{ '' if paper.models|length == 1 else 's' }} available</h2>
+      <h2 class="font-serif text-2xl font-semibold text-[#111827] mt-2">{{ viewable_models|length }} model{{ '' if viewable_models|length == 1 else 's' }} available</h2>
 
       <div class="mt-5 flex gap-4 share-identity">
         <div class="share-qr">
@@ -56,8 +57,9 @@
       </div>
 
       <div class="share-actions mt-5">
-        {% if paper.articles and paper.articles[0].pdf_path %}
-          <a href="{{ url_for('project_article_reader', slug=paper.slug, article_id=paper.articles[0].id) }}" class="btn-primary compact">View first article</a>
+        {% set first_pdf_article = (paper.articles or [])|selectattr('pdf_path')|first %}
+        {% if first_pdf_article %}
+          <a href="{{ url_for('project_article_reader', slug=paper.slug, article_id=first_pdf_article.id) }}" class="btn-primary compact">{{ 'View first article' if first_pdf_article == paper.articles[0] else 'View article PDF' }}</a>
         {% elif presentation_enabled and paper.attachments %}
           <a href="{{ url_for('project_attachment_reader', slug=paper.slug, attachment_id=paper.attachments[0].id) }}" class="btn-primary compact">Open materials</a>
         {% elif paper.pdf_path %}
@@ -68,7 +70,7 @@
       </div>
 
       <div class="share-stats mt-5">
-        <div><span>Models</span><strong>{{ paper.models|length }}</strong></div>
+        <div><span>Models</span><strong>{{ viewable_models|length }}</strong></div>
         <div><span>Articles</span><strong>{{ paper.articles|length }}</strong></div>
       </div>
     </aside>
@@ -90,7 +92,7 @@
     {% endif %}
     {% if presentation_enabled and paper.attachments %}
       <div class="topic-material-list">
-        {% for material in paper.attachments %}<a href="{{ url_for('project_attachment_reader', slug=paper.slug, attachment_id=material.id) }}"><span class="topic-material-type">{{ material.file_type|upper }}</span><span><strong>{{ material.title or material.original_filename }}</strong><small>{{ 'PDF preview ready' if material.preview_pdf_path else 'Download original' }}</small></span><span class="topic-material-open">Open</span></a>{% endfor %}
+        {% for material in paper.attachments %}<a href="{{ url_for('project_attachment_reader', slug=paper.slug, attachment_id=material.id) }}"><span class="topic-material-type">{{ material.file_type|upper }}</span><span><strong>{{ material.title or material.original_filename }}</strong><small>{{ 'PDF preview ready' if material.preview_pdf_path else ('Preparing preview' if material.preview_status in ('pending', 'processing') else 'Download original') }}</small></span><span class="topic-material-open">Open</span></a>{% endfor %}
       </div>
     {% endif %}
   </section>

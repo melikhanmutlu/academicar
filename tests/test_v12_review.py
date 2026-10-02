@@ -49,7 +49,10 @@ def test_fk_ondelete_rules_enforced_in_schema():
 
 def test_disabled_qr_link_does_not_resolve(client):
     pub, _ = _public_model(client.application, qr_status="disabled")
-    assert client.get(f"/m/{pub}", follow_redirects=False).status_code == 404
+    # Not resolved to the viewer; an explanatory "gone" page instead of a bare 404.
+    resp = client.get(f"/m/{pub}", follow_redirects=False)
+    assert resp.status_code == 410
+    assert "Location" not in resp.headers
 
 
 def test_active_qr_link_resolves_to_viewer(client):

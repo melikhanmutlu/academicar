@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import time
 
-from app import create_app, run_next_conversion_job
+from app import create_app, process_next_attachment_preview, run_next_conversion_job
 
 
 def main() -> None:
@@ -28,6 +28,14 @@ def main() -> None:
         except Exception:
             app.logger.exception("Unexpected error in conversion job processing")
             processed = False
+        if not processed:
+            # PowerPoint -> PDF previews for project materials (LibreOffice can
+            # take minutes, so it never runs inside a web request).
+            try:
+                processed = process_next_attachment_preview(app)
+            except Exception:
+                app.logger.exception("Unexpected error in presentation preview processing")
+                processed = False
         if time.monotonic() - last_report_check >= report_check_interval:
             last_report_check = time.monotonic()
             try:

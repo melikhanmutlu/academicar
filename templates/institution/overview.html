@@ -89,7 +89,9 @@
                 {% set _paper_href = none %}
               {% endif %}
               <li class="inst-activity-item">
-                {% if md.poster_path and not demo %}
+                {# serve_poster only answers for visible, active models; asking for
+                   anything else rendered a broken image. #}
+                {% if md.poster_path and not demo and _viewable and model_access_status(md) == 'active' %}
                   <span class="inst-model-thumb"><img src="{{ url_for('serve_poster', unique_id=md.id) }}" alt="" loading="lazy"></span>
                 {% else %}
                   <span class="inst-model-thumb inst-model-thumb-empty" aria-hidden="true">

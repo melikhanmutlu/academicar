@@ -49,13 +49,13 @@
     <div class="profile-stat-grid">
       <div class="profile-stat-card">
         <span>Publications</span>
-        <strong>{{ paper_count }}</strong>
+        <strong data-stat="projects">{{ paper_count }}</strong>
         <small>{{ model_count }} 3D model{{ '' if model_count == 1 else 's' }} total</small>
       </div>
       <div class="profile-stat-card">
         <span>3D Models</span>
         <strong>{{ model_count }}</strong>
-        <small>{{ free_model_count }} free / {{ academic_model_count }} academic / {{ extended_model_count }} archive</small>
+        <small>{{ free_model_count }} free / {{ academic_model_count }} academic / {{ extended_model_count }} archive{% if institutional_model_count %} / {{ institutional_model_count }} institutional{% endif %}</small>
       </div>
       <div class="profile-stat-card">
         <span>PDF Attachments</span>
@@ -65,7 +65,7 @@
       <div class="profile-stat-card">
         <span>Public Visibility</span>
         <strong>{{ public_paper_count }}/{{ paper_count }}</strong>
-        <small>{{ private_paper_count }} private</small>
+        <small>{% if review_paper_count %}{{ review_paper_count }} review link · {% endif %}{{ private_paper_count }} private</small>
       </div>
     </div>
 
@@ -99,6 +99,13 @@
           <strong>{{ extended_model_count }}</strong>
           <small>Priority archival storage</small>
         </div>
+        {% if institutional_model_count %}
+        <div class="profile-stat-card">
+          <span>Institutional</span>
+          <strong>{{ institutional_model_count }}</strong>
+          <small>Covered by your institution's contract</small>
+        </div>
+        {% endif %}
       </div>
       <div class="profile-licensing-actions">
         <a href="{{ url_for('dashboard') }}" class="btn-primary">Manage models</a>
@@ -142,7 +149,7 @@
         {% if has_password %}
           <form method="POST" action="{{ url_for('account_change_password') }}" class="space-y-3 mt-4">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="password" name="current_password" required maxlength="128" autocomplete="current-password" placeholder="Current password" class="field-input">
+            <input type="password" name="current_password" required maxlength="128" autocomplete="current-password" placeholder="Current password" aria-label="Current password" class="field-input">
             <input type="password" name="new_password" required minlength="8" maxlength="1024" autocomplete="new-password" placeholder="New password" class="field-input">
             <input type="password" name="confirm_password" required minlength="8" maxlength="1024" autocomplete="new-password" placeholder="Confirm new password" class="field-input">
             <button type="submit" class="btn-primary compact">Update password</button>
@@ -164,9 +171,9 @@
         <h3>Change email</h3>
         <form method="POST" action="{{ url_for('account_change_email') }}" class="space-y-3 mt-4">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <input type="email" name="new_email" required maxlength="120" placeholder="name@university.edu" class="field-input">
+          <input type="email" name="new_email" required maxlength="120" placeholder="name@university.edu" aria-label="New email address" autocomplete="email" class="field-input">
           {% if has_password %}
-            <input type="password" name="current_password" required maxlength="128" autocomplete="current-password" placeholder="Current password" class="field-input">
+            <input type="password" name="current_password" required maxlength="128" autocomplete="current-password" placeholder="Current password" aria-label="Current password" class="field-input">
           {% endif %}
           <button type="submit" class="btn-primary compact">Update email</button>
         </form>
@@ -180,9 +187,9 @@
         <summary>Show delete form</summary>
         <form method="POST" action="{{ url_for('account_delete') }}" class="mt-4 space-y-3" onsubmit="return confirm('This permanently deletes your account and all related data. Are you sure?');">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <input type="text" name="confirm" required pattern="DELETE" placeholder="Type DELETE" class="field-input">
+          <input type="text" name="confirm" required pattern="DELETE" placeholder="Type DELETE" aria-label="Type DELETE to confirm account deletion" autocomplete="off" class="field-input">
           {% if has_password %}
-            <input type="password" name="current_password" required maxlength="128" autocomplete="current-password" placeholder="Current password" class="field-input">
+            <input type="password" name="current_password" required maxlength="128" autocomplete="current-password" placeholder="Current password" aria-label="Current password" class="field-input">
           {% endif %}
           <button type="submit" class="btn-secondary compact danger-button">Delete my account permanently</button>
         </form>

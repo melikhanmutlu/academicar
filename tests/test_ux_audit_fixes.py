@@ -129,7 +129,7 @@ def test_csrf_failure_logged_in_returns_to_form_with_message(client, app):
     assert resp.headers["Location"].split("?")[0].endswith("/profile")
     assert "restore_draft=1" in resp.headers["Location"]
     page = client.get("/profile").data
-    assert b"security check expired" in page
+    assert b"open too long" in page
 
 
 def test_csrf_failure_logged_out_goes_to_login_with_next(client, app):
@@ -144,8 +144,13 @@ def test_csrf_failure_logged_out_goes_to_login_with_next(client, app):
         app.config["WTF_CSRF_ENABLED"] = False
     assert resp.status_code in (302, 303)
     location = resp.headers["Location"]
-    assert "/auth/login" in location
-    assert "next=" in location and "papers" in location
+    # Back to the form first; the protected page itself then asks for login
+    # with ?next= pointing at the form (and its draft-restore flag).
+    assert location.startswith("/papers/new")
+    follow = client.get(location)
+    assert follow.status_code in (302, 303)
+    assert "/auth/login" in follow.headers["Location"]
+    assert "papers" in follow.headers["Location"]
 
 
 def test_csrf_failure_json_request_gets_json(client, app):
@@ -162,7 +167,7 @@ def test_csrf_failure_json_request_gets_json(client, app):
         app.config["WTF_CSRF_ENABLED"] = False
     assert resp.status_code == 400
     assert resp.is_json
-    assert resp.get_json().get("error") == "csrf_expired"
+    assert resp.get_json().get("code") == "csrf_expired"
 
 
 def test_csrf_failure_ignores_offsite_referrer(client, app):

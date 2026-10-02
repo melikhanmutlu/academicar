@@ -406,10 +406,17 @@ def join(token):
         flash(f"Welcome — you joined {institution.name}. New uploads are covered by its institutional license.", "success")
         return redirect(url_for("dashboard"))
 
+    # Tell a signed-in user up front when their email cannot join, instead
+    # of showing a Join button that is guaranteed to fail.
+    domain_mismatch = bool(
+        current_user.is_authenticated
+        and existing is None
+        and not institution.email_matches_domains(current_user.email)
+    )
     return render_template(
         "institution/join.html",
         invite=invite,
         institution=institution,
         already_member=existing,
-        domain_mismatch=False,
+        domain_mismatch=domain_mismatch,
     )

@@ -110,11 +110,11 @@
               <div class="article-entry-fields grid sm:grid-cols-2 gap-4">
                 <div class="sm:col-span-2">
                   <label class="field-label">Article title</label>
-                  <input class="field-input" name="article_title[]" maxlength="500" value="{{ article_titles[row] if from_form else (article.title if article else '') }}" placeholder="Optional article title">
+                  <input class="field-input" name="article_title[]" maxlength="500" value="{{ article_titles[row] if from_form else ((article.title or '') if article else '') }}" placeholder="Optional article title">
                 </div>
                 <div>
                   <label class="field-label">Authors</label>
-                  <input class="field-input" name="article_authors[]" maxlength="500" value="{{ article_authors[row] if from_form and row < article_authors|length else (article.authors if article else '') }}" placeholder="Jane Doe, John Smith">
+                  <input class="field-input" name="article_authors[]" maxlength="500" value="{{ article_authors[row] if from_form and row < article_authors|length else ((article.authors or '') if article else '') }}" placeholder="Jane Doe, John Smith">
                 </div>
                 <div>
                   <label class="field-label">Year</label>
@@ -122,15 +122,15 @@
                 </div>
                 <div>
                   <label class="field-label">DOI</label>
-                  <input class="field-input" name="article_doi[]" maxlength="200" value="{{ article_dois[row] if from_form and row < article_dois|length else (article.doi if article else '') }}" placeholder="10.1234/example.2026">
+                  <input class="field-input" name="article_doi[]" maxlength="200" value="{{ article_dois[row] if from_form and row < article_dois|length else ((article.doi or '') if article else '') }}" placeholder="10.1234/example.2026">
                 </div>
                 <div>
                   <label class="field-label">PMID</label>
-                  <input class="field-input" name="article_pmid[]" aria-label="Article PMID" maxlength="100" value="{{ article_pmids[row] if from_form and row < article_pmids|length else (article.pmid if article else '') }}">
+                  <input class="field-input" name="article_pmid[]" aria-label="Article PMID" maxlength="100" value="{{ article_pmids[row] if from_form and row < article_pmids|length else ((article.pmid or '') if article else '') }}">
                 </div>
                 <div class="sm:col-span-2">
                   <label class="field-label">Abstract / note</label>
-                  <textarea class="field-textarea" name="article_abstract[]" aria-label="Article abstract or note" rows="3">{{ article_abstracts[row] if from_form and row < article_abstracts|length else (article.abstract if article else '') }}</textarea>
+                  <textarea class="field-textarea" name="article_abstract[]" aria-label="Article abstract or note" rows="3">{{ article_abstracts[row] if from_form and row < article_abstracts|length else ((article.abstract or '') if article else '') }}</textarea>
                 </div>
                 <label class="article-pdf-field sm:col-span-2">
                   <span class="field-label">Article PDF {% if article and article.pdf_path %}<em>Current file retained unless replaced</em>{% endif %}</span>
@@ -138,8 +138,11 @@
                   <input type="file" name="article_pdf[]" accept=".pdf" class="native-file-input" data-named-file-input>
                 </label>
                 <div class="article-entry-actions sm:col-span-2">
-                  <span>All article fields are optional.</span>
-                  <button type="button" class="article-remove" data-remove-article {% if loop.first %}hidden{% endif %}>Remove article</button>
+                  <span data-article-autofill-status aria-live="polite">All article fields are optional.</span>
+                  <span class="article-entry-buttons">
+                    <button type="button" class="article-autofill" data-article-autofill>Fill from DOI / PMID</button>
+                    <button type="button" class="article-remove" data-remove-article {% if loop.first %}hidden{% endif %}>Remove article</button>
+                  </span>
                 </div>
               </div>
             </details>
@@ -159,7 +162,7 @@
             <div><label class="field-label">PMID</label><input class="field-input" name="article_pmid[]" aria-label="Article PMID" maxlength="100"></div>
             <div class="sm:col-span-2"><label class="field-label">Abstract / note</label><textarea class="field-textarea" name="article_abstract[]" aria-label="Article abstract or note" rows="3"></textarea></div>
             <label class="article-pdf-field sm:col-span-2"><span class="field-label">Article PDF</span><span class="file-picker-control"><span>Choose PDF</span><small data-file-name>No file selected</small></span><input type="file" name="article_pdf[]" accept=".pdf" class="native-file-input" data-named-file-input></label>
-            <div class="article-entry-actions sm:col-span-2"><span>All article fields are optional.</span><button type="button" class="article-remove" data-remove-article>Remove article</button></div>
+            <div class="article-entry-actions sm:col-span-2"><span data-article-autofill-status aria-live="polite">All article fields are optional.</span><span class="article-entry-buttons"><button type="button" class="article-autofill" data-article-autofill>Fill from DOI / PMID</button><button type="button" class="article-remove" data-remove-article>Remove article</button></span></div>
           </div>
         </details>
       </template>
@@ -173,12 +176,12 @@
         <div>
           <p class="project-section-kicker">Teaching &amp; presentation files</p>
           <h2>Supporting materials</h2>
-          <p>Add PDFs or PowerPoint files. PowerPoint is converted to an inline PDF preview when the server has LibreOffice; the original always remains downloadable.</p>
+          <p>Add PDFs or PowerPoint files. PowerPoint files get an inline preview shortly after upload; the original always remains downloadable.</p>
         </div>
         {% if is_edit and paper.attachments %}
           <div class="material-current-list">
             {% for material in paper.attachments %}
-              <div><span><strong>{{ material.title or material.original_filename }}</strong><small>{{ material.file_type|upper }}{% if material.preview_pdf_path %} · preview ready{% endif %}</small></span><button type="submit" class="article-remove" formaction="{{ url_for('project_attachment_delete', slug=paper.slug, attachment_id=material.id) }}" formmethod="post" name="csrf_token" value="{{ csrf_token() }}">Remove</button></div>
+              <div><span><strong>{{ material.title or material.original_filename }}</strong><small>{{ material.file_type|upper }}{% if material.preview_pdf_path %} · preview ready{% elif material.preview_status in ('pending', 'processing') %} · preparing preview{% endif %}</small></span><button type="submit" class="article-remove" form="material-delete-{{ material.id }}">Remove</button></div>
             {% endfor %}
           </div>
         {% endif %}
@@ -294,6 +297,15 @@
         </div>
       </div>
     </form>
+    {% if is_edit and paper.attachments %}
+      {# Separate forms so removing a material never submits (or discards)
+         the unsaved edits in the main project form above. #}
+      {% for material in paper.attachments %}
+        <form id="material-delete-{{ material.id }}" method="POST" action="{{ url_for('project_attachment_delete', slug=paper.slug, attachment_id=material.id) }}" hidden onsubmit='return confirm({{ ("Remove “" ~ (material.title or material.original_filename) ~ "” from this project? Unsaved changes on this page will be lost, so save them first if you need them.")|tojson }});'>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        </form>
+      {% endfor %}
+    {% endif %}
 
     {% if is_edit %}
       <dialog class="confirm-dialog" data-delete-paper-dialog aria-labelledby="delete-dialog-title">
@@ -569,76 +581,56 @@
     updateFileName();
   });
 
-  // DOI / PMID Autofill Logic
-  (function() {
-    const autofillBtn = document.getElementById('autofillBtn');
-    const autofillQuery = document.getElementById('autofillQuery');
-    const autofillSpinner = document.getElementById('autofillSpinner');
-    const autofillText = document.getElementById('autofillText');
-    const autofillStatus = document.getElementById('autofillStatus');
-
-    if (autofillBtn && autofillQuery) {
-      autofillBtn.addEventListener('click', async () => {
-        const query = autofillQuery.value.trim();
-        if (!query) {
-          showStatus('Please enter a DOI or PMID first.', 'text-red-500');
-          return;
-        }
-
-        setLoading(true);
-        showStatus('Fetching metadata...', 'text-[#64748b]');
-
-        try {
-          const response = await fetch('/papers/fetch-metadata', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-CSRFToken': '{{ csrf_token() }}'
-            },
-            body: JSON.stringify({ query })
-          });
-
-          const data = await response.json();
-          if (response.ok && data.success) {
-            if (data.title) document.querySelector('[name="title"]').value = data.title;
-            if (data.authors) document.querySelector('[name="authors"]').value = data.authors;
-            if (data.year) document.querySelector('[name="year"]').value = data.year;
-            if (data.doi) document.querySelector('[name="doi"]').value = data.doi;
-            if (data.pmid) document.querySelector('[name="pmid"]').value = data.pmid;
-            if (data.abstract) document.querySelector('[name="abstract"]').value = data.abstract;
-            if (data.institution) document.querySelector('[name="institution"]').value = data.institution;
-
-            showStatus('Metadata populated successfully!', 'text-green-600');
-          } else {
-            showStatus(data.error || 'Failed to fetch metadata. Please verify the DOI/PMID.', 'text-red-500');
-          }
-        } catch (error) {
-          showStatus('Network error occurred. Please try again.', 'text-red-500');
-        } finally {
-          setLoading(false);
+  // DOI / PMID autofill, per article row. Only empty fields are filled so
+  // nothing the author already typed is overwritten.
+  articleList?.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-article-autofill]');
+    if (!button) return;
+    const entry = button.closest('[data-article-entry]');
+    const status = entry?.querySelector('[data-article-autofill-status]');
+    const field = (name) => entry.querySelector(`[name="article_${name}[]"]`);
+    const say = (message) => { if (status) status.textContent = message; };
+    const query = (field('doi')?.value.trim() || field('pmid')?.value.trim() || '');
+    if (!query) {
+      say('Enter a DOI or PMID in this article first.');
+      (field('doi') || field('pmid'))?.focus();
+      return;
+    }
+    button.disabled = true;
+    const label = button.textContent;
+    button.textContent = 'Fetching…';
+    say('Looking up metadata…');
+    try {
+      const response = await fetch('{{ url_for("papers_fetch_metadata") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ query }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) {
+        say(response.status === 429 ? 'Too many lookups. Please wait a minute and try again.' : (data.error || 'No metadata found for that DOI/PMID.'));
+        return;
+      }
+      let filled = 0;
+      ['title', 'authors', 'year', 'doi', 'pmid', 'abstract'].forEach((name) => {
+        const input = field(name);
+        if (input && !input.value.trim() && data[name]) {
+          input.value = data[name];
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          filled += 1;
         }
       });
-
-      function showStatus(msg, colorClass) {
-        autofillStatus.textContent = msg;
-        autofillStatus.className = `text-xs font-semibold mt-1 ${colorClass}`;
-        autofillStatus.classList.remove('hidden');
-      }
-
-      function setLoading(isLoading) {
-        if (isLoading) {
-          autofillSpinner.classList.remove('hidden');
-          autofillText.textContent = 'Fetching...';
-          autofillBtn.disabled = true;
-        } else {
-          autofillSpinner.classList.add('hidden');
-          autofillText.textContent = 'Fetch Metadata';
-          autofillBtn.disabled = false;
-        }
-      }
+      say(filled ? `Filled ${filled} empty field${filled === 1 ? '' : 's'}. Review before saving.` : 'Metadata found; all fields were already filled.');
+    } catch (error) {
+      say('Network error. Please try again.');
+    } finally {
+      button.disabled = false;
+      button.textContent = label;
     }
-  })();
+  });
 
+  // NOTE: deletePaperPdfAJAX below has no caller on this page (pre-existing).
   async function deletePaperPdfAJAX(slug) {
     if (!confirm("Are you sure you want to delete this PDF? This action cannot be undone.")) {
       return;
@@ -704,6 +696,7 @@
       syncModelRequired();
     }
 
+    const SUBMITTED_KEY = 'academicar:new-project-submitted';
     form.addEventListener('submit', (event) => {
       if (form.dataset.submitting === '1') { event.preventDefault(); return; }
       // A file added by drag-and-drop does not fire "change", so re-check the
@@ -711,6 +704,7 @@
       syncModelRequired();
       if (!form.checkValidity()) { event.preventDefault(); form.reportValidity(); return; }
       form.dataset.submitting = '1';
+      if (!isEdit) { try { sessionStorage.setItem(SUBMITTED_KEY, '1'); } catch (e) { /* ignore */ } }
       form.setAttribute('aria-busy', 'true');
       if (submitBtn) {
         const hasModel = Boolean(modelInput && modelInput.files && modelInput.files.length);
@@ -741,7 +735,18 @@
       let data = null;
       try { data = JSON.parse(sessionStorage.getItem(KEY) || 'null'); } catch (e) { data = null; }
       if (!data) return;
+      // Recreate article rows the user had added with "+ Article" before the
+      // page expired, so their values have somewhere to go.
+      const savedArticles = Array.isArray(data['article_title[]']) ? data['article_title[]'].length : 0;
+      const addArticle = form.querySelector('[data-add-article]');
+      const articleCount = () => form.querySelectorAll('input[name="article_title[]"]').length;
+      while (addArticle && articleCount() < savedArticles) {
+        const before = articleCount();
+        addArticle.click();
+        if (articleCount() === before) break;
+      }
       const counters = {};
+      const restored = [];
       fields().forEach((el) => {
         if (!(el.name in data)) return;
         if (el.type === 'radio') el.checked = data[el.name] === el.value;
@@ -752,6 +757,13 @@
           if (Array.isArray(values) && i < values.length) el.value = values[i];
           counters[el.name] = i + 1;
         }
+        restored.push(el);
+      });
+      // Let the page react as if the user had typed: article summaries,
+      // the colour toggle enabling its picker, required-field syncing.
+      restored.forEach((el) => {
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
       });
     };
     const params = new URLSearchParams(window.location.search);
@@ -760,11 +772,18 @@
     form.addEventListener('input', save);
     form.addEventListener('change', save);
 
-    // Returning with the Back button after a successful create must not show
-    // the old values again, or a second submit creates a duplicate project.
+    // Returning with the Back button after this form was SUBMITTED must not
+    // show the old values again, or a second submit creates a duplicate
+    // project. Coming back after merely leaving the page keeps what was typed.
+    const navEntry = (performance.getEntriesByType && performance.getEntriesByType('navigation')[0]) || {};
+    if (navEntry.type !== 'back_forward') {
+      try { sessionStorage.removeItem(SUBMITTED_KEY); } catch (e) { /* ignore */ }
+    }
     window.addEventListener('pageshow', (event) => {
-      const nav = (performance.getEntriesByType && performance.getEntriesByType('navigation')[0]) || {};
-      if (event.persisted || nav.type === 'back_forward') {
+      let wasSubmitted = false;
+      try { wasSubmitted = sessionStorage.getItem(SUBMITTED_KEY) === '1'; } catch (e) { wasSubmitted = false; }
+      if ((event.persisted || navEntry.type === 'back_forward') && wasSubmitted) {
+        try { sessionStorage.removeItem(SUBMITTED_KEY); } catch (e) { /* ignore */ }
         form.reset();
         delete form.dataset.submitting;
         form.removeAttribute('aria-busy');

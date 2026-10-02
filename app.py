@@ -214,6 +214,8 @@ def create_app(test_config: dict | None = None) -> Flask:
             "project_types": PROJECT_TYPES,
             "project_workflow_stages": PROJECT_WORKFLOW_STAGES,
             "project_visibility": project_visibility,
+            "project_landing_url": project_landing_url,
+            "active_models": active_models,
             "project_model_capacity": project_model_capacity,
             "project_supports_feature": request_project_supports_feature,
             "admin_chip_class": admin_chip_class,
@@ -1232,7 +1234,10 @@ def sync_project_articles(project: Paper, form, files) -> tuple[list[str], list[
     old_paths, new_paths = [], []
     for order_index, row in enumerate(rows):
         article = existing.get(row["id"]) if row["id"] else None
-        if not row["has_content"]:
+        # An article whose only content is an already-uploaded PDF is still an
+        # article: keep it. Rows are removed on purpose via "Remove article",
+        # which drops the row from the submitted form (handled below).
+        if not row["has_content"] and not (article and article.pdf_path):
             if article:
                 if article.pdf_path:
                     old_paths.append(os.path.join(current_app.config["PDF_FOLDER"], os.path.basename(article.pdf_path)))
@@ -1289,9 +1294,15 @@ def add_project_attachments(project: Paper, form, files) -> list[str]:
             )
             if errors:
                 raise ValueError("Invalid teaching material: " + "; ".join(errors))
-            preview_name = stored_name if extension == "pdf" else convert_presentation_to_pdf(
-                stored_path, f"preview_{uuid.uuid4().hex}.pdf"
-            )
+            # PDFs are their own preview. PowerPoint needs LibreOffice, which
+            # can take minutes, so it is queued for the worker
+            # (process_next_attachment_preview) rather than run in this
+            # request; tests and DEV_INLINE_JOBS convert inline.
+            preview_name = stored_name if extension == "pdf" else None
+            preview_status = "ready" if extension == "pdf" else "pending"
+            if extension != "pdf" and _run_jobs_inline(current_app):
+                preview_name = convert_presentation_to_pdf(stored_path, f"preview_{uuid.uuid4().hex}.pdf")
+                preview_status = "ready" if preview_name else _preview_failure_status()
             if preview_name and preview_name != stored_name:
                 new_paths.append(os.path.join(current_app.config["PDF_FOLDER"], preview_name))
             db.session.add(ProjectAttachment(
@@ -1302,6 +1313,7 @@ def add_project_attachments(project: Paper, form, files) -> list[str]:
                 file_type=extension,
                 source_path=stored_name,
                 preview_pdf_path=preview_name,
+                preview_status=preview_status,
                 order_index=len(project.attachments) + index,
             ))
         except (OSError, StorageError, ValueError):
@@ -1309,6 +1321,64 @@ def add_project_attachments(project: Paper, form, files) -> list[str]:
                 cleanup_file(created_path)
             raise
     return new_paths
+
+
+def _run_jobs_inline(app: Flask) -> bool:
+    return bool(app.config.get("TESTING") or app.config.get("DEV_INLINE_JOBS"))
+
+
+def _preview_failure_status() -> str:
+    """'unavailable' when the host has no converter at all, else 'failed'."""
+    return "failed" if (shutil.which("soffice") or shutil.which("libreoffice")) else "unavailable"
+
+
+def process_next_attachment_preview(app: Flask) -> bool:
+    """Worker step: build the PDF preview for one queued PowerPoint upload.
+
+    Returns True when an attachment was handled (so the worker loop can poll
+    again immediately), False when nothing was queued.
+    """
+    with app.app_context():
+        # A worker killed mid-conversion leaves a row in "processing"; give up
+        # on rows stuck longer than the converter's own timeout allows.
+        stale_before = datetime.now(UTC) - timedelta(minutes=30)
+        ProjectAttachment.query.filter(
+            ProjectAttachment.preview_status == "processing",
+            ProjectAttachment.created_at < stale_before,
+        ).update({"preview_status": "failed"}, synchronize_session=False)
+        attachment = (
+            ProjectAttachment.query.filter_by(preview_status="pending")
+            .order_by(ProjectAttachment.created_at.asc(), ProjectAttachment.id.asc())
+            .first()
+        )
+        if attachment is None:
+            db.session.commit()
+            return False
+        attachment.preview_status = "processing"
+        db.session.commit()
+        attachment_id = attachment.id
+        source = os.path.join(app.config["PDF_FOLDER"], os.path.basename(attachment.source_path))
+        try:
+            ensure_local(source, f"pdfs/{os.path.basename(source)}")
+            preview_name = convert_presentation_to_pdf(source, f"preview_{uuid.uuid4().hex}.pdf")
+        except Exception:
+            logger.exception("Presentation preview failed for attachment %s", attachment_id)
+            preview_name = None
+        attachment = db.session.get(ProjectAttachment, attachment_id)
+        if attachment is None:  # deleted while converting
+            if preview_name:
+                cleanup_file(os.path.join(app.config["PDF_FOLDER"], preview_name))
+            return True
+        if preview_name:
+            attachment.preview_pdf_path = preview_name
+            attachment.preview_status = "ready"
+            preview_path = os.path.join(app.config["PDF_FOLDER"], preview_name)
+            if os.path.exists(preview_path):
+                mirror_file(preview_path, f"pdfs/{preview_name}")
+        else:
+            attachment.preview_status = _preview_failure_status()
+        db.session.commit()
+        return True
 
 
 def make_slug(title: str) -> str:
@@ -1475,6 +1545,25 @@ validate_paper_form = validate_project_form
 
 def paper_is_deleted(paper: Paper | None) -> bool:
     return not paper or (paper.status or "active").lower() == "deleted"
+
+
+def active_models(project: Paper | None) -> list:
+    """Models a visitor can actually open (ready and inside their access
+    window). Counts and lists on public pages use this so a header never says
+    "3 models available" above an empty list."""
+    if project is None:
+        return []
+    return [model for model in project.models if model_access_status(model) == "active"]
+
+
+def project_landing_url(project: Paper, absolute: bool = False) -> str:
+    """URL a visitor should use to reach a project: the review link for
+    unlisted projects (whose /p/<slug> page is 404 to visitors), otherwise the
+    public project page. Mirrors the target encoded in the project QR."""
+    build = public_url if absolute else url_for
+    if project_visibility(project) == "unlisted" and project.share_token:
+        return build("project_share", share_token=project.share_token)
+    return build("paper_public", slug=project.slug)
 
 
 def project_visibility(project: Paper | None) -> str:
@@ -2179,6 +2268,17 @@ def ensure_paper_qr(paper: Paper) -> str:
     img.save(full_path)
     mirror_file(full_path, f"qr_codes/{filename}")
     return filename
+
+
+def invalidate_paper_qr(paper: Paper) -> None:
+    """Drop the cached project QR so it is regenerated for the current
+    visibility (public page vs. review link) on next request."""
+    filename = paper_qr_filename(paper.id)
+    cleanup_file(os.path.join(current_app_qr_folder(), filename))
+    try:
+        mirror_delete(f"qr_codes/{filename}")
+    except Exception:  # best-effort; the regenerated file is re-mirrored
+        logger.warning("Could not delete mirrored project QR %s", filename, exc_info=True)
 
 
 def current_app_qr_folder() -> str:
@@ -3068,31 +3168,41 @@ def register_error_handlers(app: Flask) -> None:
     @app.errorhandler(CSRFError)
     def csrf_error(error):
         # Script callers (fetch with X-CSRFToken / JSON) parse the response, so
-        # keep them on a JSON 400 instead of an HTML page.
+        # keep them on a JSON 400. ``error`` is shown to people as-is, so it is
+        # the readable sentence; ``code`` is for programs.
         wants_json = (
             request.is_json
             or bool(request.headers.get("X-CSRFToken"))
             or request.accept_mimetypes.best == "application/json"
         )
         if wants_json:
-            return jsonify({"error": "csrf_expired", "message": "The page expired. Reload it and try again."}), 400
+            return jsonify({
+                "code": "csrf_expired",
+                "error": "This page has been open too long. Reload it and try again.",
+            }), 400
         # A browser form whose token expired (tab left open past
-        # WTF_CSRF_TIME_LIMIT) or whose session ended: send the user back to
-        # where they were with an explanation instead of a dead-end error page.
+        # WTF_CSRF_TIME_LIMIT) or whose session ended: send the person back to
+        # the page they were on, with an explanation, instead of a dead end.
+        # If that page needs a login, its own @login_required sends them to the
+        # login page with ?next= pointing back here; public forms (e.g. the
+        # institutional enquiry) simply reload for visitors without accounts.
         back = None
         referrer = request.referrer
         if referrer and is_safe_redirect_url(referrer):
             parsed = urlparse(referrer)
-            # restore_draft=1 lets long forms (e.g. new project) refill the
-            # values the browser kept in sessionStorage.
-            kept = [q for q in parsed.query.split("&") if q and not q.startswith("restore_draft=")]
-            back = f"{parsed.path}?{'&'.join(kept + ['restore_draft=1'])}"
-        if not current_user.is_authenticated:
-            flash("Your session expired. Log in again, then resubmit the form.", "warning")
-            target = back if back and back.startswith("/auth/") else url_for("auth.login", next=back or request.path)
-            return redirect(target, code=303)
-        flash("The page's security check expired, so your changes were not saved. Please submit the form again.", "warning")
-        return redirect(back or url_for("dashboard"), code=303)
+            path = parsed.path or "/"
+            # "//host" or "/\host" would be read by browsers as another site.
+            if path.startswith("/") and not path.startswith(("//", "/\\")):
+                # restore_draft=1 lets long forms (e.g. new project) refill
+                # the values the browser kept in sessionStorage.
+                kept = [q for q in parsed.query.split("&") if q and not q.startswith("restore_draft=")]
+                back = f"{path}?{'&'.join(kept + ['restore_draft=1'])}"
+        flash("This page had been open too long, so the form was not sent. Please submit it again.", "warning")
+        if back:
+            return redirect(back, code=303)
+        # No usable referrer: never fall back to request.path, which is often a
+        # POST-only URL (405 on GET).
+        return redirect(url_for("dashboard" if current_user.is_authenticated else "landing"), code=303)
 
     @app.errorhandler(RequestEntityTooLarge)
     def file_too_large(error):
@@ -3534,16 +3644,25 @@ def register_routes(app: Flask) -> None:
             email = (request.form.get("email") or "").strip()[:200]
             estimated_members = (request.form.get("estimated_members") or "").strip()[:40]
             message = (request.form.get("message") or "").strip()[:5000]
+            inquiry = {
+                "institution_name": institution_name,
+                "contact_name": contact_name,
+                "email": email,
+                "estimated_members": estimated_members,
+                "message": message,
+            }
+            # Validation errors re-render with what the visitor typed instead
+            # of redirecting to an empty form.
             if not institution_name or not contact_name or not email:
                 flash("Please fill in the institution name, your name, and your work email.", "danger")
-                return redirect(url_for("institutional_inquiry"))
+                return render_template("institutional.html", inquiry=inquiry)
             if "@" not in email or "." not in email.rsplit("@", 1)[-1]:
                 flash("Please enter a valid work email address.", "danger")
-                return redirect(url_for("institutional_inquiry"))
-            from utils.email import send_email
+                return render_template("institutional.html", inquiry=inquiry)
+            from utils import email as email_utils
 
             recipient = current_app.config.get("CONTACT_EMAIL") or "info@academicar.com"
-            send_email(
+            delivered = email_utils.send_email(
                 recipient,
                 "AcademicAR institutional inquiry",
                 (
@@ -3553,10 +3672,19 @@ def register_routes(app: Flask) -> None:
                     f"{message or '(no message)'}"
                 ),
             )
+            # The audit row keeps the whole enquiry, so a lead survives even
+            # when email delivery is down and can be followed up from admin.
             log_audit(
                 "institution_inquiry_submitted",
-                details={"institution_name": institution_name, "from_email": email},
+                details={**inquiry, "delivered": bool(delivered)},
             )
+            if delivered is False:
+                flash(
+                    f"We saved your inquiry, but our email notification failed. "
+                    f"To be sure we see it soon, please also write to {recipient}.",
+                    "warning",
+                )
+                return render_template("institutional.html", inquiry=inquiry)
             flash("Thanks — we received your inquiry and will reach out shortly.", "success")
             return redirect(url_for("institutional_inquiry"))
         return render_template("institutional.html")
@@ -4227,9 +4355,19 @@ def register_routes(app: Flask) -> None:
         if not model:
             abort(404)
         # An admin-disabled QR link must stop resolving (takedown/abuse control);
-        # otherwise the disable action is a no-op.
+        # otherwise the disable action is a no-op. Explain it instead of a
+        # bare 404 so a scanned poster does not look broken.
         if qr_link is not None and qr_link.status != "active":
-            abort(404)
+            return (
+                render_template(
+                    "model_access_unavailable.html",
+                    model=model,
+                    paper=model.paper if _paper_visible_to_request(model.paper) else None,
+                    status="disabled",
+                    is_owner=False,
+                ),
+                410,
+            )
         if qr_link is not None:
             qr_link.last_resolved_at = datetime.now(UTC)
             try:
@@ -4656,6 +4794,7 @@ def register_routes(app: Flask) -> None:
             file_url=(url_for("project_attachment_preview", slug=slug, attachment_id=attachment.id) if attachment.preview_pdf_path else None),
             download_url=url_for("project_attachment_file", slug=slug, attachment_id=attachment.id),
             preview_available=bool(attachment.preview_pdf_path),
+            preview_pending=(not attachment.preview_pdf_path and attachment.preview_status in {"pending", "processing"}),
         )
 
     @app.route("/p/<slug>/materials/<int:attachment_id>/preview")
@@ -6095,6 +6234,8 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("admin_dashboard", admin_page="content"))
         paper.visibility = visibility
         paper.is_public = visibility == "public"
+        if visibility != previous["visibility"]:
+            invalidate_paper_qr(paper)
         if visibility == "unlisted" and not paper.share_token:
             paper.share_token = new_project_share_token()
         new_status = (request.form.get("status") or "active").strip().lower()
@@ -7328,8 +7469,10 @@ def register_routes(app: Flask) -> None:
 
         # Profile statistics. PERF-2: eager-load models to avoid N+1 in the
         # Python aggregation loops below.
+        # Soft-deleted projects are hidden everywhere else, so leave them out
+        # of the counts too.
         user_papers = (
-            Paper.query.options(selectinload(Paper.models))
+            active_paper_query().options(selectinload(Paper.models))
             .filter_by(user_id=current_user.id)
             .all()
         )
@@ -7340,8 +7483,11 @@ def register_routes(app: Flask) -> None:
         free_model_count = sum(1 for m in user_models if (m.license_type or "free") == "free")
         academic_model_count = sum(1 for m in user_models if m.license_type == "academic")
         extended_model_count = sum(1 for m in user_models if m.license_type == "extended_archive")
-        public_paper_count = sum(1 for p in user_papers if p.is_public)
-        private_paper_count = paper_count - public_paper_count
+        institutional_model_count = sum(1 for m in user_models if m.license_type == "institutional")
+        visibilities = [project_visibility(p) for p in user_papers]
+        public_paper_count = visibilities.count("public")
+        review_paper_count = visibilities.count("unlisted")
+        private_paper_count = paper_count - public_paper_count - review_paper_count
         pdf_paper_count = sum(1 for p in user_papers if p.pdf_path)
         model_count = len(user_models)
         recent_payments = (
@@ -7369,7 +7515,9 @@ def register_routes(app: Flask) -> None:
             free_model_count=free_model_count,
             academic_model_count=academic_model_count,
             extended_model_count=extended_model_count,
+            institutional_model_count=institutional_model_count,
             public_paper_count=public_paper_count,
+            review_paper_count=review_paper_count,
             private_paper_count=private_paper_count,
             pdf_paper_count=pdf_paper_count,
             model_count=model_count,
@@ -7561,6 +7709,9 @@ def register_routes(app: Flask) -> None:
             Payment.query.filter_by(user_id=user_id).update({"user_id": None})
             AuditLog.query.filter(AuditLog.user_id == user_id, AuditLog.event_type != "account_deleted").update({"user_id": None})
             Paper.query.filter_by(deleted_by_user_id=user_id).update({"deleted_by_user_id": None})
+            # InstitutionMember.user_id is NOT NULL, so the ORM cannot null it
+            # out on the User cascade (same as the admin delete path).
+            InstitutionMember.query.filter_by(user_id=user_id).delete()
             db.session.delete(current_user)
             db.session.commit()
         except SQLAlchemyError:
@@ -7899,10 +8050,16 @@ def register_routes(app: Flask) -> None:
             paper.pmid = paper_data["pmid"]
             paper.project_type = paper_data["project_type"]
             paper.workflow_stage = paper_data["workflow_stage"]
+            previous_visibility = project_visibility(paper)
             paper.visibility = paper_data["visibility"]
             if paper.visibility == "unlisted" and not paper.share_token:
                 paper.share_token = new_project_share_token()
             paper.is_public = paper_data["is_public"]
+            if paper.visibility != previous_visibility:
+                # The printed project QR encodes /p/<slug> or /share/<token>
+                # depending on visibility; drop the cached image so it is
+                # regenerated for the new URL instead of leading to a 404.
+                invalidate_paper_qr(paper)
 
             saved_pdf_path = None
             old_pdf_path = None

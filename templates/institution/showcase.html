@@ -77,7 +77,8 @@
     <div class="inst-showcase-grid reveal-up">
       {% for paper in papers %}
         <a href="{{ url_for('paper_public', slug=paper.slug) }}" class="surface inst-showcase-card">
-          {% set poster_model = paper.models|selectattr("poster_path")|list|first %}
+          {% set paper_models = active_models(paper) %}
+          {% set poster_model = paper_models|selectattr("poster_path")|list|first %}
           {% if poster_model %}
             <div class="inst-showcase-thumb"><img src="{{ url_for('serve_poster', unique_id=poster_model.id) }}" alt="" loading="lazy"></div>
           {% else %}
@@ -90,7 +91,7 @@
           <p class="inst-showcase-meta">
             {% if paper.year %}<span>{{ paper.year }}</span>{% endif %}
             {% if paper.field %}<span>{{ paper.field }}</span>{% endif %}
-            <span>{{ paper.models|length }} 3D model{{ '' if paper.models|length == 1 else 's' }}</span>
+            <span>{{ paper_models|length }} 3D model{{ '' if paper_models|length == 1 else 's' }}</span>
           </p>
         </a>
       {% endfor %}

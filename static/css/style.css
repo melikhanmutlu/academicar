@@ -9774,6 +9774,19 @@ body.nav-menu-open {
 }
 .article-remove:hover { border-bottom-color: currentColor; }
 .article-remove[hidden] { display: none; }
+.article-entry-buttons { display: inline-flex; align-items: center; gap: 14px; }
+.article-autofill {
+  appearance: none;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: var(--color-midnight-graphite);
+  font: 600 11px var(--font-inter);
+  cursor: pointer;
+  padding: 3px 0;
+}
+.article-autofill:hover { border-bottom-color: currentColor; }
+.article-autofill:disabled { opacity: .55; cursor: progress; }
 .article-pdf-field { display: block; cursor: pointer; }
 .article-pdf-field .field-label { display: flex; justify-content: space-between; gap: 12px; }
 .article-pdf-field em { color: var(--color-silver-ash); font-style: normal; font-size: 10px; font-weight: 500; text-transform: none; letter-spacing: 0; }

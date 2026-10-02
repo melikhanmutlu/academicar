@@ -33,7 +33,7 @@
               {% if item.detailed %}
                 <td><span>{{ item.top_country.label if item.top_country else '—' }}</span><small>{{ item.top_device.label if item.top_device else 'No device data' }}{% if item.top_source %} · {{ item.top_source.label }}{% endif %}</small></td>
               {% else %}
-                <td><span class="insight-locked">Disabled by plan</span><small>Enable detailed insights in Admin → Plans</small></td>
+                <td><span class="insight-locked">Not in this plan</span>{% if model_upgrade_options(item.model) %}<small><a href="{{ url_for('model_upgrade_page', model_id=item.model.id) }}">Upgrade this model</a> to see visitor countries, devices and sources.</small>{% else %}<small>Detailed visitor insights are not included in this model's plan.</small>{% endif %}</td>
               {% endif %}
               <td>{{ item.last_viewed_at.strftime('%d %b %Y, %H:%M') if item.last_viewed_at else 'Never' }}</td>
             </tr>

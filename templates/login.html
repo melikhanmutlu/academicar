@@ -24,7 +24,7 @@
         {{ form.hidden_tag() }}
         <div>
           {{ form.email.label(class="field-label") }}
-          {{ form.email(class="field-input", placeholder="name@university.edu") }}
+          {% if request.method == 'POST' and form.email.data %}{{ form.email(class="field-input", placeholder="name@university.edu") }}{% else %}{{ form.email(class="field-input", placeholder="name@university.edu", autofocus=True) }}{% endif %}
           {% for e in form.email.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
         </div>
         <div>

@@ -683,6 +683,7 @@
       fresh.classList.add('is-visible');
       row.replaceWith(fresh);
       row.dataset.status = fresh.dataset.status;
+      document.dispatchEvent(new CustomEvent('academicar:registry-changed'));
       return true;
     } catch (error) {
       return false;
@@ -727,7 +728,8 @@
     const grid = registry && registry.querySelector('.model-registry-grid');
     if (!registry || !toolbar || !grid) return;
 
-    const rows = [...grid.querySelectorAll('[data-model-row]')];
+    // Rows are re-read on every pass: status polling swaps cards in place.
+    const currentRows = () => [...grid.querySelectorAll('[data-model-row]')];
     const searchInput = toolbar.querySelector('[data-registry-search]');
     const statusSelect = toolbar.querySelector('[data-registry-status]');
     const sortSelect = toolbar.querySelector('[data-registry-sort]');
@@ -755,13 +757,14 @@
       const q = (searchInput ? searchInput.value : '').trim().toLowerCase();
       const status = statusSelect ? statusSelect.value : 'all';
       const sortKey = (sortSelect && sortSelect.value) || 'added';
+      const rows = currentRows();
       let visible = 0;
       rows.forEach((row) => {
         const show = (!q || (row.dataset.name || '').includes(q)) && matchesStatus(row, status);
         row.classList.toggle('is-filtered-out', !show);
         if (show) visible += 1;
       });
-      [...rows].sort(comparators[sortKey] || comparators.added).forEach((row) => grid.appendChild(row));
+      rows.sort(comparators[sortKey] || comparators.added).forEach((row) => grid.appendChild(row));
       if (emptyEl) emptyEl.hidden = visible !== 0;
       if (countEl) countEl.textContent = (visible !== rows.length) ? `Showing ${visible} of ${rows.length}` : '';
     };
@@ -770,6 +773,7 @@
     if (searchInput) searchInput.addEventListener('input', () => { clearTimeout(debounce); debounce = setTimeout(apply, 120); });
     if (statusSelect) statusSelect.addEventListener('change', apply);
     if (sortSelect) sortSelect.addEventListener('change', apply);
+    document.addEventListener('academicar:registry-changed', apply);
     if (clearBtn) clearBtn.addEventListener('click', () => {
       if (searchInput) searchInput.value = '';
       if (statusSelect) statusSelect.value = 'all';

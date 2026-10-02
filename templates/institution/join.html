@@ -27,20 +27,24 @@
             {% else %}
               <p class="text-[#5c6473] mb-6">
                 You already belong to {{ already_member.institution.name }}. Accounts can belong to one
-                institution — contact the AcademicAR team to switch.
+                institution. To switch, <a href="{{ url_for('contact_info') }}" class="underline">contact the AcademicAR team</a>.
               </p>
               <a href="{{ url_for('dashboard') }}" class="btn-secondary w-full">Back to dashboard</a>
             {% endif %}
+          {% elif domain_mismatch %}
+            <p class="text-sm text-red-700 mb-4" role="alert">
+              You are signed in as <strong>{{ current_user.email }}</strong>, which is not an
+              @{{ institution.domain_list()|join(", @") }} address, so this account cannot join.
+              Log out and sign in (or create an account) with your institutional email, then open this link again.
+            </p>
+            <form method="POST" action="{{ url_for('auth.logout') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn-secondary w-full">Log out and switch account</button>
+            </form>
           {% else %}
             <form method="POST" class="space-y-4">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <p class="text-[#5c6473]">Join as <strong>{{ current_user.email }}</strong>?</p>
-              {% if domain_mismatch %}
-                <p class="text-xs text-red-600">
-                  Your current account email does not match the required domain. Create a separate account
-                  with your institutional email, then open this link again.
-                </p>
-              {% endif %}
               <button type="submit" class="btn-primary w-full">Join {{ institution.name }}</button>
             </form>
           {% endif %}

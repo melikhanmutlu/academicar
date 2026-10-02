@@ -4,7 +4,15 @@
   {% if status == "expired" %}Model link expired{% elif status == "queued" or status == "processing" %}Model processing{% elif status == "failed" %}Model unavailable{% else %}Model unavailable{% endif %} — AcademicAR
 {% endblock %}
 
+{% block head %}
+  {% if status == "queued" or status == "processing" %}
+    {# The page promises the viewer will appear once ready, so check again. #}
+    <meta http-equiv="refresh" content="15">
+  {% endif %}
+{% endblock %}
+
 {% block content %}
+{% set landing_url = project_landing_url(paper) if paper else url_for('landing') %}
 <main class="model-unavail-shell">
   <div class="model-unavail-card reveal-up">
 
@@ -27,6 +35,7 @@
       {% elif status == "queued" %}Processing — queued
       {% elif status == "processing" %}Processing — converting
       {% elif status == "failed" %}Conversion failed
+      {% elif status == "disabled" %}Link disabled
       {% else %}Access unavailable
       {% endif %}
     </div>
@@ -38,6 +47,8 @@
         Your 3D model is being prepared.
       {% elif status == "failed" %}
         This model could not be processed.
+      {% elif status == "disabled" %}
+        This QR link has been turned off.
       {% else %}
         This model is currently unavailable.
       {% endif %}
@@ -45,9 +56,11 @@
 
     <p class="model-unavail-subtitle">
       {% if status == "expired" %}
-        The 3-day free access window for this model has closed. The QR code and viewer URL are permanently reserved — the publication owner can upgrade the license to restore access without changing this link.
+        The access period for this model has ended. The QR code and viewer URL stay reserved, so this same link will work again as soon as the publication owner renews access.
       {% elif status == "queued" or status == "processing" %}
-        The file is in the conversion queue. This usually takes under a minute. Refresh the page in a moment — the viewer will appear automatically once the model is ready.
+        The file is in the conversion queue. This usually takes under a minute. This page checks again every 15 seconds and opens the viewer once the model is ready.
+      {% elif status == "disabled" %}
+        The model behind this code is no longer offered through this link. If you expected it to work, contact the publication's authors.
       {% elif status == "failed" %}
         An error occurred while converting this file. The publication owner can upload a replacement model; the QR and viewer link will remain the same.
       {% else %}
@@ -56,6 +69,7 @@
     </p>
 
     <!-- Publication metadata panel -->
+    {% if paper %}
     <div class="model-unavail-meta">
       <div class="model-unavail-meta-row">
         <span class="model-unavail-meta-label">Publication</span>
@@ -79,6 +93,7 @@
         </span>
       </div>
     </div>
+    {% endif %}
 
     <!-- CTAs -->
     <div class="model-unavail-actions">
@@ -93,25 +108,31 @@
               </button>
             </form>
           {% endfor %}
-          <a href="{{ url_for('paper_public', slug=paper.slug) }}" class="btn-secondary">Go to publication page</a>
+          <a href="{{ landing_url }}" class="btn-secondary">Go to publication page</a>
         {% else %}
-          <a href="{{ url_for('pricing') }}" class="btn-primary">View upgrade options</a>
-          <a href="{{ url_for('paper_public', slug=paper.slug) }}" class="btn-secondary">Go to publication page</a>
+          {# A visitor cannot renew someone else's model: send them to the
+             publication; licensing info is secondary. #}
+          <a href="{{ landing_url }}" class="btn-primary">Go to publication page</a>
+          <a href="{{ url_for('landing') }}" class="btn-secondary">Learn about AcademicAR</a>
         {% endif %}
       {% elif status == "queued" or status == "processing" %}
-        <button onclick="location.reload()" class="btn-primary">Refresh page</button>
-        <a href="{{ url_for('paper_public', slug=paper.slug) }}" class="btn-secondary">Go to publication page</a>
+        <button type="button" onclick="location.reload()" class="btn-primary">Refresh now</button>
+        <a href="{{ landing_url }}" class="btn-secondary">Go to publication page</a>
+      {% elif status == "disabled" %}
+        <a href="{{ url_for('landing') }}" class="btn-primary">Learn about AcademicAR</a>
       {% else %}
-        <a href="{{ url_for('paper_public', slug=paper.slug) }}" class="btn-primary">Go to publication page</a>
+        <a href="{{ landing_url }}" class="btn-primary">Go to publication page</a>
         <a href="{{ url_for('landing') }}" class="btn-secondary">Learn about AcademicAR</a>
       {% endif %}
     </div>
 
     <!-- Footer note -->
+    {% if status != "disabled" %}
     <p class="model-unavail-note">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="vertical-align:-2px; opacity:.5;"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       The QR code and viewer URL for this model are permanently reserved by AcademicAR and will continue to work once access is restored.
     </p>
+    {% endif %}
 
   </div>
 </main>

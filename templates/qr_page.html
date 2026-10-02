@@ -96,24 +96,37 @@
   </main>
   <script>
     document.querySelectorAll('.share-copy').forEach(function (btn) {
+      var label = btn.textContent;
+      var timer;
+      var flash = function (text) {
+        btn.textContent = text;
+        clearTimeout(timer);
+        timer = setTimeout(function () { btn.textContent = label; }, 2500);
+      };
       btn.addEventListener('click', function () {
         var el = document.getElementById(btn.getAttribute('data-copy-target'));
         if (!el) return;
-        var reset = function () {
-          var original = btn.textContent;
-          btn.textContent = 'Copied';
-          setTimeout(function () { btn.textContent = original; }, 1500);
-        };
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(el.textContent).then(reset).catch(function () {});
-        } else {
+        var selectText = function () {
           var range = document.createRange();
-          range.selectNode(el);
+          range.selectNodeContents(el);
           var sel = window.getSelection();
           sel.removeAllRanges();
           sel.addRange(range);
-          try { document.execCommand('copy'); reset(); } catch (e) {}
-          sel.removeAllRanges();
+          return sel;
+        };
+        // If the browser refuses clipboard access, leave the text selected
+        // so the author can copy it manually instead of failing silently.
+        var fallback = function () {
+          var sel = selectText();
+          var copied = false;
+          try { copied = document.execCommand('copy'); } catch (e) {}
+          if (copied) { sel.removeAllRanges(); flash('Copied'); }
+          else { flash('Selected — press Ctrl/⌘+C'); }
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(el.textContent).then(function () { flash('Copied'); }).catch(fallback);
+        } else {
+          fallback();
         }
       });
     });
