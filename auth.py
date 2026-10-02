@@ -2,6 +2,7 @@
 import hashlib
 import hmac
 import os
+from datetime import UTC, datetime
 from urllib.parse import urljoin, urlparse
 
 from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, session, url_for
@@ -12,6 +13,8 @@ from wtforms import BooleanField, PasswordField, StringField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, ValidationError
 
 from extensions import limiter
+from licensing import get_license_plan
+from payments import PAID_PLAN_KEYS
 from models import User, db
 from url_helpers import public_url
 
@@ -66,17 +69,18 @@ def init_oauth(app):
 
 
 class LoginForm(FlaskForm):
-    email = StringField("Email", validators=[DataRequired(), Email()])
-    password = PasswordField("Password", validators=[DataRequired()])
+    email = StringField("Email", validators=[DataRequired(), Email()], render_kw={"autocomplete": "email"})
+    password = PasswordField("Password", validators=[DataRequired()], render_kw={"autocomplete": "current-password"})
     remember = BooleanField("Remember me")
     submit = SubmitField("Log in")
 
 
 class RegistrationForm(FlaskForm):
-    username = StringField("Full name", validators=[DataRequired(), Length(min=2, max=80)])
-    email = StringField("Email", validators=[DataRequired(), Email()])
+    username = StringField("Full name", validators=[DataRequired(), Length(min=2, max=80)], render_kw={"autocomplete": "name"})
+    email = StringField("Email", validators=[DataRequired(), Email()], render_kw={"autocomplete": "email"})
     password = PasswordField(
         "Password",
+        render_kw={"autocomplete": "new-password"},
         validators=[
             DataRequired(),
             Length(
@@ -89,6 +93,12 @@ class RegistrationForm(FlaskForm):
     confirm = PasswordField(
         "Confirm password",
         validators=[DataRequired(), EqualTo("password", message="Passwords do not match.")],
+        render_kw={"autocomplete": "new-password"},
+    )
+    # Enforced server-side too: the checkbox's HTML ``required`` alone can be
+    # bypassed, and acceptance is recorded in the registration audit entry.
+    accept_terms = BooleanField(
+        validators=[DataRequired(message="Please accept the Terms of Use, Privacy Policy and Personal Data Protection Notice.")],
     )
     submit = SubmitField("Sign up")
 
@@ -204,10 +214,17 @@ def register():
         db.session.commit()
         _rotate_session()
         login_user(user)
-        # Log registration for privacy compliance
+        # Log registration for privacy compliance (incl. proof of terms consent)
         try:
             from app import log_audit
-            log_audit("user_registered", user_id=user.id)
+            log_audit(
+                "user_registered",
+                user_id=user.id,
+                details={
+                    "terms_accepted": True,
+                    "terms_accepted_at": datetime.now(UTC).isoformat(timespec="seconds"),
+                },
+            )
         except Exception:
             pass  # Fail silently if audit logging fails
         # Funnel: the first stage of the acquisition→revenue journey.
@@ -241,6 +258,16 @@ def register():
         except Exception:
             current_app.logger.exception("welcome email failed for user %s", user.id)
         flash("Registration successful. Welcome.", "success")
+        # A visitor who picked a paid plan on /pricing arrives with ?plan=.
+        # Licensing is per model, so remind them where that plan is applied.
+        intended_plan = (request.args.get("plan") or "").strip().lower()
+        if intended_plan in PAID_PLAN_KEYS:
+            label = get_license_plan(intended_plan).label
+            flash(
+                f"You picked {label}. Create a project and upload your model, "
+                f"then press Upgrade on the model card to activate {label}.",
+                "info",
+            )
         # Same-site ?next= support (mirrors login): lets flows like an
         # institution invite send new users back to the join page. The URL —
         # not the session — carries it, because _rotate_session() clears the

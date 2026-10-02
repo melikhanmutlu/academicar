@@ -8,7 +8,7 @@
   --color-cloud-whisper: #f5f5f5;
   --color-warm-ivory: #ebe6dd;
   --color-dark-shale: #4d4d4d;
-  --color-silver-ash: #828282;
+  --color-silver-ash: #6b6b6b; /* was #828282; darkened to pass WCAG AA (4.5:1) on white and #efefef */
   --color-light-pearl: #e8e8e8;
   --color-sunset-orange: #ff682c;
   --color-data-gold: #816729;
@@ -46,7 +46,7 @@
   --black: #202020;
   --graphite: #4d4d4d;
   --graphite-2: #4d4d4d;
-  --muted: #828282;
+  --muted: #6b6b6b;
   --paper: #ffffff;
   --paper-2: #f5f5f5;
   --line: #e8e8e8;
@@ -80,6 +80,19 @@
 .flash-error   { background: #fdeceb; border-color: #f5c6c3; color: #b3261e; }
 .flash-warning { background: #fdf4e3; border-color: #f0dca8; color: #8a5a00; }
 .flash-info    { background: #eef2fd; border-color: #cdd9f6; color: #1e44ad; }
+.flash-msg[data-flash] { display: flex; align-items: flex-start; gap: 12px; }
+.flash-text { flex: 1 1 auto; min-width: 0; }
+.flash-close {
+  flex: 0 0 auto;
+  width: 32px; height: 32px;
+  margin: -6px -10px -6px 0;
+  display: inline-grid; place-items: center;
+  border: 0; border-radius: 6px;
+  background: transparent; color: inherit;
+  font-size: 20px; line-height: 1; cursor: pointer; opacity: .7;
+}
+.flash-close:hover { opacity: 1; background: rgba(0, 0, 0, .06); }
+.flash-close:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; opacity: 1; }
 @media (max-width: 640px) { .flash-stack { padding: 0 16px; } }
 .landing-section.dark-surface-section { background: var(--color-midnight-graphite); }
 
@@ -1556,7 +1569,7 @@ body {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.56);
   margin: 0 0 4px;
 }
 .site-footer-col a {
@@ -1695,7 +1708,7 @@ body {
 }
 .admin-blog-upload-status {
   font-size: 12px;
-  color: #828282;
+  color: #6b6b6b;
 }
 .admin-blog-help {
   font-size: 13px;
@@ -1730,7 +1743,7 @@ body {
 }
 .blog-article figcaption {
   font-size: 13px;
-  color: #828282;
+  color: #6b6b6b;
   text-align: center;
   margin-top: 6px;
 }
@@ -2098,6 +2111,21 @@ body {
 
 .dashboard-empty-cta {
   margin-bottom: 0;
+}
+
+/* The empty state sits on a graphite panel. Scope these so the broader
+   `.app-shell h2` and the graphite ghost `.btn-primary` cannot paint the
+   heading and the first-run CTA in the panel's own colour. */
+.app-shell .dashboard-empty-state .dashboard-empty-title,
+.dashboard-empty-state .dashboard-empty-title { color: #fff; }
+.dashboard-empty-state .btn-primary.dashboard-empty-cta {
+  color: #fff;
+  border-bottom-color: #fff;
+}
+.dashboard-empty-state .btn-primary.dashboard-empty-cta:hover,
+.dashboard-empty-state .btn-primary.dashboard-empty-cta:focus-visible {
+  color: #fff;
+  border-bottom-color: var(--color-sunset-orange);
 }
 
 /* Workflow steps */
@@ -9808,4 +9836,29 @@ body.nav-menu-open {
   .topic-document-row,
   .inst-publication-row { grid-template-columns: 34px minmax(0, 1fr); }
   .topic-document-actions { grid-column: 2; justify-content: flex-start; }
+}
+
+/* Touch screens: grow hit areas to roughly 44px without changing the desktop
+   layout. Negative margins keep inline links from pushing their rows apart. */
+@media (pointer: coarse) {
+  .model-link-action {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding-inline: 6px;
+  }
+  .publication-title-line a {
+    display: inline-block;
+    padding-block: 12px;
+    margin-block: -12px;
+  }
+  .color-preset {
+    min-width: 36px;
+    min-height: 36px;
+  }
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: 20px;
+    height: 20px;
+  }
 }

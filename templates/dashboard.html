@@ -88,7 +88,7 @@
         >
           <div class="publication-main">
             {% if first_model and not demo %}
-              <img class="project-model-thumb" src="{{ url_for('serve_poster', unique_id=first_model.id) }}" alt="Preview of {{ p.title }}" onerror="this.hidden=true; this.nextElementSibling.hidden=false;">
+              <img class="project-model-thumb" src="{{ url_for('serve_poster', unique_id=first_model.id) }}" loading="lazy" decoding="async" alt="Preview of {{ p.title }}" onerror="this.hidden=true; this.nextElementSibling.hidden=false;">
               <div class="publication-avatar" hidden>{{ init }}</div>
             {% else %}
               <div class="publication-avatar">{{ init }}</div>

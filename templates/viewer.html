@@ -894,7 +894,7 @@
     }
     .viewer-panel-body::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.42); }
     @media (max-width: 640px) {
-      .viewer-tool-btn { min-height: 34px; min-width: 34px; padding: 0.45rem; font-size: 0; justify-content: center; }
+      .viewer-tool-btn { min-height: 40px; min-width: 40px; padding: 0.45rem; font-size: 0; justify-content: center; }
       .viewer-tool-btn svg { display: block; }
       .viewer-toolbar { gap: 0.35rem; flex-wrap: nowrap; }
       header { padding-top: calc(0.75rem + env(safe-area-inset-top, 0px)) !important; padding-left: calc(0.75rem + env(safe-area-inset-left, 0px)) !important; padding-right: calc(0.75rem + env(safe-area-inset-right, 0px)) !important; }
@@ -905,8 +905,9 @@
         right: 0.75rem !important;
         bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px)) !important;
         width: auto !important;
-        max-height: 58vh;
-        max-height: 58dvh;
+        /* Keep the model visible above the open panel; the body scrolls. */
+        max-height: 48vh;
+        max-height: 48dvh;
         overflow: hidden;
         padding: 0.85rem !important;
         border-radius: 0.85rem;
@@ -1278,13 +1279,13 @@
     </aside>
     {% endif %}
 
-    <aside id="infoPanel" class="info-drawer absolute top-0 right-0 bottom-0 z-40 w-full sm:w-[420px] max-w-full bg-[#111111]/94 border-l border-white/10 overflow-y-auto p-6 backdrop-blur-2xl">
+    <aside id="infoPanel" role="dialog" aria-modal="true" aria-labelledby="infoPanelTitle" tabindex="-1" class="info-drawer absolute top-0 right-0 bottom-0 z-40 w-full sm:w-[420px] max-w-full bg-[#111111]/94 border-l border-white/10 overflow-y-auto p-6 backdrop-blur-2xl">
       <div class="flex items-center justify-between mb-6">
         <div>
           <p class="text-xs uppercase tracking-[0.18em] text-white/55">Publication metadata</p>
-          <h2 class="font-serif text-2xl font-semibold mt-1">Publication Info</h2>
+          <h2 id="infoPanelTitle" class="font-serif text-2xl font-semibold mt-1">Publication Info</h2>
         </div>
-        <button id="closeInfo" class="rounded-full border border-white/10 w-9 h-9 text-white/70 hover:text-white hover:bg-white/10">×</button>
+        <button id="closeInfo" type="button" aria-label="Close publication info" class="rounded-full border border-white/10 w-9 h-9 text-white/70 hover:text-white hover:bg-white/10">×</button>
       </div>
 
       <h3 class="font-semibold text-lg mb-4">{{ paper.title }}</h3>
@@ -1321,19 +1322,19 @@
       {% endif %}
     </aside>
 
-    <div id="qrModal" class="hidden fixed inset-0 z-50 bg-black/72 p-4 backdrop-blur-sm">
+    <div id="qrModal" role="dialog" aria-modal="true" aria-labelledby="qrModalTitle" class="hidden fixed inset-0 z-50 bg-black/72 p-4 backdrop-blur-sm">
       <div class="mx-auto mt-16 w-full max-w-sm rounded-xl border border-white/12 bg-[#111111] p-5 text-white shadow-2xl">
         <div class="flex items-start justify-between gap-4">
           <div>
-            <p class="text-xs uppercase tracking-[0.18em] text-white/45">Open on mobile</p>
-            <h2 class="mt-1 text-xl font-bold">Scan for AR</h2>
+            <p class="text-xs uppercase tracking-[0.18em] text-white/45" data-qr-eyebrow>Open on mobile</p>
+            <h2 id="qrModalTitle" class="mt-1 text-xl font-bold" data-qr-title>Scan for AR</h2>
           </div>
           <button id="closeQr" class="rounded border border-white/10 px-3 py-2 text-sm text-white/70 hover:bg-white/10" type="button">Close</button>
         </div>
-        <div class="mt-5 grid place-items-center rounded-lg bg-white p-4">
+        <div class="mt-5 grid place-items-center rounded-lg bg-white p-4" data-qr-image>
           <img src="{{ url_for('demo_mitochondria_qr') if demo_mode is defined and demo_mode else url_for('qr_image', model_id=model.id) }}" class="h-56 w-56" alt="QR code for mobile AR">
         </div>
-        <p class="mt-4 text-sm leading-relaxed text-white/60">AR opens best from a phone or tablet. Scan this QR code, then tap View in AR on the mobile viewer.</p>
+        <p class="mt-4 text-sm leading-relaxed text-white/60" data-qr-note>AR opens best from a phone or tablet. Scan this QR code, then tap View in AR on the mobile viewer.</p>
       </div>
     </div>
 
@@ -1492,13 +1493,78 @@
       });
     }
 
-    if (infoBtn && infoPanel) infoBtn.addEventListener('click', () => infoPanel.classList.add('open'));
-    if (closeInfo && infoPanel) closeInfo.addEventListener('click', () => infoPanel.classList.remove('open'));
-    if (qrBtn && qrModal) qrBtn.addEventListener('click', () => qrModal.classList.remove('hidden'));
-    if (closeQr && qrModal) closeQr.addEventListener('click', () => qrModal.classList.add('hidden'));
+    // Overlays (publication info drawer, QR / AR hand-off modal) behave as
+    // dialogs: one at a time, focus moves inside and stays there while open,
+    // Escape closes, and focus returns to the button that opened it.
+    const overlays = {
+      info: { el: infoPanel, isOpen: () => infoPanel && infoPanel.classList.contains('open'), show: () => infoPanel.classList.add('open'), hide: () => infoPanel.classList.remove('open'), first: () => closeInfo },
+      qr: { el: qrModal, isOpen: () => qrModal && !qrModal.classList.contains('hidden'), show: () => qrModal.classList.remove('hidden'), hide: () => qrModal.classList.add('hidden'), first: () => closeQr },
+    };
+    let overlayReturnFocus = null;
+    const focusableIn = (root) => Array.from(root.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])'))
+      .filter((el) => el.offsetParent !== null || el === document.activeElement);
+    const closeOverlay = (name, { restoreFocus = true } = {}) => {
+      const o = overlays[name];
+      if (!o || !o.el || !o.isOpen()) return;
+      o.hide();
+      if (restoreFocus && overlayReturnFocus && document.contains(overlayReturnFocus)) overlayReturnFocus.focus();
+      overlayReturnFocus = null;
+    };
+    const openOverlay = (name, opener) => {
+      const o = overlays[name];
+      if (!o || !o.el) return;
+      Object.keys(overlays).forEach((other) => { if (other !== name) closeOverlay(other, { restoreFocus: false }); });
+      overlayReturnFocus = opener || document.activeElement;
+      o.show();
+      const target = (o.first && o.first()) || focusableIn(o.el)[0] || o.el;
+      const moveFocus = () => { if (target && document.activeElement !== target) target.focus(); };
+      // The drawer fades in via a visibility transition and is not focusable on
+      // the first frame, so try again once the transition has run.
+      requestAnimationFrame(moveFocus);
+      setTimeout(moveFocus, 260);
+    };
+    const openOverlayName = () => Object.keys(overlays).find((name) => overlays[name].el && overlays[name].isOpen());
+    document.addEventListener('keydown', (event) => {
+      const name = openOverlayName();
+      if (!name) return;
+      if (event.key === 'Escape') { event.preventDefault(); closeOverlay(name); return; }
+      if (event.key !== 'Tab') return;
+      const items = focusableIn(overlays[name].el);
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (!overlays[name].el.contains(document.activeElement)) { event.preventDefault(); first.focus(); }
+      else if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    });
+    // QR modal copy has two modes: desktop hand-off ("scan with your phone")
+    // and phone-without-AR, where asking to scan a QR would be a dead end.
+    const qrDefaults = qrModal ? {
+      eyebrow: (qrModal.querySelector('[data-qr-eyebrow]') || {}).textContent,
+      title: (qrModal.querySelector('[data-qr-title]') || {}).textContent,
+      note: (qrModal.querySelector('[data-qr-note]') || {}).textContent,
+    } : null;
+    const setQrMode = (mode) => {
+      if (!qrModal || !qrDefaults) return;
+      const phoneNoAr = mode === 'phone-no-ar';
+      const eyebrow = qrModal.querySelector('[data-qr-eyebrow]');
+      const title = qrModal.querySelector('[data-qr-title]');
+      const note = qrModal.querySelector('[data-qr-note]');
+      const image = qrModal.querySelector('[data-qr-image]');
+      if (eyebrow) eyebrow.textContent = phoneNoAr ? 'AR on this device' : qrDefaults.eyebrow;
+      if (title) title.textContent = phoneNoAr ? 'AR isn’t available here yet' : qrDefaults.title;
+      if (note) note.textContent = phoneNoAr
+        ? 'This model can’t open in AR on this phone right now. You can still rotate and zoom it here, or share this QR code with someone on another phone.'
+        : qrDefaults.note;
+      if (image) image.classList.toggle('opacity-60', phoneNoAr);
+    };
+    if (infoBtn && infoPanel) infoBtn.addEventListener('click', () => openOverlay('info', infoBtn));
+    if (closeInfo && infoPanel) closeInfo.addEventListener('click', () => closeOverlay('info'));
+    if (qrBtn && qrModal) qrBtn.addEventListener('click', () => { setQrMode('handoff'); openOverlay('qr', qrBtn); });
+    if (closeQr && qrModal) closeQr.addEventListener('click', () => closeOverlay('qr'));
     if (qrModal) {
       qrModal.addEventListener('click', (event) => {
-        if (event.target === qrModal) qrModal.classList.add('hidden');
+        if (event.target === qrModal) closeOverlay('qr');
       });
     }
 
@@ -1732,9 +1798,12 @@
       nativeArBtn.classList.add('is-suppressed');
     }
 
+    const isPhone = isIOS || /Android/i.test(navigator.userAgent)
+      || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches && window.innerWidth < 900);
     const showQrFallback = () => {
       if (qrModal) {
-        qrModal.classList.remove('hidden');
+        setQrMode(isPhone ? 'phone-no-ar' : 'handoff');
+        openOverlay('qr', document.activeElement);
         return;
       }
       // Embedded viewer (?embed=true) renders no QR modal. Rather than leave a
@@ -1846,6 +1915,13 @@
         shotStatusEl.classList.add('is-error');
       }
       if (videoRecordButton) videoRecordButton.disabled = true;
+      // No model, no AR: keep the AR entry points from promising a launch.
+      [...arButtons, ...iosArButtons].forEach((button) => {
+        button.setAttribute('aria-disabled', 'true');
+        if ('disabled' in button) button.disabled = true;
+        button.classList.add('opacity-50', 'pointer-events-none');
+      });
+      if (arBtn) arBtn.title = 'AR is unavailable because the model failed to load.';
     });
     // A cached/local GLB can finish before this bottom-of-page script attaches
     // its listener. Reconcile that state once without reloading the model.

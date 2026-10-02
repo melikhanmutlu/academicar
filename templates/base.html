@@ -56,7 +56,7 @@
             academic: {
               50: '#f5f5f5',
               100: '#efefef',
-              500: '#828282',
+              500: '#6b6b6b',
               600: '#4d4d4d',
               700: '#202020',
               800: '#202020',
@@ -123,7 +123,10 @@
     {% if messages %}
       <div class="flash-stack">
         {% for cat, msg in messages %}
-          <div role="alert" class="flash-msg flash-{{ cat }}">{{ msg }}</div>
+          <div role="{{ 'alert' if cat in ('danger', 'error', 'warning') else 'status' }}" class="flash-msg flash-{{ cat }}" data-flash data-flash-category="{{ cat }}">
+            <span class="flash-text">{{ msg }}</span>
+            <button type="button" class="flash-close" data-flash-close aria-label="Dismiss message">&times;</button>
+          </div>
         {% endfor %}
       </div>
     {% endif %}
@@ -251,16 +254,51 @@
         document.body.insertBefore(stack, main || document.body.firstChild);
       }
       const item = document.createElement("div");
-      item.setAttribute("role", "alert");
+      item.setAttribute("role", ["danger", "error", "warning"].includes(category) ? "alert" : "status");
       item.className = "flash-msg flash-" + category;
-      item.textContent = message;
+      item.dataset.flash = "";
+      item.dataset.flashCategory = category;
+      const text = document.createElement("span");
+      text.className = "flash-text";
+      text.textContent = message;
+      const close = document.createElement("button");
+      close.type = "button";
+      close.className = "flash-close";
+      close.dataset.flashClose = "";
+      close.setAttribute("aria-label", "Dismiss message");
+      close.innerHTML = "&times;";
+      item.append(text, close);
       stack.appendChild(item);
-      setTimeout(() => {
-        item.style.transition = "opacity .4s ease";
-        item.style.opacity = "0";
-        setTimeout(() => item.remove(), 400);
-      }, 4200);
+      window.scheduleFlashDismiss(item);
     };
+
+    // Flash messages: every message can be dismissed; confirmations
+    // (success/info) also fade out on their own, while errors and warnings
+    // stay until the user closes them so they are not missed.
+    (function () {
+      const fade = (item) => {
+        if (!item.isConnected) return;
+        item.style.transition = "opacity .3s ease";
+        item.style.opacity = "0";
+        setTimeout(() => item.remove(), 300);
+      };
+      window.scheduleFlashDismiss = function (item) {
+        const cat = item.dataset.flashCategory || "info";
+        if (["danger", "error", "warning"].includes(cat)) return;
+        let timer = setTimeout(() => fade(item), 6000);
+        const pause = () => clearTimeout(timer);
+        const resume = () => { clearTimeout(timer); timer = setTimeout(() => fade(item), 3000); };
+        item.addEventListener("mouseenter", pause);
+        item.addEventListener("focusin", pause);
+        item.addEventListener("mouseleave", resume);
+        item.addEventListener("focusout", resume);
+      };
+      document.addEventListener("click", (event) => {
+        const btn = event.target.closest("[data-flash-close]");
+        if (btn) fade(btn.closest("[data-flash]"));
+      });
+      document.querySelectorAll("[data-flash]").forEach(window.scheduleFlashDismiss);
+    })();
   </script>
   {% block scripts %}{% endblock %}
 </body>

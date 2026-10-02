@@ -20,8 +20,8 @@
 
       <div class="grid sm:grid-cols-2 gap-4">
         <div>
-          <label class="field-label">Project type <span class="text-red-500">*</span></label>
-          <select name="project_type" class="field-select" required>
+          <label class="field-label" for="project_type">Project type <span class="text-red-500">*</span></label>
+          <select name="project_type" id="project_type" class="field-select" required>
             <option value="research_project" {% if form.get('project_type', 'research_project') == 'research_project' %}selected{% endif %}>Research project</option>
             <option value="publication" {% if form.get('project_type') == 'publication' %}selected{% endif %}>Publication / article</option>
             <option value="thesis" {% if form.get('project_type') == 'thesis' %}selected{% endif %}>Thesis / dissertation</option>
@@ -32,8 +32,8 @@
           </select>
         </div>
         <div>
-          <label class="field-label">Project stage <span class="text-red-500">*</span></label>
-          <select name="workflow_stage" class="field-select" required>
+          <label class="field-label" for="workflow_stage">Project stage <span class="text-red-500">*</span></label>
+          <select name="workflow_stage" id="workflow_stage" class="field-select" required>
             <option value="in_progress" {% if form.get('workflow_stage', 'in_progress') == 'in_progress' %}selected{% endif %}>In progress</option>
             <option value="ready_for_review" {% if form.get('workflow_stage') == 'ready_for_review' %}selected{% endif %}>Ready for review</option>
             <option value="published" {% if form.get('workflow_stage') == 'published' %}selected{% endif %}>Published</option>
@@ -43,15 +43,15 @@
       </div>
 
       <div>
-        <label class="field-label">Topic title <span class="text-red-500">*</span></label>
-        <input type="text" name="title" value="{{ form.get('title', '') }}" required maxlength="500" class="field-input text-lg" placeholder="e.g. Cardiovascular anatomy teaching collection">
+        <label class="field-label" for="project_title">Topic title <span class="text-red-500">*</span></label>
+        <input type="text" name="title" id="project_title" value="{{ form.get('title', '') }}" required maxlength="500" class="field-input text-lg" placeholder="e.g. Cardiovascular anatomy teaching collection">
         <p class="text-xs text-[#5c6473] mt-2">This is the shared subject that groups models, related articles, and presentation files.</p>
       </div>
 
       <div class="grid sm:grid-cols-2 gap-4">
         <div>
-          <label class="field-label">Field</label>
-          <select name="field" class="field-select">
+          <label class="field-label" for="project_field">Field</label>
+          <select name="field" id="project_field" class="field-select">
             <option value="">Select</option>
             {% for f in academic_fields %}
               <option value="{{ f }}" {% if form.get('field') == f %}selected{% endif %}>{{ f }}</option>
@@ -118,7 +118,7 @@
                 </div>
                 <div>
                   <label class="field-label">Year</label>
-                  <input class="field-input" type="number" name="article_year[]" min="1900" max="2100" value="{{ article_years[row] if from_form and row < article_years|length else (article.year if article and article.year else '') }}">
+                  <input class="field-input" type="number" name="article_year[]" aria-label="Article year" min="1900" max="2100" value="{{ article_years[row] if from_form and row < article_years|length else (article.year if article and article.year else '') }}">
                 </div>
                 <div>
                   <label class="field-label">DOI</label>
@@ -126,11 +126,11 @@
                 </div>
                 <div>
                   <label class="field-label">PMID</label>
-                  <input class="field-input" name="article_pmid[]" maxlength="100" value="{{ article_pmids[row] if from_form and row < article_pmids|length else (article.pmid if article else '') }}">
+                  <input class="field-input" name="article_pmid[]" aria-label="Article PMID" maxlength="100" value="{{ article_pmids[row] if from_form and row < article_pmids|length else (article.pmid if article else '') }}">
                 </div>
                 <div class="sm:col-span-2">
                   <label class="field-label">Abstract / note</label>
-                  <textarea class="field-textarea" name="article_abstract[]" rows="3">{{ article_abstracts[row] if from_form and row < article_abstracts|length else (article.abstract if article else '') }}</textarea>
+                  <textarea class="field-textarea" name="article_abstract[]" aria-label="Article abstract or note" rows="3">{{ article_abstracts[row] if from_form and row < article_abstracts|length else (article.abstract if article else '') }}</textarea>
                 </div>
                 <label class="article-pdf-field sm:col-span-2">
                   <span class="field-label">Article PDF {% if article and article.pdf_path %}<em>Current file retained unless replaced</em>{% endif %}</span>
@@ -154,10 +154,10 @@
           <div class="article-entry-fields grid sm:grid-cols-2 gap-4">
             <div class="sm:col-span-2"><label class="field-label">Article title</label><input class="field-input" name="article_title[]" maxlength="500" placeholder="Optional article title"></div>
             <div><label class="field-label">Authors</label><input class="field-input" name="article_authors[]" maxlength="500" placeholder="Jane Doe, John Smith"></div>
-            <div><label class="field-label">Year</label><input class="field-input" type="number" name="article_year[]" min="1900" max="2100"></div>
+            <div><label class="field-label">Year</label><input class="field-input" type="number" name="article_year[]" aria-label="Article year" min="1900" max="2100"></div>
             <div><label class="field-label">DOI</label><input class="field-input" name="article_doi[]" maxlength="200" placeholder="10.1234/example.2026"></div>
-            <div><label class="field-label">PMID</label><input class="field-input" name="article_pmid[]" maxlength="100"></div>
-            <div class="sm:col-span-2"><label class="field-label">Abstract / note</label><textarea class="field-textarea" name="article_abstract[]" rows="3"></textarea></div>
+            <div><label class="field-label">PMID</label><input class="field-input" name="article_pmid[]" aria-label="Article PMID" maxlength="100"></div>
+            <div class="sm:col-span-2"><label class="field-label">Abstract / note</label><textarea class="field-textarea" name="article_abstract[]" aria-label="Article abstract or note" rows="3"></textarea></div>
             <label class="article-pdf-field sm:col-span-2"><span class="field-label">Article PDF</span><span class="file-picker-control"><span>Choose PDF</span><small data-file-name>No file selected</small></span><input type="file" name="article_pdf[]" accept=".pdf" class="native-file-input" data-named-file-input></label>
             <div class="article-entry-actions sm:col-span-2"><span>All article fields are optional.</span><button type="button" class="article-remove" data-remove-article>Remove article</button></div>
           </div>
@@ -251,7 +251,9 @@
 
           <div>
             <label class="field-label" for="source_unit">Source unit <span class="text-[#ff682c]">*</span></label>
-            <select name="source_unit" id="source_unit" class="field-input" required>
+            {# Required only once a model file is chosen (toggled in script) so a
+               project can still be created first and get its model later. #}
+            <select name="source_unit" id="source_unit" class="field-input" data-model-required>
               <option value="" selected disabled>Select unit…</option>
               <option value="mm">Millimeters (mm)</option>
               <option value="cm">Centimeters (cm)</option>
@@ -274,7 +276,7 @@
           <input type="color" name="color" value="#cccccc" disabled aria-label="Model color" class="color-optional-picker" data-color-input>
 
           <label class="flex items-start gap-3 rounded-xl border border-[#e2e8f0] bg-white p-4 text-sm text-[#475569]">
-            <input type="checkbox" name="compliance_confirm" value="yes" class="mt-1">
+            <input type="checkbox" name="compliance_confirm" value="yes" class="mt-1" data-model-required>
             <span>I confirm that this model has been anonymized, that I have the right to share/publish it, and that I am responsible for all required ethical approval and consent processes.</span>
           </label>
         </section>
@@ -288,7 +290,7 @@
         {% endif %}
         <div class="flex items-center gap-3">
           <a href="{{ url_for('paper_detail', slug=paper.slug) if is_edit else url_for('dashboard') }}" class="btn-secondary">Cancel</a>
-          <button type="submit" class="btn-primary">{{ 'Save Changes' if is_edit else 'Save and Continue' }}</button>
+          <button type="submit" class="btn-primary" data-form-submit>{{ 'Save Changes' if is_edit else 'Save and Continue' }}</button>
         </div>
       </div>
     </form>
@@ -679,5 +681,102 @@
       alert("An error occurred while deleting the PDF.");
     }
   }
+</script>
+
+<script>
+  // Submit feedback, model-dependent required fields, and draft safety for the
+  // project form. Large model uploads can take minutes, so the button must show
+  // that work is in progress and must not be pressed twice.
+  (function () {
+    const form = document.querySelector('[data-upload-form]');
+    if (!form) return;
+    const isEdit = {{ 'true' if is_edit else 'false' }};
+    const submitBtn = form.querySelector('[data-form-submit]');
+    const modelInput = form.querySelector('input[name="model_file"]');
+    const modelRequired = form.querySelectorAll('[data-model-required]');
+
+    const syncModelRequired = () => {
+      const hasModel = Boolean(modelInput && modelInput.files && modelInput.files.length);
+      modelRequired.forEach((field) => { field.required = hasModel; });
+    };
+    if (modelInput) {
+      modelInput.addEventListener('change', syncModelRequired);
+      syncModelRequired();
+    }
+
+    form.addEventListener('submit', (event) => {
+      if (form.dataset.submitting === '1') { event.preventDefault(); return; }
+      // A file added by drag-and-drop does not fire "change", so re-check the
+      // model-dependent fields here before letting the upload start.
+      syncModelRequired();
+      if (!form.checkValidity()) { event.preventDefault(); form.reportValidity(); return; }
+      form.dataset.submitting = '1';
+      form.setAttribute('aria-busy', 'true');
+      if (submitBtn) {
+        const hasModel = Boolean(modelInput && modelInput.files && modelInput.files.length);
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-70', 'cursor-not-allowed');
+        submitBtn.textContent = hasModel ? 'Uploading model…' : 'Saving…';
+      }
+    });
+
+    if (isEdit) return;
+
+    // Draft: if the security token expires or the session ends while this long
+    // form is open, the server redirects back with ?restore_draft=1 and the
+    // typed values come back. File inputs and consent are never restored.
+    const KEY = 'academicar:new-project-draft';
+    const fields = () => Array.from(form.elements).filter((el) =>
+      el.name && !['file', 'hidden', 'submit', 'button', 'password'].includes(el.type) && el.name !== 'compliance_confirm');
+    const save = () => {
+      const data = {};
+      fields().forEach((el) => {
+        if (el.type === 'radio') { if (el.checked) data[el.name] = el.value; }
+        else if (el.type === 'checkbox') { data[el.name] = el.checked; }
+        else if (!el.disabled) { (data[el.name] = data[el.name] || []).push(el.value); }
+      });
+      try { sessionStorage.setItem(KEY, JSON.stringify(data)); } catch (e) { /* storage unavailable */ }
+    };
+    const restore = () => {
+      let data = null;
+      try { data = JSON.parse(sessionStorage.getItem(KEY) || 'null'); } catch (e) { data = null; }
+      if (!data) return;
+      const counters = {};
+      fields().forEach((el) => {
+        if (!(el.name in data)) return;
+        if (el.type === 'radio') el.checked = data[el.name] === el.value;
+        else if (el.type === 'checkbox') el.checked = Boolean(data[el.name]);
+        else {
+          const i = counters[el.name] = (counters[el.name] || 0);
+          const values = data[el.name];
+          if (Array.isArray(values) && i < values.length) el.value = values[i];
+          counters[el.name] = i + 1;
+        }
+      });
+    };
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('restore_draft') === '1') restore();
+    else { try { sessionStorage.removeItem(KEY); } catch (e) { /* ignore */ } }
+    form.addEventListener('input', save);
+    form.addEventListener('change', save);
+
+    // Returning with the Back button after a successful create must not show
+    // the old values again, or a second submit creates a duplicate project.
+    window.addEventListener('pageshow', (event) => {
+      const nav = (performance.getEntriesByType && performance.getEntriesByType('navigation')[0]) || {};
+      if (event.persisted || nav.type === 'back_forward') {
+        form.reset();
+        delete form.dataset.submitting;
+        form.removeAttribute('aria-busy');
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.classList.remove('opacity-70', 'cursor-not-allowed');
+          submitBtn.textContent = 'Save and Continue';
+        }
+        syncModelRequired();
+        try { sessionStorage.removeItem(KEY); } catch (e) { /* ignore */ }
+      }
+    });
+  })();
 </script>
 {% endblock %}

@@ -605,6 +605,7 @@ def test_join_anonymous_shows_auth_ctas_and_register_next_returns(client):
             "email": "new@example.com",
             "password": "password123",
             "confirm": "password123",
+            "accept_terms": "y",
         },
         follow_redirects=False,
     )

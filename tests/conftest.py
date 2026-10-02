@@ -58,6 +58,7 @@ def register(client, email="user@example.com", password="password123", username=
             "email": email,
             "password": password,
             "confirm": password,
+            "accept_terms": "y",
         },
         follow_redirects=True,
     )

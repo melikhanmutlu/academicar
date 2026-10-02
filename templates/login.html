@@ -17,7 +17,7 @@
       <div class="btn-secondary w-full mb-2 opacity-60 cursor-not-allowed" aria-disabled="true">
         Continue with Google
       </div>
-      <p class="text-xs text-[#828282] mb-5">Google sign-in will be available after OAuth credentials are configured.</p>
+      <p class="text-xs text-[#6b6b6b] mb-5">Google sign-in will be available after OAuth credentials are configured.</p>
       {% endif %}
 
       <form method="POST" class="space-y-5">
@@ -29,7 +29,7 @@
         </div>
         <div>
           {{ form.password.label(class="field-label") }}
-          {{ form.password(class="field-input") }}
+          {% if request.method == 'POST' and form.email.data %}{{ form.password(class="field-input", autofocus=True) }}{% else %}{{ form.password(class="field-input") }}{% endif %}
           {% for e in form.password.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
           <p class="text-sm text-right mt-2"><a href="{{ url_for('auth.forgot_password') }}" class="text-[#5c6473] underline underline-offset-4">Forgot password?</a></p>
         </div>

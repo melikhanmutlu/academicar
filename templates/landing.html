@@ -110,9 +110,12 @@
   <div class="lp-container">
     <div class="lp-ar-layout reveal-up">
       <div class="lp-ar-visual">
-        <img src="{{ url_for('static', filename='images/ar-phone-mockup.png') }}"
-             alt="Mitochondria 3D model placed in augmented reality on a desk"
-             class="lp-ar-photo" loading="lazy">
+        <picture>
+          <source srcset="{{ url_for('static', filename='images/ar-phone-mockup.webp') }}" type="image/webp">
+          <img src="{{ url_for('static', filename='images/ar-phone-mockup.png') }}"
+               alt="Mitochondria 3D model placed in augmented reality on a desk"
+               class="lp-ar-photo" loading="lazy" decoding="async" width="941" height="1672">
+        </picture>
         <!-- soft glow behind the device -->
         <div class="lp-ar-glow" aria-hidden="true"></div>
       </div>

@@ -110,7 +110,7 @@
         <li>AR-ready GLB, screenshot tools, and metadata page</li>
         <li>Model replacement while retaining the same resolver</li>
       </ul>
-      <a href="{{ url_for('auth.register') }}" class="pricing-cta">Get started</a>
+      <a href="{{ url_for('auth.register', plan='academic') }}" class="pricing-cta">Get started</a>
     </article>
 
     <article class="plan-detail-card featured reveal-up delay-2">
@@ -131,7 +131,7 @@
         <li>Persistent QR and viewer URL</li>
         <li>Viewer, AR, screenshots, and rich metadata fields</li>
       </ul>
-      <a href="{{ url_for('auth.register') }}" class="pricing-cta">Choose extended</a>
+      <a href="{{ url_for('auth.register', plan='extended_archive') }}" class="pricing-cta">Choose extended</a>
     </article>
   </div>
 </section>

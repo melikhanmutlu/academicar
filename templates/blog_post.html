@@ -35,14 +35,14 @@
 
 {% block content %}
 <article class="max-w-3xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
-  <nav class="text-sm text-[#828282] mb-6" aria-label="Breadcrumb">
+  <nav class="text-sm text-[#6b6b6b] mb-6" aria-label="Breadcrumb">
     <a href="{{ url_for('blog_index') }}" class="hover:underline">Blog</a> <span aria-hidden="true">/</span>
     <span>{{ post.title }}</span>
   </nav>
 
   <header class="mb-8">
     <h1 class="font-serif text-4xl font-bold text-[#202020] mb-3">{{ post.title }}</h1>
-    <div class="text-sm text-[#828282]">
+    <div class="text-sm text-[#6b6b6b]">
       <time datetime="{{ post.date }}">{{ post.date }}</time> · {{ post.read_minutes }} min read · {{ post.author }}
     </div>
   </header>

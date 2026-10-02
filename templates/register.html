@@ -17,7 +17,7 @@
       <div class="btn-secondary w-full mb-2 opacity-60 cursor-not-allowed" aria-disabled="true">
         Continue with Google
       </div>
-      <p class="text-xs text-[#828282] mb-5">Google sign-up will be available after OAuth credentials are configured.</p>
+      <p class="text-xs text-[#6b6b6b] mb-5">Google sign-up will be available after OAuth credentials are configured.</p>
       {% endif %}
 
       <form method="POST" class="space-y-5">
@@ -45,9 +45,10 @@
           </div>
         </div>
         <label class="flex items-start gap-3 text-sm text-[#5c6473]">
-          <input type="checkbox" name="accept_terms" required class="mt-1">
+          <input type="checkbox" name="accept_terms" value="y" required class="mt-1"{% if form.accept_terms.data %} checked{% endif %}>
           <span>I accept the <a href="{{ url_for('terms') }}" target="_blank" rel="noopener noreferrer" class="text-[#111827] underline underline-offset-2">Terms of Use</a>, <a href="{{ url_for('privacy') }}" target="_blank" rel="noopener noreferrer" class="text-[#111827] underline underline-offset-2">Privacy Policy</a>, and <a href="{{ url_for('data_protection') }}" target="_blank" rel="noopener noreferrer" class="text-[#111827] underline underline-offset-2">Personal Data Protection Notice</a></span>
         </label>
+        {% for e in form.accept_terms.errors %}<p class="text-xs text-red-600 -mt-3">{{ e }}</p>{% endfor %}
         {{ form.submit(class="btn-primary w-full") }}
       </form>
 

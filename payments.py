@@ -172,8 +172,11 @@ class DevProvider(PaymentProvider):
         return success_url
 
     def verify_webhook(self, request) -> bool:
-        # Webhooks are only simulated in tests; accept them in non-prod.
-        return True
+        # The dev checkout settles inline, so a running deployment never needs
+        # this webhook. It carries no signature, so accept it only under the
+        # test client; otherwise anyone could POST a "paid" event and grant a
+        # paid license on any environment where dev payments are enabled.
+        return bool(current_app.config.get("TESTING"))
 
     def parse_event(self, request) -> dict | None:
         data = request.get_json(silent=True) or {}

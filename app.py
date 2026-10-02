@@ -12,6 +12,7 @@ import types
 import uuid
 import zipfile
 from datetime import UTC, datetime, timedelta
+from urllib.parse import urlparse
 
 from flask import Flask, Response, abort, current_app, flash, g, jsonify, make_response, redirect, render_template, request, send_from_directory, session, url_for
 from flask_limiter.errors import RateLimitExceeded
@@ -26,7 +27,7 @@ from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
 
-from auth import auth_bp, init_oauth
+from auth import auth_bp, init_oauth, is_safe_redirect_url
 from config import Config
 from extensions import csrf, limiter, rate_limit_key
 from converters import FBXConverter, OBJConverter, STLConverter
@@ -3066,8 +3067,32 @@ def cleanup_paths(paths: list[tuple[str, str]]) -> None:
 def register_error_handlers(app: Flask) -> None:
     @app.errorhandler(CSRFError)
     def csrf_error(error):
-        flash("Session security validation failed. Please try again.", "danger")
-        return render_template("errors/400.html", error=error), 400
+        # Script callers (fetch with X-CSRFToken / JSON) parse the response, so
+        # keep them on a JSON 400 instead of an HTML page.
+        wants_json = (
+            request.is_json
+            or bool(request.headers.get("X-CSRFToken"))
+            or request.accept_mimetypes.best == "application/json"
+        )
+        if wants_json:
+            return jsonify({"error": "csrf_expired", "message": "The page expired. Reload it and try again."}), 400
+        # A browser form whose token expired (tab left open past
+        # WTF_CSRF_TIME_LIMIT) or whose session ended: send the user back to
+        # where they were with an explanation instead of a dead-end error page.
+        back = None
+        referrer = request.referrer
+        if referrer and is_safe_redirect_url(referrer):
+            parsed = urlparse(referrer)
+            # restore_draft=1 lets long forms (e.g. new project) refill the
+            # values the browser kept in sessionStorage.
+            kept = [q for q in parsed.query.split("&") if q and not q.startswith("restore_draft=")]
+            back = f"{parsed.path}?{'&'.join(kept + ['restore_draft=1'])}"
+        if not current_user.is_authenticated:
+            flash("Your session expired. Log in again, then resubmit the form.", "warning")
+            target = back if back and back.startswith("/auth/") else url_for("auth.login", next=back or request.path)
+            return redirect(target, code=303)
+        flash("The page's security check expired, so your changes were not saved. Please submit the form again.", "warning")
+        return redirect(back or url_for("dashboard"), code=303)
 
     @app.errorhandler(RequestEntityTooLarge)
     def file_too_large(error):
@@ -3783,15 +3808,23 @@ def register_routes(app: Flask) -> None:
             flash("Could not start the upgrade: exchange rate unavailable. Please try again shortly.", "danger")
             return redirect(request.referrer or url_for("dashboard"))
         coupon, coupon_error = active_coupon(request.form.get("coupon_code"), plan_key)
+        # On a coupon problem, return to the picker with the chosen plan and the
+        # typed code still filled in so a typo can be corrected in place.
+        retry_url = url_for(
+            "model_upgrade_page",
+            model_id=model.id,
+            plan=plan_key,
+            coupon=(request.form.get("coupon_code") or "").strip()[:64] or None,
+        )
         if coupon_error:
             flash(coupon_error, "danger")
-            return redirect(url_for("model_upgrade_page", model_id=model.id))
+            return redirect(retry_url)
         if coupon is not None:
             coupon, coupon_error = reserve_coupon(coupon.id, plan_key)
             if coupon_error:
                 db.session.rollback()
                 flash(coupon_error, "danger")
-                return redirect(url_for("model_upgrade_page", model_id=model.id))
+                return redirect(retry_url)
         amount_kurus, discount_amount = coupon_price(amount_before_discount, coupon, plan_key)
         payment = Payment(
             user_id=current_user.id,

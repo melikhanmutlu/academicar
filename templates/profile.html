@@ -34,8 +34,8 @@
     <form method="POST" action="{{ url_for('account_update_profile') }}" class="profile-form-card">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="profile-form-row">
-        <label class="field-label">Full name</label>
-        <input type="text" name="username" value="{{ user.username }}" required minlength="2" maxlength="80" class="field-input">
+        <label class="field-label" for="profile_full_name">Full name</label>
+        <input type="text" name="username" id="profile_full_name" autocomplete="name" value="{{ user.username }}" required minlength="2" maxlength="80" class="field-input">
       </div>
       <button type="submit" class="btn-primary compact">Save profile</button>
     </form>

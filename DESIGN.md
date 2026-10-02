@@ -15,7 +15,7 @@ Ventriloc employs an analytical architecture aesthetic: a pristine gray-on-white
 | Cloud Whisper | `#f5f5f5` | `--color-cloud-whisper` | Muted backgrounds, navigation item backgrounds, light borders |
 | Warm Ivory | `#ebe6dd` | `--color-warm-ivory` | Subtle background shifts for content separation |
 | Dark Shale | `#4d4d4d` | `--color-dark-shale` | Secondary text, muted links, subtle dividers |
-| Silver Ash | `#828282` | `--color-silver-ash` | Tertiary text, inactive navigation items, placeholder text |
+| Silver Ash | `#6b6b6b` | `--color-silver-ash` | Tertiary text, inactive navigation items, placeholder text |
 | Light Pearl | `#e8e8e8` | `--color-light-pearl` | Thin dividers and subtle background accents |
 | Sunset Orange | `#ff682c` | `--color-sunset-orange` | Decorative accents, data visualization elements, highlight color for UI components |
 | Data Gold | `#816729` | `--color-data-gold` | Data visualization elements, secondary icon color, subtle branding accents |
@@ -95,7 +95,7 @@ Text in Midnight Graphite (#202020), no background, 2px bottom border in Midnigh
 ### Muted Nav Link
 **Role:** Navigation item, typically for less prominent sections or inactive states.
 
-Text in Silver Ash (#828282), no background, no border. Font is Inter 400 at 16px, line-height 1.25, normal letter-spacing.
+Text in Silver Ash (#6b6b6b), no background, no border. Font is Inter 400 at 16px, line-height 1.25, normal letter-spacing.
 
 ### Primary Ghost Button
 **Role:** Call to action, typically in sections with high visual contrast.
@@ -105,7 +105,7 @@ Transparent background, Midnight Graphite (#202020) text, 2px bottom border in M
 ### Secondary Ghost Button
 **Role:** Discreet calls to action or secondary actions.
 
-Transparent background, Silver Ash (#828282) text, no border. Font is Inter 400 at 16px, line-height 1.25, normal letter-spacing. Padding 0px top/bottom, 0px left/right. 20px border radius.
+Transparent background, Silver Ash (#6b6b6b) text, no border. Font is Inter 400 at 16px, line-height 1.25, normal letter-spacing. Padding 0px top/bottom, 0px left/right. 20px border radius.
 
 ### Highlight Card
 **Role:** Information display, often for data visualizations or key summaries.
@@ -192,7 +192,7 @@ No distinct primary action color was observed; use the extracted neutral button 
   --color-cloud-whisper: #f5f5f5;
   --color-warm-ivory: #ebe6dd;
   --color-dark-shale: #4d4d4d;
-  --color-silver-ash: #828282;
+  --color-silver-ash: #6b6b6b;
   --color-light-pearl: #e8e8e8;
   --color-sunset-orange: #ff682c;
   --color-data-gold: #816729;
@@ -273,7 +273,7 @@ No distinct primary action color was observed; use the extracted neutral button 
   --color-cloud-whisper: #f5f5f5;
   --color-warm-ivory: #ebe6dd;
   --color-dark-shale: #4d4d4d;
-  --color-silver-ash: #828282;
+  --color-silver-ash: #6b6b6b;
   --color-light-pearl: #e8e8e8;
   --color-sunset-orange: #ff682c;
   --color-data-gold: #816729;

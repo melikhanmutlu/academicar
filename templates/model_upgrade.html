@@ -15,17 +15,19 @@
   </div>
 
   {% if options %}
+    {% set requested_plan = request.args.get('plan') %}
+    {% set selected_plan = requested_plan if requested_plan in options|map(attribute='key')|list else options[0].key %}
     <form id="upgradeForm" method="POST"
-          action="{{ url_for('upgrade_model_license', model_id=model.id, plan=options[0].key) }}"
+          action="{{ url_for('upgrade_model_license', model_id=model.id, plan=selected_plan) }}"
           class="upgrade-card reveal-up">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
       <div class="upgrade-plan-list">
         {% for o in options %}
-          <label class="upgrade-plan{% if loop.first %} is-selected{% endif %}">
+          <label class="upgrade-plan{% if o.key == selected_plan %} is-selected{% endif %}">
             <input type="radio" name="plan" value="{{ o.key }}"
                    data-action="{{ url_for('upgrade_model_license', model_id=model.id, plan=o.key) }}"
-                   {% if loop.first %}checked{% endif %}>
+                   {% if o.key == selected_plan %}checked{% endif %}>
             <span class="upgrade-plan-body">
               <span class="upgrade-plan-head">
                 <span class="upgrade-plan-name">
@@ -45,8 +47,8 @@
       </div>
 
       <div class="upgrade-coupon">
-        <div><label for="couponCode">Coupon code</label><p>The code is validated before PayTR opens; the discounted total is sent to the payment gateway.</p></div>
-        <input id="couponCode" name="coupon_code" maxlength="64" autocomplete="off" placeholder="Enter coupon">
+        <div><label for="couponCode">Coupon code</label><p>The code is checked before you continue to payment, and the discounted total is what you are charged.</p></div>
+        <input id="couponCode" name="coupon_code" maxlength="64" autocomplete="off" placeholder="Enter coupon" value="{{ request.args.get('coupon', '') }}">
       </div>
 
       <div class="upgrade-actions">
@@ -80,6 +82,19 @@
     }
     radios.forEach(function (r) { r.addEventListener('change', sync); });
     sync();
+    // One checkout per click: lock the button while the payment is created.
+    var submitBtn = form.querySelector('.upgrade-submit');
+    var submitLabel = submitBtn ? submitBtn.textContent : '';
+    form.addEventListener('submit', function (event) {
+      if (form.dataset.submitting === '1') { event.preventDefault(); return; }
+      form.dataset.submitting = '1';
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Starting payment…'; }
+    });
+    window.addEventListener('pageshow', function (event) {
+      if (!event.persisted) return;
+      delete form.dataset.submitting;
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = submitLabel; }
+    });
   })();
 </script>
 {% endblock %}
