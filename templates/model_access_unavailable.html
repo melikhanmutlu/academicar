@@ -105,14 +105,18 @@
       {% if status == "expired" %}
         {% if is_owner %}
           {% set upgrade_options = model_upgrade_options(model) %}
-          {% for o in upgrade_options %}
-            <form method="POST" action="{{ url_for('upgrade_model_license', model_id=model.id, plan=o.key) }}" style="display:inline-block">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button type="submit" class="{% if loop.first %}btn-primary{% else %}btn-secondary{% endif %}" title="{{ (o.plan.duration_days // 365) }}-year AR &amp; QR access">
-                {{ 'Upgrade license · ' if o.kind == 'upgrade' else 'Renew · ' }}{{ o.plan.label }} ${{ '%.2f'|format(o.plan.price_usd) }}
-              </button>
-            </form>
-          {% endfor %}
+          {# Open the plan page with this plan preselected (coupon field,
+             plan details) instead of jumping straight to the payment form. #}
+          {% if upgrade_options %}
+            <div class="model-unavail-plans">
+              {% for o in upgrade_options %}
+                <a href="{{ url_for('model_upgrade_page', model_id=model.id, plan=o.key) }}" class="lp-btn {{ 'lp-btn-dark' if loop.first else 'lp-btn-ghost' }}" title="{{ (o.plan.duration_days // 365) }}-year AR &amp; QR access">
+                  {{ 'Upgrade license · ' if o.kind == 'upgrade' else 'Renew · ' }}{{ o.plan.label }} ${{ '%.2f'|format(o.plan.price_usd) }}
+                </a>
+              {% endfor %}
+            </div>
+            <p class="model-unavail-coupon-hint">Have a coupon code? You can enter it on the next step, before payment.</p>
+          {% endif %}
           <a href="{{ landing_url }}" class="btn-secondary">Go to project page</a>
         {% else %}
           {# A visitor cannot renew someone else's model: send them to the

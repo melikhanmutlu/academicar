@@ -431,3 +431,19 @@ def test_article_rows_offer_doi_autofill(client):
     # Rendered row + the template used for "+ Article".
     assert html.count("data-article-autofill ") + html.count("data-article-autofill>") >= 2
     assert "/papers/fetch-metadata" in html
+
+
+def test_expired_page_upgrade_buttons_open_the_plan_page_with_coupon_field(client, app):
+    """Owners of an expired model choose a plan on the upgrade page (coupon
+    field, plan details) instead of being sent straight to payment."""
+    register(client)
+    paper_id, _ = _make_paper(app)
+    expired = datetime.now(UTC) - timedelta(days=1)
+    model_id = _make_model(app, paper_id, license_type="free", expires=expired)
+    html = client.get(f"/view/{model_id}").data.decode()
+    assert f'/models/{model_id}/upgrade?plan=academic' in html
+    assert f'action="/models/{model_id}/upgrade/' not in html
+    assert "Have a coupon code?" in html
+    page = client.get(f"/models/{model_id}/upgrade?plan=extended_archive").data.decode()
+    assert 'name="coupon_code"' in page
+    assert re.search(r'value="extended_archive"[^>]*checked', page)

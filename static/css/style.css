@@ -9901,3 +9901,20 @@ body.nav-menu-open {
 /* Slightly tighter visibility rows now that the panel sits beside content. */
 .visibility-option { padding: 8px 12px; }
 body.project-detail-page { overflow-x: clip; }
+.model-unavail-coupon-hint {
+  flex-basis: 100%;
+  margin: 0 0 6px;
+  text-align: center;
+  font: 12.5px var(--font-inter);
+  color: var(--color-dark-shale);
+}
+.model-unavail-plans {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+@media (max-width: 640px) {
+  .model-unavail-plans .lp-btn { width: 100%; white-space: normal; text-align: center; }
+}
