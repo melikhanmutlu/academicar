@@ -18,7 +18,7 @@
 {% block content %}
 {% set viewable_models = active_models(paper) %}
 <div class="app-shell py-10 pb-10">
-  <section class="grid lg:grid-cols-[minmax(0,1fr)_360px] gap-5 mb-8">
+  <section class="grid lg:grid-cols-[minmax(0,1fr)_360px] gap-5 mb-8 public-hero-grid">
     <div class="surface paper-hero rounded-xl p-6 sm:p-7 reveal-up">
       <div class="flex flex-wrap gap-2 mb-4">
         <span class="detail-chip dark">{{ (paper.project_type or 'research_project')|replace('_', ' ')|title }}</span>
@@ -28,10 +28,12 @@
 
       <h1 class="paper-title font-serif text-3xl lg:text-4xl font-bold leading-tight text-[#111827]">{{ paper.title }}</h1>
 
+      {% if paper.institution or paper.department %}
       <div class="paper-meta mt-5">
         {% if paper.institution %}<div><span>Organization</span><strong>{{ paper.institution }}</strong></div>{% endif %}
         {% if paper.department %}<div><span>Department</span><strong>{{ paper.department }}</strong></div>{% endif %}
       </div>
+      {% endif %}
 
       {% if paper.abstract %}
         <div class="abstract-block mt-5 pt-5 border-t border-[#141821]/10" data-collapsible-abstract>
@@ -56,8 +58,9 @@
         </div>
       </div>
 
+      {% set first_pdf_article = (paper.articles or [])|selectattr('pdf_path')|first %}
+      {% if first_pdf_article or (presentation_enabled and paper.attachments) or paper.pdf_path %}
       <div class="share-actions mt-5">
-        {% set first_pdf_article = (paper.articles or [])|selectattr('pdf_path')|first %}
         {% if first_pdf_article %}
           <a href="{{ url_for('project_article_reader', slug=paper.slug, article_id=first_pdf_article.id) }}" class="btn-primary compact">{{ 'View first article' if first_pdf_article == paper.articles[0] else 'View article PDF' }}</a>
         {% elif presentation_enabled and paper.attachments %}
@@ -66,6 +69,7 @@
           <a href="{{ url_for('paper_public_pdf', slug=paper.slug) }}" class="btn-primary compact">View legacy document</a>
         {% endif %}
       </div>
+      {% endif %}
 
       <div class="share-stats mt-5">
         <div><span>Models</span><strong>{{ viewable_models|length }}</strong></div>

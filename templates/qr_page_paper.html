@@ -61,7 +61,7 @@
       <div class="actions">
         <button type="button" onclick="window.print()" class="btn">Print</button>
         <a href="{{ url_for('qr_image_paper', paper_id=paper.id) }}" download="qr_paper_{{ paper.id }}.png" class="btn btn-outline">Download PNG</a>
-        <a href="{{ url_for('paper_detail', slug=paper.slug) }}" class="btn btn-outline">Back</a>
+        <a href="{{ url_for('project_detail', slug=paper.slug) }}" class="btn btn-outline">Back</a>
       </div>
     </section>
 
@@ -71,7 +71,7 @@
       </div>
       <div class="instructions">
         <strong style="color:white;">Usage:</strong>
-        Place this QR in your paper, poster, or presentation. Readers scan it to land on the paper page where they can read the PDF and explore every 3D / AR model.
+        Place this QR in your paper, poster, or presentation. Readers scan it to land on the project page, where they can explore every 3D / AR model and any attached articles.
       </div>
     </aside>
   </main>

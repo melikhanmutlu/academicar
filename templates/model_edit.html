@@ -8,7 +8,7 @@
 {% block content %}
 {% set model_status = model.processing_status or 'ready' %}
 <div class="app-shell model-edit-shell py-10 pb-10">
-  <a href="{{ url_for('paper_detail', slug=paper.slug) }}" class="detail-back-button">&larr; Publication</a>
+  <a href="{{ url_for('project_detail', slug=paper.slug) }}" class="detail-back-button">&larr; Project</a>
 
   <div class="model-edit-header">
     <div>
@@ -29,7 +29,7 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="model-edit-card-head">
           <h2>Viewer card</h2>
-          <p>The model name and note appear on the publication detail page and public viewer surfaces.</p>
+          <p>The model name and note appear on the project page and in the public viewer.</p>
         </div>
         <div class="model-edit-field-grid">
           <label class="field-label">Model name</label>
@@ -42,7 +42,7 @@
         </div>
 
         <div class="model-edit-actions">
-          <a href="{{ url_for('paper_detail', slug=paper.slug) }}" class="detail-action">Cancel</a>
+          <a href="{{ url_for('project_detail', slug=paper.slug) }}" class="detail-action">Cancel</a>
           <button type="submit" class="detail-action detail-action-primary">Save Changes</button>
         </div>
       </form>
@@ -53,7 +53,7 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="model-edit-card-head">
           <h2>Viewer card</h2>
-          <p>The model name and note appear on the publication detail page and public viewer surfaces. Saved together with the appearance below.</p>
+          <p>The model name and note appear on the project page and in the public viewer. Saved together with the appearance below.</p>
         </div>
         <div class="model-edit-field-grid">
           <label class="field-label">Model name</label>
@@ -129,7 +129,7 @@
           </div>
         </div>
         <div class="model-edit-actions">
-          <a href="{{ url_for('paper_detail', slug=paper.slug) }}" class="detail-action">Cancel</a>
+          <a href="{{ url_for('project_detail', slug=paper.slug) }}" class="detail-action">Cancel</a>
           <button type="submit" class="detail-action detail-action-primary">Save Changes</button>
         </div>
       </form>
@@ -146,7 +146,7 @@
         <div class="surface model-edit-card">
           <div class="model-edit-card-head">
             <h2>Access plan</h2>
-            <p>A model's license is a paid upgrade and keeps the same QR and resolver URL. Upgrade or renew from the publication page.</p>
+            <p>A model's license is a paid upgrade and keeps the same QR and resolver URL. Upgrade or renew from the project page.</p>
           </div>
           <div class="model-meta-grid">
             <div><span>Current plan</span><strong>
@@ -163,7 +163,7 @@
             </strong></div>
           </div>
           <div class="model-edit-actions">
-            <a href="{{ url_for('paper_detail', slug=paper.slug) }}" class="detail-action detail-action-primary">Upgrade or renew</a>
+            <a href="{{ url_for('project_detail', slug=paper.slug) }}" class="detail-action detail-action-primary">Upgrade or renew</a>
           </div>
         </div>
 
@@ -245,7 +245,7 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="model-edit-card-head">
           <h2>Update model, keep link</h2>
-          <p>Upload a replacement GLB, STL, OBJ, or FBX. The model ID, QR image, resolver URL, and publication placement remain the same.</p>
+          <p>Upload a replacement GLB, STL, OBJ, or FBX. The model ID, QR image, resolver URL, and place in the project remain the same.</p>
         </div>
         <label class="upload-dropzone model-edit-dropzone">
           <span>Select replacement model file</span>
@@ -288,7 +288,7 @@
       </div>
       <div class="model-edit-side-actions">
         <a href="{{ url_for('qr_print', model_id=model.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action">View QR</a>
-        <a href="{{ url_for('paper_detail', slug=paper.slug) }}" class="detail-action">Back to Publication</a>
+        <a href="{{ url_for('project_detail', slug=paper.slug) }}" class="detail-action">Back to project</a>
         <form method="POST" action="{{ url_for('model_delete', model_id=model.id) }}" onsubmit="return confirm('Delete this 3D model? This cannot be undone.');" class="w-full mt-4 pt-4 border-t border-[#e2e8f0]">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="detail-action detail-action-danger w-full text-center">Delete Model</button>

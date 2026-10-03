@@ -5,7 +5,7 @@
 {% block content %}
 <div class="app-shell py-6 pb-10">
   <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-    <a href="{{ project_landing_url(paper) }}" class="nav-link inline-flex">&larr; Back to topic</a>
+    <a href="{{ project_landing_url(paper) }}" class="nav-link inline-flex">&larr; Back to project</a>
     <div class="flex flex-wrap gap-2">
       <a href="{{ download_url|default(url_for('paper_public_pdf_file', slug=paper.slug)) }}" download class="btn-secondary compact">Download original</a>
       {% if preview_available|default(true) %}<a href="{{ file_url|default(url_for('paper_public_pdf_file', slug=paper.slug)) }}" target="_blank" rel="noopener noreferrer" class="btn-secondary compact">Open preview</a>{% endif %}

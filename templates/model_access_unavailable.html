@@ -77,7 +77,7 @@
     {% if paper %}
     <div class="model-unavail-meta">
       <div class="model-unavail-meta-row">
-        <span class="model-unavail-meta-label">Publication</span>
+        <span class="model-unavail-meta-label">Project</span>
         <span class="model-unavail-meta-value">{{ paper.title }}</span>
       </div>
       {% if paper.authors %}
@@ -113,23 +113,23 @@
               </button>
             </form>
           {% endfor %}
-          <a href="{{ landing_url }}" class="btn-secondary">Go to publication page</a>
+          <a href="{{ landing_url }}" class="btn-secondary">Go to project page</a>
         {% else %}
           {# A visitor cannot renew someone else's model: send them to the
              publication; licensing info is secondary. #}
-          <a href="{{ landing_url }}" class="btn-primary">Go to publication page</a>
+          <a href="{{ landing_url }}" class="btn-primary">Go to project page</a>
           <a href="{{ url_for('landing') }}" class="btn-secondary">Learn about AcademicAR</a>
         {% endif %}
       {% elif status == "queued" or status == "processing" %}
         <button type="button" onclick="location.reload()" class="btn-primary">Refresh now</button>
-        <a href="{{ landing_url }}" class="btn-secondary">Go to publication page</a>
+        <a href="{{ landing_url }}" class="btn-secondary">Go to project page</a>
       {% elif status == "disabled" %}
         <a href="{{ url_for('landing') }}" class="btn-primary">Learn about AcademicAR</a>
       {% elif status == "private" %}
         {% if not current_user.is_authenticated %}<a href="{{ url_for('auth.login', next=request.full_path if request.query_string else request.path) }}" class="btn-primary">I'm the author &mdash; log in</a>{% endif %}
         <a href="{{ url_for('landing') }}" class="btn-secondary">Learn about AcademicAR</a>
       {% else %}
-        <a href="{{ landing_url }}" class="btn-primary">Go to publication page</a>
+        <a href="{{ landing_url }}" class="btn-primary">Go to project page</a>
         <a href="{{ url_for('landing') }}" class="btn-secondary">Learn about AcademicAR</a>
       {% endif %}
     </div>

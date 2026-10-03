@@ -1282,8 +1282,8 @@
     <aside id="infoPanel" role="dialog" aria-modal="true" aria-labelledby="infoPanelTitle" tabindex="-1" class="info-drawer absolute top-0 right-0 bottom-0 z-40 w-full sm:w-[420px] max-w-full bg-[#111111]/94 border-l border-white/10 overflow-y-auto p-6 backdrop-blur-2xl">
       <div class="flex items-center justify-between mb-6">
         <div>
-          <p class="text-xs uppercase tracking-[0.18em] text-white/55">Publication metadata</p>
-          <h2 id="infoPanelTitle" class="font-serif text-2xl font-semibold mt-1">Publication Info</h2>
+          <p class="text-xs uppercase tracking-[0.18em] text-white/55">Project details</p>
+          <h2 id="infoPanelTitle" class="font-serif text-2xl font-semibold mt-1">About this model</h2>
         </div>
         <button id="closeInfo" type="button" aria-label="Close publication info" class="rounded-full border border-white/10 w-9 h-9 text-white/70 hover:text-white hover:bg-white/10">×</button>
       </div>
@@ -1384,7 +1384,7 @@
           <div class="flex gap-2">
             <button type="button" data-collage-download class="viewer-tool-btn">Download image</button>
             {% if is_owner %}
-              <button type="button" data-collage-save class="viewer-tool-btn primary">Save to publication</button>
+              <button type="button" data-collage-save class="viewer-tool-btn primary">Save to project</button>
             {% endif %}
           </div>
         </div>
@@ -2369,7 +2369,7 @@
 
     // --- Combine screenshots: pick a few generated views (+ an optional QR
     // badge) and arrange them into one figure via drag/resize, entirely
-    // client-side. "Download image" needs no backend; "Save to publication"
+    // client-side. "Download image" needs no backend; "Save to project"
     // (owner-only) uploads the rendered PNG to model_collage_save.
     const COLLAGE_OUTPUT_W = 1600;
     const COLLAGE_OUTPUT_H = 1200; // matches the .viewer-collage-frame 4:3 aspect ratio
@@ -2645,12 +2645,12 @@
           body: formData,
         });
         if (!resp.ok) throw new Error('save failed');
-        setCollageStatus('Saved — it now shows on your publication page.', 'is-success');
+        setCollageStatus('Saved — it now shows on your project page.', 'is-success');
       } catch (error) {
         setCollageStatus('Could not save the combined figure. Please try again.', 'is-error');
       } finally {
         collageSaveButton.disabled = false;
-        collageSaveButton.textContent = 'Save to publication';
+        collageSaveButton.textContent = 'Save to project';
       }
     };
 

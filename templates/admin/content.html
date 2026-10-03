@@ -135,7 +135,7 @@
                       <button type="submit" class="admin-btn admin-btn-secondary compact">Restore</button>
                     </form>
                   {% else %}
-                    <a href="{{ url_for('paper_detail', slug=paper.slug) }}" class="admin-btn admin-btn-secondary compact">Open</a>
+                    <a href="{{ url_for('project_detail', slug=paper.slug) }}" class="admin-btn admin-btn-secondary compact">Open</a>
                   {% endif %}
                 </div>
                 <details class="admin-editor">

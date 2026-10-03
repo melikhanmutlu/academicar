@@ -82,7 +82,7 @@
 
         <div
           class="pub-row publication-row"
-          data-search="{{ ((p.title or '') ~ ' ' ~ (p.authors or '') ~ ' ' ~ (p.institution or '') ~ ' ' ~ (p.field or '') ~ ' ' ~ (p.year or '') ~ ' ' ~ (p.doi or '') ~ ' ' ~ (p.pmid or ''))|lower }}"
+          data-search="{{ ((p.title or '') ~ ' ' ~ (p.authors or '') ~ ' ' ~ (p.institution or '') ~ ' ' ~ (p.department or '') ~ ' ' ~ (p.field or '') ~ ' ' ~ (p.year or '') ~ ' ' ~ (p.doi or '') ~ ' ' ~ (p.pmid or '') ~ ' ' ~ visibility_label(p))|lower }}"
           data-title="{{ (p.title or '')|lower }}"
           data-models="{{ p.models|length }}"
         >
@@ -98,7 +98,9 @@
                 <a href="{{ paper_href }}">{{ p.title }}</a>
               </div>
               <p>
-                {{ p.authors if p.authors else '-' }}{% if p.institution %}<span> &middot; </span>{{ p.institution }}{% endif %}
+                {% if not demo %}<span class="publication-visibility is-{{ project_visibility(p) }}">{{ visibility_label(p) }}</span>{% endif %}
+                {% set row_meta = [p.authors, p.institution or p.department]|select|list %}
+                {% if row_meta %}{% if not demo %}<span> &middot; </span>{% endif %}{{ row_meta|join(' · ') }}{% endif %}
                 {% if p.year %}<span class="publication-year">{{ p.year }}</span>{% endif %}
               </p>
             </div>

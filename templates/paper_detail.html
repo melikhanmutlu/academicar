@@ -140,7 +140,7 @@
 
   {% if paper.articles or (presentation_enabled and paper.attachments) %}
   <section class="topic-library surface rounded-xl p-5 sm:p-6 mb-5">
-    <div class="section-heading-row"><div><p class="project-section-kicker">Topic library</p><h2>Related articles &amp; supporting materials</h2></div><a href="{{ url_for('project_edit', slug=paper.slug) }}" class="detail-action">Manage library</a></div>
+    <div class="section-heading-row"><div><p class="project-section-kicker">Project library</p><h2>Related articles &amp; supporting materials</h2></div><a href="{{ url_for('project_edit', slug=paper.slug) }}" class="detail-action">Manage library</a></div>
     {% if paper.articles %}
       <div class="topic-document-list">
         {% for article in paper.articles %}

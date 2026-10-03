@@ -1296,7 +1296,7 @@ def sync_project_articles(project: Paper, form, files) -> tuple[list[str], list[
                 db.session.delete(article)
             continue
         if row["id"] and article is None:
-            raise ValueError("An article row does not belong to this topic.")
+            raise ValueError("An article row does not belong to this project.")
         if article is None:
             article = ProjectArticle(project=project)
             db.session.add(article)
@@ -3081,7 +3081,7 @@ def _create_model_for_paper(
         cleanup_dir(converted_dir)
         return False, (
             f"The {capacity['plan'].label} plan allows {capacity['limit']} model(s) "
-            "per topic. Upgrade an existing model or ask an admin to raise the plan limit."
+            "per project. Upgrade the existing model to add more, or start a new project."
         )
 
     size_error = model_file_limit_error(file_size, license_normalized)
@@ -8173,7 +8173,7 @@ def register_routes(app: Flask) -> None:
             ]
             if material_uploads and not project_supports_feature(paper, "presentation_library"):
                 paper_errors.append(
-                    "PDF / PowerPoint supporting materials are disabled for this topic's plan."
+                    "PDF / PowerPoint supporting materials are disabled for this project's plan."
                 )
             if paper_errors:
                 flash(" ".join(paper_errors), "danger")
@@ -8388,9 +8388,9 @@ def register_routes(app: Flask) -> None:
         except SQLAlchemyError:
             db.session.rollback()
             logger.exception("Paper delete failed")
-            flash("The publication could not be deleted. Please try again.", "danger")
-            return redirect(url_for("paper_detail", slug=slug))
-        flash("Publication deleted.", "info")
+            flash("The project could not be deleted. Please try again.", "danger")
+            return redirect(url_for("project_detail", slug=slug))
+        flash("Project deleted.", "info")
         return redirect(url_for("dashboard"))
 
     @app.route("/papers/<slug>/upload-model", methods=["POST"])
@@ -8402,7 +8402,7 @@ def register_routes(app: Flask) -> None:
         file = request.files.get("file") or request.files.get("model_file")
         if not file or not file.filename:
             flash("No file selected.", "danger")
-            return redirect(url_for("paper_detail", slug=slug))
+            return redirect(url_for("project_detail", slug=slug))
 
         ok, message = _create_model_for_paper(
             paper,
@@ -8415,7 +8415,7 @@ def register_routes(app: Flask) -> None:
             compliance_confirm=request.form.get("compliance_confirm"),
         )
         flash(message, "success" if ok else "danger")
-        return redirect(url_for("paper_detail", slug=slug))
+        return redirect(url_for("project_detail", slug=slug))
 
     # NOTE: there is intentionally no owner-facing "change my model's license"
     # route. Licenses are paid upgrades only (see upgrade_model_license ->
@@ -8437,16 +8437,16 @@ def register_routes(app: Flask) -> None:
         file = request.files.get("file") or request.files.get("model_file")
         if not file or not file.filename:
             flash("No replacement file selected.", "danger")
-            return redirect(url_for("paper_detail", slug=model.paper.slug))
+            return redirect(url_for("project_detail", slug=model.paper.slug))
         if not allowed_model(file.filename):
             flash("Replacement must be a .stl, .glb, .obj, or .fbx file.", "danger")
-            return redirect(url_for("paper_detail", slug=model.paper.slug))
+            return redirect(url_for("project_detail", slug=model.paper.slug))
         if request.form.get("compliance_confirm") != "yes":
             flash(
                 "You must reconfirm anonymization, rights, and ethics responsibility before replacing the model.",
                 "danger",
             )
-            return redirect(url_for("paper_detail", slug=model.paper.slug))
+            return redirect(url_for("project_detail", slug=model.paper.slug))
 
         original_name = secure_filename(file.filename)
         source_format = original_name.rsplit(".", 1)[1].lower()
@@ -8462,7 +8462,7 @@ def register_routes(app: Flask) -> None:
         except StorageError as e:
             cleanup_dir(upload_dir)
             flash(str(e), "danger")
-            return redirect(url_for("paper_detail", slug=model.paper.slug))
+            return redirect(url_for("project_detail", slug=model.paper.slug))
 
         # OBJ companions live alongside the source so the converter can resolve
         # MTL / texture references from the same directory.
@@ -8476,13 +8476,13 @@ def register_routes(app: Flask) -> None:
             except StorageError as e:
                 cleanup_dir(upload_dir)
                 flash(str(e), "danger")
-                return redirect(url_for("paper_detail", slug=model.paper.slug))
+                return redirect(url_for("project_detail", slug=model.paper.slug))
 
         size_error = model_file_limit_error(os.path.getsize(source_path), model.license_type)
         if size_error:
             cleanup_dir(upload_dir)
             flash(size_error, "danger")
-            return redirect(url_for("paper_detail", slug=model.paper.slug))
+            return redirect(url_for("project_detail", slug=model.paper.slug))
 
         # Archive the new source under uploads/<model_id>/v<n>/ so we have a
         # tamper-evident trail of every replacement attempt.
@@ -8543,7 +8543,7 @@ def register_routes(app: Flask) -> None:
         else:
             flash("Model file replaced.", "success")
         cleanup_dir(upload_dir)
-        return redirect(url_for("paper_detail", slug=model.paper.slug))
+        return redirect(url_for("project_detail", slug=model.paper.slug))
 
     @app.route("/models/<model_id>/appearance", methods=["POST"])
     @login_required
@@ -8924,14 +8924,14 @@ def register_routes(app: Flask) -> None:
             db.session.rollback()
             logger.exception("Model delete failed")
             flash("The model could not be deleted. Please try again.", "danger")
-            return redirect(url_for("paper_detail", slug=slug))
+            return redirect(url_for("project_detail", slug=slug))
         cleanup_paths(file_paths)
         mirror_delete(f"converted/{model_id}/model.glb")
         mirror_delete(f"converted/{model_id}/model.usdz")
         mirror_delete(f"converted/{model_id}/poster.png")
         mirror_delete(f"qr_codes/qr_{model_id}.png")
         flash("Model deleted.", "info")
-        return redirect(url_for("paper_detail", slug=slug))
+        return redirect(url_for("project_detail", slug=slug))
 
 
 app = create_app()

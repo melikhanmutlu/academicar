@@ -163,7 +163,7 @@
 
       <div>
         <label class="field-label">Project description</label>
-        <textarea name="abstract" rows="6" class="field-textarea" placeholder="What is this topic, what do the models show, and who is it for?">{{ form.get('abstract', '') }}</textarea>
+        <textarea name="abstract" rows="6" class="field-textarea" placeholder="What is this project about, what do the models show, and who is it for?">{{ form.get('abstract', '') }}</textarea>
       </div>
 
         </div>
@@ -290,7 +290,7 @@
             <input type="file" name="materials[]" multiple accept=".pdf,.ppt,.pptx" class="native-file-input" data-named-file-input>
           </label>
         {% else %}
-          <p class="rounded-lg border border-[#e8e8e8] bg-[#f8f8f8] p-4 text-sm text-[#64748b]">Supporting PDF / PowerPoint uploads are disabled for this topic's current plan.</p>
+          <p class="rounded-lg border border-[#e8e8e8] bg-[#f8f8f8] p-4 text-sm text-[#64748b]">Supporting PDF / PowerPoint uploads are disabled for this project's current plan.</p>
         {% endif %}
       </section>
 
@@ -305,12 +305,12 @@
 
       <div class="paper-form-actions flex items-center justify-between gap-3 pt-4 border-t border-[#141821]/10">
         {% if is_edit %}
-          <button type="button" class="detail-action detail-action-danger" data-delete-paper-open>Delete Publication</button>
+          <button type="button" class="detail-action detail-action-danger" data-delete-paper-open>Delete project</button>
         {% else %}
           <span></span>
         {% endif %}
         <div class="flex items-center gap-3">
-          <a href="{{ url_for('paper_detail', slug=paper.slug) if is_edit else url_for('dashboard') }}" class="btn-secondary">Cancel</a>
+          <a href="{{ url_for('project_detail', slug=paper.slug) if is_edit else url_for('dashboard') }}" class="btn-secondary">Cancel</a>
           <button type="submit" class="btn-primary" data-form-submit>{{ 'Save Changes' if is_edit else 'Save and Continue' }}</button>
         </div>
       </div>
@@ -329,12 +329,12 @@
       <dialog class="confirm-dialog" data-delete-paper-dialog aria-labelledby="delete-dialog-title">
         <form method="dialog" class="confirm-dialog-card">
           <div>
-            <h2 id="delete-dialog-title">Delete this publication?</h2>
-            <p>The publication will be hidden from your dashboard and public links. Admins can restore it later.</p>
+            <h2 id="delete-dialog-title">Delete this project?</h2>
+            <p>The project will be hidden from your dashboard and its links and QR codes will stop working. Admins can restore it later.</p>
           </div>
           <div class="confirm-dialog-actions">
             <button type="submit" class="detail-action">Cancel</button>
-            <button type="submit" class="detail-action detail-action-danger" form="delete-paper-form">Delete Publication</button>
+            <button type="submit" class="detail-action detail-action-danger" form="delete-paper-form">Delete project</button>
           </div>
         </form>
       </dialog>
@@ -387,7 +387,7 @@
   if (deleteDialog && deleteDialogOpen) {
     deleteDialogOpen.addEventListener('click', () => {
       if (typeof deleteDialog.showModal === 'function') deleteDialog.showModal();
-      else if (window.confirm('Delete this publication? Admins can restore it later.')) {
+      else if (window.confirm('Delete this project? Admins can restore it later.')) {
         document.getElementById('delete-paper-form')?.requestSubmit();
       }
     });
@@ -699,7 +699,7 @@
         }
         const replaceNote = document.querySelector('label[data-pdf-upload-card] span.text-sm');
         if (replaceNote) {
-          replaceNote.textContent = "Optional PDF upload. PDF files are only downloadable by the publication owner.";
+          replaceNote.textContent = "Optional PDF upload. PDF files are only downloadable by the project owner.";
         }
       } else {
         alert(data.error || "Could not delete PDF. Please try again.");
