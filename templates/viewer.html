@@ -32,6 +32,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script type="module" src="https://unpkg.com/@google/model-viewer@4.3.0/dist/model-viewer.min.js" crossorigin="anonymous"></script>
   <script src="{{ url_for('static', filename='vendor/jszip.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='vendor/fix-webm-duration.js') }}" defer></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 
   <style>
@@ -1493,6 +1494,23 @@
     let collageNextZ = 1;
     let modelAnimationAvailable = false;
     let modelAnimationPlaying = true;
+    // model-viewer keeps two canvases in its shadow root and shows only one
+    // (class "show"); the first one is display:none and never receives frames,
+    // so recording it produced empty videos.
+    const visibleViewerCanvas = () => {
+      const canvases = [...(viewer?.shadowRoot?.querySelectorAll('canvas') || [])];
+      return canvases.find((c) => c.classList.contains('show'))
+        || canvases.find((c) => getComputedStyle(c).display !== 'none')
+        || null;
+    };
+    // When frames get slow, model-viewer renders into the top-left part of
+    // its canvas and scales it up with CSS; it reports the rendered size in a
+    // "render-scale" event. Recording reads only that region.
+    let renderedPixels = null;
+    viewer?.addEventListener('render-scale', (event) => {
+      const detail = event.detail || {};
+      if (detail.pixelWidth && detail.pixelHeight) renderedPixels = { w: detail.pixelWidth, h: detail.pixelHeight };
+    });
     let videoRecorder = null;
     let videoChunks = [];
     let videoStopTimer = null;
@@ -1949,7 +1967,7 @@
       }
       if (shotStatusEl) shotStatusEl.textContent = '';
       if (videoRecordButton) {
-        const canvas = viewer.shadowRoot?.querySelector('canvas');
+        const canvas = visibleViewerCanvas();
         const supported = Boolean(window.MediaRecorder && canvas && typeof canvas.captureStream === 'function');
         videoRecordButton.disabled = !supported;
         videoRecordButton.textContent = supported ? 'Start recording' : 'Recording unavailable';
@@ -2911,45 +2929,111 @@
     const stopVideoRecording = () => {
       if (videoRecorder && videoRecorder.state === 'recording') videoRecorder.stop();
     };
+    // The 3D canvas is transparent, which most players show as black: paint
+    // the viewer's current backdrop behind every recorded frame instead.
+    const paintVideoBackdrop = (ctx, w, h) => {
+      const mode = document.documentElement.getAttribute('data-viewer-bg') || 'dark';
+      if (mode === 'white') {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+        return;
+      }
+      const cx = w * 0.5;
+      const cy = h * (mode === 'light' ? 0.42 : 0.48);
+      const radius = Math.hypot(Math.max(cx, w - cx), Math.max(cy, h - cy));
+      const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+      if (mode === 'light') {
+        gradient.addColorStop(0, '#ffffff'); gradient.addColorStop(0.56, '#eef1f4'); gradient.addColorStop(1, '#d8dde3');
+      } else {
+        gradient.addColorStop(0, '#2a2a2d'); gradient.addColorStop(0.54, '#111111'); gradient.addColorStop(1, '#050505');
+      }
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, w, h);
+    };
     const startVideoRecording = () => {
-      const canvas = viewer.shadowRoot?.querySelector('canvas');
-      if (!window.MediaRecorder || !canvas || typeof canvas.captureStream !== 'function') {
+      const source = visibleViewerCanvas();
+      const frame = document.createElement('canvas');
+      if (!window.MediaRecorder || !source || typeof frame.captureStream !== 'function') {
         setVideoStatus('This browser cannot record the 3D canvas.', true);
         return;
       }
-      const stream = canvas.captureStream(30);
-      const preferredTypes = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+      // model-viewer lowers its render resolution when the frame rate drops
+      // and hides that with a CSS scale, so a raw capture shows a small model
+      // in a corner. Keep full resolution while recording.
+      // The setter has no getter; 0.5 is model-viewer's default.
+      const ModelViewer = customElements.get('model-viewer');
+      const previousRenderScale = (ModelViewer && typeof ModelViewer.minimumRenderScale === 'number') ? ModelViewer.minimumRenderScale : 0.5;
+      if (ModelViewer) ModelViewer.minimumRenderScale = 1;
+      // Size the video to the viewer as displayed (device pixels); encoders
+      // want even dimensions, and very large (retina) frames are capped.
+      const dpr = window.devicePixelRatio || 1;
+      const displayWidth = Math.max(1, Math.round(viewer.clientWidth * dpr));
+      const displayHeight = Math.max(1, Math.round(viewer.clientHeight * dpr));
+      const scale = Math.min(1, 1920 / displayWidth);
+      frame.width = Math.max(2, Math.round(displayWidth * scale / 2) * 2);
+      frame.height = Math.max(2, Math.round(displayHeight * scale / 2) * 2);
+      const frameCtx = frame.getContext('2d');
+      let frameRequest = null;
+      const drawFrame = () => {
+        const sw = Math.min(source.width, renderedPixels ? renderedPixels.w : displayWidth);
+        const sh = Math.min(source.height, renderedPixels ? renderedPixels.h : displayHeight);
+        paintVideoBackdrop(frameCtx, frame.width, frame.height);
+        frameCtx.drawImage(source, 0, 0, sw, sh, 0, 0, frame.width, frame.height);
+        frameRequest = requestAnimationFrame(drawFrame);
+      };
+      drawFrame();
+      const stream = frame.captureStream(30);
+      // H.264 MP4 plays everywhere (PowerPoint, Keynote, QuickTime, phones).
+      // A bare "video/mp4" can mean VP9-in-MP4 in Chromium, which many players
+      // reject, so WebM comes before it; bare MP4 is the last resort for
+      // browsers that only record MP4.
+      const preferredTypes = [
+        'video/mp4;codecs=avc1.42E01E', 'video/mp4;codecs=avc1',
+        'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4',
+      ];
       const mimeType = preferredTypes.find((type) => MediaRecorder.isTypeSupported?.(type)) || '';
+      const cleanup = () => {
+        cancelAnimationFrame(frameRequest);
+        stream.getTracks().forEach((track) => track.stop());
+        if (ModelViewer) ModelViewer.minimumRenderScale = previousRenderScale;
+      };
       try {
         videoRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       } catch (error) {
-        stream.getTracks().forEach((track) => track.stop());
+        cleanup();
         setVideoStatus('Recording could not be started in this browser.', true);
         return;
       }
       videoChunks = [];
+      const startedAt = performance.now();
       videoRecorder.addEventListener('dataavailable', (event) => {
         if (event.data && event.data.size) videoChunks.push(event.data);
       });
       videoRecorder.addEventListener('error', () => setVideoStatus('Recording failed.', true));
-      videoRecorder.addEventListener('stop', () => {
+      videoRecorder.addEventListener('stop', async () => {
         clearTimeout(videoStopTimer);
-        stream.getTracks().forEach((track) => track.stop());
+        cleanup();
         const finalType = videoRecorder?.mimeType || mimeType || 'video/webm';
-        if (videoChunks.length) {
-          const blob = new Blob(videoChunks, { type: finalType });
-          const link = document.createElement('a');
-          link.href = URL.createObjectURL(blob);
-          link.download = `${safeName(modelBaseName)}-viewer-recording.${finalType.includes('mp4') ? 'mp4' : 'webm'}`;
-          link.click();
-          setTimeout(() => URL.revokeObjectURL(link.href), 1500);
-          setVideoStatus('Recording downloaded.');
-        } else {
-          setVideoStatus('No video frames were captured.', true);
-        }
-        if (videoRecordButton) videoRecordButton.textContent = 'Start recording';
+        const chunks = videoChunks;
         videoRecorder = null;
         videoChunks = [];
+        if (videoRecordButton) videoRecordButton.textContent = 'Start recording';
+        if (!chunks.length) {
+          setVideoStatus('No video frames were captured.', true);
+          return;
+        }
+        let blob = new Blob(chunks, { type: finalType });
+        // Browser-recorded WebM has no duration, so players cannot show its
+        // length or seek; write it into the file before download.
+        if (!finalType.includes('mp4') && typeof window.ysFixWebmDuration === 'function') {
+          try { blob = await window.ysFixWebmDuration(blob, performance.now() - startedAt, { logger: false }); } catch (error) { /* keep the raw file */ }
+        }
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${safeName(modelBaseName)}-viewer-recording.${finalType.includes('mp4') ? 'mp4' : 'webm'}`;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(link.href), 1500);
+        setVideoStatus('Recording downloaded.');
       }, { once: true });
       videoRecorder.start(250);
       if (videoRecordButton) videoRecordButton.textContent = 'Stop & download';
