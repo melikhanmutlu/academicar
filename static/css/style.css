@@ -8559,9 +8559,9 @@ body.nav-menu-open {
 .model-unavail-shell {
   min-height: calc(100vh - 64px);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 48px 20px;
+  padding: 72px 20px 48px;
   background: var(--color-canvas-white);
 }
 
@@ -8703,14 +8703,21 @@ body.nav-menu-open {
 }
 
 .model-unavail-note {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
   font-size: 12px;
   color: var(--color-silver-ash);
   line-height: 1.5;
   max-width: 420px;
   margin: 0 auto;
+  text-align: left;
 }
+.model-unavail-note svg { flex: 0 0 auto; margin-top: 2px; opacity: .6; }
 
 @media (max-width: 600px) {
+  .model-unavail-shell { padding-top: 40px; }
   .model-unavail-title { font-size: 20px; }
   .model-unavail-actions { flex-direction: column; }
   .model-unavail-actions .btn-primary,

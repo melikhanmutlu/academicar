@@ -42,7 +42,9 @@
     </div>
 
     <h1 class="model-unavail-title">
-      {% if status == "expired" %}
+      {% if status == "expired" and is_owner %}
+        This model's access has expired.
+      {% elif status == "expired" %}
         This model's AR link has expired.
       {% elif status == "queued" or status == "processing" %}
         Your 3D model is being prepared.
@@ -59,21 +61,25 @@
 
     <p class="model-unavail-subtitle">
       {% if status == "expired" %}
-        The access period for this model has ended. The QR code and viewer URL stay reserved, so this same link will work again as soon as the publication owner renews access.
+        {% if is_owner %}
+          Your {{ get_license_plan(model.license_type).label }} plan{% if model.access_expires_at %} ended on {{ model.access_expires_at.strftime('%b %d, %Y') }}{% else %} has ended{% endif %}. Renew or upgrade to turn the viewer, AR and QR code back on &mdash; the link and any printed QR codes stay the same.
+        {% else %}
+          The access period for this model has ended. The QR code and viewer link stay reserved and will work again as soon as the project's authors renew access.
+        {% endif %}
       {% elif status == "queued" or status == "processing" %}
         The file is in the conversion queue. This usually takes under a minute. This page checks again every 15 seconds and opens the viewer once the model is ready.
       {% elif status == "disabled" %}
-        The model behind this code is no longer offered through this link. If you expected it to work, contact the publication's authors.
+        The model behind this code is no longer offered through this link. If you expected it to work, contact the project's authors.
       {% elif status == "private" %}
         Its authors have not shared it yet. If you were given this link or QR code, ask them to turn on sharing &mdash; this same link starts working as soon as they do.
       {% elif status == "failed" %}
-        An error occurred while converting this file. The publication owner can upload a replacement model; the QR and viewer link will remain the same.
+        An error occurred while converting this file. The project owner can upload a replacement model; the QR and viewer link will remain the same.
       {% else %}
-        This model is not currently accessible. The QR and viewer URL are still managed by AcademicAR — the publication owner can restore access at any time without changing this link.
+        This model is not currently accessible. The QR and viewer URL are still managed by AcademicAR — the project owner can restore access at any time without changing this link.
       {% endif %}
     </p>
 
-    <!-- Publication metadata panel -->
+    <!-- Project metadata panel -->
     {% if paper %}
     <div class="model-unavail-meta">
       <div class="model-unavail-meta-row">
@@ -97,6 +103,12 @@
           {{ get_license_plan(model.license_type).label }}
         </span>
       </div>
+      {% if status == "expired" and model.access_expires_at %}
+      <div class="model-unavail-meta-row">
+        <span class="model-unavail-meta-label">Ended</span>
+        <span class="model-unavail-meta-value">{{ model.access_expires_at.strftime('%b %d, %Y') }}</span>
+      </div>
+      {% endif %}
     </div>
     {% endif %}
 
@@ -120,7 +132,7 @@
           <a href="{{ landing_url }}" class="btn-secondary">Go to project page</a>
         {% else %}
           {# A visitor cannot renew someone else's model: send them to the
-             publication; licensing info is secondary. #}
+             project; licensing info is secondary. #}
           <a href="{{ landing_url }}" class="btn-primary">Go to project page</a>
           <a href="{{ url_for('landing') }}" class="btn-secondary">Learn about AcademicAR</a>
         {% endif %}
@@ -141,8 +153,8 @@
     <!-- Footer note -->
     {% if status not in ("disabled", "private") %}
     <p class="model-unavail-note">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="vertical-align:-2px; opacity:.5;"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      The QR code and viewer URL for this model are permanently reserved by AcademicAR and will continue to work once access is restored.
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span>The QR code and viewer link for this model are permanently reserved and will work again once access is restored.</span>
     </p>
     {% endif %}
 

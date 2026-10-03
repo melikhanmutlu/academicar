@@ -789,7 +789,7 @@ def test_free_model_expires_after_three_days_but_keeps_qr_and_can_be_upgraded(cl
     expired_viewer = client.get(f"/view/{model_id}")
     assert expired_resolver.status_code == 410
     assert expired_viewer.status_code == 410
-    assert "AR link has expired" in expired_viewer.get_data(as_text=True)
+    assert "access has expired" in expired_viewer.get_data(as_text=True)  # owner wording
     assert client.get(f"/files/{model_id}/model.glb").status_code == 404
 
     with client.application.app_context():

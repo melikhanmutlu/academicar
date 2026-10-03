@@ -447,3 +447,19 @@ def test_expired_page_upgrade_buttons_open_the_plan_page_with_coupon_field(clien
     page = client.get(f"/models/{model_id}/upgrade?plan=extended_archive").data.decode()
     assert 'name="coupon_code"' in page
     assert re.search(r'value="extended_archive"[^>]*checked', page)
+
+
+def test_expired_page_speaks_to_the_owner_and_shows_the_end_date(client, app):
+    register(client)
+    paper_id, _ = _make_paper(app)
+    ended = datetime(2026, 9, 13, 12, 0, tzinfo=UTC)
+    model_id = _make_model(app, paper_id, license_type="free", expires=ended)
+    owner = client.get(f"/view/{model_id}").data.decode()
+    assert "This model&#39;s access has expired." in owner or "This model's access has expired." in owner
+    assert "ended on Sep 13, 2026" in owner and "Renew or upgrade" in owner
+    assert ">Ended<" in owner
+    assert "publication" not in owner.lower().split("<main", 1)[1].split("</main>", 1)[0]
+    client.post("/auth/logout")
+    visitor = client.get(f"/view/{model_id}").data.decode()
+    assert "project&#39;s authors renew access" in visitor or "project's authors renew access" in visitor
+    assert "Renew or upgrade" not in visitor
