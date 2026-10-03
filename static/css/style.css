@@ -9854,3 +9854,50 @@ body.nav-menu-open {
 /* Share-panel text may wrap; never let it widen the panel past the screen. */
 .visibility-option-text { min-width: 0; }
 .share-actions.share-actions-inline .detail-action { white-space: normal; text-align: center; padding-left: 8px; padding-right: 8px; }
+
+/* Project page (v37): the left column holds the project card, library, model
+   registry and upload form; the share panel stays beside them and sticks
+   under the site header while scrolling. No tall empty gap above the
+   models when the description is short. */
+@media (max-width: 1099px) {
+  /* Too narrow for models beside the share panel: stack like on phones. */
+  .paper-detail-layout { grid-template-columns: minmax(0, 1fr); }
+}
+@media (min-width: 1100px) {
+  .paper-detail-layout {
+    grid-template-rows: repeat(4, auto);
+    row-gap: 0;
+  }
+  .paper-detail-layout > :not(.share-panel) {
+    grid-column: 1;
+    min-width: 0;
+    margin-bottom: 20px;
+  }
+  .paper-detail-layout > .share-panel {
+    grid-column: 2;
+    grid-row: 1 / -1;
+    align-self: start;
+    position: sticky;
+    top: 84px;
+    max-height: calc(100vh - 104px);
+    overflow-y: auto;
+  }
+  .paper-detail-layout .model-registry-grid { grid-template-columns: minmax(0, 1fr); }
+}
+.section-heading-count {
+  margin-left: 8px;
+  font: 500 14px var(--font-inter);
+  letter-spacing: 0;
+  color: var(--color-silver-ash);
+  vertical-align: middle;
+}
+.paper-actions .detail-action:not(.detail-action-primary) {
+  border: 0;
+  background: transparent;
+  color: var(--color-dark-shale);
+  padding: 0 6px;
+}
+.paper-actions .detail-action:not(.detail-action-primary):hover { color: var(--color-midnight-graphite); }
+/* Slightly tighter visibility rows now that the panel sits beside content. */
+.visibility-option { padding: 8px 12px; }
+body.project-detail-page { overflow-x: clip; }

@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ paper.title }} - AcademicAR{% endblock %}
+{# overflow-x: hidden on body breaks the sticky share panel; clip does not. #}
+{% block body_class %}project-detail-page{% endblock %}
 {% block head %}
 <script type="module" src="https://unpkg.com/@google/model-viewer@4.3.0/dist/model-viewer.min.js" crossorigin="anonymous"></script>
 {% endblock %}
@@ -40,6 +42,7 @@
             <span class="detail-chip">{{ visibility_label(paper) }}</span>
         </div>
         <div class="paper-actions">
+          <a href="{{ url_for('project_edit', slug=paper.slug) }}" class="detail-action">Add article or material</a>
           <a href="{{ url_for('project_edit', slug=paper.slug) }}" class="detail-action detail-action-primary">Edit Project</a>
         </div>
       </div>
@@ -152,29 +155,14 @@
         {% endif %}
       </div>
 
-      <div class="share-actions mt-5">
-        {% if not paper.models and can_upload_more %}
-          <a href="#add-model" class="detail-action detail-action-primary">Add the first model</a>
-        {% elif paper.articles and paper.articles[0].pdf_path %}
-          <a href="{{ url_for('project_article_reader', slug=paper.slug, article_id=paper.articles[0].id) }}" target="_blank" rel="noopener noreferrer" class="detail-action detail-action-primary">Present first article</a>
-        {% elif presentation_enabled and paper.attachments %}
-          <a href="{{ url_for('project_attachment_reader', slug=paper.slug, attachment_id=paper.attachments[0].id) }}" target="_blank" rel="noopener noreferrer" class="detail-action detail-action-primary">Open materials</a>
-        {% endif %}
-        <a href="{{ url_for('project_edit', slug=paper.slug) }}" class="detail-action">Add article or material</a>
-      </div>
-
-      <div class="share-stats mt-5">
-        <div>
-          <span>Models</span>
-          <strong>{{ paper.models|length }}</strong>
-        </div>
-        <div>
-          <span>Articles</span>
-          <strong>{{ paper.articles|length }}</strong>
-        </div>
-      </div>
+      {% if not paper.models and can_upload_more %}
+        <div class="share-actions mt-5"><a href="#add-model" class="detail-action detail-action-primary">Add the first model</a></div>
+      {% elif paper.articles and paper.articles[0].pdf_path %}
+        <div class="share-actions mt-5"><a href="{{ url_for('project_article_reader', slug=paper.slug, article_id=paper.articles[0].id) }}" target="_blank" rel="noopener noreferrer" class="detail-action detail-action-primary">Present first article</a></div>
+      {% elif presentation_enabled and paper.attachments %}
+        <div class="share-actions mt-5"><a href="{{ url_for('project_attachment_reader', slug=paper.slug, attachment_id=paper.attachments[0].id) }}" target="_blank" rel="noopener noreferrer" class="detail-action detail-action-primary">Open materials</a></div>
+      {% endif %}
     </aside>
-  </section>
 
   {% if paper.articles or (presentation_enabled and paper.attachments) %}
   <section class="topic-library surface rounded-xl p-5 sm:p-6 mb-5">
@@ -197,7 +185,7 @@
   <section class="mb-5" data-model-registry>
     <div class="section-heading-row">
       <div>
-        <h2>Model registry</h2>
+        <h2>Model registry{% if paper.models %} <span class="section-heading-count">{{ paper.models|length }} model{{ '' if paper.models|length == 1 else 's' }}</span>{% endif %}</h2>
       </div>
     </div>
 
@@ -478,6 +466,7 @@
     {% endif %}
     {% endif %}
   </section>
+  </section>{# /.paper-detail-layout #}
 </div>
 {% endblock %}
 

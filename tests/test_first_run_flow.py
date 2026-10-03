@@ -174,3 +174,21 @@ def test_narrowing_visibility_asks_for_confirmation(client, app):
     assert "data-confirm" in option("unlisted")     # public -> review link
     assert option("public").startswith('<button type="button"')  # current: no resubmit
     assert "Who can open this project" in html
+
+
+def test_project_page_puts_models_beside_the_share_panel(client, app):
+    """v37 layout: the model registry follows the project card in the left
+    column (no empty gap under a short description); the share panel holds
+    only sharing, and "Add article or material" lives in the card toolbar."""
+    register(client)
+    slug, _, _ = _project(app, visibility="public")
+    html = client.get(f"/projects/{slug}").data.decode()
+    layout_start = html.index('class="paper-detail-layout')
+    layout_end = html.index("/.paper-detail-layout")
+    assert layout_start < html.index("data-model-registry") < layout_end
+    assert layout_start < html.index('id="add-model"') < layout_end
+    assert "share-stats" not in html
+    toolbar = html[html.index('class="paper-actions"'):html.index('class="paper-actions"') + 600]
+    assert "Add article or material" in toolbar
+    assert 'class="section-heading-count">1 model<' in html
+    assert "project-detail-page" in html  # body class that keeps the panel sticky
