@@ -44,12 +44,18 @@
       .qr-panel { background: white; color: #111111; padding: 0; margin-top: 22px; }
       .qr-wrap { border: none; padding: 0; width: 320px; }
     }
+    .private-warning { margin-top: 18px; padding: 14px 16px; border: 1px solid #ffd9c7; background: #fff1ea; border-radius: 4px; font-size: 13px; line-height: 1.55; color: #111111; max-width: 560px; }
+    .private-warning a { color: #111111; font-weight: 700; }
+    @media print { .private-warning { display: none; } }
   </style>
 </head>
 <body>
   <main class="sheet">
     <section class="meta">
       <h1>{{ paper.title }}</h1>
+      {% if project_visibility(paper) == 'private' %}
+      <p class="private-warning" role="note"><strong>This project is private.</strong> Anyone who scans this code sees a "private project" page. Switch it to <em>Review link</em> or <em>Public</em> on the <a href="{{ url_for('project_detail', slug=paper.slug) }}">project page</a> before printing.</p>
+      {% endif %}
       {% if paper.authors %}<p class="subtitle">{{ paper.authors }}{% if paper.institution %} · {{ paper.institution }}{% endif %}</p>{% endif %}
       <p class="url">{{ project_landing_url(paper, absolute=True) }}</p>
       <div class="actions">

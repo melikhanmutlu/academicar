@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}
-  {% if status == "expired" %}Model link expired{% elif status == "queued" or status == "processing" %}Model processing{% elif status == "failed" %}Model unavailable{% else %}Model unavailable{% endif %} — AcademicAR
+  {% if status == "private" %}Private project{% elif status == "expired" %}Model link expired{% elif status == "queued" or status == "processing" %}Model processing{% elif status == "failed" %}Model unavailable{% else %}Model unavailable{% endif %} — AcademicAR
 {% endblock %}
 
 {% block head %}
@@ -36,6 +36,7 @@
       {% elif status == "processing" %}Processing — converting
       {% elif status == "failed" %}Conversion failed
       {% elif status == "disabled" %}Link disabled
+      {% elif status == "private" %}Private project
       {% else %}Access unavailable
       {% endif %}
     </div>
@@ -49,6 +50,8 @@
         This model could not be processed.
       {% elif status == "disabled" %}
         This QR link has been turned off.
+      {% elif status == "private" %}
+        This project is private.
       {% else %}
         This model is currently unavailable.
       {% endif %}
@@ -61,6 +64,8 @@
         The file is in the conversion queue. This usually takes under a minute. This page checks again every 15 seconds and opens the viewer once the model is ready.
       {% elif status == "disabled" %}
         The model behind this code is no longer offered through this link. If you expected it to work, contact the publication's authors.
+      {% elif status == "private" %}
+        Its authors have not shared it yet. If you were given this link or QR code, ask them to turn on sharing &mdash; this same link starts working as soon as they do.
       {% elif status == "failed" %}
         An error occurred while converting this file. The publication owner can upload a replacement model; the QR and viewer link will remain the same.
       {% else %}
@@ -120,6 +125,9 @@
         <a href="{{ landing_url }}" class="btn-secondary">Go to publication page</a>
       {% elif status == "disabled" %}
         <a href="{{ url_for('landing') }}" class="btn-primary">Learn about AcademicAR</a>
+      {% elif status == "private" %}
+        {% if not current_user.is_authenticated %}<a href="{{ url_for('auth.login', next=request.full_path if request.query_string else request.path) }}" class="btn-primary">I'm the author &mdash; log in</a>{% endif %}
+        <a href="{{ url_for('landing') }}" class="btn-secondary">Learn about AcademicAR</a>
       {% else %}
         <a href="{{ landing_url }}" class="btn-primary">Go to publication page</a>
         <a href="{{ url_for('landing') }}" class="btn-secondary">Learn about AcademicAR</a>
@@ -127,7 +135,7 @@
     </div>
 
     <!-- Footer note -->
-    {% if status != "disabled" %}
+    {% if status not in ("disabled", "private") %}
     <p class="model-unavail-note">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="vertical-align:-2px; opacity:.5;"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       The QR code and viewer URL for this model are permanently reserved by AcademicAR and will continue to work once access is restored.

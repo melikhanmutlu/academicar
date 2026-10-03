@@ -37,7 +37,7 @@
             <span class="detail-chip dark">{{ (paper.project_type or 'publication')|replace('_', ' ')|title }}</span>
             {% if paper.field %}<span class="detail-chip">{{ paper.field }}</span>{% endif %}
             {% if paper.year %}<span class="detail-chip">{{ paper.year }}</span>{% endif %}
-            <span class="detail-chip">{{ project_visibility(paper)|title }}</span>
+            <span class="detail-chip">{{ visibility_label(paper) }}</span>
         </div>
         <div class="paper-actions">
           <a href="{{ url_for('project_edit', slug=paper.slug) }}" class="detail-action detail-action-primary">Edit Project</a>
@@ -77,36 +77,54 @@
         </div>
       </div>
 
+      {% set current_visibility = project_visibility(paper) %}
+      <form method="POST" action="{{ url_for('project_visibility_update', slug=paper.slug) }}" class="visibility-switch mt-4" aria-label="Who can open this project">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% for value in ('private', 'unlisted', 'public') %}
+          <button type="submit" name="visibility" value="{{ value }}" class="{{ 'is-active' if current_visibility == value else '' }}" {% if current_visibility == value %}aria-pressed="true" disabled{% else %}aria-pressed="false"{% endif %}>{{ visibility_labels[value] }}</button>
+        {% endfor %}
+      </form>
+
+      {% if current_visibility == 'private' %}
+        <div class="share-private-note mt-4" role="note">
+          <strong>Only you can open this project.</strong>
+          <p>Its links and QR codes show a "private" page to everyone else. Choose <em>Review link</em> to share it with reviewers, or <em>Public</em> to print the QR on a poster or paper.</p>
+        </div>
+      {% else %}
       <div class="mt-5 flex gap-4 share-identity">
         <div class="share-qr">
           <img src="{{ url_for('qr_image_paper', paper_id=paper.id) }}" class="w-28 h-28" alt="QR code for {{ paper.title }}">
         </div>
         <div class="min-w-0 flex-1">
-          <p class="share-description">Scan this QR code with a smartphone to view the interactive 3D models and project details.</p>
-          {% set share_url = public_url('project_share', share_token=paper.share_token) if project_visibility(paper) == 'unlisted' else public_url('paper_public', slug=paper.slug) %}
+          <p class="share-description">{{ 'Anyone with this link or QR can open the project; it is not listed publicly.' if current_visibility == 'unlisted' else 'Scan this QR code with a smartphone to view the interactive 3D models and project details.' }}</p>
+          {% set share_url = project_landing_url(paper, absolute=True) %}
           <div class="copy-field mt-3" title="{{ share_url }}">
             <span>{{ share_url }}</span>
             <button type="button" data-copy-link="{{ share_url }}" aria-label="Copy project link">Copy</button>
           </div>
         </div>
       </div>
+      {% endif %}
 
       <div class="share-actions mt-5">
-        {% if paper.articles and paper.articles[0].pdf_path %}
+        {% if not paper.models and can_upload_more %}
+          <a href="#add-model" class="detail-action detail-action-primary">Add the first model</a>
+        {% elif paper.articles and paper.articles[0].pdf_path %}
           <a href="{{ url_for('project_article_reader', slug=paper.slug, article_id=paper.articles[0].id) }}" target="_blank" rel="noopener noreferrer" class="detail-action detail-action-primary">Present first article</a>
         {% elif presentation_enabled and paper.attachments %}
           <a href="{{ url_for('project_attachment_reader', slug=paper.slug, attachment_id=paper.attachments[0].id) }}" target="_blank" rel="noopener noreferrer" class="detail-action detail-action-primary">Open materials</a>
-        {% else %}
-          <a href="{{ url_for('project_edit', slug=paper.slug) }}" class="detail-action detail-action-primary">Add document</a>
         {% endif %}
-        <a href="{{ url_for('paper_public', slug=paper.slug) }}" target="_blank" rel="noopener noreferrer" class="detail-action">Open Public Page</a>
-        <a href="{{ url_for('qr_print_paper', paper_id=paper.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action">View Paper QR</a>
+        {% if current_visibility != 'private' %}
+          <a href="{{ project_landing_url(paper) }}" target="_blank" rel="noopener noreferrer" class="detail-action">Preview as visitor</a>
+          <a href="{{ url_for('qr_print_paper', paper_id=paper.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action">Project QR</a>
+        {% endif %}
+        <a href="{{ url_for('project_edit', slug=paper.slug) }}" class="detail-action">Add article or material</a>
       </div>
 
       <div class="share-stats mt-5">
         <div>
           <span>Visibility</span>
-          <strong>{{ 'Public' if paper.is_public else 'Private' }}</strong>
+          <strong>{{ visibility_label(paper) }}</strong>
         </div>
         <div>
           <span>Models</span>
@@ -190,7 +208,7 @@
           {% set model_status = m.processing_status or 'ready' %}
           {% set access_state = model_access_status(m) %}
           {% set plan = license_plans.get(m.license_type or 'free') or license_plans.get('free') %}
-          {% set conversion_label = (m.source_format or 'stl')|upper ~ ' -> GLB' %}
+          {% set conversion_label = (m.source_format or 'stl')|upper ~ ' → GLB' %}
           {% set dimensions_label = format_model_dimensions_cm(m) %}
           <div class="model-row model-card surface rounded-xl group reveal-up" data-model-row data-status-url="{{ url_for('model_status', model_id=m.id) }}" data-status="{{ model_status }}" data-name="{{ (m.display_name or m.original_filename or '')|lower }}" data-size="{{ m.file_size or 0 }}" data-order="{{ loop.index0 }}">
             <div class="model-card-body">
@@ -296,7 +314,8 @@
     {% else %}
       <div class="surface rounded-xl border border-dashed border-[#111827]/20 p-12 text-center reveal-up">
         <h3 class="font-serif text-2xl font-semibold text-[#111827]">No models yet.</h3>
-        <p class="text-[#5c6473] mt-2">Upload the first anonymized STL or GLB model to generate the viewer link and QR code.</p>
+        <p class="text-[#5c6473] mt-2">Upload the first anonymized GLB, STL, OBJ or FBX model to generate its viewer link and QR code.</p>
+        {% if can_upload_more %}<a href="#add-model" class="detail-action detail-action-primary mt-5 inline-flex">Add the first model</a>{% endif %}
       </div>
     {% endif %}
   </section>
@@ -304,7 +323,7 @@
   <section id="add-model" class="mb-6 reveal-up">
     {% if not can_upload_more %}
       <div class="surface rounded-xl p-5 capacity-notice">
-        <div><p class="project-section-kicker">Plan capacity reached</p><h2>{{ model_capacity.used }} / {{ model_capacity.limit }} models</h2><p>{{ model_capacity.plan.label }} currently allows {{ model_capacity.limit }} model(s) per topic. Upgrade an existing model or ask an administrator to raise this limit.</p></div>
+        <div><p class="project-section-kicker">Plan capacity reached</p><h2>{{ model_capacity.used }} / {{ model_capacity.limit }} models</h2><p>{{ model_capacity.plan.label }} projects hold {{ model_capacity.limit }} model{{ '' if model_capacity.limit == 1 else 's' }}. {% if model_capacity.plan.key == 'institutional' %}Ask your institution's administrator to raise this limit, or upgrade an existing model.{% else %}Upgrade the existing model to add more, or start a new project for the next model.{% endif %}</p></div>
         {% if paper.models %}<a class="detail-action detail-action-primary" href="{{ url_for('model_upgrade_page', model_id=paper.models[0].id) }}">Review upgrade options</a>{% endif %}
       </div>
     {% else %}
@@ -364,7 +383,7 @@
                 <p class="upload-description">Upload an anonymized model file. The platform prepares a stable public viewer, managed QR code, and AR-ready GLB asset.</p>
                 <div class="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4">
                   <p class="text-sm font-semibold text-[#111827]">Starts on Free access</p>
-                  <p class="text-xs text-[#5c6473] mt-1">New models get a 3-day, watermarked viewer (up to 100 MB). Upgrade to Academic (3-year) or Extended Archive (10-year) any time from the model card below — the same QR and viewer link stay stable.</p>
+                  <p class="text-xs text-[#5c6473] mt-1">New models get a 3-day, watermarked viewer (up to 100 MB){% set free_limit = get_license_plan('free').max_models_per_project %}{% if free_limit %}; a Free project holds {{ free_limit }} model{{ '' if free_limit == 1 else 's' }}{% endif %}. Upgrade to Academic (3-year) or Extended Archive (10-year) any time from the model card below — the same QR and viewer link stay stable.</p>
                 </div>
                 <div class="grid sm:grid-cols-2 gap-4">
                   <input type="text" name="display_name" placeholder="Model name" aria-label="Model name" maxlength="255" class="field-input">
@@ -379,7 +398,7 @@
                     <option value="m">Meters (m)</option>
                     <option value="embedded">Embedded units (FBX / GLB)</option>
                   </select>
-                  <p class="text-xs text-[#5c6473] mt-1">STL and OBJ files carry no unit - choose the unit your model was made in (e.g. cm in 3ds Max / SketchUp). FBX/GLB already include real units, so pick "Embedded". You can change this later on the model's edit page.</p>
+                  <p class="text-xs text-[#5c6473] mt-1">STL and OBJ files carry no unit - choose the unit your model was made in (e.g. cm in 3ds Max / SketchUp). FBX/GLB already include real units, so “Embedded” is selected for you. You can change this later on the model's edit page.</p>
                 </div>
                 <label class="flex items-start gap-3 rounded-xl border border-[#e2e8f0] bg-white p-4 text-sm text-[#475569]">
                   <input type="checkbox" name="compliance_confirm" value="yes" required class="mt-1">
@@ -546,8 +565,26 @@
         if (!event.dataTransfer || !event.dataTransfer.files.length) return;
         applyDroppedFiles(event.dataTransfer.files);
       });
+      // GLB/FBX carry their own units, so pick "Embedded" for the author;
+      // STL/OBJ need an explicit choice. The model name defaults to the file
+      // name so visitors don't see raw names such as "scan_final.stl".
+      const syncFromModelFile = () => {
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) return;
+        const ext = extensionFor(file);
+        const unit = uploadForm.querySelector('[name="source_unit"]');
+        if (unit && ['glb', 'fbx'].includes(ext)) unit.value = 'embedded';
+        else if (unit && unit.value === 'embedded' && ['stl', 'obj'].includes(ext)) unit.value = '';
+        const nameInput = uploadForm.querySelector('[name="display_name"]');
+        if (nameInput && (!nameInput.value.trim() || nameInput.value === nameInput.dataset.autoName)) {
+          const base = file.name.replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ').trim();
+          nameInput.value = base;
+          nameInput.dataset.autoName = base;
+        }
+      };
       fileInput.addEventListener('change', () => {
         updateDropzoneState();
+        syncFromModelFile();
       });
     }
 

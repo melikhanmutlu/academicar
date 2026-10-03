@@ -48,10 +48,10 @@ def test_private_project_stays_hidden_from_other_users(client, app):
     model_id, slug = _private_model(app)
     client.post("/auth/logout")
     register(client, email="other@example.com")
-    assert client.get(f"/view/{model_id}").status_code == 404
+    assert client.get(f"/view/{model_id}").status_code == 403  # "private project" page
     assert client.get(f"/files/{model_id}/model.glb").status_code == 404
     client.post("/auth/logout")
-    assert client.get(f"/view/{model_id}").status_code == 404
+    assert client.get(f"/view/{model_id}").status_code == 403
 
 
 def test_admin_preview_does_not_count_as_owner_analytics(client, app):

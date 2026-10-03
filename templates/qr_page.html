@@ -51,6 +51,9 @@
       .qr-panel { background: white; color: #111111; padding: 0; margin-top: 22px; }
       .qr-wrap { border: none; padding: 0; width: 320px; }
     }
+    .private-warning { margin-top: 18px; padding: 14px 16px; border: 1px solid #ffd9c7; background: #fff1ea; border-radius: 4px; font-size: 13px; line-height: 1.55; color: #111111; max-width: 560px; }
+    .private-warning a { color: #111111; font-weight: 700; }
+    @media print { .private-warning { display: none; } }
   </style>
 </head>
 <body>
@@ -58,6 +61,9 @@
     <section class="meta">
       <h1>{{ model.display_name or model.original_filename }}</h1>
       <p class="subtitle">{{ paper.title }}</p>
+      {% if project_visibility(paper) == 'private' %}
+      <p class="private-warning" role="note"><strong>This project is private.</strong> Anyone who scans this code sees a "private project" page. Switch it to <em>Review link</em> or <em>Public</em> on the <a href="{{ url_for('project_detail', slug=paper.slug) }}">project page</a> before printing.</p>
+      {% endif %}
       <p class="url">{{ model_resolver_url(model) }}</p>
       <div class="actions">
         <button type="button" onclick="window.print()" class="btn">Print</button>

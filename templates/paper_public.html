@@ -46,7 +46,7 @@
       <p class="text-xs uppercase tracking-[0.12em] text-[#9ca3af] font-bold">Project information</p>
       <h2 class="font-serif text-2xl font-semibold text-[#111827] mt-2">{{ viewable_models|length }} model{{ '' if viewable_models|length == 1 else 's' }} available</h2>
 
-      <div class="mt-5 flex gap-4 share-identity">
+      <div class="mt-5 flex gap-4 share-identity public-qr-revisit">
         <div class="share-qr">
           <img src="{{ url_for('qr_image_paper', paper_id=paper.id) }}" class="w-28 h-28" alt="QR code for {{ paper.title }}">
         </div>
@@ -64,8 +64,6 @@
           <a href="{{ url_for('project_attachment_reader', slug=paper.slug, attachment_id=paper.attachments[0].id) }}" class="btn-primary compact">Open materials</a>
         {% elif paper.pdf_path %}
           <a href="{{ url_for('paper_public_pdf', slug=paper.slug) }}" class="btn-primary compact">View legacy document</a>
-        {% else %}
-          <span class="btn-secondary compact opacity-60 cursor-not-allowed" aria-disabled="true">PDF not available</span>
         {% endif %}
       </div>
 

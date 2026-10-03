@@ -11,13 +11,111 @@
   <a href="{{ url_for('project_detail', slug=paper.slug) if is_edit else url_for('dashboard') }}" class="nav-link inline-flex mb-5">&larr; {{ 'Back to project' if is_edit else 'Back to dashboard' }}</a>
 
   <h1 class="font-serif text-3xl lg:text-4xl font-bold text-[#111827]">{{ 'Edit your project.' if is_edit else 'Create a project for your 3D work.' }}</h1>
-  <p class="text-[#5c6473] mt-2 mb-6">{{ 'Update the context, models, sharing and optional publication references.' if is_edit else 'Start with a title and add a model now; publication details can come later.' }}</p>
+  <p class="text-[#5c6473] mt-2 mb-6">{{ 'Update the project details, sharing and related articles. Models are managed on the project page.' if is_edit else 'Add a title and your 3D model. Everything else is optional and can be added later.' }}</p>
 
   <div class="project-new-layout">
     <div class="project-new-main">
     <form method="POST" enctype="multipart/form-data" class="surface rounded-xl p-6 sm:p-8 space-y-6" data-upload-form>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
+      <div>
+        <label class="field-label" for="project_title">Project title <span class="text-red-500">*</span></label>
+        <input type="text" name="title" id="project_title" value="{{ form.get('title', '') }}" required maxlength="500" class="field-input text-lg" placeholder="e.g. Cardiovascular anatomy teaching collection">
+        <p class="text-xs text-[#5c6473] mt-2">The subject your 3D models belong to, e.g. a paper, thesis, course or collection.</p>
+      </div>
+
+      {% if not is_edit %}
+        <section class="rounded-xl border border-[#e8e8e8] bg-[#f8f8f8] p-5 space-y-4">
+          <div>
+            <h2 class="font-serif text-2xl font-semibold text-[#111827]">Add your 3D model</h2>
+            <p class="text-sm text-[#5c6473] mt-2">Optional now — you can also create the project first and add the model later. GLB, STL, OBJ or FBX.</p>
+          </div>
+
+          <label class="upload-dropzone">
+            <span class="block text-[#111827] font-semibold">Select model file</span>
+            <span class="block text-sm text-[#64748b] mt-1" data-dropzone-copy>Drag and drop a model here, or choose a file. The model gets its own license, QR resolver link, and processing job.</span>
+            <span class="file-picker-control mt-4"><span>Choose file</span><small data-file-name>No file selected</small></span>
+            <input type="file" name="model_file" accept=".glb,.stl,.obj,.fbx" class="native-file-input" data-dropzone-input>
+          </label>
+
+          <div class="companion-files-section" data-companion-section style="display: none;">
+            <label class="field-label">MTL and Texture files <span class="text-[#64748b] font-normal">(optional companion files for OBJ)</span></label>
+            <label class="file-picker-control file-picker-control-muted mt-1">
+              <span>Choose companion files</span>
+              <small data-file-name>No files selected</small>
+              <input type="file" name="model_companion_files" multiple accept=".mtl,.png,.jpg,.jpeg,.webp" class="native-file-input" data-companion-input>
+            </label>
+            <p class="text-xs text-[#5c6473] mt-2">Upload the material (.mtl) and texture images (.png, .jpg) referenced by the .obj file.</p>
+          </div>
+
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label class="field-label" for="model_display_name">Model name</label>
+              <input type="text" name="model_display_name" id="model_display_name" placeholder="e.g. Left knee, sagittal cut" class="field-input" maxlength="255">
+            </div>
+            <div>
+              <label class="field-label" for="model_description">Short note <span class="text-[#64748b] font-normal">(optional)</span></label>
+              <input type="text" name="model_description" id="model_description" placeholder="Shown under the model for visitors" class="field-input" maxlength="5000">
+            </div>
+          </div>
+
+          <div>
+            <label class="field-label" for="source_unit">Source unit <span class="text-[#ff682c]">*</span></label>
+            {# Required only once a model file is chosen (toggled in script) so a
+               project can still be created first and get its model later. #}
+            <select name="source_unit" id="source_unit" class="field-input" data-model-required>
+              <option value="" selected disabled>Select unit…</option>
+              <option value="mm">Millimeters (mm)</option>
+              <option value="cm">Centimeters (cm)</option>
+              <option value="m">Meters (m)</option>
+              <option value="embedded">Embedded units (FBX / GLB)</option>
+            </select>
+            <p class="text-xs text-[#5c6473] mt-1">STL and OBJ files carry no unit — choose the unit your model was made in (e.g. cm in 3ds Max / SketchUp). FBX/GLB already include real units, so “Embedded” is selected for you. You can change this later on the model’s edit page.</p>
+          </div>
+
+          <div class="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4">
+            <p class="text-sm font-semibold text-[#111827]">Starts on Free access</p>
+            <p class="text-xs text-[#5c6473] mt-1">New models get a 3-day, watermarked viewer (up to 100 MB){% set free_limit = get_license_plan('free').max_models_per_project %}{% if free_limit %}; a Free project holds {{ free_limit }} model{{ '' if free_limit == 1 else 's' }}{% endif %}. Upgrade to Academic or Extended Archive any time after upload — the QR and viewer link stay the same.</p>
+          </div>
+
+          <label class="color-optional-control" data-color-control>
+            <input type="checkbox" name="color_enabled" value="yes" data-color-toggle>
+            <span class="color-optional-swatch" aria-hidden="true"></span>
+            <span class="color-optional-label">Color</span>
+          </label>
+          <input type="color" name="color" value="#cccccc" disabled aria-label="Model color" class="color-optional-picker" data-color-input>
+
+          <label class="flex items-start gap-3 rounded-xl border border-[#e2e8f0] bg-white p-4 text-sm text-[#475569]">
+            <input type="checkbox" name="compliance_confirm" value="yes" class="mt-1" data-model-required>
+            <span>I confirm that this model has been anonymized, that I have the right to share/publish it, and that I am responsible for all required ethical approval and consent processes.</span>
+          </label>
+        </section>
+      {% endif %}
+
+      <div>
+        <label class="field-label">Visibility</label>
+        <div class="grid sm:grid-cols-3 gap-3">
+          <label class="rounded-xl border border-[#111827]/15 bg-white/60 p-4 cursor-pointer">
+            <input type="radio" name="visibility" value="private" {% if form.get('visibility', 'private') == 'private' %}checked{% endif %}>
+            <span class="font-semibold text-[#111827] ml-2">Private</span>
+            <span class="block text-sm text-[#5c6473] mt-2">Only you can open it. Links and QR codes show a "private" page to others.</span>
+          </label>
+          <label class="rounded-xl border border-[#111827]/15 bg-white/60 p-4 cursor-pointer">
+            <input type="radio" name="visibility" value="unlisted" {% if form.get('visibility') == 'unlisted' %}checked{% endif %}>
+            <span class="font-semibold text-[#111827] ml-2">Review link</span>
+            <span class="block text-sm text-[#5c6473] mt-2">Anyone with the private link can review it. It is not indexed or listed publicly.</span>
+          </label>
+          <label class="rounded-xl border border-[#111827]/15 bg-white/60 p-4 cursor-pointer">
+            <input type="radio" name="visibility" value="public" {% if form.get('visibility') == 'public' %}checked{% endif %}>
+            <span class="font-semibold text-[#111827] ml-2">Public</span>
+            <span class="block text-sm text-[#5c6473] mt-2">Anyone can discover and view the project, its models, and available documents.</span>
+          </label>
+        </div>
+      </div>
+
+      <details class="form-optional-section"{% if is_edit or form %} open{% endif %}>
+        <summary><span><strong>Project details</strong><small>Type, stage, field, organization, department and description · optional</small></span></summary>
+        <div class="form-optional-body space-y-6">
       <div class="grid sm:grid-cols-2 gap-4">
         <div>
           <label class="field-label" for="project_type">Project type <span class="text-red-500">*</span></label>
@@ -42,12 +140,6 @@
         </div>
       </div>
 
-      <div>
-        <label class="field-label" for="project_title">Topic title <span class="text-red-500">*</span></label>
-        <input type="text" name="title" id="project_title" value="{{ form.get('title', '') }}" required maxlength="500" class="field-input text-lg" placeholder="e.g. Cardiovascular anatomy teaching collection">
-        <p class="text-xs text-[#5c6473] mt-2">This is the shared subject that groups models, related articles, and presentation files.</p>
-      </div>
-
       <div class="grid sm:grid-cols-2 gap-4">
         <div>
           <label class="field-label" for="project_field">Field</label>
@@ -69,12 +161,23 @@
         </div>
       </div>
 
+      <div>
+        <label class="field-label">Project description</label>
+        <textarea name="abstract" rows="6" class="field-textarea" placeholder="What is this topic, what do the models show, and who is it for?">{{ form.get('abstract', '') }}</textarea>
+      </div>
+
+        </div>
+      </details>
+
+      <details class="form-optional-section"{% if is_edit or form %} open{% endif %}>
+        <summary><span><strong>Articles &amp; materials</strong><small>Related papers with PDFs, and PDF / PowerPoint teaching files · optional</small></span></summary>
+        <div class="form-optional-body space-y-6">
       <section class="article-collection" data-article-collection>
         <div class="article-collection-head">
           <div>
             <p class="project-section-kicker">Related literature</p>
-            <h2>Articles about this topic</h2>
-            <p>The first article form stays open but is optional. Add as many independently authored articles as you need.</p>
+            <h2>Related articles</h2>
+            <p>Optional. Add the papers this project relates to; each can have its own authors, DOI and PDF.</p>
           </div>
           <button type="button" class="btn-secondary compact" data-add-article>+ Article</button>
         </div>
@@ -167,11 +270,6 @@
         </details>
       </template>
 
-      <div>
-        <label class="field-label">Project description</label>
-        <textarea name="abstract" rows="6" class="field-textarea" placeholder="What is this topic, what do the models show, and who is it for?">{{ form.get('abstract', '') }}</textarea>
-      </div>
-
       <section class="project-materials">
         <div>
           <p class="project-section-kicker">Teaching &amp; presentation files</p>
@@ -196,94 +294,14 @@
         {% endif %}
       </section>
 
+        </div>
+      </details>
+
       {# Legacy fields stay present for older integrations but are populated from the first child article server-side. #}
       <input type="hidden" name="authors" value="">
       <input type="hidden" name="year" value="">
       <input type="hidden" name="doi" value="">
       <input type="hidden" name="pmid" value="">
-
-      <div>
-        <label class="field-label">Visibility</label>
-        <div class="grid sm:grid-cols-3 gap-3">
-          <label class="rounded-xl border border-[#111827]/15 bg-white/60 p-4 cursor-pointer">
-            <input type="radio" name="visibility" value="private" {% if form.get('visibility', 'private') == 'private' %}checked{% endif %}>
-            <span class="font-semibold text-[#111827] ml-2">Private</span>
-            <span class="block text-sm text-[#5c6473] mt-2">Only you and authorized workspace members can access this project.</span>
-          </label>
-          <label class="rounded-xl border border-[#111827]/15 bg-white/60 p-4 cursor-pointer">
-            <input type="radio" name="visibility" value="unlisted" {% if form.get('visibility') == 'unlisted' %}checked{% endif %}>
-            <span class="font-semibold text-[#111827] ml-2">Review link</span>
-            <span class="block text-sm text-[#5c6473] mt-2">Anyone with the private link can review it. It is not indexed or listed publicly.</span>
-          </label>
-          <label class="rounded-xl border border-[#111827]/15 bg-white/60 p-4 cursor-pointer">
-            <input type="radio" name="visibility" value="public" {% if form.get('visibility') == 'public' %}checked{% endif %}>
-            <span class="font-semibold text-[#111827] ml-2">Public</span>
-            <span class="block text-sm text-[#5c6473] mt-2">Anyone can discover and view the project, its models, and available documents.</span>
-          </label>
-        </div>
-      </div>
-
-      {% if not is_edit %}
-        <section class="rounded-xl border border-[#e8e8e8] bg-[#f8f8f8] p-5 space-y-4">
-          <div>
-            <h2 class="font-serif text-2xl font-semibold text-[#111827] mt-3">Attach the first model</h2>
-            <p class="text-sm text-[#5c6473] mt-2">You can create the publication first and upload later, or attach the first GLB, STL, OBJ, or FBX file now.</p>
-          </div>
-
-          <label class="upload-dropzone">
-            <span class="block text-[#111827] font-semibold">Select model file</span>
-            <span class="block text-sm text-[#64748b] mt-1" data-dropzone-copy>Drag and drop a model here, or choose a file. The model gets its own license, QR resolver link, and processing job.</span>
-            <span class="file-picker-control mt-4"><span>Choose file</span><small data-file-name>No file selected</small></span>
-            <input type="file" name="model_file" accept=".glb,.stl,.obj,.fbx" class="native-file-input" data-dropzone-input>
-          </label>
-
-          <div class="companion-files-section" data-companion-section style="display: none;">
-            <label class="field-label">MTL and Texture files <span class="text-[#64748b] font-normal">(optional companion files for OBJ)</span></label>
-            <label class="file-picker-control file-picker-control-muted mt-1">
-              <span>Choose companion files</span>
-              <small data-file-name>No files selected</small>
-              <input type="file" name="model_companion_files" multiple accept=".mtl,.png,.jpg,.jpeg,.webp" class="native-file-input" data-companion-input>
-            </label>
-            <p class="text-xs text-[#5c6473] mt-2">Upload the material (.mtl) and texture images (.png, .jpg) referenced by the .obj file.</p>
-          </div>
-
-          <div class="grid sm:grid-cols-2 gap-4">
-            <input type="text" name="model_display_name" placeholder="Model name" class="field-input" maxlength="255" aria-label="Model name">
-            <input type="text" name="model_description" placeholder="Short model note" class="field-input" maxlength="5000" aria-label="Model description">
-          </div>
-
-          <div>
-            <label class="field-label" for="source_unit">Source unit <span class="text-[#ff682c]">*</span></label>
-            {# Required only once a model file is chosen (toggled in script) so a
-               project can still be created first and get its model later. #}
-            <select name="source_unit" id="source_unit" class="field-input" data-model-required>
-              <option value="" selected disabled>Select unit…</option>
-              <option value="mm">Millimeters (mm)</option>
-              <option value="cm">Centimeters (cm)</option>
-              <option value="m">Meters (m)</option>
-              <option value="embedded">Embedded units (FBX / GLB)</option>
-            </select>
-            <p class="text-xs text-[#5c6473] mt-1">STL and OBJ files carry no unit — choose the unit your model was made in (e.g. cm in 3ds Max / SketchUp). FBX/GLB already include real units, so pick “Embedded”. You can change this later on the model’s edit page.</p>
-          </div>
-
-          <div class="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4">
-            <p class="text-sm font-semibold text-[#111827]">Starts on Free access</p>
-            <p class="text-xs text-[#5c6473] mt-1">New models get a 3-day, watermarked viewer (up to 100 MB). Upgrade to Academic or Extended Archive any time after upload — the QR and viewer link stay the same.</p>
-          </div>
-
-          <label class="color-optional-control" data-color-control>
-            <input type="checkbox" name="color_enabled" value="yes" data-color-toggle>
-            <span class="color-optional-swatch" aria-hidden="true"></span>
-            <span class="color-optional-label">Color</span>
-          </label>
-          <input type="color" name="color" value="#cccccc" disabled aria-label="Model color" class="color-optional-picker" data-color-input>
-
-          <label class="flex items-start gap-3 rounded-xl border border-[#e2e8f0] bg-white p-4 text-sm text-[#475569]">
-            <input type="checkbox" name="compliance_confirm" value="yes" class="mt-1" data-model-required>
-            <span>I confirm that this model has been anonymized, that I have the right to share/publish it, and that I am responsible for all required ethical approval and consent processes.</span>
-          </label>
-        </section>
-      {% endif %}
 
       <div class="paper-form-actions flex items-center justify-between gap-3 pt-4 border-t border-[#141821]/10">
         {% if is_edit %}
@@ -487,8 +505,26 @@
         if (!event.dataTransfer || !event.dataTransfer.files.length) return;
         applyDroppedFiles(event.dataTransfer.files);
       });
+      // GLB/FBX carry their own units, so pick "Embedded" for the author;
+      // STL/OBJ need an explicit choice. The model name defaults to the file
+      // name so visitors don't see raw names such as "scan_final.stl".
+      const syncFromModelFile = () => {
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) return;
+        const ext = extensionFor(file);
+        const unit = uploadForm.querySelector('[name="source_unit"]');
+        if (unit && ['glb', 'fbx'].includes(ext)) unit.value = 'embedded';
+        else if (unit && unit.value === 'embedded' && ['stl', 'obj'].includes(ext)) unit.value = '';
+        const nameInput = uploadForm.querySelector('[name="model_display_name"]');
+        if (nameInput && (!nameInput.value.trim() || nameInput.value === nameInput.dataset.autoName)) {
+          const base = file.name.replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ').trim();
+          nameInput.value = base;
+          nameInput.dataset.autoName = base;
+        }
+      };
       fileInput.addEventListener('change', () => {
         updateDropzoneState();
+        syncFromModelFile();
       });
     }
 
@@ -764,6 +800,10 @@
       restored.forEach((el) => {
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
+        // Show restored text inside the collapsed optional sections.
+        if (el.tagName !== 'SELECT' && !['radio', 'checkbox', 'hidden'].includes(el.type) && el.value) {
+          el.closest('details.form-optional-section')?.setAttribute('open', '');
+        }
       });
     };
     const params = new URLSearchParams(window.location.search);

@@ -217,6 +217,8 @@ def create_app(test_config: dict | None = None) -> Flask:
             "project_landing_url": project_landing_url,
             "active_models": active_models,
             "paper_is_deleted": paper_is_deleted,
+            "visibility_label": visibility_label,
+            "visibility_labels": VISIBILITY_LABELS,
             "project_model_capacity": project_model_capacity,
             "project_supports_feature": request_project_supports_feature,
             "admin_chip_class": admin_chip_class,
@@ -1614,6 +1616,15 @@ def project_landing_url(project: Paper, absolute: bool = False) -> str:
     if project_visibility(project) == "unlisted" and project.share_token:
         return build("project_share", share_token=project.share_token)
     return build("paper_public", slug=project.slug)
+
+
+VISIBILITY_LABELS = {"private": "Private", "unlisted": "Review link", "public": "Public"}
+
+
+def visibility_label(project: Paper | None) -> str:
+    """One user-facing name per visibility state (the form, chips and stats
+    used to say "Review link", "Unlisted" and "Private" for the same thing)."""
+    return VISIBILITY_LABELS[project_visibility(project)]
 
 
 def project_visibility(project: Paper | None) -> str:
@@ -4359,7 +4370,7 @@ def register_routes(app: Flask) -> None:
         if not model:
             abort(404)
         if not _paper_visible_to_request(model.paper):
-            abort(404)
+            return _private_project_response(model.paper)
         status = model_access_status(model)
         is_owner = current_user.is_authenticated and current_user.id == model.user_id
         if status != "active":
@@ -4432,7 +4443,7 @@ def register_routes(app: Flask) -> None:
             )
         track_event("qr_scanned", owner_user_id=model.user_id, project_id=model.paper_id, model_id=model.id)
         if not _paper_visible_to_request(model.paper):
-            abort(404)
+            return _private_project_response(model.paper)
         status = model_access_status(model)
         if status != "active":
             is_owner = current_user.is_authenticated and current_user.id == model.user_id
@@ -4691,6 +4702,20 @@ def register_routes(app: Flask) -> None:
             return False
         return current_user.id == paper.user_id or bool(current_user.is_admin)
 
+    def _private_project_response(paper: Paper):
+        """Visitors following a link or QR of a private project get an
+        explanation instead of a bare "Page not found" (deleted projects stay
+        404). Nothing about the project itself is shown."""
+        if paper_is_deleted(paper):
+            abort(404)
+        return (
+            render_template(
+                "model_access_unavailable.html", model=None, paper=None,
+                status="private", is_owner=False,
+            ),
+            403,
+        )
+
     def _is_admin_preview(owner_user_id) -> bool:
         """An admin looking at someone else's model; kept out of the owner's
         view analytics."""
@@ -4727,11 +4752,12 @@ def register_routes(app: Flask) -> None:
         # Unlisted projects are intentionally not reachable through their
         # human-readable slug; reviewers receive the opaque /share/ URL.
         if project_visibility(paper) == "unlisted" and not (
-            current_user.is_authenticated and current_user.id == paper.user_id
+            current_user.is_authenticated
+            and (current_user.id == paper.user_id or current_user.is_admin)
         ):
             abort(404)
         if not _paper_visible_to_request(paper):
-            abort(404)
+            return _private_project_response(paper)
         if not _is_admin_preview(paper.user_id):
             track_event("project_viewed", owner_user_id=paper.user_id, project_id=paper.id)
         return render_template("paper_public.html", paper=paper)
@@ -4740,7 +4766,7 @@ def register_routes(app: Flask) -> None:
     def project_share(share_token):
         paper = active_paper_query().filter_by(share_token=share_token).first_or_404()
         if project_visibility(paper) != "unlisted" and not _paper_visible_to_request(paper):
-            abort(404)
+            return _private_project_response(paper)
         track_event("review_link_opened", owner_user_id=paper.user_id, project_id=paper.id)
         response = make_response(render_template("paper_public.html", paper=paper, unlisted_share=True))
         response.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
@@ -8054,8 +8080,14 @@ def register_routes(app: Flask) -> None:
                     source_unit=request.form.get("source_unit"),
                     compliance_confirm=request.form.get("compliance_confirm"),
                 )
-                category = "success" if ok else "danger"
-                flash(message, category)
+                if ok:
+                    flash(message, "success")
+                else:
+                    # The project itself was saved; say so, so the author
+                    # retries the upload instead of resubmitting the form and
+                    # creating a duplicate project.
+                    flash(f"Project saved, but the model could not be added: {message} Try another file below.", "danger")
+                    return redirect(url_for("project_detail", slug=paper.slug, _anchor="add-model"))
             else:
                 flash("Project created.", "success")
             return redirect(url_for("project_detail", slug=paper.slug))
@@ -8086,6 +8118,45 @@ def register_routes(app: Flask) -> None:
             upgraded_model=upgraded_model,
             upgraded_active=upgraded_active,
         )
+
+    @app.route("/projects/<slug>/visibility", methods=["POST"])
+    @login_required
+    @require_paper_ownership
+    def project_visibility_update(slug):
+        """One-click visibility switch from the project page's share panel."""
+        paper = active_paper_query().filter_by(slug=slug).first_or_404()
+        visibility = (request.form.get("visibility") or "").strip().lower()
+        if visibility not in PROJECT_VISIBILITIES:
+            flash("Invalid visibility option.", "danger")
+            return redirect(url_for("project_detail", slug=paper.slug))
+        previous_visibility = project_visibility(paper)
+        paper.visibility = visibility
+        paper.is_public = visibility == "public"
+        if visibility == "unlisted" and not paper.share_token:
+            paper.share_token = new_project_share_token()
+        if visibility != previous_visibility:
+            invalidate_paper_qr(paper)
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Visibility could not be changed. Please try again.", "danger")
+            return redirect(url_for("project_detail", slug=paper.slug))
+        log_audit(
+            "paper_visibility_changed",
+            user_id=current_user.id,
+            resource_id=str(paper.id),
+            details={"from": previous_visibility, "to": visibility},
+        )
+        flash(
+            {
+                "private": "Project is private. Only you can open its links.",
+                "unlisted": "Review link is on. Anyone with the link or QR can open the project.",
+                "public": "Project is public. Anyone can open its links and QR codes.",
+            }[visibility],
+            "success",
+        )
+        return redirect(url_for("project_detail", slug=paper.slug))
 
     @app.route("/papers/<slug>/edit", methods=["GET", "POST"], endpoint="paper_edit")
     @app.route("/projects/<slug>/edit", methods=["GET", "POST"], endpoint="project_edit")

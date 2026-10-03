@@ -209,6 +209,7 @@ def test_paper_detail_uses_clear_actions_without_publication_expiry(client):
             "doi": "10.1000/detail-ux",
             "abstract": "This detail page has an abstract for visual hierarchy checks.",
             "is_public": "public",
+            "visibility": "public",
         },
         follow_redirects=True,
     )
@@ -225,8 +226,8 @@ def test_paper_detail_uses_clear_actions_without_publication_expiry(client):
     assert "meta-link-button" in html
     assert "Abstract" in html
     assert "Description / Abstract" not in html
-    assert "Open Public Page" in html
-    assert "View Paper QR" in html
+    assert "Preview as visitor" in html
+    assert "Project QR" in html
     assert "Availability" not in html
     assert "Active until" not in html
 
@@ -547,8 +548,12 @@ def test_private_paper_model_hidden_from_anonymous_but_visible_to_owner(client):
         db.session.add(model)
         db.session.commit()
 
-    # Anonymous visitor: everything 404s.
-    assert client.get(f"/view/{model_id}").status_code == 404
+    # Anonymous visitor: the viewer explains the project is private (instead
+    # of a bare 404) without revealing anything about it; files stay 404.
+    viewer = client.get(f"/view/{model_id}")
+    assert viewer.status_code == 403
+    assert b"This project is private." in viewer.data
+    assert b"private.glb" not in viewer.data and b"Private Paper" not in viewer.data
     assert client.get(f"/files/{model_id}/model.glb").status_code == 404
 
     # Owner: viewer and GLB are accessible.
@@ -625,7 +630,7 @@ def test_valid_stl_upload_creates_model_and_qr(client, monkeypatch):
     # Model card v2 meta rows: "Format" carries the conversion + file size,
     # "Size" carries the physical dimensions.
     assert "Format" in html
-    assert "STL -&gt; GLB" in html
+    assert "STL → GLB" in html
     assert "Size" in html
     assert "File limit" not in html
     assert "Version" not in html
