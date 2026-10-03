@@ -407,10 +407,13 @@ def reset_password(token):
 @auth_bp.route("/logout", methods=["POST"])
 @login_required
 def logout():
-    logout_user()
     # Drop any remaining session contents (not just the Flask-Login keys) so
-    # nothing carries over to the next user on a shared device.
+    # nothing carries over to the next user on a shared device. Clear first:
+    # logout_user() then marks the "remember me" cookie for deletion, and
+    # clearing afterwards would erase that mark and log the user straight
+    # back in from the cookie on the next request.
     _rotate_session()
+    logout_user()
     flash("Logged out.", "info")
     return redirect(url_for("landing"))
 
