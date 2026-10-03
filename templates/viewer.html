@@ -230,6 +230,40 @@
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-shot-card span {
       color: #52606d;
     }
+    /* Controls whose colours are set in this file (not via text-white/*
+       utility classes) need their own light-theme values, or their white
+       text disappears on the white panel. */
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-publish-cta {
+      color: #52606d;
+    }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-shot-status,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-video-status {
+      color: #52606d;
+    }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-shot-status.is-error,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-video-status.is-error {
+      color: #b3411f;
+    }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-video-actions button {
+      background: rgba(15, 23, 42, 0.05);
+      border-color: rgba(15, 23, 42, 0.14);
+      color: #364152;
+    }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-video-actions button:disabled {
+      color: #6b7280;
+    }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-color-swatch,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-color-custom {
+      background: rgba(15, 23, 42, 0.04);
+      border-color: rgba(15, 23, 42, 0.14);
+      color: #364152;
+    }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-color-swatch i {
+      border-color: rgba(15, 23, 42, 0.18);
+    }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-color-swatch[aria-pressed="true"] {
+      box-shadow: 0 0 0 2px #1f2933;
+    }
     /* Section dividers. */
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-rotation-tools,
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-animation-tools,
