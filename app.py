@@ -216,6 +216,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             "project_visibility": project_visibility,
             "project_landing_url": project_landing_url,
             "active_models": active_models,
+            "paper_is_deleted": paper_is_deleted,
             "project_model_capacity": project_model_capacity,
             "project_supports_feature": request_project_supports_feature,
             "admin_chip_class": admin_chip_class,
@@ -4336,7 +4337,8 @@ def register_routes(app: Flask) -> None:
             details={"paper_id": model.paper_id, "public_id": model.public_id},
         )
         annotations = ModelAnnotation.query.filter_by(model_id=model.id).order_by(ModelAnnotation.order_index).all()
-        track_event("model_viewed", owner_user_id=model.user_id, project_id=model.paper_id, model_id=model.id)
+        if not _is_admin_preview(model.user_id):
+            track_event("model_viewed", owner_user_id=model.user_id, project_id=model.paper_id, model_id=model.id)
         scale_ref = human_scale_reference(format_model_dimensions_cm(model))
         return render_template(
             "viewer.html", model=model, paper=model.paper, has_usdz=has_usdz,
@@ -4410,6 +4412,8 @@ def register_routes(app: Flask) -> None:
         model = db.session.get(Model3D, model_id)
         if not model or not _paper_visible_to_request(model.paper):
             return jsonify({"ok": False}), 404
+        if _is_admin_preview(model.user_id):
+            return jsonify({"ok": True, "ignored": True}), 202
         if browser_event_is_duplicate(event_name, model_id):
             return jsonify({"ok": True, "duplicate": True}), 202
         track_event(event_name, owner_user_id=model.user_id, project_id=model.paper_id, model_id=model.id)
@@ -4627,12 +4631,25 @@ def register_routes(app: Flask) -> None:
         return send_from_directory(app.config["PDF_FOLDER"], pdf_name)
 
     def _paper_visible_to_request(paper: Paper) -> bool:
-        """A project is visible if shared publicly/unlisted, or owned by user."""
+        """A project is visible if shared publicly/unlisted, owned by the user,
+        or the viewer is an admin (the admin panel links to users' private
+        models; answering those with "Page not found" hid live models)."""
         if paper_is_deleted(paper):
             return False
         if project_visibility(paper) in {"public", "unlisted"}:
             return True
-        return current_user.is_authenticated and current_user.id == paper.user_id
+        if not current_user.is_authenticated:
+            return False
+        return current_user.id == paper.user_id or bool(current_user.is_admin)
+
+    def _is_admin_preview(owner_user_id) -> bool:
+        """An admin looking at someone else's model; kept out of the owner's
+        view analytics."""
+        return (
+            current_user.is_authenticated
+            and bool(current_user.is_admin)
+            and current_user.id != owner_user_id
+        )
 
     @app.route("/qr-image/paper/<int:paper_id>")
     def qr_image_paper(paper_id):
@@ -4666,7 +4683,8 @@ def register_routes(app: Flask) -> None:
             abort(404)
         if not _paper_visible_to_request(paper):
             abort(404)
-        track_event("project_viewed", owner_user_id=paper.user_id, project_id=paper.id)
+        if not _is_admin_preview(paper.user_id):
+            track_event("project_viewed", owner_user_id=paper.user_id, project_id=paper.id)
         return render_template("paper_public.html", paper=paper)
 
     @app.route("/share/<share_token>")
@@ -4760,7 +4778,8 @@ def register_routes(app: Flask) -> None:
         article = ProjectArticle.query.filter_by(id=article_id, project_id=project.id).first_or_404()
         if not article.pdf_path:
             abort(404)
-        track_event("article_viewed", owner_user_id=project.user_id, project_id=project.id)
+        if not _is_admin_preview(project.user_id):
+            track_event("article_viewed", owner_user_id=project.user_id, project_id=project.id)
         return render_template(
             "pdf_reader.html",
             paper=project,
@@ -4785,7 +4804,8 @@ def register_routes(app: Flask) -> None:
         if not project_supports_feature(project, "presentation_library"):
             abort(403)
         attachment = ProjectAttachment.query.filter_by(id=attachment_id, project_id=project.id).first_or_404()
-        track_event("material_viewed", owner_user_id=project.user_id, project_id=project.id)
+        if not _is_admin_preview(project.user_id):
+            track_event("material_viewed", owner_user_id=project.user_id, project_id=project.id)
         return render_template(
             "pdf_reader.html",
             paper=project,

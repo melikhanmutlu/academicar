@@ -162,7 +162,7 @@
           {% for model in models %}
             <tr>
               <td>
-                <a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener noreferrer">{{ model.display_name or model.original_filename or model.id }}</a>
+                {% if paper_is_deleted(model.paper) %}<span>{{ model.display_name or model.original_filename or model.id }}</span> <small>Project deleted</small>{% else %}<a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener noreferrer">{{ model.display_name or model.original_filename or model.id }}</a>{% endif %}
                 <small>{{ model_resolver_url(model) if model.public_id else "No public id" }}</small>
               </td>
               <td>{{ model.paper.title if model.paper else "-" }}</td>
