@@ -2,10 +2,11 @@
 
 Regression test for the "Multiple head revisions are present" failure: when a
 new migration is branched off an old revision instead of the current head, the
-graph grows two heads and ``flask db upgrade`` aborts. On Railway the start
-command chains the worker behind ``flask db upgrade && python worker.py``, so a
-failed upgrade silently prevents the worker from booting and every freshly
-uploaded model stays wedged in "Processing model" forever.
+graph grows two heads and ``flask db upgrade`` aborts. On Railway a failed
+upgrade stops the container start (see ``test_railway_start_command_*``);
+before that, it silently prevented the worker from booting while the web
+process kept serving, and every freshly uploaded model stayed wedged in
+"Processing model" forever.
 
 A single head keeps ``flask db upgrade`` (and app.py's ``get_current_head()``
 stamp path) unambiguous.
