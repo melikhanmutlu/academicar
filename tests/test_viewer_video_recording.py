@@ -34,3 +34,9 @@ def test_webm_duration_fix_is_vendored_and_loaded():
     assert (ROOT / "static" / "vendor" / "fix-webm-duration.LICENSE").exists()
     assert "vendor/fix-webm-duration.js" in VIEWER
     assert "ysFixWebmDuration(blob" in VIEWER
+
+
+def test_mp4_recordings_are_defragmented_before_download():
+    assert (ROOT / "static" / "js" / "mp4-defragment.js").exists()
+    assert "js/mp4-defragment.js" in VIEWER
+    assert "academicarDefragmentMp4(blob)" in VIEWER

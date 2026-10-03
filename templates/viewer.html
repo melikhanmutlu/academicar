@@ -33,6 +33,7 @@
   <script type="module" src="https://unpkg.com/@google/model-viewer@4.3.0/dist/model-viewer.min.js" crossorigin="anonymous"></script>
   <script src="{{ url_for('static', filename='vendor/jszip.min.js') }}"></script>
   <script src="{{ url_for('static', filename='vendor/fix-webm-duration.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/mp4-defragment.js') }}" defer></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 
   <style>
@@ -3023,9 +3024,15 @@
           return;
         }
         let blob = new Blob(chunks, { type: finalType });
-        // Browser-recorded WebM has no duration, so players cannot show its
-        // length or seek; write it into the file before download.
-        if (!finalType.includes('mp4') && typeof window.ysFixWebmDuration === 'function') {
+        // Browser recordings lack what desktop players need to show the
+        // length and seek: WebM has no duration, and MP4 comes out fragmented
+        // (QuickTime, Windows players and PowerPoint show it as endless).
+        // Fix the container before download; the video itself is untouched.
+        if (finalType.includes('mp4')) {
+          if (typeof window.academicarDefragmentMp4 === 'function') {
+            try { blob = await window.academicarDefragmentMp4(blob); } catch (error) { /* keep the raw file */ }
+          }
+        } else if (typeof window.ysFixWebmDuration === 'function') {
           try { blob = await window.ysFixWebmDuration(blob, performance.now() - startedAt, { logger: false }); } catch (error) { /* keep the raw file */ }
         }
         const link = document.createElement('a');
