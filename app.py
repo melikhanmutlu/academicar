@@ -284,8 +284,32 @@ ACADEMIC_FIELDS = (
     "Medicine", "Dentistry", "Engineering", "Architecture", "Biology",
     "Archaeology", "Veterinary Medicine", "Chemistry", "Other",
 )
-INSTITUTION_DEPARTMENTS = (
-    "Plastic Surgery", "Orthopaedics", "General Surgery", "Radiology",
+# Medical departments follow the 44 departments (anabilim dalı) of the
+# Istanbul University-Cerrahpaşa Faculty of Medicine, in English. Names that
+# were already in use ("Plastic Surgery", "Orthopaedics", …) stay canonical so
+# saved projects keep grouping together; the official long forms are aliases.
+MEDICAL_DEPARTMENTS = (
+    # Basic medical sciences
+    "Anatomy", "Biophysics", "Biostatistics and Medical Informatics",
+    "Histology and Embryology", "History of Medicine and Ethics",
+    "Medical Biochemistry", "Medical Biology", "Medical Education",
+    "Medical Microbiology", "Physiology",
+    # Internal medical sciences
+    "Cardiology", "Child and Adolescent Psychiatry", "Dermatology and Venereology",
+    "Emergency Medicine", "Family Medicine", "Forensic Medicine",
+    "Infectious Diseases and Clinical Microbiology", "Internal Medicine",
+    "Medical Genetics", "Medical Pharmacology", "Neurology", "Nuclear Medicine",
+    "Pediatrics", "Physical Medicine and Rehabilitation", "Psychiatry",
+    "Public Health", "Pulmonary Medicine", "Radiation Oncology", "Radiology",
+    "Sports Medicine",
+    # Surgical medical sciences
+    "Anesthesiology and Reanimation", "Cardiovascular Surgery", "General Surgery",
+    "Neurosurgery", "Obstetrics and Gynecology", "Ophthalmology",
+    "Oral and Maxillofacial Surgery", "Orthopaedics", "Otorhinolaryngology",
+    "Pathology", "Pediatric Surgery", "Plastic Surgery", "Thoracic Surgery",
+    "Urology",
+)
+INSTITUTION_DEPARTMENTS = MEDICAL_DEPARTMENTS + (
     "Dentistry", "Civil Engineering", "Electrical Engineering",
     "Mechanical Engineering", "Architecture", "Biomedical Engineering",
 )
@@ -294,8 +318,33 @@ _DEPARTMENT_ALIASES = {
     "orthopedics": "Orthopaedics",
     "orthopedic surgery": "Orthopaedics",
     "orthopaedic surgery": "Orthopaedics",
+    "orthopaedics and traumatology": "Orthopaedics",
+    "orthopedics and traumatology": "Orthopaedics",
     "plastic and reconstructive surgery": "Plastic Surgery",
+    "plastic, reconstructive and aesthetic surgery": "Plastic Surgery",
     "plastics": "Plastic Surgery",
+    "paediatrics": "Pediatrics",
+    "child health and diseases": "Pediatrics",
+    "paediatric surgery": "Pediatric Surgery",
+    "anaesthesiology and reanimation": "Anesthesiology and Reanimation",
+    "anesthesiology": "Anesthesiology and Reanimation",
+    "anaesthesiology": "Anesthesiology and Reanimation",
+    "chest diseases": "Pulmonary Medicine",
+    "pulmonology": "Pulmonary Medicine",
+    "chest surgery": "Thoracic Surgery",
+    "brain and nerve surgery": "Neurosurgery",
+    "ear, nose and throat": "Otorhinolaryngology",
+    "ent": "Otorhinolaryngology",
+    "otolaryngology": "Otorhinolaryngology",
+    "eye diseases": "Ophthalmology",
+    "gynecology and obstetrics": "Obstetrics and Gynecology",
+    "obstetrics and gynaecology": "Obstetrics and Gynecology",
+    "medical pathology": "Pathology",
+    "dermatology": "Dermatology and Venereology",
+    "infectious diseases": "Infectious Diseases and Clinical Microbiology",
+    "mental health and diseases": "Psychiatry",
+    "child and adolescent mental health and diseases": "Child and Adolescent Psychiatry",
+    "physical therapy and rehabilitation": "Physical Medicine and Rehabilitation",
     "civil eng": "Civil Engineering",
     "electrical and electronics engineering": "Electrical Engineering",
     "electrical engineering and electronics": "Electrical Engineering",
