@@ -53,7 +53,9 @@ def test_unlisted_project_uses_opaque_reviewer_link(client):
 
     # A title-derived public URL must not expose an unlisted review project.
     anonymous = client.application.test_client()
-    assert anonymous.get(f"/p/{slug}").status_code == 404
+    by_slug = anonymous.get(f"/p/{slug}")
+    assert by_slug.status_code == 403  # "not shared" page, never the project
+    assert b"Reviewer-only scan set" not in by_slug.data
     review = anonymous.get(f"/share/{token}")
     assert review.status_code == 200
     assert review.headers["X-Robots-Tag"] == "noindex, nofollow, noarchive"

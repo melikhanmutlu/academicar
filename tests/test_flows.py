@@ -227,7 +227,7 @@ def test_paper_detail_uses_clear_actions_without_publication_expiry(client):
     assert "Abstract" in html
     assert "Description / Abstract" not in html
     assert "Preview as visitor" in html
-    assert "Project QR" in html
+    assert "Print or download QR" in html
     assert "Availability" not in html
     assert "Active until" not in html
 

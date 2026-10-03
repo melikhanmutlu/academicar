@@ -4750,12 +4750,14 @@ def register_routes(app: Flask) -> None:
     def paper_public(slug):
         paper = active_paper_query().filter_by(slug=slug).first_or_404()
         # Unlisted projects are intentionally not reachable through their
-        # human-readable slug; reviewers receive the opaque /share/ URL.
+        # human-readable slug; reviewers receive the opaque /share/ URL. A
+        # printed public QR of a project later switched to a review link gets
+        # the "not shared" page (no project details) instead of a dead 404.
         if project_visibility(paper) == "unlisted" and not (
             current_user.is_authenticated
             and (current_user.id == paper.user_id or current_user.is_admin)
         ):
-            abort(404)
+            return _private_project_response(paper)
         if not _paper_visible_to_request(paper):
             return _private_project_response(paper)
         if not _is_admin_preview(paper.user_id):

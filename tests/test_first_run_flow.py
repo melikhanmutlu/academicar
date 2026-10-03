@@ -33,7 +33,7 @@ def test_private_project_page_warns_and_hides_share_links(client, app):
     register(client)
     slug, _, _ = _project(app)
     html = client.get(f"/projects/{slug}").data.decode()
-    assert "Only you can open this project." in html
+    assert "Not shared yet" in html and "Only you can open this project and its models." in html
     assert "Preview as visitor" not in html
     assert "/qr-image/paper/" not in html  # no printable project QR while private
 
@@ -83,7 +83,10 @@ def test_owner_switches_visibility_from_project_page(client, app):
     # One name for the state everywhere ("Review link"), and the preview goes
     # to the share URL that visitors can actually open.
     assert "Unlisted" not in html
-    assert re.search(r"<span>Visibility</span>\s*<strong>Review link</strong>", html)
+    # The selected option is marked as current in the "Who can open this
+    # project" choice (no separate, duplicate "Visibility" stat).
+    assert re.search(r'value="unlisted"\s+class="visibility-option is-selected"', html)
+    assert "<span>Visibility</span>" not in html
     assert f'/share/{paper.share_token}' in html
     client.post(f"/projects/{slug}/visibility", data={"visibility": "public"})
     with app.app_context():
@@ -160,3 +163,14 @@ def test_failed_first_upload_says_project_was_saved(client, app):
     assert "Project saved, but the model could not be added" in page
     with app.app_context():
         assert Paper.query.filter_by(title="Broken upload").count() == 1
+
+
+def test_narrowing_visibility_asks_for_confirmation(client, app):
+    register(client)
+    slug, _, _ = _project(app, visibility="public")
+    html = client.get(f"/projects/{slug}").data.decode()
+    option = lambda value: re.search(rf'<button type="(\w+)" name="visibility" value="{value}"[^>]*>', html).group(0)
+    assert "data-confirm" in option("private")      # public -> private
+    assert "data-confirm" in option("unlisted")     # public -> review link
+    assert option("public").startswith('<button type="button"')  # current: no resubmit
+    assert "Who can open this project" in html

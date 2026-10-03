@@ -78,33 +78,79 @@
       </div>
 
       {% set current_visibility = project_visibility(paper) %}
-      <form method="POST" action="{{ url_for('project_visibility_update', slug=paper.slug) }}" class="visibility-switch mt-4" aria-label="Who can open this project">
+      {% set visibility_options = [
+        ('private', 'Only you', 'lock'),
+        ('unlisted', 'Anyone with the link · not listed or searchable', 'link'),
+        ('public', 'Anyone · ready for posters, papers and slides', 'globe'),
+      ] %}
+      <form method="POST" action="{{ url_for('project_visibility_update', slug=paper.slug) }}" class="visibility-choice mt-5" data-visibility-form>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        {% for value in ('private', 'unlisted', 'public') %}
-          <button type="submit" name="visibility" value="{{ value }}" class="{{ 'is-active' if current_visibility == value else '' }}" {% if current_visibility == value %}aria-pressed="true" disabled{% else %}aria-pressed="false"{% endif %}>{{ visibility_labels[value] }}</button>
-        {% endfor %}
+        <fieldset>
+          <legend>Who can open this project</legend>
+          {% for value, hint, icon in visibility_options %}
+            {% set selected = current_visibility == value %}
+            {% set confirm_text = '' %}
+            {% if value == 'private' and current_visibility != 'private' %}
+              {% set confirm_text = 'Make this project private? Anyone who opens its links or scans its QR codes (including printed ones) will see a "private project" page until you share it again.' %}
+            {% elif value == 'unlisted' and current_visibility == 'public' %}
+              {% set confirm_text = 'Switch to a review link? The public project page and its QR code stop opening for visitors; share the new review link instead. Model QR codes keep working.' %}
+            {% endif %}
+            <button type="{{ 'button' if selected else 'submit' }}" name="visibility" value="{{ value }}"
+                    class="visibility-option{{ ' is-selected' if selected else '' }}"
+                    aria-pressed="{{ 'true' if selected else 'false' }}"
+                    {% if confirm_text %}data-confirm="{{ confirm_text }}"{% endif %}
+                    {% if selected %}aria-current="true"{% endif %}>
+              <span class="visibility-option-radio" aria-hidden="true"></span>
+              <span class="visibility-option-icon" aria-hidden="true">
+                {% if icon == 'lock' %}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+                {% elif icon == 'link' %}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11.5 4.5"/><path d="M14 11a5 5 0 0 0-7.07 0l-2.83 2.83a5 5 0 0 0 7.07 7.07l1.33-1.33"/></svg>
+                {% else %}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18"/></svg>{% endif %}
+              </span>
+              <span class="visibility-option-text"><strong>{{ visibility_labels[value] }}</strong><small>{{ hint }}</small></span>
+              {% if selected %}<span class="visibility-option-state">Current</span>{% endif %}
+            </button>
+          {% endfor %}
+        </fieldset>
       </form>
 
-      {% if current_visibility == 'private' %}
-        <div class="share-private-note mt-4" role="note">
-          <strong>Only you can open this project.</strong>
-          <p>Its links and QR codes show a "private" page to everyone else. Choose <em>Review link</em> to share it with reviewers, or <em>Public</em> to print the QR on a poster or paper.</p>
-        </div>
-      {% else %}
-      <div class="mt-5 flex gap-4 share-identity">
-        <div class="share-qr">
-          <img src="{{ url_for('qr_image_paper', paper_id=paper.id) }}" class="w-28 h-28" alt="QR code for {{ paper.title }}">
-        </div>
-        <div class="min-w-0 flex-1">
-          <p class="share-description">{{ 'Anyone with this link or QR can open the project; it is not listed publicly.' if current_visibility == 'unlisted' else 'Scan this QR code with a smartphone to view the interactive 3D models and project details.' }}</p>
-          {% set share_url = project_landing_url(paper, absolute=True) %}
-          <div class="copy-field mt-3" title="{{ share_url }}">
-            <span>{{ share_url }}</span>
-            <button type="button" data-copy-link="{{ share_url }}" aria-label="Copy project link">Copy</button>
+      <div class="share-state-box mt-4" data-share-state="{{ current_visibility }}">
+        {% if current_visibility == 'private' %}
+          <div class="share-private-note" role="note">
+            <strong>Not shared yet</strong>
+            <p>Only you can open this project and its models. Anyone else who opens a link or scans a QR code sees a "private project" page.</p>
+            <p>To share, choose <em>Review link</em> (e.g. for reviewers or co-authors) or <em>Public</em> (for posters, papers and slides).</p>
           </div>
-        </div>
+        {% else %}
+          {% set share_url = project_landing_url(paper, absolute=True) %}
+          <div class="share-identity flex gap-4">
+            <div class="share-qr">
+              <img src="{{ url_for('qr_image_paper', paper_id=paper.id) }}" class="w-28 h-28" alt="QR code that opens {{ 'the review link for' if current_visibility == 'unlisted' else 'the public page of' }} {{ paper.title }}">
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="share-state-title">{{ 'Review link' if current_visibility == 'unlisted' else 'Public project page' }}</p>
+              <p class="share-description">
+                {% if current_visibility == 'unlisted' %}
+                  Send this link or QR to reviewers or co-authors. Anyone who has it can open the project; it is not listed on AcademicAR or in search engines.
+                {% else %}
+                  Anyone can open this page. Scanning the QR opens it on a phone with every 3D model ready for AR.
+                {% endif %}
+              </p>
+            </div>
+          </div>
+          <label class="share-link-label" for="projectShareUrl">{{ 'Review link' if current_visibility == 'unlisted' else 'Project link' }}</label>
+          <div class="copy-field" title="{{ share_url }}">
+            <input id="projectShareUrl" type="text" value="{{ share_url }}" readonly aria-readonly="true" onfocus="this.select()">
+            <button type="button" data-copy-link="{{ share_url }}" aria-label="Copy {{ 'review' if current_visibility == 'unlisted' else 'project' }} link">Copy</button>
+          </div>
+          <div class="share-actions share-actions-inline mt-3">
+            <a href="{{ project_landing_url(paper) }}" target="_blank" rel="noopener noreferrer" class="detail-action">Preview as visitor</a>
+            <a href="{{ url_for('qr_print_paper', paper_id=paper.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action">Print or download QR</a>
+          </div>
+          {% if paper.models %}
+            <p class="share-hint">This QR opens the whole project. Each model below also has its own QR that opens that model straight in 3D / AR.</p>
+          {% endif %}
+        {% endif %}
       </div>
-      {% endif %}
 
       <div class="share-actions mt-5">
         {% if not paper.models and can_upload_more %}
@@ -114,18 +160,10 @@
         {% elif presentation_enabled and paper.attachments %}
           <a href="{{ url_for('project_attachment_reader', slug=paper.slug, attachment_id=paper.attachments[0].id) }}" target="_blank" rel="noopener noreferrer" class="detail-action detail-action-primary">Open materials</a>
         {% endif %}
-        {% if current_visibility != 'private' %}
-          <a href="{{ project_landing_url(paper) }}" target="_blank" rel="noopener noreferrer" class="detail-action">Preview as visitor</a>
-          <a href="{{ url_for('qr_print_paper', paper_id=paper.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action">Project QR</a>
-        {% endif %}
         <a href="{{ url_for('project_edit', slug=paper.slug) }}" class="detail-action">Add article or material</a>
       </div>
 
       <div class="share-stats mt-5">
-        <div>
-          <span>Visibility</span>
-          <strong>{{ visibility_label(paper) }}</strong>
-        </div>
         <div>
           <span>Models</span>
           <strong>{{ paper.models|length }}</strong>
@@ -673,6 +711,12 @@
   }
 
   // Delegated so rows refreshed in place (status polling below) keep working.
+  // Narrowing who can open the project affects links and printed QR codes:
+  // ask first. Widening access (e.g. to Public) needs no confirmation.
+  document.querySelector('[data-visibility-form]')?.addEventListener('submit', (event) => {
+    const message = event.submitter && event.submitter.dataset.confirm;
+    if (message && !window.confirm(message)) event.preventDefault();
+  });
   document.addEventListener('click', async (event) => {
     const button = event.target.closest('[data-copy-link]');
     if (!button) return;
@@ -681,11 +725,13 @@
       if (button.dataset.analyticsModelId) {
         fetch('/analytics/event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'share_link_copied', model_id: button.dataset.analyticsModelId }), keepalive: true }).catch(() => {});
       }
-      const original = button.textContent;
+      // Restore the original markup: some buttons hold a long and a short
+      // label, and restoring textContent merged them ("Copy linkCopy").
+      const original = button.innerHTML;
       button.textContent = 'Copied';
-      setTimeout(() => { button.textContent = original; }, 1400);
+      setTimeout(() => { button.innerHTML = original; }, 1400);
     } catch (error) {
-      window.prompt('Copy this viewer link:', button.dataset.copyLink);
+      window.prompt('Copy this link:', button.dataset.copyLink);
     }
   });
 
