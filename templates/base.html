@@ -14,11 +14,11 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="{{ canonical_url() }}">
   <meta property="og:site_name" content="AcademicAR">
-  <meta property="og:image" content="{{ url_for('static', filename='images/clinical-spatial-hero.png', _external=True) }}">
+  <meta property="og:image" content="{% block og_image %}{{ share_image_url() }}{% endblock %}">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="{{ self.og_title() }}">
   <meta name="twitter:description" content="{{ self.og_description() }}">
-  <meta name="twitter:image" content="{{ url_for('static', filename='images/clinical-spatial-hero.png', _external=True) }}">
+  <meta name="twitter:image" content="{{ self.og_image() }}">
 
   <script type="application/ld+json">
   {

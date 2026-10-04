@@ -85,6 +85,7 @@ from institutions import (
 from models import AnalyticsEvent, AuditLog, BlogPost, ConversionJob, Coupon, Institution, InstitutionInvite, InstitutionMember, LicensePlanConfig, Model3D, ModelAnnotation, ModelVersion, Paper, Payment, ProjectArticle, ProjectAttachment, QRLink, User, db
 from services.r2_mirror import mirror_file, mirror_directory, mirror_directory_sync, mirror_delete, ensure_local
 from services.monitoring import init_error_monitoring
+from services import qr_assets
 from payments import (
     PAID_PLAN_KEYS,
     ForexRateUnavailable,
@@ -231,6 +232,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             "project_visibility": project_visibility,
             "project_landing_url": project_landing_url,
             "active_models": active_models,
+            "share_image_url": share_image_url,
             "paper_is_deleted": paper_is_deleted,
             "visibility_label": visibility_label,
             "visibility_labels": VISIBILITY_LABELS,
@@ -1739,6 +1741,27 @@ def active_models(project: Paper | None) -> list:
     return [model for model in project.models if model_access_status(model) == "active"]
 
 
+DEFAULT_SHARE_IMAGE = "images/clinical-spatial-hero.png"
+
+
+def share_image_url(project: Paper | None = None, model: Model3D | None = None) -> str:
+    """Absolute og:image for link previews (WhatsApp, LinkedIn, X...): the
+    model's poster when a crawler can fetch it (public project, model open to
+    visitors), otherwise the generic AcademicAR image. For a project, the
+    first openable model with a poster is used."""
+    if project is None and model is not None:
+        project = getattr(model, "paper", None)
+    # Demo pages pass plain namespaces, not database rows.
+    if not isinstance(project, Paper):
+        return public_url("static", filename=DEFAULT_SHARE_IMAGE)
+    candidates = [model] if model is not None else active_models(project)
+    if project_visibility(project) == "public" and not paper_is_deleted(project):
+        for candidate in candidates:
+            if candidate is not None and candidate.poster_path and model_access_status(candidate) == "active":
+                return public_url("serve_poster", unique_id=candidate.id)
+    return public_url("static", filename=DEFAULT_SHARE_IMAGE)
+
+
 def project_landing_url(project: Paper, absolute: bool = False) -> str:
     """URL a visitor should use to reach a project: the review link for
     unlisted projects (whose /p/<slug> page is 404 to visitors), otherwise the
@@ -2456,9 +2479,10 @@ FAQ_ITEMS = (
     },
     {
         "q": "Can I embed the viewer in my website or institutional repository?",
-        "a": "Yes. Public model viewers can be embedded as a lightweight iframe "
-             "widget, so you can place the interactive 3D model on a lab page, "
-             "blog, or repository alongside your publication.",
+        "a": "Yes. On a public project, the Embed button on each model card copies "
+             "a ready-made iframe, so you can place the interactive 3D model on a "
+             "lab page, blog, course page (Moodle, Canvas) or repository alongside "
+             "your publication.",
     },
     {
         "q": "Who owns the uploaded models and data?",
@@ -4906,6 +4930,51 @@ def register_routes(app: Flask) -> None:
             abort(403)
         share = build_share_snippets(model, model_resolver_url(model))
         return render_template("qr_page.html", model=model, paper=model.paper, share=share)
+
+    QR_ASSETS = {
+        # asset name -> (mimetype, builder(url, title) -> bytes|str)
+        "qr.svg": ("image/svg+xml", lambda url, title: qr_assets.qr_svg(url)),
+        "qr-print.png": ("image/png", lambda url, title: qr_assets.qr_png(url)),
+        "label.svg": ("image/svg+xml", qr_assets.qr_label_svg),
+        "label.png": ("image/png", qr_assets.qr_label_png),
+    }
+
+    def _qr_asset_response(asset, url, title, stem):
+        if asset not in QR_ASSETS:
+            abort(404)
+        mimetype, build = QR_ASSETS[asset]
+        body = build(url, title)
+        response = Response(body.encode() if isinstance(body, str) else body, mimetype=mimetype)
+        response.headers["Content-Disposition"] = f'attachment; filename="{stem}-{asset}"'
+        response.headers["Cache-Control"] = "private, no-cache"
+        return response
+
+    @app.route("/qr-print/<model_id>/<asset>")
+    @login_required
+    def qr_print_asset(model_id, asset):
+        """Print-quality QR downloads (vector SVG, high-res PNG, poster label)
+        for the owner; same target URL as the stored QR image."""
+        model = db.session.get(Model3D, model_id)
+        if not model or not model.paper:
+            abort(404)
+        if model.user_id != current_user.id:
+            abort(403)
+        ensure_model_qr_link(model)
+        title = model.display_name or model.original_filename or model.paper.title or "3D model"
+        return _qr_asset_response(asset, model_resolver_url(model), title, f"qr-{model.public_id or model.id}")
+
+    @app.route("/qr-print/paper/<int:paper_id>/<asset>")
+    @login_required
+    def qr_print_paper_asset(paper_id, asset):
+        paper = db.session.get(Paper, paper_id)
+        if not paper or paper_is_deleted(paper):
+            abort(404)
+        if paper.user_id != current_user.id:
+            abort(403)
+        if project_visibility(paper) == "unlisted" and not paper.share_token:
+            paper.share_token = new_project_share_token()
+            db.session.commit()
+        return _qr_asset_response(asset, project_landing_url(paper, absolute=True), paper.title, f"qr-project-{paper.id}")
 
     @app.route("/pdfs/<int:paper_id>")
     @login_required

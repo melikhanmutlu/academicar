@@ -307,6 +307,12 @@
                 {% endif %}
                 <div class="model-actions-secondary">
                   <button type="button" class="model-link-action" data-copy-link="{{ model_resolver_url(m) }}" data-analytics-model-id="{{ m.id }}" aria-label="Copy viewer link"><span class="label-full">Copy link</span><span class="label-short">Copy</span></button>
+                  {% if current_visibility == 'public' and access_state == 'active' %}
+                    {# Iframe for a website, LMS (Moodle/Canvas) or repository page. Only
+                       public projects: a framed viewer has no review-link cookie. #}
+                    {% set embed_src = public_url('view_model', model_id=m.id, embed='true') %}
+                    <button type="button" class="model-link-action" data-copy-link='<iframe src="{{ embed_src }}" title="{{ (m.display_name or m.original_filename or '3D model')|replace('"', '') }} (interactive 3D model)" width="100%" height="480" style="border:0;border-radius:8px" allow="xr-spatial-tracking; fullscreen" allowfullscreen loading="lazy"></iframe>' aria-label="Copy embed code" title="Copy an iframe to embed this 3D viewer in a website, Moodle/Canvas or a repository page">Embed</button>
+                  {% endif %}
                   <a href="{{ url_for('qr_print', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-link-action">QR</a>
                   <a href="{{ url_for('model_edit', model_id=m.id) }}" class="model-link-action">Edit</a>
                   <form method="POST" action="{{ url_for('model_delete', model_id=m.id) }}" class="model-delete-form" onsubmit="return confirm('Delete this 3D model? This cannot be undone.');">

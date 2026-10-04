@@ -2,16 +2,13 @@
 {% set presentation_enabled = project_supports_feature(paper, 'presentation_library') %}
 {% block title %}{{ paper.title }} - AcademicAR{% endblock %}
 {% block meta_description %}{{ (paper.abstract or 'Interactive 3D project with browser and AR-ready models.')|striptags|truncate(160) }}{% endblock %}
+{# Link preview: base.html renders the og:/twitter: tags from these blocks
+   (duplicate tags made crawlers show the generic site title). #}
+{% block og_title %}{{ paper.title|striptags|truncate(120) }}{% endblock %}
+{% block og_description %}{{ (paper.abstract or 'Interactive 3D project with browser and AR-ready models.')|striptags|truncate(200) }}{% endblock %}
+{% block og_image %}{{ share_image_url(paper) }}{% endblock %}
 {% block head %}
-<meta property="og:type" content="website">
-<meta property="og:title" content="{{ paper.title|striptags|truncate(120) }}">
-<meta property="og:description" content="{{ (paper.abstract or 'Interactive 3D project with browser and AR-ready models.')|striptags|truncate(200) }}">
-<meta property="og:image" content="{{ url_for('static', filename='images/clinical-spatial-hero.png', _external=True) }}">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="{{ paper.title|striptags|truncate(120) }}">
-<meta name="twitter:description" content="{{ (paper.abstract or 'Interactive 3D project with browser and AR-ready models.')|striptags|truncate(200) }}">
 {% if unlisted_share|default(false) %}<meta name="robots" content="noindex,nofollow,noarchive">{% endif %}
-<meta name="twitter:image" content="{{ url_for('static', filename='images/clinical-spatial-hero.png', _external=True) }}">
 <script type="module" src="https://unpkg.com/@google/model-viewer@4.3.0/dist/model-viewer.min.js" crossorigin="anonymous"></script>
 {% endblock %}
 
