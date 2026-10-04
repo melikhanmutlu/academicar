@@ -1115,6 +1115,8 @@ def ensure_sqlite_schema(app: Flask) -> None:
             # Same as migration e2f3a4b5c6d7: existing accounts count as verified.
             connection.execute(text("ALTER TABLE users ADD COLUMN email_verified_at DATETIME"))
             connection.execute(text("UPDATE users SET email_verified_at = COALESCE(created_at, CURRENT_TIMESTAMP)"))
+        if user_columns and "impact_report_opt_out" not in user_columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN impact_report_opt_out BOOLEAN NOT NULL DEFAULT 0"))
         columns = {row[1] for row in connection.execute(text("PRAGMA table_info(papers)")).fetchall()}
         if "deleted_at" not in columns:
             connection.execute(text("ALTER TABLE papers ADD COLUMN deleted_at DATETIME"))
@@ -2396,7 +2398,12 @@ def _csv_response(rows: list[dict], columns: list[str], filename: str, truncated
     writer = csv.DictWriter(buf, fieldnames=columns, extrasaction="ignore")
     writer.writeheader()
     for row in rows:
-        writer.writerow(row)
+        # Spreadsheet formula injection: a user-entered title such as
+        # "=HYPERLINK(...)" must stay text when an admin opens the export.
+        writer.writerow({
+            key: ("'" + value if isinstance(value, str) and value[:1] in ("=", "+", "-", "@", "\t", "\r") else value)
+            for key, value in row.items()
+        })
     response = Response(buf.getvalue(), mimetype="text/csv")
     response.headers["Content-Disposition"] = f"attachment; filename={filename}"
     return response
@@ -5247,7 +5254,46 @@ def register_routes(app: Flask) -> None:
     @app.route("/insights")
     @login_required
     def insights():
-        return render_template("insights.html", analytics=analytics_snapshot(current_user.id))
+        days = _insights_days()
+        return render_template(
+            "insights.html",
+            analytics=analytics_snapshot(current_user.id, days=days),
+            generated_on=datetime.now(UTC).strftime("%d %b %Y"),
+        )
+
+    INSIGHTS_PERIODS = (7, 30, 90, 365)
+
+    def _insights_days() -> int:
+        days = request.args.get("days", type=int) or 30
+        return days if days in INSIGHTS_PERIODS else 30
+
+    @app.route("/insights/export.csv")
+    @login_required
+    def insights_export():
+        """Per-model numbers for the chosen period, for grant reports and CVs."""
+        days = _insights_days()
+        analytics = analytics_snapshot(current_user.id, days=days)
+        rows = [
+            {
+                "model": item["model"].display_name or item["model"].original_filename or item["model"].id,
+                "project": item["model"].paper.title if item["model"].paper else "",
+                "viewer_link": model_resolver_url(item["model"]),
+                "views": item["views"],
+                "unique_visitors": item["unique_visitors"],
+                "qr_scans": item["qr_scans"],
+                "ar_starts": item["ar_starts"],
+                "link_copies": item["shares"],
+                "engagement_rate_percent": item["engagement_rate"],
+                "last_viewed_at": item["last_viewed_at"],
+            }
+            for item in analytics["model_metrics"]
+        ]
+        return _csv_response(
+            rows,
+            ["model", "project", "viewer_link", "views", "unique_visitors", "qr_scans", "ar_starts",
+             "link_copies", "engagement_rate_percent", "last_viewed_at"],
+            f"academicar-insights-{days}d.csv",
+        )
 
     @app.route("/admin", defaults={"admin_page": "overview"})
     @app.route("/admin/<admin_page>")
@@ -8135,6 +8181,34 @@ def register_routes(app: Flask) -> None:
             db.session.rollback()
             flash("Could not update profile information. Please try again.", "danger")
         return redirect(url_for("profile"))
+
+    @app.route("/account/impact-report", methods=["POST"])
+    @login_required
+    def account_impact_report():
+        current_user.impact_report_opt_out = request.form.get("impact_report") != "on"
+        db.session.commit()
+        flash(
+            "Monthly impact emails are off." if current_user.impact_report_opt_out
+            else "You will get a monthly summary of how readers use your models.",
+            "success",
+        )
+        return redirect(url_for("profile") + "#email-preferences")
+
+    @app.route("/account/impact-report/unsubscribe/<token>", methods=["GET", "POST"])
+    def impact_report_unsubscribe(token):
+        """Link from the monthly email. GET only shows a button: mail
+        scanners open links, and must not unsubscribe anyone."""
+        from lifecycle import user_id_from_impact_unsubscribe_token
+
+        user = db.session.get(User, user_id_from_impact_unsubscribe_token(token) or 0)
+        if user is None:
+            abort(404)
+        if request.method == "POST":
+            user.impact_report_opt_out = True
+            db.session.commit()
+            log_audit("impact_report_unsubscribed", user_id=user.id)
+            return render_template("impact_unsubscribe.html", done=True)
+        return render_template("impact_unsubscribe.html", done=False, token=token)
 
     @app.route("/account/delete", methods=["POST"])
     @login_required

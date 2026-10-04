@@ -30,6 +30,8 @@ class User(UserMixin, db.Model):
     # When the user proved they own ``email`` (verification link, Google,
     # password-reset link or email-change link). NULL = not verified yet.
     email_verified_at = db.Column(db.DateTime, nullable=True)
+    # The monthly "your models' impact" email (views, QR scans, AR); on by default.
+    impact_report_opt_out = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     created_at = db.Column(db.DateTime, default=utc_now)
 
     # ``papers`` is the historical storage-facing name. New product surfaces

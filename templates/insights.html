@@ -7,7 +7,17 @@
       <h1>Insights</h1>
       <p>How visitors engage with your projects and 3D models in the last {{ analytics.days }} days.</p>
     </div>
+    <div class="insights-actions">
+      <nav class="insights-periods" aria-label="Period">
+        {% for d, label in [(7, '7 days'), (30, '30 days'), (90, '90 days'), (365, '12 months')] %}
+          <a href="{{ url_for('insights', days=d) }}" {% if analytics.days == d %}aria-current="page" class="is-active"{% endif %}>{{ label }}</a>
+        {% endfor %}
+      </nav>
+      <a href="{{ url_for('insights_export', days=analytics.days) }}" class="btn-secondary btn-compact">Download CSV</a>
+      <button type="button" class="btn-secondary btn-compact" onclick="window.print()">Print / PDF</button>
+    </div>
   </header>
+  <p class="insights-print-note">AcademicAR impact report &middot; {{ current_user.username }} &middot; last {{ analytics.days }} days &middot; generated {{ generated_on }}</p>
 
   <section class="insights-metrics">
     <div><span>Model views</span><strong>{{ analytics.views }}</strong></div>
@@ -46,12 +56,13 @@
 
   <section class="insights-section surface">
     <div class="insights-section-head"><h2>Viewer activity</h2><span>Last {{ analytics.days }} days</span></div>
-    <div class="insights-trend" aria-label="Daily model views">
+    <div class="insights-trend{% if analytics.trend|length > 30 %} insights-trend--dense{% endif %}" aria-label="Daily model views">
       {% set max_views = analytics.trend|map(attribute='views')|max if analytics.trend else 0 %}
       {% for point in analytics.trend %}
         <div class="insights-bar-wrap" title="{{ point.label }}: {{ point.views }} views">
           <i style="height: {{ ((point.views / max_views) * 100) if max_views else 0 }}%"></i>
-          {% if loop.index0 % 5 == 0 %}<small>{{ point.label }}</small>{% endif %}
+          {# About six date labels whatever the period (7 days ... 12 months). #}
+          {% if loop.index0 % ([1, (analytics.trend|length) // 6]|max) == 0 %}<small>{{ point.label }}</small>{% endif %}
         </div>
       {% endfor %}
     </div>

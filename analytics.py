@@ -199,10 +199,12 @@ def analytics_snapshot(owner_user_id: int | None = None, days: int = 30) -> dict
         trend.append({"label": day_start.strftime("%b %d"), "views": day_query.filter(AnalyticsEvent.event_name == "model_viewed").count()})
 
     def breakdown(column):
+        # Viewer audience only: counting every event mixed sign-ups and
+        # uploads into "devices" / "countries".
         return [
             {"label": label, "count": count_value}
             for label, count_value in (
-                query.with_entities(column, func.count(AnalyticsEvent.id))
+                views_query.with_entities(column, func.count(AnalyticsEvent.id))
                 .filter(column.isnot(None))
                 .group_by(column)
                 .order_by(func.count(AnalyticsEvent.id).desc())

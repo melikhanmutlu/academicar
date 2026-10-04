@@ -116,3 +116,108 @@ def send_model_renewal_reminders(now: datetime | None = None) -> int:
     if candidates:
         db.session.commit()
     return processed
+
+
+IMPACT_REPORT_EVENT = "impact_report_sent"
+
+
+def impact_unsubscribe_token(user_id: int) -> str:
+    from flask import current_app
+    from itsdangerous import URLSafeSerializer
+
+    return URLSafeSerializer(current_app.config["SECRET_KEY"], salt="impact-report-unsubscribe").dumps({"uid": user_id})
+
+
+def user_id_from_impact_unsubscribe_token(token: str) -> int | None:
+    from flask import current_app
+    from itsdangerous import BadSignature, URLSafeSerializer
+
+    try:
+        data = URLSafeSerializer(current_app.config["SECRET_KEY"], salt="impact-report-unsubscribe").loads(token)
+    except BadSignature:
+        return None
+    uid = data.get("uid") if isinstance(data, dict) else None
+    return uid if isinstance(uid, int) else None
+
+
+def _previous_month(now: datetime) -> tuple[datetime, datetime, str]:
+    """(start, end, 'YYYY-MM') of the calendar month before ``now`` (naive UTC)."""
+    first_this = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+    last_prev = first_this - timedelta(days=1)
+    first_prev = last_prev.replace(day=1)
+    return first_prev, first_this, first_prev.strftime("%Y-%m")
+
+
+def send_monthly_impact_reports(now: datetime | None = None) -> int:
+    """Email each owner a short summary of last month's reader activity on
+    their models (views, unique visitors, QR scans, AR starts, top model).
+    Only owners whose models were actually viewed, once per month, never to
+    users who opted out or are deactivated. Called from the worker loop."""
+    from sqlalchemy import func
+
+    from models import AnalyticsEvent, User
+    from utils.email import send_email
+
+    now = now or datetime.now(UTC)
+    start, end, month_key = _previous_month(now)
+    window = AnalyticsEvent.query.filter(
+        AnalyticsEvent.occurred_at >= start,
+        AnalyticsEvent.occurred_at < end,
+        AnalyticsEvent.owner_user_id.isnot(None),
+    )
+    owner_ids = [
+        uid for (uid,) in window.filter(AnalyticsEvent.event_name == "model_viewed")
+        .with_entities(AnalyticsEvent.owner_user_id).distinct().all()
+    ]
+    sent = 0
+    for owner_id in owner_ids:
+        user = db.session.get(User, owner_id)
+        if user is None or not user.email or user.impact_report_opt_out or user.deactivated_at is not None:
+            continue
+        stamp = f"{owner_id}:{month_key}"
+        if AuditLog.query.filter_by(event_type=IMPACT_REPORT_EVENT, resource_id=stamp).first():
+            continue
+        mine = window.filter(AnalyticsEvent.owner_user_id == owner_id)
+        views = mine.filter(AnalyticsEvent.event_name == "model_viewed")
+
+        def count(name):
+            return mine.filter(AnalyticsEvent.event_name == name).count()
+
+        unique = views.with_entities(func.count(func.distinct(AnalyticsEvent.visitor_hash))).scalar() or 0
+        top = (
+            views.filter(AnalyticsEvent.model_id.isnot(None))
+            .with_entities(AnalyticsEvent.model_id, func.count(AnalyticsEvent.id))
+            .group_by(AnalyticsEvent.model_id)
+            .order_by(func.count(AnalyticsEvent.id).desc())
+            .first()
+        )
+        top_line = ""
+        if top is not None:
+            top_model = db.session.get(Model3D, top[0])
+            if top_model is not None:
+                top_name = top_model.display_name or top_model.original_filename or "3D model"
+                top_line = f"Most viewed: {top_name} ({top[1]} views)\n"
+        month_label = start.strftime("%B %Y")
+        body = (
+            f"Hi {user.username},\n\n"
+            f"Here is how readers engaged with your AcademicAR models in {month_label}:\n\n"
+            f"  Views: {views.count()}\n"
+            f"  Unique visitors: {int(unique)}\n"
+            f"  QR scans: {count('qr_scanned')}\n"
+            f"  AR starts: {count('viewer_ar_started')}\n"
+            f"{('  ' + top_line) if top_line else ''}\n"
+            f"Full details and a CSV for your reports: {public_url('insights', days=30)}\n\n"
+            "You get this summary once a month when your models were viewed. "
+            f"Stop these emails: {public_url('impact_report_unsubscribe', token=impact_unsubscribe_token(user.id))}\n"
+        )
+        delivered = False
+        try:
+            delivered = bool(send_email(user.email, f"Your AcademicAR models in {month_label}", body))
+        except Exception:
+            logger.exception("impact report email failed for user %s", user.id)
+        db.session.add(AuditLog(event_type=IMPACT_REPORT_EVENT, user_id=user.id, resource_id=stamp,
+                                details={"month": month_key, "delivered": delivered}))
+        sent += 1
+    if sent:
+        db.session.commit()
+    return sent

@@ -137,6 +137,21 @@
     </section>
   {% endif %}
 
+  <section class="profile-section reveal-up" id="email-preferences">
+    <div class="section-heading">
+      <h2>Email preferences</h2>
+      <p>Account emails (confirmations, password resets, renewals) are always sent.</p>
+    </div>
+    <form method="POST" action="{{ url_for('account_impact_report') }}" class="profile-card">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="flex items-start gap-3">
+        <input type="checkbox" name="impact_report" {% if not user.impact_report_opt_out %}checked{% endif %} class="mt-1">
+        <span><strong>Monthly impact summary</strong><br><span class="text-sm text-[#5c6473]">Views, QR scans and AR starts for your models, once a month when they were viewed.</span></span>
+      </label>
+      <button type="submit" class="btn-secondary compact mt-4">Save</button>
+    </form>
+  </section>
+
   <section class="profile-section reveal-up">
     <div class="section-heading">
       <h2>Security & account</h2>

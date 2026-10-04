@@ -66,6 +66,15 @@ def main() -> None:
                 app.logger.exception("Unexpected error in R2 mirror failure alert")
             try:
                 with app.app_context():
+                    from lifecycle import send_monthly_impact_reports
+
+                    impact = send_monthly_impact_reports()
+                    if impact:
+                        app.logger.info("Sent %d monthly impact report(s).", impact)
+            except Exception:
+                app.logger.exception("Unexpected error in monthly impact reports")
+            try:
+                with app.app_context():
                     from lifecycle import send_model_renewal_reminders
 
                     reminders = send_model_renewal_reminders()

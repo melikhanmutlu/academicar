@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Monthly impact emails - AcademicAR{% endblock %}
+{% block content %}
+<div class="auth-shell">
+  <div class="max-w-md mx-auto w-full">
+    <section class="surface rounded-xl p-6 sm:p-8">
+      <h1 class="font-serif text-3xl font-bold text-[#111827]">Monthly impact emails</h1>
+      {% if done %}
+        <p class="text-[#5c6473] mt-3">Done &mdash; you will not get the monthly summary any more. You can switch it back on from your profile.</p>
+        <a href="{{ url_for('landing') }}" class="btn-secondary w-full mt-6">Back to AcademicAR</a>
+      {% else %}
+        <p class="text-[#5c6473] mt-3">Stop the monthly summary of views, QR scans and AR starts for your models?</p>
+        <form method="POST" class="mt-6">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn-primary w-full">Stop monthly emails</button>
+        </form>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

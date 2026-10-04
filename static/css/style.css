@@ -10046,3 +10046,21 @@ body.project-detail-page { overflow-x: clip; }
 @media (max-width: 640px) {
   .inst-showcase-head { flex-direction: column; align-items: flex-start; }
 }
+
+/* Insights: period switch, export and a print layout ("Print / PDF"). */
+.insights-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.insights-periods { display: inline-flex; border: 1px solid var(--color-light-pearl); border-radius: 8px; overflow: hidden; }
+.insights-periods a { padding: 6px 10px; font-size: 13px; color: var(--color-dark-shale); text-decoration: none; }
+.insights-periods a + a { border-left: 1px solid var(--color-light-pearl); }
+.insights-periods a.is-active { background: var(--color-midnight-graphite); color: var(--color-canvas-white); }
+.insights-print-note { display: none; }
+@media print {
+  .site-header, .site-footer, .insights-actions, .flash-stack { display: none !important; }
+  .insights-print-note { display: block; font-size: 12px; color: var(--color-silver-ash); margin: 0 0 12px; }
+  .insights-page { padding-top: 0; }
+  .insights-section, .insights-metrics > div { break-inside: avoid; }
+  .model-insights-table-wrap { overflow: visible !important; }
+}
+/* 90-day / 12-month trends: thinner bars so they fit the card on phones. */
+.insights-trend--dense { gap: 1px; }
+.insights-trend--dense .insights-bar-wrap { min-width: 0; }
