@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import time
 
-from app import create_app, process_next_attachment_preview, run_next_conversion_job
+from app import create_app, process_next_attachment_preview, run_next_conversion_job, run_scheduled_backups
 
 
 def main() -> None:
@@ -21,6 +21,8 @@ def main() -> None:
     # and internally once-per-calendar-month, so a coarse timer suffices.
     report_check_interval = float(os.environ.get("INSTITUTION_REPORT_CHECK_INTERVAL", "900"))
     last_report_check = 0.0
+    backup_check_interval = float(app.config.get("BACKUP_CHECK_INTERVAL_SECONDS", 60))
+    last_backup_check = 0.0
     app.logger.info("AcademicAR worker booted. Polling conversion_jobs every %.1fs.", interval)
     while True:
         try:
@@ -71,6 +73,17 @@ def main() -> None:
                         app.logger.info("Sent %d model renewal reminder(s).", reminders)
             except Exception:
                 app.logger.exception("Unexpected error in model renewal reminders")
+        if not processed and time.monotonic() - last_backup_check >= backup_check_interval:
+            # Daily archive + manual "Create backup now" requests (zipping the
+            # database and every stored file must stay out of web requests).
+            last_backup_check = time.monotonic()
+            try:
+                with app.app_context():
+                    created = run_scheduled_backups(app)
+                if created:
+                    app.logger.info("Backup archive created: %s", created)
+            except Exception:
+                app.logger.exception("Unexpected error in scheduled backups")
         if processed:
             continue
         time.sleep(interval)

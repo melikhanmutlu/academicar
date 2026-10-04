@@ -84,6 +84,7 @@ from institutions import (
 )
 from models import AnalyticsEvent, AuditLog, BlogPost, ConversionJob, Coupon, Institution, InstitutionInvite, InstitutionMember, LicensePlanConfig, Model3D, ModelAnnotation, ModelVersion, Paper, Payment, ProjectArticle, ProjectAttachment, QRLink, User, db
 from services.r2_mirror import mirror_file, mirror_directory, mirror_directory_sync, mirror_delete, ensure_local
+from services.monitoring import init_error_monitoring
 from payments import (
     PAID_PLAN_KEYS,
     ForexRateUnavailable,
@@ -109,15 +110,17 @@ logging.basicConfig(level=_log_level, format="%(asctime)s [%(levelname)s] %(mess
 logger = logging.getLogger(__name__)
 
 # Baseline Content-Security-Policy. Whitelists the CDNs the app currently
-# depends on (Tailwind play CDN, Google model-viewer on unpkg/ajax.googleapis,
-# Google Fonts). 'unsafe-eval' is required by the Tailwind play CDN's JIT; both
-# it and the inline <script>/<style> blocks need 'unsafe-inline'. Tightening
-# these (self-hosted Tailwind build, nonce-based scripts) is a follow-up.
+# depends on (Google model-viewer on unpkg/ajax.googleapis, Google Fonts).
+# Tailwind is a compiled stylesheet (static/css/tailwind.css), so the Play CDN
+# host is gone. 'unsafe-eval' stays: model-viewer's Draco decoder compiles
+# WebAssembly, and Safari < 16 has no narrower 'wasm-unsafe-eval'. Inline
+# <script>/<style> blocks need 'unsafe-inline'; nonce-based scripts are a
+# follow-up.
 CONTENT_SECURITY_POLICY = "; ".join(
     [
         "default-src 'self'",
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' "
-        "https://cdn.tailwindcss.com https://unpkg.com https://ajax.googleapis.com https://www.gstatic.com https://cdnjs.cloudflare.com",
+        "https://unpkg.com https://ajax.googleapis.com https://www.gstatic.com https://cdnjs.cloudflare.com",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' data: https://fonts.gstatic.com",
         "img-src 'self' data: blob: https:",
@@ -159,6 +162,8 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.config.setdefault("RATELIMIT_HEADERS_ENABLED", True)
     validate_secret_key(app)
     Config.init_app(app)
+    if not app.config.get("TESTING"):
+        init_error_monitoring(app_env)
     # ProxyFix is enabled whenever a reverse proxy is in front of us. In dev
     # the test client and Flask's dev server set remote_addr correctly so this
     # has no effect; in production it lets request.remote_addr reflect the
@@ -1023,6 +1028,63 @@ def ensure_daily_backup(app: Flask, created_by_user_id: int | None = None) -> st
     return create_backup_archive(app, created_by_user_id=created_by_user_id, reason="daily")
 
 
+def prune_backup_archives(app: Flask, keep: int | None = None) -> list[str]:
+    """Keep the newest ``keep`` archives (BACKUP_RETENTION_COUNT, default 14)
+    locally and in the R2/B2 mirror; delete older ones. Returns the removed
+    filenames."""
+    keep = keep if keep is not None else int(app.config.get("BACKUP_RETENTION_COUNT") or 14)
+    if keep < 1:
+        return []
+    removed = []
+    for item in list_backup_archives(app)[keep:]:
+        path = os.path.join(backup_folder(app), item["filename"])
+        try:
+            os.remove(path)
+        except OSError:
+            logger.warning("Could not delete old backup %s", path, exc_info=True)
+            continue
+        mirror_delete(f"admin_backups/{item['filename']}")
+        removed.append(item["filename"])
+    if removed:
+        logger.info("Pruned %d old backup archive(s): %s", len(removed), removed)
+    return removed
+
+
+def pending_backup_request() -> AuditLog | None:
+    """The newest admin "Create backup now" request that no archive (or
+    failure) has answered yet."""
+    request_row = (
+        AuditLog.query.filter_by(event_type="admin_backup_requested").order_by(AuditLog.timestamp.desc()).first()
+    )
+    if request_row is None:
+        return None
+    answered = AuditLog.query.filter(
+        AuditLog.event_type.in_(("admin_backup_created", "admin_backup_failed")),
+        AuditLog.timestamp >= request_row.timestamp,
+    ).first()
+    return None if answered is not None else request_row
+
+
+def run_scheduled_backups(app: Flask) -> str | None:
+    """Worker entry point: answer a pending manual request, otherwise make
+    sure today's daily archive exists; then apply retention. Zipping the
+    database and every stored file is heavy, so it never runs in a web
+    request in production."""
+    request_row = pending_backup_request()
+    try:
+        if request_row is not None:
+            filename = create_backup_archive(app, created_by_user_id=request_row.user_id, reason="manual")
+        else:
+            filename = ensure_daily_backup(app)
+    except Exception as exc:
+        logger.exception("Backup archive failed")
+        log_audit("admin_backup_failed", details={"error": f"{type(exc).__name__}: {exc}"[:300]})
+        return None
+    if filename:
+        prune_backup_archives(app)
+    return filename
+
+
 def validate_secret_key(app: Flask) -> None:
     app_env = str(app.config.get("APP_ENV", "development")).lower()
     secret_key = app.config.get("SECRET_KEY")
@@ -1044,6 +1106,11 @@ def ensure_sqlite_schema(app: Flask) -> None:
     if not str(app.config.get("SQLALCHEMY_DATABASE_URI", "")).startswith("sqlite"):
         return
     with db.engine.begin() as connection:
+        user_columns = {row[1] for row in connection.execute(text("PRAGMA table_info(users)")).fetchall()}
+        if user_columns and "email_verified_at" not in user_columns:
+            # Same as migration e2f3a4b5c6d7: existing accounts count as verified.
+            connection.execute(text("ALTER TABLE users ADD COLUMN email_verified_at DATETIME"))
+            connection.execute(text("UPDATE users SET email_verified_at = COALESCE(created_at, CURRENT_TIMESTAMP)"))
         columns = {row[1] for row in connection.execute(text("PRAGMA table_info(papers)")).fetchall()}
         if "deleted_at" not in columns:
             connection.execute(text("ALTER TABLE papers ADD COLUMN deleted_at DATETIME"))
@@ -3448,6 +3515,30 @@ def register_routes(app: Flask) -> None:
         except Exception:
             return jsonify({"status": "error"}), 500
 
+    @app.route("/health/worker")
+    def health_worker():
+        """For an uptime monitor: 503 when the oldest queued conversion job
+        has waited longer than WORKER_STALL_MINUTES (the worker process is
+        down or stuck). Kept separate from /health so a busy queue never makes
+        the platform restart the web process."""
+        stall_minutes = int(os.environ.get("WORKER_STALL_MINUTES", "30"))
+        try:
+            oldest = (
+                db.session.query(func.min(ConversionJob.created_at))
+                .filter(ConversionJob.status == "pending")
+                .scalar()
+            )
+        except Exception:
+            return jsonify({"status": "error"}), 500
+        waited = None
+        if oldest is not None:
+            if oldest.tzinfo is None:
+                oldest = oldest.replace(tzinfo=UTC)
+            waited = int((datetime.now(UTC) - oldest).total_seconds())
+        stalled = waited is not None and waited > stall_minutes * 60
+        body = {"status": "stalled" if stalled else "ok", "oldest_pending_seconds": waited}
+        return jsonify(body), 503 if stalled else 200
+
     @app.route("/")
     def landing():
         return render_template("landing.html")
@@ -5555,12 +5646,11 @@ def register_routes(app: Flask) -> None:
             .limit(10)
             .all()
         )
-        if admin_page == "backups":
-            ensure_daily_backup(app, created_by_user_id=current_user.id)
+        # Daily archives are made by the worker (run_scheduled_backups).
         backups = list_backup_archives(app) if admin_page == "backups" else []
+        backup_requested = pending_backup_request() if admin_page == "backups" else None
         if admin_page == "blog":
-            # Self-heal on every visit — same precedent as
-            # `if admin_page == "backups": ensure_daily_backup(...)`.
+            # Self-heal on every visit (cheap, idempotent).
             seed_builtin_blog_posts(app)
         blog_posts = (
             BlogPost.query.order_by(BlogPost.created_at.desc()).all() if admin_page == "blog" else []
@@ -5611,8 +5701,7 @@ def register_routes(app: Flask) -> None:
         pricing_rows = []
         coupons = []
         if admin_page == "pricing":
-            # Self-heal on every visit — same precedent as
-            # `if admin_page == "backups": ensure_daily_backup(...)`.
+            # Self-heal on every visit (cheap, idempotent).
             seed_license_plans(app)
             plan_order = {"free": 0, "academic": 1, "extended_archive": 2, "institutional": 3}
             pricing_rows = sorted(LicensePlanConfig.query.all(), key=lambda r: plan_order.get(r.key, 99))
@@ -5665,6 +5754,7 @@ def register_routes(app: Flask) -> None:
             security_events=security_events,
             critical_alerts=critical_alerts,
             backups=backups,
+            backup_requested=backup_requested,
             blog_posts=blog_posts,
             editing_post=editing_post,
             institutions=institutions_rows,
@@ -6441,8 +6531,15 @@ def register_routes(app: Flask) -> None:
     @login_required
     def admin_backup_create():
         require_admin()
-        filename = create_backup_archive(app, created_by_user_id=current_user.id, reason="manual")
-        flash(f"Backup created: {filename}", "success")
+        if app.config.get("TESTING") or app.config.get("DEV_INLINE_JOBS"):
+            # Tests and explicit local dev build the archive inline.
+            filename = create_backup_archive(app, created_by_user_id=current_user.id, reason="manual")
+            prune_backup_archives(app)
+            flash(f"Backup created: {filename}", "success")
+            return redirect(url_for("admin_dashboard", admin_page="backups"))
+        if pending_backup_request() is None:
+            log_audit("admin_backup_requested", user_id=current_user.id)
+        flash("Backup requested. The worker builds it in the background; refresh this page in a minute or two.", "success")
         return redirect(url_for("admin_dashboard", admin_page="backups"))
 
     @app.route("/admin/backups/<filename>")
@@ -7929,6 +8026,8 @@ def register_routes(app: Flask) -> None:
 
         previous = current_user.email
         current_user.email = new_email
+        # The link was sent to the new address, so it is proven too.
+        current_user.email_verified_at = datetime.now(UTC)
         try:
             db.session.commit()
             log_audit(

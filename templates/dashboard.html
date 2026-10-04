@@ -4,6 +4,18 @@
 {% set demo = demo_mode is defined and demo_mode %}
 <div class="app-shell dashboard-shell py-8">
   {% if demo %}{% include "_demo_banner.html" %}{% endif %}
+  {% if not demo and not (admin_view is defined and admin_view) and current_user.is_authenticated and not current_user.is_email_verified %}
+    <div class="inst-status-notice" role="status" data-verify-email-notice>
+      <div>
+        <strong>Confirm your email address</strong>
+        <p>We sent a link to {{ current_user.email }}. Confirming it is required to join an institution and keeps password resets reaching you.</p>
+      </div>
+      <form method="POST" action="{{ url_for('auth.resend_verification_email') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn-secondary btn-compact">Resend link</button>
+      </form>
+    </div>
+  {% endif %}
   <div class="dashboard-header reveal-up">
     <div>
       <h1>{{ viewed_user.username ~ "'s dashboard" if admin_view is defined and admin_view else "Dashboard" }}</h1>

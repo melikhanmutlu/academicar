@@ -667,6 +667,18 @@ def test_join_flow_logged_in_user(client):
     assert page.status_code == 200
     assert b"Join Test University" in page.data
 
+    # A domain-restricted invite needs a confirmed address first.
+    assert b"Resend confirmation link" in page.data
+    blocked = client.post(f"/institution/join/{token}", follow_redirects=True)
+    assert b"Confirm your email address first" in blocked.data
+    with client.application.app_context():
+        assert InstitutionMember.query.count() == 0
+        from auth import generate_email_verification_token
+        from models import User
+
+        verify_token = generate_email_verification_token(User.query.filter_by(email="joiner@boun.edu.tr").one())
+    assert b"email address is confirmed" in client.get(f"/auth/verify-email/{verify_token}", follow_redirects=True).data
+
     response = client.post(f"/institution/join/{token}", follow_redirects=True)
     assert b"you joined Test University" in response.data
     with client.application.app_context():

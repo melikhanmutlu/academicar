@@ -27,6 +27,9 @@ class User(UserMixin, db.Model):
     # Set when an admin deactivates the account. A deactivated user cannot log in
     # and existing sessions are invalidated (see load_user). NULL means active.
     deactivated_at = db.Column(db.DateTime, nullable=True)
+    # When the user proved they own ``email`` (verification link, Google,
+    # password-reset link or email-change link). NULL = not verified yet.
+    email_verified_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=utc_now)
 
     # ``papers`` is the historical storage-facing name. New product surfaces
@@ -39,6 +42,10 @@ class User(UserMixin, db.Model):
         cascade="all, delete-orphan",
         foreign_keys="Paper.user_id",
     )
+
+    @property
+    def is_email_verified(self) -> bool:
+        return self.email_verified_at is not None
 
     @property
     def is_active(self) -> bool:

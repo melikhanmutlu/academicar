@@ -186,6 +186,63 @@ def _rotate_session():
     session.clear()
 
 
+EMAIL_VERIFY_MAX_AGE = 7 * 24 * 3600
+
+
+def _email_verify_serializer():
+    from itsdangerous import URLSafeTimedSerializer
+
+    return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="email-verify")
+
+
+def generate_email_verification_token(user) -> str:
+    """Signed token bound to the account AND the address, so changing the
+    email invalidates links sent to the old one (exported for tests)."""
+    return _email_verify_serializer().dumps({"uid": user.id, "email": user.email})
+
+
+def mark_email_verified(user) -> None:
+    if user.email_verified_at is None:
+        user.email_verified_at = datetime.now(UTC)
+
+
+def send_verification_email(user, *, welcome: bool = False) -> bool:
+    """Email the confirmation link (as part of the welcome email right after
+    sign-up). Best effort: returns False when mail is unconfigured/failed."""
+    from utils.email import send_email
+
+    verify_url = public_url("auth.verify_email", token=generate_email_verification_token(user))
+    if welcome:
+        subject = "Welcome to AcademicAR - confirm your email"
+        body = (
+            f"Hi {user.username},\n\n"
+            "Welcome to AcademicAR. Please confirm this is your email address:\n\n"
+            f"{verify_url}\n\n"
+            "Then publish your first interactive 3D/AR model in a few minutes:\n\n"
+            "  1. Create a project.\n"
+            "  2. Upload a GLB, STL, OBJ or FBX model.\n"
+            "  3. Share the generated link and QR code on your paper, "
+            "poster or slides.\n\n"
+            f"Start here: {public_url('dashboard')}\n\n"
+            "Readers open your model in 3D or AR straight from a phone - no "
+            "app, no login."
+        )
+    else:
+        subject = "Confirm your email for AcademicAR"
+        body = (
+            f"Hi {user.username},\n\n"
+            "Please confirm this is your email address:\n\n"
+            f"{verify_url}\n\n"
+            "The link is valid for 7 days. If you did not create an AcademicAR "
+            "account, you can ignore this email."
+        )
+    try:
+        return bool(send_email(user.email, subject, body))
+    except Exception:
+        current_app.logger.exception("verification email failed for user %s", user.id)
+        return False
+
+
 def _apply_configured_admin(user: User) -> None:
     admin_emails = current_app.config.get("ADMIN_EMAILS", [])
     if isinstance(admin_emails, str):
@@ -233,31 +290,10 @@ def register():
             track_event("user_registered", owner_user_id=user.id)
         except Exception:
             pass  # Analytics must never block registration
-        # Lifecycle: best-effort welcome email. No-ops (logs) when mail is
-        # unconfigured, and never blocks or fails registration.
-        try:
-            from utils.email import send_email
-
-            dashboard_url = public_url("dashboard")
-            send_email(
-                user.email,
-                "Welcome to AcademicAR",
-                (
-                    f"Hi {user.username},\n\n"
-                    "Welcome to AcademicAR. You can publish your first interactive "
-                    "3D/AR model in a few minutes:\n\n"
-                    "  1. Create a project.\n"
-                    "  2. Upload a GLB, STL, OBJ or FBX model.\n"
-                    "  3. Share the generated link and QR code on your paper, "
-                    "poster or slides.\n\n"
-                    f"Start here: {dashboard_url}\n\n"
-                    "Readers open your model in 3D or AR straight from a phone — no "
-                    "app, no login."
-                ),
-            )
-        except Exception:
-            current_app.logger.exception("welcome email failed for user %s", user.id)
-        flash("Registration successful. Welcome.", "success")
+        # Lifecycle: best-effort welcome email carrying the confirmation link.
+        # No-ops (logs) when mail is unconfigured, never blocks registration.
+        send_verification_email(user, welcome=True)
+        flash(f"Registration successful. Welcome. We sent a confirmation link to {user.email}.", "success")
         # A visitor who picked a paid plan on /pricing arrives with ?plan=.
         # Licensing is per model, so remind them where that plan is applied.
         intended_plan = (request.args.get("plan") or "").strip().lower()
@@ -391,6 +427,8 @@ def reset_password(token):
     form = ResetPasswordForm()
     if form.validate_on_submit():
         user.set_password(form.password.data)
+        # The reset link went to this address, so the owner is proven.
+        mark_email_verified(user)
         db.session.commit()
         try:
             from app import log_audit
@@ -402,6 +440,52 @@ def reset_password(token):
         return redirect(url_for("auth.login"))
 
     return render_template("reset_password.html", form=form, token=token)
+
+
+@auth_bp.route("/verify-email/<token>")
+def verify_email(token):
+    from itsdangerous import BadSignature, SignatureExpired
+
+    try:
+        data = _email_verify_serializer().loads(token, max_age=EMAIL_VERIFY_MAX_AGE)
+    except SignatureExpired:
+        flash("This confirmation link has expired. Log in and send a new one from your dashboard.", "warning")
+        return redirect(url_for("dashboard") if current_user.is_authenticated else url_for("auth.login"))
+    except BadSignature:
+        flash("This confirmation link is not valid.", "danger")
+        return redirect(url_for("dashboard") if current_user.is_authenticated else url_for("auth.login"))
+    user = db.session.get(User, data.get("uid"))
+    if user is None or (user.email or "").lower() != (data.get("email") or "").lower():
+        # Account gone, or the address changed after the link was sent.
+        flash("This confirmation link is no longer valid.", "warning")
+        return redirect(url_for("dashboard") if current_user.is_authenticated else url_for("auth.login"))
+    if user.email_verified_at is None:
+        mark_email_verified(user)
+        db.session.commit()
+        try:
+            from app import log_audit
+
+            log_audit("email_verified", user_id=user.id)
+        except Exception:
+            pass
+    flash("Your email address is confirmed.", "success")
+    return redirect(url_for("dashboard") if current_user.is_authenticated else url_for("auth.login"))
+
+
+@auth_bp.route("/verify-email/resend", methods=["POST"])
+@login_required
+@limiter.limit("5 per hour", methods=["POST"])
+def resend_verification_email():
+    if current_user.is_email_verified:
+        flash("Your email address is already confirmed.", "info")
+    elif send_verification_email(current_user):
+        flash(f"We sent a new confirmation link to {current_user.email}.", "success")
+    else:
+        flash("The confirmation email could not be sent right now. Please try again later.", "warning")
+    next_page = request.form.get("next")
+    if next_page and is_safe_redirect_url(next_page):
+        return redirect(next_page)
+    return redirect(url_for("dashboard"))
 
 
 @auth_bp.route("/logout", methods=["POST"])
@@ -470,6 +554,18 @@ def google_callback():
             existing.google_id = google_id
             if not existing.avatar_url and picture:
                 existing.avatar_url = picture
+            if existing.email_verified_at is None and existing.password_hash:
+                # The password was set by whoever registered this address
+                # without proving they own it (possibly not this person).
+                # Drop it so a squatter cannot keep access to the account
+                # the real owner now signs in to.
+                existing.password_hash = None
+                flash(
+                    "We signed you in with Google. The password previously set on this "
+                    "unconfirmed account was removed; set a new one from your profile if you want it.",
+                    "info",
+                )
+            mark_email_verified(existing)
             _apply_configured_admin(existing)
             user = existing
             # Let the user know their accounts were merged on first Google login
@@ -485,11 +581,14 @@ def google_callback():
                 username=name,
                 google_id=google_id,
                 avatar_url=picture,
+                email_verified_at=datetime.now(UTC),
             )
             _apply_configured_admin(user)
             db.session.add(user)
             is_new_user = True
     else:
+        if user.email == email:
+            mark_email_verified(user)
         _apply_configured_admin(user)
     db.session.commit()
 

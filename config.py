@@ -133,6 +133,10 @@ class Config:
     # (MAX_MODEL_FILE_BYTES, read from the MAX_MODEL_FILE_BYTES / MAX_CONTENT_LENGTH
     # env vars) since the worker validates without importing the Flask config.
     STUCK_JOB_TIMEOUT_SECONDS = int(os.environ.get("STUCK_JOB_TIMEOUT_SECONDS", 3600))
+    # Admin backup archives the worker keeps (newest N, locally and offsite).
+    BACKUP_RETENTION_COUNT = int(os.environ.get("BACKUP_RETENTION_COUNT", 14))
+    # How often the worker checks for today's archive / a manual request.
+    BACKUP_CHECK_INTERVAL_SECONDS = int(os.environ.get("BACKUP_CHECK_INTERVAL_SECONDS", 60))
     if APP_ENV in {"production", "prod", "pilot"}:
         DEV_INLINE_JOBS = os.environ.get("ALLOW_PRODUCTION_INLINE_JOBS", "0").lower() in {
             "1",

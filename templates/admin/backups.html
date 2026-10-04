@@ -7,13 +7,14 @@
     <div class="admin-section-head">
       <div>
         <h2>Backups</h2>
-        <p>Daily and manual archives include the SQLite database when available, uploads, converted models, PDFs, QR images, and a QR resolver manifest.</p>
+        <p>The worker makes a daily archive (database dump, uploads, converted models, PDFs, QR images and a QR resolver manifest) and keeps the newest {{ config.BACKUP_RETENTION_COUNT or 14 }}, locally and in the offsite mirror.</p>
       </div>
       <span>{{ backups|length }} archives</span>
     </div>
     <form method="POST" action="{{ url_for('admin_backup_create') }}" class="admin-filter-bar">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <button type="submit" class="admin-btn admin-btn-primary compact">Create backup now</button>
+      <button type="submit" class="admin-btn admin-btn-primary compact"{% if backup_requested %} disabled{% endif %}>Create backup now</button>
+      {% if backup_requested %}<span class="admin-editor-note">Requested {{ backup_requested.timestamp.strftime("%Y-%m-%d %H:%M") }} UTC &mdash; the worker is building it.</span>{% endif %}
     </form>
     <div class="table-wrap">
       <table class="data-table admin-table">

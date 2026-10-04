@@ -381,6 +381,18 @@ def join(token):
                 already_member=None,
                 domain_mismatch=True,
             )
+        if _needs_verified_email(institution):
+            # A domain restriction only means something if the address is
+            # proven: anyone can type colleague@university.edu at sign-up.
+            flash("Confirm your email address first, then accept the invite.", "warning")
+            return render_template(
+                "institution/join.html",
+                invite=invite,
+                institution=institution,
+                already_member=None,
+                domain_mismatch=False,
+                needs_verification=True,
+            )
         member = InstitutionMember(
             institution_id=institution.id,
             user_id=current_user.id,
@@ -428,4 +440,13 @@ def join(token):
         institution=institution,
         already_member=existing,
         domain_mismatch=domain_mismatch,
+        needs_verification=bool(
+            current_user.is_authenticated and existing is None and not domain_mismatch
+            and _needs_verified_email(institution)
+        ),
     )
+
+
+def _needs_verified_email(institution) -> bool:
+    """Domain-restricted invites require a confirmed email address."""
+    return bool(institution.domain_list()) and not current_user.is_email_verified

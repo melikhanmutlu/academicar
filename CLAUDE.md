@@ -44,6 +44,9 @@ verification commands and read the output — evidence before claims:
 - The model upload surface now accepts GLB, STL, OBJ, and FBX. OBJ/FBX conversion is handled by external converter wrappers.
 - GLB output is optimized via `gltf-transform` (Draco geometry compression + webp textures) in `finalize_converted_glb()`. The optimizer is best-effort: if `gltf-transform` is unavailable the original GLB passes through unchanged.
 - `fbx2gltf` is pinned to 0.9.7-p1 (the project is effectively unmaintained upstream). Do not upgrade without testing.
+- Backups (database dump + stored files zip) are built by the worker (`run_scheduled_backups`): a daily archive plus admin "Create backup now" requests, keeping the newest `BACKUP_RETENTION_COUNT`. The web request only records the request.
+- Error monitoring: Sentry when `SENTRY_DSN` is set (web + worker). Uptime: `/health` (web + DB) and `/health/worker` (503 when queued jobs wait longer than `WORKER_STALL_MINUTES`).
+- Password sign-ups confirm their email (`User.email_verified_at`); domain-restricted institution invites require a confirmed address.
 
 ## Quick Commands
 
@@ -205,7 +208,9 @@ Environment variables in `.env` (see `.env.example`):
 
 **Template changes**
 - Templates in `templates/` (Jinja2)
-- Static CSS in `static/css/style.css` (custom) + Tailwind CDN
+- Static CSS in `static/css/style.css` (custom) + compiled Tailwind `static/css/tailwind.css`
+  (linked last in `<head>`, where the old Play CDN injected it). After adding Tailwind
+  classes to a template, run `npm run build:css` and commit the CSS; CI fails if it is stale.
 - Use `{{ public_url(model.id) }}` to generate public viewer links in templates
 
 ## Deployment Notes

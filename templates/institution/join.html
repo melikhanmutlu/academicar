@@ -42,6 +42,15 @@
               <input type="hidden" name="next" value="{{ request.path }}">
               <button type="submit" class="btn-secondary w-full">Log out and switch account</button>
             </form>
+          {% elif needs_verification is defined and needs_verification %}
+            <p class="text-[#5c6473] mb-4">
+              Confirm <strong>{{ current_user.email }}</strong> first: open the link we emailed you, then come back to this page.
+            </p>
+            <form method="POST" action="{{ url_for('auth.resend_verification_email') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="next" value="{{ request.path }}">
+              <button type="submit" class="btn-secondary w-full">Resend confirmation link</button>
+            </form>
           {% else %}
             <form method="POST" class="space-y-4">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
