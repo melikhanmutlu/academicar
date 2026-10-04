@@ -1590,3 +1590,17 @@ def test_invite_context_survives_login_and_switch_account(client):
     register(client, email="other@gmail.com")
     response = client.post("/auth/logout", data={"next": "https://evil.example/"})
     assert response.headers["Location"].endswith("/")
+
+
+def test_panel_403_explains_who_can_open_it(client):
+    from tests.conftest import register
+
+    register(client)
+    with client.application.app_context():
+        from models import User
+
+        add_member(create_institution(name="Explained University"), User.query.one())
+    response = client.get("/institution/")
+    assert response.status_code == 403
+    html = response.get_data(as_text=True)
+    assert "The institution panel is for Explained University" in html

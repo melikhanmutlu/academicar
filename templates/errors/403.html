@@ -3,7 +3,17 @@
 {% block content %}
 <div class="max-w-2xl mx-auto px-4 py-16 text-center">
   <h1 class="font-serif text-3xl font-bold text-academic-900 mb-3">Access denied</h1>
+  {% set _membership = current_user.institution_membership if current_user.is_authenticated else None %}
+  {% if request.path.startswith('/institution') and current_user.is_authenticated and (current_user.is_admin or _membership) %}
+    {# Institution panel: say who can open it and where to go instead. #}
+    {% if _membership %}
+      <p class="text-gray-600 mb-6">The institution panel is for {{ _membership.institution.name }}'s admins. As a member, your uploads are covered automatically &mdash; see the status on your dashboard{% if institution_admin_emails(_membership.institution_id) %}, or <a class="underline" href="mailto:{{ institution_admin_emails(_membership.institution_id)|join(',') }}">email your institution admin</a>{% endif %}.</p>
+    {% else %}
+      <p class="text-gray-600 mb-6">The institution panel is for institution admins. As a platform admin, manage institutions from <a class="underline" href="{{ url_for('admin_dashboard', admin_page='institutions') }}">Admin &rarr; Institutions</a>.</p>
+    {% endif %}
+  {% else %}
   <p class="text-gray-600 mb-6">You do not have permission to open this page or file.</p>
+  {% endif %}
   <a href="{{ url_for('dashboard') if current_user.is_authenticated else url_for('landing') }}" class="inline-block bg-academic-700 hover:bg-academic-800 text-white px-5 py-2.5 rounded-md font-semibold">Go back</a>
 </div>
 {% endblock %}

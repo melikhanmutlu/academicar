@@ -120,7 +120,7 @@ a 3D engineer or a custom WebGL build.
 
 ## 3. Get your viewer link and QR code
 
-Every model gets a stable public viewer URL and a **permanent QR code**. Because
+Every model gets a stable public viewer URL and a **stable QR code**. Because
 the QR resolves through a fixed identifier, it keeps working even if you later
 replace the file, recolor it, or extend its license — so the QR you print today
 will not rot.
@@ -205,7 +205,7 @@ effort next time.
 Done right, a QR turns a poster from something people glance at into something they
 hold in their hands.
 
-*[Generate a permanent QR code for your 3D model](/auth/register) in a couple of
+*[Generate a stable QR code for your 3D model](/auth/register) in a couple of
 minutes.*
 """,
     },
@@ -352,7 +352,7 @@ without plugins. The infrastructure to publish 3D well finally exists.
 
 Historically, embedding interactive 3D meant custom web work that most authors
 won't do. That's the gap AcademicAR fills: upload your model, get an optimized,
-AR-ready viewer and a permanent QR code, and link it from your figure caption. The
+AR-ready viewer and a stable QR code, and link it from your figure caption. The
 interactive object lives alongside your paper instead of dying as a static image.
 
 Interactive 3D figures aren't a gimmick — they're a more honest way to communicate

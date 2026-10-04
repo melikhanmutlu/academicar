@@ -30,7 +30,7 @@ DISCIPLINES: dict[str, dict] = {
             "or a textbook model and publish it as an interactive viewer with tap-to-place "
             "augmented reality — so a heart, skull, or brachial plexus can be examined from "
             "every angle and placed at true scale on a desk.",
-            "Every model gets a permanent QR code and short link you can drop into a "
+            "Every model gets a stable QR code and short link you can drop into a "
             "lecture slide, lab handout, dissection guide, or paper. No headset, no install, "
             "and the link keeps working even after you recolor or replace the model.",
         ],
@@ -72,7 +72,7 @@ DISCIPLINES: dict[str, dict] = {
         "title": "AR for Chemistry: 3D Molecular Models | AcademicAR",
         "meta_description": (
             "Publish 3D molecular and crystal-structure models students can rotate and place in "
-            "AR. Share interactive figures from any browser with a permanent QR code."
+            "AR. Share interactive figures from any browser with a stable QR code."
         ),
         "h1": "Interactive 3D & AR for molecular and materials chemistry",
         "subhead": (
@@ -178,7 +178,7 @@ DISCIPLINES: dict[str, dict] = {
         "title": "AR for Archaeology: 3D Artifacts | AcademicAR",
         "meta_description": (
             "Publish 3D scans of artifacts and reconstructions as interactive AR models. Share "
-            "finds and heritage objects from any browser with a permanent QR code."
+            "finds and heritage objects from any browser with a stable QR code."
         ),
         "h1": "Interactive 3D & AR for archaeology and heritage",
         "subhead": (
@@ -230,7 +230,7 @@ DISCIPLINES: dict[str, dict] = {
         "title": "AR for Geology: 3D Samples & Outcrops | AcademicAR",
         "meta_description": (
             "Share 3D scans of hand samples, fossils, and outcrops as interactive AR models. "
-            "Bring field and lab specimens to any browser with a permanent QR code."
+            "Bring field and lab specimens to any browser with a stable QR code."
         ),
         "h1": "Interactive 3D & AR for geology and earth science",
         "subhead": (
@@ -281,7 +281,7 @@ DISCIPLINES: dict[str, dict] = {
         "title": "AR for Engineering: 3D CAD Models | AcademicAR",
         "meta_description": (
             "Publish CAD parts and assemblies as interactive 3D and AR models. Share mechanisms "
-            "and designs from any browser with a permanent QR code — no CAD seat required."
+            "and designs from any browser with a stable QR code — no CAD seat required."
         ),
         "h1": "Interactive 3D & AR for engineering and design",
         "subhead": (

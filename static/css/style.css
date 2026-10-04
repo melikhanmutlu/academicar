@@ -1618,6 +1618,9 @@ body {
   margin: 0 0 18px;
   padding-left: 24px;
 }
+/* Tailwind preflight removes list markers. */
+.blog-article ul { list-style: disc; }
+.blog-article ol { list-style: decimal; }
 .blog-article li {
   margin-bottom: 8px;
 }
@@ -9319,7 +9322,16 @@ body.nav-menu-open {
   margin-top: 10px;
 }
 .dashboard-institution-note { color: var(--color-silver-ash); font-size: 13px; }
-.dashboard-institution-link { color: var(--color-sunset-orange); font-size: 13px; font-weight: 500; }
+/* Graphite text with an orange underline: orange text at body size fails
+   WCAG contrast (2.9:1) on white. */
+.dashboard-institution-link {
+  color: var(--color-midnight-graphite);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: var(--color-sunset-orange);
+  text-underline-offset: 3px;
+}
 .inst-showcase-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -9376,7 +9388,15 @@ body.nav-menu-open {
 .demo-banner-text { font-size: 14px; color: var(--color-dark-shale); }
 .demo-banner-text strong { color: var(--color-midnight-graphite); margin-right: 6px; }
 .demo-banner-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-.demo-banner-cross { font-size: 14px; font-weight: 500; color: var(--color-sunset-orange); white-space: nowrap; }
+.demo-banner-cross {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-midnight-graphite);
+  white-space: nowrap;
+  text-decoration: underline;
+  text-decoration-color: var(--color-sunset-orange);
+  text-underline-offset: 3px;
+}
 .demo-banner-cross:hover { color: var(--color-orange-pressed); }
 
 .lp-hero-examples {

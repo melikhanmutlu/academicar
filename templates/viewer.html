@@ -1261,7 +1261,7 @@
                 <button type="button" class="viewer-color-swatch" data-color-swatch="{{ hex }}" data-color-name="{{ name }}" title="{{ name }}" aria-label="Apply {{ name }} color"><i style="background: {{ hex }}" aria-hidden="true"></i><span>{{ name }}</span></button>
               {% endfor %}
               <label class="viewer-color-custom" title="Custom color" aria-label="Custom color">
-                <span>Custom colour</span>
+                <span>Custom color</span>
                 <input type="color" value="#cccccc" data-color-picker>
               </label>
             </div>
@@ -1488,7 +1488,17 @@
       { key: 'right-perspective', label: 'Right perspective', orbit: '35deg 65deg auto' }
     ];
     const defaultCameraOrbit = '0deg 90deg auto';
-    const defaultFieldOfView = '28deg';
+    // 28deg is the vertical field of view. On a portrait phone that leaves a
+    // narrow horizontal view and wide models were cut off at both sides, so
+    // widen it to keep roughly the same horizontal framing (capped at 56deg).
+    const defaultFieldOfView = (() => {
+      const aspect = window.innerWidth / Math.max(window.innerHeight, 1);
+      if (aspect >= 1) return '28deg';
+      const vertical = 2 * Math.atan(Math.tan(14 * Math.PI / 180) / aspect) * 180 / Math.PI;
+      return `${Math.min(56, Math.max(28, Math.round(vertical)))}deg`;
+    })();
+    // Attribute, not property: <model-viewer> may not be upgraded yet.
+    if (viewer && defaultFieldOfView !== '28deg') viewer.setAttribute('field-of-view', defaultFieldOfView);
     const defaultOrientation = '0deg 0deg 0deg';
     // Resolved (numeric) camera captured once the model is framed at load. Reset view
     // restores this exact state so it can never re-resolve an "auto" radius to a
@@ -1613,7 +1623,7 @@
       if (note) note.textContent = phoneNoAr
         ? 'This model can’t open in AR on this device right now. You can still rotate and zoom it here, or share this QR code with someone on another phone or tablet.'
         : qrDefaults.note;
-      if (image) image.classList.toggle('opacity-60', phoneNoAr);
+      // The QR stays at full contrast: the copy asks people to scan it.
     };
     if (infoBtn && infoPanel) infoBtn.addEventListener('click', () => openOverlay('info', infoBtn));
     if (closeInfo && infoPanel) closeInfo.addEventListener('click', () => closeOverlay('info'));

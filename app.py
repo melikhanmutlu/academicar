@@ -2356,7 +2356,7 @@ FAQ_ITEMS = (
     {
         "q": "What is AcademicAR?",
         "a": "AcademicAR turns the 3D models behind your research into an "
-             "interactive web viewer with augmented reality and a permanent QR "
+             "interactive web viewer with augmented reality and a stable QR "
              "code, so readers can explore your specimen, molecule, or artifact "
              "from a paper, thesis, poster, or slide.",
     },
@@ -4528,7 +4528,8 @@ def register_routes(app: Flask) -> None:
             details={"paper_id": model.paper_id, "public_id": model.public_id},
         )
         annotations = ModelAnnotation.query.filter_by(model_id=model.id).order_by(ModelAnnotation.order_index).all()
-        if not _is_admin_preview(model.user_id):
+        # The owner's own visits and admin previews are not reader views.
+        if not is_owner and not _is_admin_preview(model.user_id):
             track_event("model_viewed", owner_user_id=model.user_id, project_id=model.paper_id, model_id=model.id)
         scale_ref = human_scale_reference(format_model_dimensions_cm(model))
         return render_template(

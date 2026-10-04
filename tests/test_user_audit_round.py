@@ -87,3 +87,17 @@ def test_viewer_uses_only_generated_tailwind_opacity_steps(client):
     for path in Path("templates").rglob("*.html"):
         for match in re.finditer(r"\b(?:bg|border|text|ring)-(?:\[[^\]\s]+\]|black|white|[a-z]+-\d{2,3})/(\d+)\b", path.read_text()):
             assert int(match.group(1)) % 5 == 0, f"{path}: {match.group(0)}"
+
+
+def test_owner_visits_do_not_count_as_model_views(client, app):
+    from models import AnalyticsEvent
+
+    register(client)
+    model_id, _ = _ready_model(app)
+    assert client.get(f"/view/{model_id}").status_code == 200
+    with app.app_context():
+        assert AnalyticsEvent.query.filter_by(model_id=model_id, event_name="model_viewed").count() == 0
+    client.post("/auth/logout")
+    client.get(f"/view/{model_id}")
+    with app.app_context():
+        assert AnalyticsEvent.query.filter_by(model_id=model_id, event_name="model_viewed").count() == 1

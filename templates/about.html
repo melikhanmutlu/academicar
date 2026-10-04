@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}About AcademicAR{% endblock %}
-{% block meta_description %}AcademicAR helps researchers, educators, and museums turn 3D models into interactive web viewers with augmented reality and permanent QR codes for papers, theses, posters, and teaching.{% endblock %}
+{% block meta_description %}AcademicAR helps researchers, educators, and museums turn 3D models into interactive web viewers with augmented reality and stable QR codes for papers, theses, posters, and teaching.{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
@@ -52,8 +52,8 @@
     <section class="mt-8 pt-8 border-t border-[#e8e8e8]">
       <p>
         Questions or partnership ideas?
-        {% if config.CONTACT_ENABLED %}<a href="{{ url_for('contact') }}" class="underline font-semibold text-[#202020]">Contact us</a>
-        or {% endif %}<a href="{{ url_for('auth.register') }}" class="underline">create a free account</a> to get started.
+        <a href="{{ url_for('contact') if config.CONTACT_ENABLED else url_for('contact_info') }}" class="underline font-semibold text-[#202020]">Contact us</a>
+        or <a href="{{ url_for('auth.register') }}" class="underline">create a free account</a> to get started.
       </p>
     </section>
   </div>
