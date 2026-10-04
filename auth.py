@@ -468,6 +468,10 @@ def verify_email(token):
             log_audit("email_verified", user_id=user.id)
         except Exception:
             pass
+    # Project invites sent to this address now become editor access.
+    from collaborators import claim_pending_collaborations
+
+    claim_pending_collaborations(user)
     flash("Your email address is confirmed.", "success")
     return redirect(url_for("dashboard") if current_user.is_authenticated else url_for("auth.login"))
 

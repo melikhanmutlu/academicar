@@ -11,6 +11,10 @@
 {% set model_capacity = project_model_capacity(paper) %}
 {% set can_upload_more = model_capacity.can_add %}
 {% set presentation_enabled = project_supports_feature(paper, 'presentation_library') %}
+{# Editors (collaborators) edit content; deleting, visibility, upgrades and
+   collaborator management stay with the owner. #}
+{% set is_project_owner = (project_role|default('owner')) == 'owner' %}
+{% set funding_owner_id = paper.user_id %}
 <div class="app-shell paper-detail-shell">
   <a href="{{ url_for('dashboard') }}" class="detail-back-button">&larr; Dashboard</a>
 
@@ -86,6 +90,9 @@
         ('unlisted', 'Anyone with the link · not listed or searchable', 'link'),
         ('public', 'Anyone · ready for posters, papers and slides', 'globe'),
       ] %}
+      {% if not is_project_owner %}
+      <p class="share-hint mt-5" data-visibility-readonly>Visibility: <strong>{{ visibility_labels[current_visibility] }}</strong>. Only the project owner can change who can open this project.</p>
+      {% else %}
       <form method="POST" action="{{ url_for('project_visibility_update', slug=paper.slug) }}" class="visibility-choice mt-5" data-visibility-form>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <fieldset>
@@ -115,6 +122,7 @@
           {% endfor %}
         </fieldset>
       </form>
+      {% endif %}
 
       <div class="share-state-box mt-4" data-share-state="{{ current_visibility }}">
         {% if current_visibility == 'private' %}
@@ -315,13 +323,15 @@
                   {% endif %}
                   <a href="{{ url_for('qr_print', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-link-action">QR</a>
                   <a href="{{ url_for('model_edit', model_id=m.id) }}" class="model-link-action">Edit</a>
+                  {% if is_project_owner %}
                   <form method="POST" action="{{ url_for('model_delete', model_id=m.id) }}" class="model-delete-form" onsubmit="return confirm('Delete this 3D model? This cannot be undone.');">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="model-link-action model-link-danger" aria-label="Delete model">Delete</button>
                   </form>
+                  {% endif %}
                 </div>
                 {% set upgrade_options = model_upgrade_options(m) %}
-                {% if upgrade_options %}
+                {% if upgrade_options and is_project_owner %}
                   {% set kinds = upgrade_options|map(attribute='kind')|list %}
                   <a href="{{ url_for('model_upgrade_page', model_id=m.id) }}" class="model-card-upgrade{% if access_state == 'expired' %} is-urgent{% endif %}">
                     {{ 'Upgrade' if 'upgrade' in kinds else 'Renew' }}
@@ -331,10 +341,12 @@
                 <span class="model-card-cta is-disabled">{{ 'Processing' if model_status != 'failed' else 'Not ready' }}</span>
                 <div class="model-actions-secondary">
                   <a href="{{ url_for('model_edit', model_id=m.id) }}" class="model-link-action">Edit</a>
+                  {% if is_project_owner %}
                   <form method="POST" action="{{ url_for('model_delete', model_id=m.id) }}" class="model-delete-form" onsubmit="return confirm('Delete this 3D model? This cannot be undone.');">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="model-link-action model-link-danger" aria-label="Delete model">Delete</button>
                   </form>
+                  {% endif %}
                 </div>
               {% endif %}
             </div>
@@ -360,7 +372,7 @@
     {% if not can_upload_more %}
       <div class="surface rounded-xl p-5 capacity-notice">
         <div><p class="project-section-kicker">Plan capacity reached</p><h2>{{ model_capacity.used }} / {{ model_capacity.limit }} models</h2><p>{{ model_capacity.plan.label }} projects hold {{ model_capacity.limit }} model{{ '' if model_capacity.limit == 1 else 's' }}. {% if model_capacity.plan.key == 'institutional' %}Ask your institution's administrator to raise this limit, or upgrade an existing model.{% else %}Upgrade the existing model to add more, or start a new project for the next model.{% endif %}</p></div>
-        {% if paper.models %}<a class="detail-action detail-action-primary" href="{{ url_for('model_upgrade_page', model_id=paper.models[0].id) }}">Review upgrade options</a>{% endif %}
+        {% if paper.models and is_project_owner %}<a class="detail-action detail-action-primary" href="{{ url_for('model_upgrade_page', model_id=paper.models[0].id) }}">Review upgrade options</a>{% endif %}
       </div>
     {% else %}
     {% if paper.models %}
@@ -472,6 +484,46 @@
     {% else %}
       </div>
     {% endif %}
+    {% endif %}
+  </section>
+
+  <section id="collaborators" class="surface rounded-xl p-5 sm:p-6 mb-6 reveal-up" data-collaborators>
+    <div class="section-heading-row">
+      <div>
+        <p class="project-section-kicker">Team</p>
+        <h2>Collaborators{% if paper.collaborators %} <span class="section-heading-count">{{ paper.collaborators|length }}</span>{% endif %}</h2>
+      </div>
+    </div>
+    <p class="text-sm text-[#5c6473]">Editors can update the project details, upload and replace models, edit labels and appearance, and add PDFs and materials. Deleting, visibility, upgrades and the team stay with the owner{% if not is_project_owner %} ({{ paper.author.username or paper.author.email }}){% endif %}. Models count toward the owner's plan.</p>
+    <ul class="collaborator-list mt-4">
+      <li class="collaborator-row">
+        <span class="collaborator-name">{{ paper.author.email }}</span>
+        <span class="detail-chip dark">Owner</span>
+      </li>
+      {% for c in paper.collaborators|sort(attribute='id') %}
+        <li class="collaborator-row" data-collaborator-row>
+          <span class="collaborator-name">{{ c.email }}</span>
+          {% if c.user_id %}<span class="detail-chip">Editor</span>{% else %}<span class="detail-chip status" title="Joins once they sign up and confirm this email address">Invited</span>{% endif %}
+          {% if is_project_owner or c.user_id == current_user.id %}
+            <form method="POST" action="{{ url_for('project_collaborator_remove', slug=paper.slug, collaborator_id=c.id) }}" class="collaborator-remove"
+                  onsubmit="return confirm('{{ 'Leave this project? You will lose access to it.' if c.user_id == current_user.id else 'Remove this collaborator from the project?' }}');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="model-link-action model-link-danger">{{ 'Leave project' if c.user_id == current_user.id else ('Cancel invite' if not c.user_id else 'Remove') }}</button>
+            </form>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+    {% if is_project_owner %}
+      <form method="POST" action="{{ url_for('project_collaborator_add', slug=paper.slug) }}" class="collaborator-add mt-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="field-label" for="collaboratorEmail">Invite an editor by email</label>
+        <div class="collaborator-add-row">
+          <input id="collaboratorEmail" type="email" name="email" required maxlength="120" placeholder="colleague@university.edu" class="field-input" autocomplete="off">
+          <button type="submit" class="detail-action detail-action-primary">Invite</button>
+        </div>
+        <p class="text-xs text-[#5c6473] mt-2">An existing AcademicAR account is added right away. Anyone else gets an email and joins after signing up with that address.</p>
+      </form>
     {% endif %}
   </section>
   </section><!-- /.paper-detail-layout -->

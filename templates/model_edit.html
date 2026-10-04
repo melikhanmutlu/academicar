@@ -9,6 +9,8 @@
 {# A failed replacement keeps the previous GLB live, so the page works as
    for a ready model (the replacement card shows the error). #}
 {% set model_status = 'ready' if model.processing_status == 'replacement_failed' else (model.processing_status or 'ready') %}
+{# Collaborators (editors) edit the model; deleting and upgrades stay with the owner. #}
+{% set is_project_owner = project_role(model.paper) != 'editor' %}
 <div class="app-shell model-edit-shell py-10 pb-10">
   <a href="{{ url_for('project_detail', slug=paper.slug) }}" class="detail-back-button">&larr; Project</a>
 
@@ -168,7 +170,7 @@
               {%- else -%}No expiry{%- endif -%}
             </strong></div>
           </div>
-          {% if model.license_type != 'institutional' %}
+          {% if model.license_type != 'institutional' and is_project_owner %}
           <div class="model-edit-actions">
             <a href="{{ url_for('model_upgrade_page', model_id=model.id) }}" class="detail-action detail-action-primary">Upgrade or renew</a>
           </div>
@@ -297,10 +299,12 @@
       <div class="model-edit-side-actions">
         <a href="{{ url_for('qr_print', model_id=model.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action">View QR</a>
         <a href="{{ url_for('project_detail', slug=paper.slug) }}" class="detail-action">Back to project</a>
+        {% if is_project_owner %}
         <form method="POST" action="{{ url_for('model_delete', model_id=model.id) }}" onsubmit="return confirm('Delete this 3D model? This cannot be undone.');" class="w-full mt-4 pt-4 border-t border-[#e2e8f0]">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="detail-action detail-action-danger w-full text-center">Delete Model</button>
         </form>
+        {% endif %}
       </div>
     </aside>
   </div>

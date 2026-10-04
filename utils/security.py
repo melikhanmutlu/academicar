@@ -44,3 +44,45 @@ def require_model_ownership(func):
                 abort(403)
         return func(*args, **kwargs)
     return decorated_function
+
+
+def _require_project_editor(paper):
+    from collaborators import can_edit_project
+
+    if not can_edit_project(paper):
+        abort(403)
+
+
+def require_paper_editor(func):
+    """Owner or editor of the project in 'slug' / 'paper_id' (content
+    editing). Owner-only actions keep @require_paper_ownership."""
+    @wraps(func)
+    def decorated_function(*args, **kwargs):
+        paper = None
+        if "slug" in kwargs:
+            paper = Paper.query.filter(
+                Paper.slug == kwargs["slug"],
+                db.or_(Paper.status.is_(None), Paper.status != "deleted"),
+            ).first_or_404()
+        elif "paper_id" in kwargs:
+            paper = db.session.get(Paper, kwargs["paper_id"])
+            if not paper or (paper.status or "active") == "deleted":
+                abort(404)
+        if paper is not None:
+            _require_project_editor(paper)
+        return func(*args, **kwargs)
+    return decorated_function
+
+
+def require_model_editor(func):
+    """Owner or editor of the model's project (content editing)."""
+    @wraps(func)
+    def decorated_function(*args, **kwargs):
+        if "model_id" in kwargs:
+            model = db.session.get(Model3D, kwargs["model_id"])
+            if not model:
+                abort(404)
+            if model.user_id != current_user.id:
+                _require_project_editor(model.paper)
+        return func(*args, **kwargs)
+    return decorated_function

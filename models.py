@@ -238,6 +238,9 @@ class Model3D(db.Model):
     # Declared source unit for unitless formats (mm/cm/m), or "embedded" for
     # FBX/GLB. Stored so the edit page can re-interpret the unit (rescale by ratio).
     source_unit = db.Column(db.String(12), nullable=True)
+    # Who uploaded it. Models always belong to the project owner (user_id);
+    # this records a collaborator's upload for the audit trail.
+    uploaded_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     processing_status = db.Column(db.String(30), nullable=False, default="ready")
     processing_error = db.Column(db.Text, nullable=True)
     anonymization_confirmed = db.Column(db.Boolean, nullable=False, default=False)
@@ -260,6 +263,33 @@ class Model3D(db.Model):
 
     def __repr__(self) -> str:
         return f"<Model3D {self.id}>"
+
+
+class ProjectCollaborator(db.Model):
+    """A co-author/lab member who can edit a project's content.
+
+    Editors edit metadata, upload/replace models, change appearance and
+    labels and add PDFs/materials. Deleting, visibility, collaborators and
+    payments stay with the owner, and every model belongs to the owner.
+    ``user_id`` is NULL while an emailed invite waits for that address to
+    sign up and confirm it.
+    """
+    __tablename__ = "project_collaborators"
+    __table_args__ = (db.UniqueConstraint("paper_id", "email", name="uq_project_collaborator_email"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    paper_id = db.Column(db.Integer, db.ForeignKey("papers.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    email = db.Column(db.String(120), nullable=False, index=True)
+    invited_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = db.Column(db.DateTime, default=utc_now)
+    accepted_at = db.Column(db.DateTime, nullable=True)
+
+    paper = db.relationship(
+        "Paper",
+        backref=db.backref("collaborators", lazy=True, cascade="all, delete-orphan"),
+    )
+    user = db.relationship("User", foreign_keys=[user_id])
 
 
 class ModelAnnotation(db.Model):

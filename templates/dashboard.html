@@ -180,6 +180,25 @@
       {% endif %}
     </section>
   {% endif %}
+
+  {% set shared = shared_projects|default([]) %}
+  {% if shared %}
+    <section class="latest-models reveal-up" data-shared-projects>
+      <div class="dashboard-list-header latest-models-header">
+        <h2>Shared with you</h2>
+      </div>
+      <div class="surface rounded-xl px-5 py-2">
+        <ul class="shared-project-list">
+          {% for project in shared %}
+            <li>
+              <a href="{{ url_for('project_detail', slug=project.slug) }}">{{ project.title }}</a>
+              <small>Editor · owner {{ project.author.username or project.author.email }}</small>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </section>
+  {% endif %}
 </div>
 
 <script>

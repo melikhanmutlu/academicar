@@ -9900,7 +9900,7 @@ body.nav-menu-open {
 }
 @media (min-width: 1100px) {
   .paper-detail-layout {
-    grid-template-rows: repeat(4, auto);
+    grid-template-rows: repeat(5, auto);
     row-gap: 0;
   }
   .paper-detail-layout > :not(.share-panel) {
@@ -10064,3 +10064,26 @@ body.project-detail-page { overflow-x: clip; }
 /* 90-day / 12-month trends: thinner bars so they fit the card on phones. */
 .insights-trend--dense { gap: 1px; }
 .insights-trend--dense .insights-bar-wrap { min-width: 0; }
+
+/* Project collaborators (owner + editors). */
+#collaborators { scroll-margin-top: 96px; }
+.collaborator-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--color-light-pearl); }
+.collaborator-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-light-pearl);
+  font-size: 14px;
+}
+.collaborator-name { flex: 1; min-width: 0; overflow-wrap: anywhere; color: var(--color-midnight-graphite); }
+.collaborator-remove { margin: 0; }
+.collaborator-add-row { display: flex; gap: 8px; margin-top: 6px; }
+.collaborator-add-row .field-input { flex: 1; min-width: 0; }
+.collaborator-add-row .detail-action { flex-shrink: 0; }
+.shared-project-list { list-style: none; margin: 0; padding: 0; }
+.shared-project-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--color-light-pearl); font-size: 14px; }
+.shared-project-list li:last-child { border-bottom: 0; }
+.shared-project-list a { font-weight: 600; color: var(--color-midnight-graphite); text-decoration: none; overflow-wrap: anywhere; }
+.shared-project-list a:hover { color: var(--color-sunset-orange); }
+.shared-project-list small { color: var(--color-dark-shale, #4d4d4d); flex-shrink: 0; }

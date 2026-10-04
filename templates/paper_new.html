@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% set is_edit = mode|default('new') == 'edit' %}
 {% set presentation_enabled = project_supports_feature(paper if is_edit else none, 'presentation_library') %}
+{# A collaborator (editor) edits content only: visibility and deleting stay with the owner. #}
+{% set is_project_owner = not is_edit or project_role(paper) != 'editor' %}
 {% block title %}{{ 'Edit Project' if is_edit else 'New Project' }} - AcademicAR{% endblock %}
 {# Drop body's overflow-x clip so the sticky decorative aside has a single
    scroll container (see body.project-form-page in style.css). #}
@@ -90,6 +92,9 @@
         </section>
       {% endif %}
 
+      {% if not is_project_owner %}
+      <p class="text-sm text-[#5c6473]" data-visibility-readonly>Visibility: <strong>{{ visibility_labels[project_visibility(paper)] }}</strong>. Only the project owner can change who can open this project.</p>
+      {% else %}
       <div>
         <label class="field-label">Visibility</label>
         <div class="grid sm:grid-cols-3 gap-3">
@@ -110,6 +115,7 @@
           </label>
         </div>
       </div>
+      {% endif %}
 
       <details class="form-optional-section"{% if is_edit or form %} open{% endif %}>
         <summary><span><strong>Project details</strong><small>Type, stage, field, organization, department and description · optional</small></span></summary>
@@ -277,7 +283,7 @@
         {% if is_edit and paper.attachments %}
           <div class="material-current-list">
             {% for material in paper.attachments %}
-              <div><span><strong>{{ material.title or material.original_filename }}</strong><small>{{ material.file_type|upper }}{% if material.preview_pdf_path %} · preview ready{% elif material.preview_status in ('pending', 'processing') %} · preparing preview{% endif %}</small></span><button type="submit" class="article-remove" form="material-delete-{{ material.id }}">Remove</button></div>
+              <div><span><strong>{{ material.title or material.original_filename }}</strong><small>{{ material.file_type|upper }}{% if material.preview_pdf_path %} · preview ready{% elif material.preview_status in ('pending', 'processing') %} · preparing preview{% endif %}</small></span>{% if is_project_owner %}<button type="submit" class="article-remove" form="material-delete-{{ material.id }}">Remove</button>{% endif %}</div>
             {% endfor %}
           </div>
         {% endif %}
@@ -302,7 +308,7 @@
       <input type="hidden" name="pmid" value="">
 
       <div class="paper-form-actions flex items-center justify-between gap-3 pt-4 border-t border-[#141821]/10">
-        {% if is_edit %}
+        {% if is_edit and is_project_owner %}
           <button type="button" class="detail-action detail-action-danger" data-delete-paper-open>Delete project</button>
         {% else %}
           <span></span>
@@ -313,7 +319,7 @@
         </div>
       </div>
     </form>
-    {% if is_edit and paper.attachments %}
+    {% if is_edit and paper.attachments and is_project_owner %}
       {# Separate forms so removing a material never submits (or discards)
          the unsaved edits in the main project form above. #}
       {% for material in paper.attachments %}
@@ -323,7 +329,7 @@
       {% endfor %}
     {% endif %}
 
-    {% if is_edit %}
+    {% if is_edit and is_project_owner %}
       <dialog class="confirm-dialog" data-delete-paper-dialog aria-labelledby="delete-dialog-title">
         <form method="dialog" class="confirm-dialog-card">
           <div>

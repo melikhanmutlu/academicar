@@ -69,6 +69,14 @@ from licensing import (
 from blog_content import code_post_slugs, get_all_posts, get_post, render_body
 from discipline_content import all_disciplines, discipline_slugs, get_discipline, related_disciplines
 from institution_panel import institution_bp
+from collaborators import (
+    add_collaborator,
+    can_edit_project,
+    claim_pending_collaborations,
+    project_role,
+    send_collaborator_email,
+    shared_projects_for,
+)
 from institutions import (
     apply_institutional_license,
     end_institution_access_now,
@@ -82,7 +90,7 @@ from institutions import (
     reapply_model_license,
     renew_institution_contract,
 )
-from models import AnalyticsEvent, AuditLog, BlogPost, ConversionJob, Coupon, Institution, InstitutionInvite, InstitutionMember, LicensePlanConfig, Model3D, ModelAnnotation, ModelVersion, Paper, Payment, ProjectArticle, ProjectAttachment, QRLink, User, db
+from models import AnalyticsEvent, AuditLog, BlogPost, ConversionJob, Coupon, Institution, InstitutionInvite, InstitutionMember, LicensePlanConfig, Model3D, ModelAnnotation, ModelVersion, Paper, Payment, ProjectArticle, ProjectAttachment, ProjectCollaborator, QRLink, User, db
 from services.r2_mirror import mirror_file, mirror_directory, mirror_directory_sync, mirror_delete, ensure_local
 from services.monitoring import init_error_monitoring
 from services import qr_assets
@@ -102,7 +110,7 @@ from analytics import (
     funnel_snapshot,
     track_event,
 )
-from utils.security import require_model_ownership, require_paper_ownership
+from utils.security import require_model_editor, require_model_ownership, require_paper_editor, require_paper_ownership
 from services.storage_service import StorageError, safe_move_file, safe_save_file, save_companion_files
 
 
@@ -230,6 +238,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             "project_types": PROJECT_TYPES,
             "project_workflow_stages": PROJECT_WORKFLOW_STAGES,
             "project_visibility": project_visibility,
+            "project_role": project_role,
             "project_landing_url": project_landing_url,
             "active_models": active_models,
             "share_image_url": share_image_url,
@@ -1127,6 +1136,8 @@ def ensure_sqlite_schema(app: Flask) -> None:
         model_columns = {row[1] for row in connection.execute(text("PRAGMA table_info(models)")).fetchall()}
         if model_columns and "dimensions_cm" not in model_columns:
             connection.execute(text("ALTER TABLE models ADD COLUMN dimensions_cm VARCHAR(50)"))
+        if model_columns and "uploaded_by_user_id" not in model_columns:
+            connection.execute(text("ALTER TABLE models ADD COLUMN uploaded_by_user_id INTEGER"))
         payment_columns = {row[1] for row in connection.execute(text("PRAGMA table_info(payments)")).fetchall()}
         if payment_columns and "model_id" not in payment_columns:
             connection.execute(text("ALTER TABLE payments ADD COLUMN model_id VARCHAR(36)"))
@@ -1817,15 +1828,17 @@ def intended_project_plan_for_user(user_id: int | None) -> str:
     return "free"
 
 
-def upload_funding_context() -> dict:
-    """What the current user's next upload starts on, for the upload forms.
+def upload_funding_context(owner_id: int | None = None) -> dict:
+    """What the next upload starts on, for the upload forms. Models belong to
+    the project owner, so pass ``owner_id`` when an editor uploads to someone
+    else's project (default: the current user).
 
     kind is "institutional" (the member's institution covers it) or "free";
     for a member whose institution cannot fund it, reason says why
     (suspended / contract_expired / quota_models / quota_storage)."""
     if not current_user.is_authenticated:
         return {"kind": "free", "institution": None, "reason": None}
-    membership = get_active_membership(current_user.id)
+    membership = get_active_membership(owner_id or current_user.id)
     if membership is None:
         return {"kind": "free", "institution": None, "reason": None}
     institution = membership.institution
@@ -3335,6 +3348,7 @@ def _create_model_for_paper(
         id=unique_id,
         paper_id=paper.id,
         user_id=paper.user_id,
+        uploaded_by_user_id=current_user.id if current_user.is_authenticated else None,
         display_name=display_name,
         description=description,
         original_filename=original_name,
@@ -4652,15 +4666,17 @@ def register_routes(app: Flask) -> None:
             details={"paper_id": model.paper_id, "public_id": model.public_id},
         )
         annotations = ModelAnnotation.query.filter_by(model_id=model.id).order_by(ModelAnnotation.order_index).all()
-        # The owner's own visits and admin previews are not reader views.
-        if not is_owner and not _is_admin_preview(model.user_id):
+        # Owners and project editors manage the model from the viewer
+        # (labels, colour); their visits and admin previews are not reader views.
+        can_edit = can_edit_project(model.paper)
+        if not can_edit and not _is_admin_preview(model.user_id):
             track_event("model_viewed", owner_user_id=model.user_id, project_id=model.paper_id, model_id=model.id)
         scale_ref = human_scale_reference(format_model_dimensions_cm(model))
         return render_template(
             "viewer.html", model=model, paper=model.paper, has_usdz=has_usdz,
             annotations=annotations, scale_reference=scale_ref,
             dimensions_cm=format_model_dimensions_cm(model),
-            is_owner=is_owner,
+            is_owner=can_edit,
         )
 
     @app.route("/m/<public_id>")
@@ -4781,7 +4797,7 @@ def register_routes(app: Flask) -> None:
         # shows the graceful "unavailable" state via model_is_accessible below).
         # Admins previewing a user's dashboard see the same thumbnails.
         is_owner = current_user.is_authenticated and (
-            current_user.id == model.user_id or bool(current_user.is_admin)
+            current_user.id == model.user_id or bool(current_user.is_admin) or can_edit_project(model.paper)
         )
         if not _paper_visible_to_request(model.paper) or not (is_owner or model_is_accessible(model)):
             abort(404)
@@ -4819,7 +4835,7 @@ def register_routes(app: Flask) -> None:
             abort(404)
         # Admins previewing a user's dashboard see the same thumbnails.
         is_owner = current_user.is_authenticated and (
-            current_user.id == model.user_id or bool(current_user.is_admin)
+            current_user.id == model.user_id or bool(current_user.is_admin) or can_edit_project(model.paper)
         )
         if not _paper_visible_to_request(model.paper) or not (is_owner or model_is_accessible(model)):
             abort(404)
@@ -4834,7 +4850,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/models/<model_id>/collage", methods=["POST"])
     @login_required
-    @require_model_ownership
+    @require_model_editor
     def model_collage_save(model_id):
         """Persist a client-composed "combined view" figure (several viewer
         screenshots, optionally with a QR badge, merged into one PNG in the
@@ -4882,7 +4898,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/models/<model_id>/collage", methods=["DELETE"])
     @login_required
-    @require_model_ownership
+    @require_model_editor
     def model_collage_delete(model_id):
         model = db.session.get(Model3D, model_id)
         if not model:
@@ -4935,7 +4951,7 @@ def register_routes(app: Flask) -> None:
             abort(404)
         if not model.paper:
             abort(404)
-        if model.user_id != current_user.id:
+        if not can_edit_project(model.paper):
             abort(403)
         share = build_share_snippets(model, model_resolver_url(model))
         return render_template("qr_page.html", model=model, paper=model.paper, share=share)
@@ -4966,7 +4982,7 @@ def register_routes(app: Flask) -> None:
         model = db.session.get(Model3D, model_id)
         if not model or not model.paper:
             abort(404)
-        if model.user_id != current_user.id:
+        if not can_edit_project(model.paper):
             abort(403)
         ensure_model_qr_link(model)
         title = model.display_name or model.original_filename or model.paper.title or "3D model"
@@ -4978,7 +4994,7 @@ def register_routes(app: Flask) -> None:
         paper = db.session.get(Paper, paper_id)
         if not paper or paper_is_deleted(paper):
             abort(404)
-        if paper.user_id != current_user.id:
+        if not can_edit_project(paper):
             abort(403)
         if project_visibility(paper) == "unlisted" and not paper.share_token:
             paper.share_token = new_project_share_token()
@@ -4991,7 +5007,7 @@ def register_routes(app: Flask) -> None:
         paper = db.session.get(Paper, paper_id)
         if not paper or not paper.pdf_path:
             abort(404)
-        if paper.user_id != current_user.id:
+        if not can_edit_project(paper):
             abort(403)
         pdf_name = os.path.basename(paper.pdf_path)
         ensure_local(os.path.join(app.config["PDF_FOLDER"], pdf_name), f"pdfs/{pdf_name}")
@@ -5007,7 +5023,7 @@ def register_routes(app: Flask) -> None:
             return True
         if not current_user.is_authenticated:
             return False
-        return current_user.id == paper.user_id or bool(current_user.is_admin)
+        return current_user.id == paper.user_id or bool(current_user.is_admin) or can_edit_project(paper)
 
     def _private_project_response(paper: Paper):
         """Visitors following a link or QR of a private project get an
@@ -5048,7 +5064,7 @@ def register_routes(app: Flask) -> None:
         paper = db.session.get(Paper, paper_id)
         if not paper or paper_is_deleted(paper):
             abort(404)
-        if paper.user_id != current_user.id:
+        if not can_edit_project(paper):
             abort(403)
         ensure_paper_qr(paper)
         return render_template("qr_page_paper.html", paper=paper)
@@ -5243,9 +5259,12 @@ def register_routes(app: Flask) -> None:
             .limit(6)
             .all()
         )
+        # Invites sent to this (confirmed) address before the account existed.
+        claim_pending_collaborations(current_user)
         return render_template(
             "dashboard.html",
             papers=papers,
+            shared_projects=shared_projects_for(current_user),
             latest_models=latest_models,
             analytics=analytics_snapshot(current_user.id),
             institution_membership=get_active_membership(current_user.id),
@@ -7801,6 +7820,11 @@ def register_routes(app: Flask) -> None:
             Payment.query.filter_by(user_id=uid).update({"user_id": None})
             AuditLog.query.filter(AuditLog.user_id == uid).update({"user_id": None})
             Paper.query.filter_by(deleted_by_user_id=uid).update({"deleted_by_user_id": None})
+            # Their seats on other people's projects go; models they uploaded
+            # there stay with the project owner.
+            ProjectCollaborator.query.filter_by(user_id=uid).delete()
+            ProjectCollaborator.query.filter_by(invited_by_user_id=uid).update({"invited_by_user_id": None})
+            Model3D.query.filter_by(uploaded_by_user_id=uid).update({"uploaded_by_user_id": None})
             # InstitutionMember.user_id is NOT NULL, so the ORM can't null it out
             # on the User cascade — remove the membership row explicitly first.
             membership = InstitutionMember.query.filter_by(user_id=uid).first()
@@ -8235,6 +8259,9 @@ def register_routes(app: Flask) -> None:
             Payment.query.filter_by(user_id=user_id).update({"user_id": None})
             AuditLog.query.filter(AuditLog.user_id == user_id, AuditLog.event_type != "account_deleted").update({"user_id": None})
             Paper.query.filter_by(deleted_by_user_id=user_id).update({"deleted_by_user_id": None})
+            ProjectCollaborator.query.filter_by(user_id=user_id).delete()
+            ProjectCollaborator.query.filter_by(invited_by_user_id=user_id).update({"invited_by_user_id": None})
+            Model3D.query.filter_by(uploaded_by_user_id=user_id).update({"uploaded_by_user_id": None})
             # InstitutionMember.user_id is NOT NULL, so the ORM cannot null it
             # out on the User cascade (same as the admin delete path).
             InstitutionMember.query.filter_by(user_id=user_id).delete()
@@ -8530,7 +8557,7 @@ def register_routes(app: Flask) -> None:
     @login_required
     def project_detail(slug):
         paper = active_paper_query().filter_by(slug=slug).first_or_404()
-        if paper.user_id != current_user.id:
+        if not can_edit_project(paper):
             abort(403)
         # After a paid upgrade the provider redirects here with ?upgraded=<model_id>.
         # Show a success banner; its wording is based on the model's ACTUAL access
@@ -8548,7 +8575,68 @@ def register_routes(app: Flask) -> None:
             paper=paper,
             upgraded_model=upgraded_model,
             upgraded_active=upgraded_active,
+            project_role=project_role(paper),
         )
+
+    @app.route("/projects/<slug>/collaborators", methods=["POST"])
+    @login_required
+    @require_paper_ownership
+    @limiter.limit("30 per hour", methods=["POST"])
+    def project_collaborator_add(slug):
+        paper = active_paper_query().filter_by(slug=slug).first_or_404()
+        email = (request.form.get("email") or "").strip().lower()
+        target = url_for("project_detail", slug=paper.slug) + "#collaborators"
+        from email_validator import EmailNotValidError, validate_email
+
+        try:
+            validate_email(email, check_deliverability=False)
+        except EmailNotValidError:
+            flash("Enter a valid email address.", "danger")
+            return redirect(target)
+        if len(email) > 120:
+            flash("That email address is too long.", "danger")
+            return redirect(target)
+        row, outcome = add_collaborator(paper, email, current_user)
+        if outcome == "self":
+            flash("That is your own address; you already own this project.", "info")
+        elif outcome == "exists":
+            flash(f"{email} is already {'an editor' if row.user_id else 'invited'}.", "info")
+        elif outcome == "limit":
+            flash("This project already has the maximum number of collaborators.", "warning")
+        else:
+            delivered = send_collaborator_email(row, current_user)
+            log_audit("project_collaborator_added", user_id=current_user.id, resource_id=str(paper.id),
+                      details={"email": email, "pending": outcome == "pending"})
+            if outcome == "added":
+                flash(f"{email} can now edit this project.", "success")
+            else:
+                flash(
+                    f"Invite {'emailed' if delivered else 'saved'}: {email} becomes an editor after signing up "
+                    "with that address and confirming it.",
+                    "success",
+                )
+        return redirect(target)
+
+    @app.route("/projects/<slug>/collaborators/<int:collaborator_id>/remove", methods=["POST"])
+    @login_required
+    def project_collaborator_remove(slug, collaborator_id):
+        """The owner removes anyone; an editor can remove themselves (leave)."""
+        paper = active_paper_query().filter_by(slug=slug).first_or_404()
+        row = ProjectCollaborator.query.filter_by(id=collaborator_id, paper_id=paper.id).first_or_404()
+        is_owner = paper.user_id == current_user.id
+        leaving = row.user_id is not None and row.user_id == current_user.id
+        if not (is_owner or leaving):
+            abort(403)
+        email = row.email
+        db.session.delete(row)
+        db.session.commit()
+        log_audit("project_collaborator_removed", user_id=current_user.id, resource_id=str(paper.id),
+                  details={"email": email, "left": leaving})
+        if leaving:
+            flash(f"You left \"{paper.title}\".", "success")
+            return redirect(url_for("dashboard"))
+        flash(f"{email} can no longer edit this project.", "success")
+        return redirect(url_for("project_detail", slug=paper.slug) + "#collaborators")
 
     @app.route("/projects/<slug>/visibility", methods=["POST"])
     @login_required
@@ -8592,7 +8680,7 @@ def register_routes(app: Flask) -> None:
     @app.route("/papers/<slug>/edit", methods=["GET", "POST"], endpoint="paper_edit")
     @app.route("/projects/<slug>/edit", methods=["GET", "POST"], endpoint="project_edit")
     @login_required
-    @require_paper_ownership
+    @require_paper_editor
     def project_edit(slug):
         paper = active_paper_query().filter_by(slug=slug).first_or_404()
 
@@ -8622,6 +8710,10 @@ def register_routes(app: Flask) -> None:
             paper.project_type = paper_data["project_type"]
             paper.workflow_stage = paper_data["workflow_stage"]
             previous_visibility = project_visibility(paper)
+            if paper.user_id != current_user.id:
+                # Visibility is the owner's call; editors keep it as is.
+                paper_data["visibility"] = previous_visibility
+                paper_data["is_public"] = previous_visibility == "public"
             paper.visibility = paper_data["visibility"]
             if paper.visibility == "unlisted" and not paper.share_token:
                 paper.share_token = new_project_share_token()
@@ -8708,7 +8800,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/papers/<slug>/upload-pdf", methods=["POST"])
     @login_required
-    @require_paper_ownership
+    @require_paper_editor
     def paper_upload_pdf(slug):
         paper = active_paper_query().filter_by(slug=slug).first()
         if not paper:
@@ -8827,7 +8919,7 @@ def register_routes(app: Flask) -> None:
     @app.route("/papers/<slug>/upload-model", methods=["POST"])
     @login_required
     @limiter.limit(upload_rate_limit_value, methods=["POST"], exempt_when=upload_rate_limit_disabled)
-    @require_paper_ownership
+    @require_paper_editor
     def upload_model(slug):
         paper = active_paper_query().filter_by(slug=slug).first_or_404()
         file = request.files.get("file") or request.files.get("model_file")
@@ -8857,7 +8949,7 @@ def register_routes(app: Flask) -> None:
     @app.route("/models/<model_id>/replace", methods=["POST"])
     @login_required
     @limiter.limit(upload_rate_limit_value, methods=["POST"], exempt_when=upload_rate_limit_disabled)
-    @require_model_ownership
+    @require_model_editor
     def model_replace(model_id):
         """Replace the model's source file while preserving its model_id,
         public_id, QR code, and resolver URL. The previous working GLB is
@@ -8999,7 +9091,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/models/<model_id>/appearance", methods=["POST"])
     @login_required
-    @require_model_ownership
+    @require_model_editor
     def model_appearance_update(model_id):
         """Update appearance (solid color) while preserving model_id, public_id,
         QR code, resolver URL, and the underlying GLB on failure."""
@@ -9018,7 +9110,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/models/<model_id>/viewer-color", methods=["POST"])
     @login_required
-    @require_model_ownership
+    @require_model_editor
     def model_viewer_color(model_id):
         """Owner-only: bake a solid color chosen in the viewer into the model.
 
@@ -9059,7 +9151,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/models/<model_id>/rescale", methods=["POST"])
     @login_required
-    @require_model_ownership
+    @require_model_editor
     def model_rescale(model_id):
         """Rescale the GLB so its longest dimension matches the user-specified cm value."""
         model = db.session.get(Model3D, model_id)
@@ -9154,7 +9246,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/models/<model_id>/change-unit", methods=["POST"])
     @login_required
-    @require_model_ownership
+    @require_model_editor
     def model_change_unit(model_id):
         """Re-interpret the model's source unit (mm/cm/m), rescaling the GLB by
         the ratio between the old and new unit. For STL/OBJ models that declared
@@ -9252,7 +9344,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/models/<model_id>/annotations", methods=["POST"])
     @login_required
-    @require_model_ownership
+    @require_model_editor
     def model_annotation_add(model_id):
         """Add a single annotation to the model."""
         model = db.session.get(Model3D, model_id)
@@ -9301,7 +9393,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/models/<model_id>/annotations/<int:annotation_id>", methods=["DELETE"])
     @login_required
-    @require_model_ownership
+    @require_model_editor
     def model_annotation_delete(model_id, annotation_id):
         """Delete a single annotation."""
         annotation = db.session.get(ModelAnnotation, annotation_id)
@@ -9324,7 +9416,7 @@ def register_routes(app: Flask) -> None:
         model = db.session.get(Model3D, model_id)
         if not model:
             abort(404)
-        if model.user_id != current_user.id:
+        if not can_edit_project(model.paper):
             abort(403)
         return jsonify(
             {
@@ -9338,7 +9430,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/models/<model_id>/edit", methods=["GET", "POST"])
     @login_required
-    @require_model_ownership
+    @require_model_editor
     def model_edit(model_id):
         model = db.session.get(Model3D, model_id)
         if not model:

@@ -1,6 +1,6 @@
 {# What a new upload starts on. Members of an institution that can fund the
    upload see their institutional coverage; everyone else sees Free. #}
-{% set funding = upload_funding_context() %}
+{% set funding = upload_funding_context(funding_owner_id|default(none)) %}
 <div class="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4" data-upload-plan-note="{{ funding.kind }}">
   {% if funding.kind == "institutional" %}
     <p class="text-sm font-semibold text-[#111827]">Covered by {{ funding.institution.name }}</p>
