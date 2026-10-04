@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Syntax check
+        run: python -m py_compile app.py auth.py models.py config.py licensing.py worker.py institutions.py institution_panel.py converters/*.py
+      - name: Tests
+        run: python -m pytest tests -p no:cacheprovider -q
+
+  css:
+    # static/css/tailwind.css is committed; fail if a template change added
+    # classes without rebuilding it (npm run build:css).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build:css
+      - name: Compiled CSS is up to date
+        run: git diff --exit-code static/css/tailwind.css
