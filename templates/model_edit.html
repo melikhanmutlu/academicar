@@ -6,7 +6,9 @@
 {% endblock %}
 
 {% block content %}
-{% set model_status = model.processing_status or 'ready' %}
+{# A failed replacement keeps the previous GLB live, so the page works as
+   for a ready model (the replacement card shows the error). #}
+{% set model_status = 'ready' if model.processing_status == 'replacement_failed' else (model.processing_status or 'ready') %}
 <div class="app-shell model-edit-shell py-10 pb-10">
   <a href="{{ url_for('project_detail', slug=paper.slug) }}" class="detail-back-button">&larr; Project</a>
 
@@ -38,7 +40,7 @@
 
         <div class="model-edit-field-grid">
           <label class="field-label">Model note</label>
-          <textarea name="description" rows="6" class="field-textarea" maxlength="5000" aria-label="Model note" placeholder="Describe the model context within the publication">{{ model.description or '' }}</textarea>
+          <textarea name="description" rows="6" class="field-textarea" maxlength="5000" aria-label="Model note" placeholder="Describe the model context within the project">{{ model.description or '' }}</textarea>
         </div>
 
         <div class="model-edit-actions">
@@ -51,6 +53,10 @@
       {% if model_status == 'ready' %}
       <form method="POST" action="{{ url_for('model_appearance_update', model_id=model.id) }}" class="surface model-edit-card model-edit-material-card">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {# Set to 1 by the script below once the colour / finish is touched, so
+           saving only the name or note leaves the model's materials alone. #}
+        <input type="hidden" name="color_changed" value="0" data-color-changed>
+        <input type="hidden" name="finish_changed" value="0" data-finish-changed>
         <div class="model-edit-card-head">
           <h2>Viewer card</h2>
           <p>The model name and note appear on the project page and in the public viewer. Saved together with the appearance below.</p>
@@ -61,11 +67,11 @@
         </div>
         <div class="model-edit-field-grid">
           <label class="field-label">Model note</label>
-          <textarea name="description" rows="6" class="field-textarea" maxlength="5000" aria-label="Model note" placeholder="Describe the model context within the publication">{{ model.description or '' }}</textarea>
+          <textarea name="description" rows="6" class="field-textarea" maxlength="5000" aria-label="Model note" placeholder="Describe the model context within the project">{{ model.description or '' }}</textarea>
         </div>
         <div class="model-edit-card-head">
           <h2>Material &amp; appearance</h2>
-          <p>Adjust the color and surface finish. The preview updates live as you drag the sliders — click "Update Appearance" to save it onto the model. The viewer link and QR stay the same.</p>
+          <p>Adjust the color and surface finish. The preview updates live as you drag the sliders — click "Save Changes" to save it onto the model. The model keeps its original colors until you pick one. The viewer link and QR stay the same.</p>
         </div>
         <div class="model-edit-material-grid">
           <div class="model-edit-preview">
@@ -109,13 +115,13 @@
               <p>Use the swatch, type a hex code, or pick a preset — they stay in sync.</p>
             </div>
             <div class="model-edit-field-grid">
-              <label class="field-label model-edit-slider-label" for="appearanceRoughness">Roughness <span id="roughness-val">{{ '%.2f'|format(model.appearance_roughness or 0.35) }}</span></label>
-              <input type="range" id="appearanceRoughness" name="roughness" min="0" max="1" step="0.05" value="{{ model.appearance_roughness or 0.35 }}" class="w-full" oninput="document.getElementById('roughness-val').textContent=this.value">
+              <label class="field-label model-edit-slider-label" for="appearanceRoughness">Roughness <span id="roughness-val">{{ '%.2f'|format(model.appearance_roughness if model.appearance_roughness is not none else 0.35) }}</span></label>
+              <input type="range" id="appearanceRoughness" name="roughness" min="0" max="1" step="0.05" value="{{ model.appearance_roughness if model.appearance_roughness is not none else 0.35 }}" class="w-full" oninput="document.getElementById('roughness-val').textContent=this.value">
               <p>0 = mirror-smooth, 1 = fully rough/matte.</p>
             </div>
             <div class="model-edit-field-grid">
-              <label class="field-label model-edit-slider-label" for="appearanceMetallic">Metallic <span id="metallic-val">{{ '%.2f'|format(model.appearance_metallic or 0.05) }}</span></label>
-              <input type="range" id="appearanceMetallic" name="metallic" min="0" max="1" step="0.05" value="{{ model.appearance_metallic or 0.05 }}" class="w-full" oninput="document.getElementById('metallic-val').textContent=this.value">
+              <label class="field-label model-edit-slider-label" for="appearanceMetallic">Metallic <span id="metallic-val">{{ '%.2f'|format(model.appearance_metallic if model.appearance_metallic is not none else 0.05) }}</span></label>
+              <input type="range" id="appearanceMetallic" name="metallic" min="0" max="1" step="0.05" value="{{ model.appearance_metallic if model.appearance_metallic is not none else 0.05 }}" class="w-full" oninput="document.getElementById('metallic-val').textContent=this.value">
               <p>0 = dielectric (plastic, bone), 1 = metallic (implant, steel).</p>
             </div>
             <div class="model-edit-field-grid">
@@ -146,7 +152,7 @@
         <div class="surface model-edit-card">
           <div class="model-edit-card-head">
             <h2>Access plan</h2>
-            <p>A model's license is a paid upgrade and keeps the same QR and resolver URL. Upgrade or renew from the project page.</p>
+            <p>{% if model.license_type == 'institutional' %}This model is covered by your institution's contract; its access follows the contract end date. Your institution admin manages renewals.{% else %}A model's license is a paid upgrade and keeps the same QR and resolver URL.{% endif %}</p>
           </div>
           <div class="model-meta-grid">
             <div><span>Current plan</span><strong>
@@ -162,9 +168,11 @@
               {%- else -%}No expiry{%- endif -%}
             </strong></div>
           </div>
+          {% if model.license_type != 'institutional' %}
           <div class="model-edit-actions">
-            <a href="{{ url_for('project_detail', slug=paper.slug) }}" class="detail-action detail-action-primary">Upgrade or renew</a>
+            <a href="{{ url_for('model_upgrade_page', model_id=model.id) }}" class="detail-action detail-action-primary">Upgrade or renew</a>
           </div>
+          {% endif %}
         </div>
 
         {% if model_status == 'ready' %}
@@ -354,12 +362,22 @@
     return [((value >> 16) & 255) / 255, ((value >> 8) & 255) / 255, (value & 255) / 255, 1];
   }
 
+  const colorChangedField = document.querySelector('[data-color-changed]');
+  const finishChangedField = document.querySelector('[data-finish-changed]');
+  // Untouched properties keep the model's own materials in the preview.
+  const touched = { color: false, finish: false };
+  function markTouched(kind) {
+    touched[kind] = true;
+    const field = kind === 'color' ? colorChangedField : finishChangedField;
+    if (field) field.value = '1';
+  }
+
   function applyLivePreview() {
     if (!materialPreview || !materialPreview.model) return;
     const materials = materialPreview.model.materials || [];
-    const roughness = appearanceRoughness ? parseFloat(appearanceRoughness.value) : NaN;
-    const metallic = appearanceMetallic ? parseFloat(appearanceMetallic.value) : NaN;
-    const colorFactor = appearanceColor ? hexToColorFactor(appearanceColor.value) : null;
+    const roughness = touched.finish && appearanceRoughness ? parseFloat(appearanceRoughness.value) : NaN;
+    const metallic = touched.finish && appearanceMetallic ? parseFloat(appearanceMetallic.value) : NaN;
+    const colorFactor = touched.color && appearanceColor ? hexToColorFactor(appearanceColor.value) : null;
     materials.forEach((material) => {
       const pbr = material && material.pbrMetallicRoughness;
       if (!pbr) return;
@@ -375,9 +393,10 @@
     // The model may already be loaded if the custom element registered early
     if (materialPreview.model) applyLivePreview();
     materialPreview.addEventListener('load', applyLivePreview);
-    [appearanceRoughness, appearanceMetallic, appearanceColor].forEach((el) => {
-      if (el) el.addEventListener('input', applyLivePreview);
+    [appearanceRoughness, appearanceMetallic].forEach((el) => {
+      if (el) el.addEventListener('input', () => { markTouched('finish'); applyLivePreview(); });
     });
+    if (appearanceColor) appearanceColor.addEventListener('input', () => { markTouched('color'); applyLivePreview(); });
   }
 
   if (materialPreview) {
@@ -413,6 +432,7 @@
         if (val.length && val[0] !== '#') val = '#' + val;
         if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
           appearanceColor.value = val;
+          markTouched('color');
           applyLivePreview();
         }
         highlightEditPreset(val);
@@ -424,6 +444,7 @@
         const hex = btn.dataset.preset;
         if (appearanceColor) {
           appearanceColor.value = hex;
+          markTouched('color');
           applyLivePreview();
         }
         if (editHexInput) editHexInput.value = hex.toUpperCase();

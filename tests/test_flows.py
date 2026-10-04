@@ -428,7 +428,7 @@ def test_admin_can_restore_soft_deleted_publication(client):
     login(client, email="admin@example.com")
     response = client.post(f"/admin/papers/{paper_id}/restore", follow_redirects=True)
     assert response.status_code == 200
-    assert "Publication restored" in response.get_data(as_text=True)
+    assert "Project restored" in response.get_data(as_text=True)
     with client.application.app_context():
         restored = db.session.get(Paper, paper_id)
         assert restored.status == "active"
@@ -1690,3 +1690,47 @@ def test_paper_edit_pdf_deletion(client):
         paper = Paper.query.filter_by(title="Paper with PDF to Delete").one()
         assert paper.pdf_path is None
         assert not os.path.exists(pdf_path)
+
+
+def test_saving_only_the_name_does_not_recolor_the_model(client, monkeypatch):
+    """The edit page posts name, note and appearance together. With the
+    change flags at 0, the GLB must stay untouched (a multi-colour model was
+    being flattened to the pre-filled #cccccc swatch)."""
+    import app as app_module
+    from tests.conftest import register, upload_file_bytes, valid_ascii_stl_bytes
+
+    calls = []
+    monkeypatch.setattr(app_module, "enrich_glb_for_ar", lambda *a, **k: calls.append("enrich") or True)
+    monkeypatch.setattr(app_module, "apply_pbr_factors", lambda *a, **k: calls.append("pbr") or True)
+
+    register(client)
+    client.post("/papers/new", data={"title": "Name Paper"}, follow_redirects=True)
+    with client.application.app_context():
+        slug = Paper.query.filter_by(title="Name Paper").one().slug
+    client.post(
+        f"/papers/{slug}/upload-model",
+        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "n.stl"), "compliance_confirm": "yes", "source_unit": "cm"},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    with client.application.app_context():
+        model_id = Model3D.query.one().id
+
+    form = {"color": "#cccccc", "roughness": "0.35", "metallic": "0.05", "ar_placement": "floor",
+            "display_name": "Renamed", "description": "", "color_changed": "0", "finish_changed": "0"}
+    assert client.post(f"/models/{model_id}/appearance", data=form, follow_redirects=True).status_code == 200
+    assert calls == []
+    with client.application.app_context():
+        model = db.session.get(Model3D, model_id)
+        assert model.display_name == "Renamed"
+        assert model.appearance_color is None
+
+    form.update(finish_changed="1", metallic="0.6")
+    client.post(f"/models/{model_id}/appearance", data=form, follow_redirects=True)
+    assert calls == ["pbr"]  # finish only: keep the model's own colours
+
+    form.update(color_changed="1", color="#aa0000")
+    client.post(f"/models/{model_id}/appearance", data=form, follow_redirects=True)
+    assert calls[-1] == "enrich"
+    with client.application.app_context():
+        assert db.session.get(Model3D, model_id).appearance_color == "#aa0000"

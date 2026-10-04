@@ -44,11 +44,11 @@
   <section class="profile-section reveal-up">
     <div class="section-heading">
       <h2>Statistics</h2>
-      <p>Current account activity across all publications.</p>
+      <p>Current account activity across all projects.</p>
     </div>
     <div class="profile-stat-grid">
       <div class="profile-stat-card">
-        <span>Publications</span>
+        <span>Projects</span>
         <strong data-stat="projects">{{ paper_count }}</strong>
         <small>{{ model_count }} 3D model{{ '' if model_count == 1 else 's' }} total</small>
       </div>
@@ -80,7 +80,7 @@
   <section class="profile-section reveal-up">
     <div class="section-heading">
       <h2>Licensing</h2>
-      <p>Each 3D model carries its own license and access window. Upgrade or renew a model from its publication page to extend AR &amp; QR access.</p>
+      <p>Each 3D model carries its own license and access window. Upgrade or renew a model from its project page to extend AR &amp; QR access.</p>
     </div>
     <div class="profile-card profile-licensing-card">
       <div class="profile-stat-grid">
@@ -182,10 +182,10 @@
 
     <div class="profile-card danger-panel">
       <h3>Delete account</h3>
-      <p>Permanently removes your account, publications, models, QR codes, and PDFs. This cannot be undone.</p>
+      <p>Permanently removes your account, projects, models, QR codes, and PDFs. This cannot be undone.</p>
       <details>
         <summary>Show delete form</summary>
-        <form method="POST" action="{{ url_for('account_delete') }}" class="mt-4 space-y-3" onsubmit="return confirm('This permanently deletes your account and all related data. Are you sure?');">
+        <form method="POST" action="{{ url_for('account_delete') }}" class="mt-4 space-y-3" onsubmit="return window.confirm('This permanently deletes your account and all related data. Are you sure?');">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="text" name="confirm" required pattern="DELETE" placeholder="Type DELETE" aria-label="Type DELETE to confirm account deletion" autocomplete="off" class="field-input">
           {% if has_password %}

@@ -242,7 +242,7 @@
                   <span data-article-autofill-status aria-live="polite">All article fields are optional.</span>
                   <span class="article-entry-buttons">
                     <button type="button" class="article-autofill" data-article-autofill>Fill from DOI / PMID</button>
-                    <button type="button" class="article-remove" data-remove-article {% if loop.first %}hidden{% endif %}>Remove article</button>
+                    <button type="button" class="article-remove" data-remove-article>Remove article</button>
                   </span>
                 </div>
               </div>
@@ -571,8 +571,6 @@
     const entries = [...articleList.querySelectorAll('[data-article-entry]')];
     entries.forEach((entry, index) => {
       entry.querySelectorAll('[data-article-number]').forEach((number) => { number.textContent = String(index + 1); });
-      const remove = entry.querySelector('[data-remove-article]');
-      if (remove) remove.hidden = index === 0;
       syncArticleSummary(entry);
     });
   };

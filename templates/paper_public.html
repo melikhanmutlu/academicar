@@ -161,8 +161,17 @@
       </div>
     {% else %}
       <div class="surface rounded-xl border border-dashed border-[#111827]/20 p-12 text-center reveal-up">
-        <h3 class="font-serif text-2xl font-semibold text-[#111827]">No models available yet.</h3>
-        <p class="text-[#5c6473] mt-2">No 3D models have been shared for this project yet.</p>
+        {% set _has_ready = paper.models|selectattr('processing_status', 'in', [None, 'ready', 'replacement_failed'])|list %}
+        {% if _has_ready %}
+          <h3 class="font-serif text-2xl font-semibold text-[#111827]">Models temporarily unavailable.</h3>
+          <p class="text-[#5c6473] mt-2">The access period for this project's 3D models has ended. Their QR codes and links stay reserved and work again as soon as the authors renew access.</p>
+        {% elif paper.models|selectattr('processing_status', 'in', ['queued', 'processing'])|list %}
+          <h3 class="font-serif text-2xl font-semibold text-[#111827]">Models are being prepared.</h3>
+          <p class="text-[#5c6473] mt-2">The 3D models for this project are still processing. Check back shortly.</p>
+        {% else %}
+          <h3 class="font-serif text-2xl font-semibold text-[#111827]">No models available yet.</h3>
+          <p class="text-[#5c6473] mt-2">No 3D models have been shared for this project yet.</p>
+        {% endif %}
       </div>
     {% endif %}
   </section>

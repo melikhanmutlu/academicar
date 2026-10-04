@@ -94,6 +94,10 @@
           <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
           <a href="{{ url_for('insights') }}" class="nav-link">Insights</a>
           <a href="{{ url_for('project_new') }}" class="nav-link">+ New Project</a>
+          {% set _membership = current_user.institution_membership %}
+          {% if _membership and _membership.role == 'admin' %}
+            <a href="{{ url_for('institution.overview') }}" class="nav-link">Institution</a>
+          {% endif %}
           {% if current_user.is_admin %}
             <a href="{{ url_for('admin_dashboard') }}" class="nav-link">Admin</a>
           {% endif %}
@@ -111,6 +115,10 @@
             <button type="submit" class="nav-link-muted" style="background: transparent; border: none; cursor: pointer; padding: 0;">Log out</button>
           </form>
         {% else %}
+          <a href="{{ url_for('ar_for_index') }}" class="nav-link-muted">Use cases</a>
+          <a href="{{ url_for('pricing') }}" class="nav-link-muted">Pricing</a>
+          <a href="{{ url_for('institutional_inquiry') }}" class="nav-link-muted">Institutional</a>
+          <a href="{{ url_for('blog_index') }}" class="nav-link-muted">Blog</a>
           <a href="{{ url_for('auth.login') }}" class="nav-link-muted">Log in</a>
           <a href="{{ url_for('auth.register') }}" class="nav-link">Sign up</a>
         {% endif %}
@@ -232,11 +240,20 @@
       const mobileToggle = document.querySelector('.mobile-nav-toggle');
       const navActions = document.querySelector('.site-nav-actions');
       if (mobileToggle && navActions) {
-        mobileToggle.addEventListener('click', () => {
-          const active = navActions.classList.toggle('is-active');
+        const setMenu = (active) => {
+          navActions.classList.toggle('is-active', active);
           mobileToggle.classList.toggle('is-open', active);
           mobileToggle.setAttribute('aria-expanded', active);
           document.body.classList.toggle('nav-menu-open', active);
+        };
+        mobileToggle.addEventListener('click', () => {
+          setMenu(!navActions.classList.contains('is-active'));
+        });
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape' && navActions.classList.contains('is-active')) {
+            setMenu(false);
+            mobileToggle.focus();
+          }
         });
       }
     })();

@@ -2066,11 +2066,25 @@ def _apply_model_appearance_change(model, form):
 
     roughness_raw = form.get("roughness")
     metallic_raw = form.get("metallic")
+    stored_roughness = model.appearance_roughness if model.appearance_roughness is not None else 0.35
+    stored_metallic = model.appearance_metallic if model.appearance_metallic is not None else 0.05
     try:
-        roughness = max(0.0, min(1.0, float(roughness_raw))) if roughness_raw else (model.appearance_roughness or 0.35)
-        metallic = max(0.0, min(1.0, float(metallic_raw))) if metallic_raw else (model.appearance_metallic or 0.05)
+        roughness = max(0.0, min(1.0, float(roughness_raw))) if roughness_raw else stored_roughness
+        metallic = max(0.0, min(1.0, float(metallic_raw))) if metallic_raw else stored_metallic
     except (ValueError, TypeError):
         return False, "Provide valid roughness and metallic values (0–1).", "danger", None
+
+    # The edit pages send color_changed / finish_changed so saving only the
+    # name or note never rewrites the GLB (which would flatten a multi-colour
+    # model to the pre-filled swatch). Callers without the flags (the inline
+    # registry colour form) keep the old always-apply behaviour.
+    tracks_changes = "color_changed" in form or "finish_changed" in form
+    color_changed = not tracks_changes or form.get("color_changed") == "1"
+    finish_changed = not tracks_changes or form.get("finish_changed") == "1"
+    if not color_changed:
+        new_color = model.appearance_color
+    if not finish_changed:
+        roughness, metallic = stored_roughness, stored_metallic
 
     ar_placement_raw = form.get("ar_placement")
     ar_placement = ar_placement_raw if ar_placement_raw in ("floor", "wall") else (model.ar_placement or "floor")
@@ -2088,7 +2102,9 @@ def _apply_model_appearance_change(model, form):
             # factors are tuned, so dropping metallic to 0 removes a golden FBX
             # sheen without flattening the texture to a solid colour. Untextured
             # models still get the solid-colour enrichment (the color picker).
-            if has_base_color_textures(glb_path):
+            if not color_changed and not finish_changed:
+                pass
+            elif not color_changed or has_base_color_textures(glb_path):
                 apply_pbr_factors(glb_path, roughness=roughness, metallic=metallic)
             else:
                 enrich_glb_for_ar(glb_path, rgba, roughness=roughness, metallic=metallic)
@@ -2111,14 +2127,18 @@ def _apply_model_appearance_change(model, form):
             model.display_name = (form.get("display_name") or "").strip()[:255] or None
         if "description" in form:
             model.description = (form.get("description") or "").strip()[:5000] or None
-        try:
-            model.file_size = os.path.getsize(glb_path)
-        except OSError:
-            pass
-        refreshed_poster = _refresh_model_poster(model)
+        glb_rewritten = color_changed or finish_changed
+        refreshed_poster = None
+        if glb_rewritten:
+            try:
+                model.file_size = os.path.getsize(glb_path)
+            except OSError:
+                pass
+            refreshed_poster = _refresh_model_poster(model)
         db.session.commit()
         # Re-mirror the rewritten GLB so R2 doesn't keep the pre-recolor copy.
-        mirror_file(glb_path, f"converted/{model.id}/model.glb")
+        if glb_rewritten:
+            mirror_file(glb_path, f"converted/{model.id}/model.glb")
         if refreshed_poster:
             mirror_file(refreshed_poster, f"converted/{model.id}/poster.png")
         changes = {"color": new_color, "roughness": roughness, "metallic": metallic, "ar_placement": ar_placement}
@@ -6419,7 +6439,7 @@ def register_routes(app: Flask) -> None:
             resource_id=str(paper.id),
             details={"from": previous, "to": {"status": paper.status}},
         )
-        flash(f"Publication restored: {paper.title}.", "success")
+        flash(f"Project restored: {paper.title}.", "success")
         return redirect(url_for("admin_dashboard", admin_page="content"))
 
     def _admin_model_redirect(next_hint, model, default_page="models"):
@@ -6934,7 +6954,7 @@ def register_routes(app: Flask) -> None:
             resource_id=str(paper.id),
             details={"changed": changed},
         )
-        flash(f"Publication metadata updated: {paper.title}.", "success")
+        flash(f"Project updated: {paper.title}.", "success")
         return _admin_paper_redirect(next_hint, paper)
 
     @app.route("/admin/models/<model_id>/access-window", methods=["POST"])
@@ -8579,6 +8599,12 @@ def register_routes(app: Flask) -> None:
                 f"Replacement failed: {model.replacement_error or 'conversion error'}. "
                 "The previous model is still active.",
                 "warning",
+            )
+        elif model.replacement_status == "replacement_processing":
+            # Production: the worker has only queued it so far.
+            flash(
+                "Replacement uploaded and processing. The current version stays live until it is ready.",
+                "info",
             )
         else:
             flash("Model file replaced.", "success")

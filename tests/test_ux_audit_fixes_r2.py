@@ -142,6 +142,12 @@ def test_unlisted_reader_back_link_uses_share_url(client, app):
         db.session.commit()
         attachment_id = attachment.id
         token = db.session.get(Paper, paper_id).share_token
+    # The owner goes back to their management page ...
+    html = client.get(f"/p/{slug}/materials/{attachment_id}").data.decode()
+    assert f'href="/projects/{slug}"' in html
+    # ... a visitor with the review link back to the share page.
+    client.post("/auth/logout")
+    client.get(f"/share/{token}")
     html = client.get(f"/p/{slug}/materials/{attachment_id}").data.decode()
     assert f"/share/{token}" in html
     assert f'href="/p/{slug}"' not in html

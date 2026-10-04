@@ -4912,7 +4912,6 @@ input[type="file"]::-webkit-file-upload-button {
   max-width: none;
   overflow: hidden;
   position: relative;
-  column-count: 1;
   mask-image: linear-gradient(180deg, black 85%, transparent 100%);
   -webkit-mask-image: linear-gradient(180deg, black 85%, transparent 100%);
 }
@@ -6173,9 +6172,6 @@ input[type="file"]::-webkit-file-upload-button {
   }
   .paper-meta > div:last-child {
     border-bottom: 0;
-  }
-  .paper-hero .abstract-copy {
-    columns: 1;
   }
   .share-identity { flex-direction: column; }
   .share-identity {
@@ -8423,12 +8419,14 @@ body.nav-menu-open {
   transform: scale(0.2);
 }
 
+/* SVG lines rotate around the viewBox centre (12,12): move each outer line
+   onto the centre first so the two cross as an X. */
 .mobile-nav-toggle.is-open .hamburger-line-top {
-  transform: rotate(45deg) translate(0, 0);
+  transform: rotate(45deg) translate(0, 6px);
 }
 
 .mobile-nav-toggle.is-open .hamburger-line-bottom {
-  transform: rotate(-45deg) translate(0, 0);
+  transform: rotate(-45deg) translate(0, -6px);
 }
 
 @media (max-width: 768px) {
@@ -9606,6 +9604,7 @@ body.nav-menu-open {
 }
 .article-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   border: 1px solid var(--color-light-pearl);
   border-radius: 8px;
   overflow: hidden;
@@ -9961,4 +9960,27 @@ body.project-detail-page { overflow-x: clip; }
 .inst-status-notice .btn-secondary { flex-shrink: 0; }
 @media (max-width: 640px) {
   .inst-status-notice { flex-direction: column; align-items: stretch; }
+}
+
+/* Elements toggled with the hidden attribute must stay hidden even when a
+   component class sets display (grid/flex). */
+.publication-avatar[hidden],
+.btn-secondary[hidden] { display: none !important; }
+
+/* Model edit "Access plan" tiles have room to wrap; don't cut the plan/date. */
+.model-edit-card .model-meta-grid strong {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Keyboard focus on the visually-hidden file input / colour toggle. */
+.upload-dropzone:focus-within,
+.color-optional-control:focus-within {
+  outline: 2px solid var(--color-midnight-graphite);
+  outline-offset: 2px;
+}
+
+.mobile-nav-toggle:focus-visible {
+  outline: 2px solid var(--color-midnight-graphite);
+  outline-offset: 2px;
 }

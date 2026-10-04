@@ -14,7 +14,7 @@
       <small>{% if user.deactivated_at %}Deactivated{% else %}Active account{% endif %}</small>
     </div>
     <div class="admin-metric">
-      <span>Publications</span>
+      <span>Projects</span>
       <strong>{{ papers|length }}</strong>
       <small>{{ papers|selectattr("is_public")|list|length }} public</small>
     </div>
@@ -80,7 +80,7 @@
   <section class="admin-section">
     <div class="admin-section-head">
       <div>
-        <h2>Publications</h2>
+        <h2>Projects</h2>
         <p>Edit publication metadata or open the public record. The slug (public URL) is fixed.</p>
       </div>
       <span>{{ papers|length }} records</span>
@@ -89,7 +89,7 @@
       <table class="data-table admin-table">
         <thead>
           <tr>
-            <th>Publication</th>
+            <th>Project</th>
             <th>Status</th>
             <th>Models</th>
             <th>Created</th>
@@ -122,7 +122,7 @@
                         <label class="admin-editor-field"><span>PMID</span><input name="pmid" value="{{ paper.pmid or '' }}" maxlength="100"></label>
                         <label class="admin-editor-field"><span>Institution</span><input name="institution" value="{{ paper.institution or '' }}" maxlength="300"></label>
                       </div>
-                      <p class="admin-editor-note">Publications never expire; access windows live on each model's license.</p>
+                      <p class="admin-editor-note">Projects never expire; access windows live on each model's license.</p>
                       <div class="admin-editor-actions">
                         <button type="submit" class="admin-btn admin-btn-primary compact">Save metadata</button>
                       </div>
@@ -152,7 +152,7 @@
         <thead>
           <tr>
             <th>Model</th>
-            <th>Publication</th>
+            <th>Project</th>
             <th>License</th>
             <th>Status</th>
             <th>Manage</th>

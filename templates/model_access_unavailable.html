@@ -12,7 +12,8 @@
 {% endblock %}
 
 {% block content %}
-{% set landing_url = project_landing_url(paper) if paper else url_for('landing') %}
+{# Owners go back to their management page, visitors to the public one. #}
+{% set landing_url = (url_for('project_detail', slug=paper.slug) if is_owner else project_landing_url(paper)) if paper else url_for('landing') %}
 <main class="model-unavail-shell">
   <div class="model-unavail-card reveal-up">
 
