@@ -43,32 +43,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['Inter', 'sans-serif'],
-            serif: ['Montserrat', 'sans-serif'],
-          },
-          colors: {
-            academic: {
-              50: '#f5f5f5',
-              100: '#efefef',
-              500: '#6b6b6b',
-              600: '#4d4d4d',
-              700: '#202020',
-              800: '#202020',
-              900: '#202020',
-            }
-          }
-        }
-      }
-    }
-  </script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=asset_version) }}">
   {% block head %}{% endblock %}
+  {# Compiled Tailwind (npm run build:css). Last in <head>, where the old Play
+     CDN injected its styles, so utilities keep winning over style.css. #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css', v=asset_version) }}">
 </head>
 <body class="font-sans min-h-screen flex flex-col {% block body_class %}{% endblock %}" style="background: var(--color-canvas-white); color: var(--color-midnight-graphite);">
 

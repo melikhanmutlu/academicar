@@ -11,5 +11,11 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "scripts": {
+    "build:css": "tailwindcss -c tailwind.config.js -i static/css/tailwind.src.css -o static/css/tailwind.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.19"
   }
 }

@@ -29,7 +29,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
   <script type="module" src="https://unpkg.com/@google/model-viewer@4.3.0/dist/model-viewer.min.js" crossorigin="anonymous"></script>
   <script src="{{ url_for('static', filename='vendor/jszip.min.js') }}"></script>
   <script src="{{ url_for('static', filename='vendor/fix-webm-duration.js') }}" defer></script>
@@ -989,6 +988,8 @@
       transform: rotate(180deg);
     }
   </style>
+  {# Compiled Tailwind, last in <head> like the old Play CDN styles. #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css', v=asset_version) }}">
 </head>
 <body class="bg-[#050505] text-white min-h-screen overflow-hidden max-w-[100vw]">
   {% set viewer_features = get_license_plan(model.license_type).features %}
