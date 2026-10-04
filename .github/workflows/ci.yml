@@ -16,12 +16,23 @@ jobs:
           cache-dependency-path: |
             requirements.txt
             requirements-dev.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: npm
       - name: Install dependencies
-        run: pip install -r requirements-dev.txt
+        run: |
+          pip install -r requirements-dev.txt
+          npm ci
       - name: Syntax check
         run: python -m py_compile app.py auth.py models.py config.py licensing.py worker.py institutions.py institution_panel.py converters/*.py
       - name: Tests
-        run: python -m pytest tests -p no:cacheprovider -q
+        run: |
+          set -o pipefail
+          python -m pytest tests -p no:cacheprovider -q -rfE 2>&1 | tee pytest.log
+      - name: Report failing tests
+        if: failure()
+        run: grep -E "^(FAILED|ERROR) " pytest.log | head -50 | sed 's/^/::error::/' || true
 
   css:
     # static/css/tailwind.css is committed; fail if a template change added
