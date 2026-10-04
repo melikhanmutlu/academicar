@@ -6586,6 +6586,11 @@ details[open] .upload-chevron { transform: rotate(45deg); }
     font-size: 0;
   }
 
+  /* Cards without an icon (institution showcase): the label gets the full row. */
+  .metric-card-head > .metric-label:first-child {
+    grid-column: 1 / -1;
+  }
+
   .metric-label[data-mobile-label]::after {
     content: attr(data-mobile-label);
     font-size: 11px;
@@ -9983,4 +9988,41 @@ body.project-detail-page { overflow-x: clip; }
 .mobile-nav-toggle:focus-visible {
   outline: 2px solid var(--color-midnight-graphite);
   outline-offset: 2px;
+}
+
+/* Institution panel tables: stacked rows on phones so the actions stay
+   reachable (they sat off-screen inside the horizontal scroll). */
+.inst-invite-copy { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.inst-invite-copy .inst-invite-url { flex: 1 1 auto; min-width: 0; }
+@media (max-width: 640px) {
+  .inst-stack-table thead { display: none; }
+  .inst-stack-table,
+  .inst-stack-table tbody,
+  .inst-stack-table tr,
+  .inst-stack-table td { display: block; width: 100%; }
+  .inst-stack-table tr {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--color-light-pearl);
+  }
+  .inst-stack-table td {
+    display: grid;
+    grid-template-columns: 76px minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    padding: 4px 0;
+    border: 0;
+  }
+  .inst-stack-table td[data-label]::before {
+    content: attr(data-label);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-silver-ash);
+  }
+  .inst-stack-table td[colspan] { display: block; }
+}
+
+@media (max-width: 640px) {
+  .inst-showcase-head { flex-direction: column; align-items: flex-start; }
 }

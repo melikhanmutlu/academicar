@@ -39,6 +39,7 @@
             </p>
             <form method="POST" action="{{ url_for('auth.logout') }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="next" value="{{ request.path }}">
               <button type="submit" class="btn-secondary w-full">Log out and switch account</button>
             </form>
           {% else %}
@@ -49,7 +50,7 @@
             </form>
           {% endif %}
         {% else %}
-          <p class="text-[#5c6473] mb-4">Log in or create an account to accept this invite. If you use Google sign-in, open this link again afterwards.</p>
+          <p class="text-[#5c6473] mb-4">Log in or create an account to accept this invite{% if institution.email_domains %} &mdash; use your @{{ institution.domain_list()|join(", @") }} email{% endif %}. If you use Google sign-in, open this link again afterwards.</p>
           <div class="space-y-3">
             <a href="{{ url_for('auth.login', next=request.path) }}" class="btn-primary w-full">Log in</a>
             <a href="{{ url_for('auth.register', next=request.path) }}" class="btn-secondary w-full">Create account</a>

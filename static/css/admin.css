@@ -388,7 +388,8 @@
 }
 
 .admin-editor-field input,
-.admin-editor-field select {
+.admin-editor-field select,
+.admin-editor-field textarea {
   width: 100%;
   height: 34px;
   padding: 6px 8px;
@@ -398,6 +399,13 @@
   font-family: var(--font-inter);
   font-size: 13px;
   color: var(--color-midnight-graphite);
+}
+
+.admin-editor-field textarea {
+  min-height: 88px;
+  height: auto;
+  resize: vertical;
+  line-height: 1.45;
 }
 
 .admin-editor-note {
@@ -467,7 +475,8 @@
 /* .admin-metric strong defaults to a large numeric KPI style (36px); this
    modifier is for cards whose value is text (an email, a title) instead of
    a number, so long content wraps instead of overflowing the card. */
-.admin-metric strong.is-text {
+.admin-metric strong.is-text,
+.admin-insight-card strong.is-text {
   font-family: var(--font-inter);
   font-size: 15px;
   font-weight: 600;

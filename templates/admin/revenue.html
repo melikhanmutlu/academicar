@@ -24,16 +24,16 @@
         {% for status in ["pending", "paid", "failed", "refunded"] %}
           <div><span>{{ status|title }}</span><strong>{{ payment_counts.get(status, 0) }}</strong></div>
         {% endfor %}
-        <div><span>Total paid revenue</span><strong>{{ "%.2f"|format(totals.paid_revenue / 100) }} {{ config.PAYMENT_CURRENCY }}</strong></div>
+        <div><span>Total paid revenue</span><strong>{{ totals.paid_revenue }}</strong></div>
       </div>
     </div>
     <div class="admin-section-subtable">
-      <h3>Monthly revenue</h3>
+      <h3>Monthly revenue <small>({{ config.PAYMENT_CURRENCY }}; hover a bar for every currency)</small></h3>
       <div class="admin-bar-chart">
         {% for month in monthly_revenue %}
-          <div>
-            <span style="height: {{ 8 + (month.amount / 1000)|int }}px"></span>
-            <small>{{ month.label[5:] }}</small>
+          <div title="{{ month.label }}: {{ month.summary }}">
+            <span style="height: {{ month.bar_px }}px"></span>
+            <small>{{ month.label[5:] }}{% if month.label[5:] == '01' or loop.first %}<br>{{ month.label[:4] }}{% endif %}</small>
           </div>
         {% endfor %}
       </div>
@@ -117,7 +117,7 @@
               <td>{{ payment.provider }}</td>
               <td>
                 <div class="admin-actions">
-                  <form method="POST" action="{{ url_for('admin_payment_status_update', payment_id=payment.id) }}" class="admin-inline-form">
+                  <form method="POST" action="{{ url_for('admin_payment_status_update', payment_id=payment.id) }}" class="admin-inline-form" onsubmit="return this.elements.status.value !== 'refunded' || window.confirm('Mark this payment refunded? The license it granted is revoked and the model returns to the Free plan.');">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <select name="status" class="field-select compact-select">
                       {% for status in ["pending", "paid", "failed", "refunded"] %}

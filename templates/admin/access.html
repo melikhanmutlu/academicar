@@ -94,7 +94,7 @@
               <td><span class="status-chip {{ admin_chip_class(qr.status) }}">{{ qr.status|title }}</span></td>
               <td>{{ qr.last_resolved_at.strftime("%Y-%m-%d %H:%M") if qr.last_resolved_at else "-" }}</td>
               <td>
-                <form method="POST" action="{{ url_for('admin_qr_status_update', qr_id=qr.id) }}" class="admin-inline-form">
+                <form method="POST" action="{{ url_for('admin_qr_status_update', qr_id=qr.id) }}" class="admin-inline-form" onsubmit="return this.elements.status.value !== 'disabled' || window.confirm('Disable this QR link? Printed posters and slides that use it will show a &quot;Link disabled&quot; page until it is turned back on.');">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <select name="status" class="field-select compact-select">
                     <option value="active" {% if qr.status == "active" %}selected{% endif %}>Active</option>

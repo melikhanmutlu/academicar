@@ -77,6 +77,7 @@ from institutions import (
     institution_can_fund_upload,
     institution_coverage_label,
     institution_status_notice,
+    invite_state,
     institution_usage,
     reapply_model_license,
     renew_institution_contract,
@@ -214,6 +215,8 @@ def create_app(test_config: dict | None = None) -> Flask:
             "upload_funding_context": upload_funding_context,
             "institution_coverage_label": institution_coverage_label,
             "institution_status_notice": institution_status_notice,
+            "invite_state": invite_state,
+            "join_invite_institution": join_invite_institution,
             "user_selectable_plan_keys": USER_SELECTABLE_PLAN_KEYS,
             "format_model_dimensions_cm": format_model_dimensions_cm,
             "academic_fields": ACADEMIC_FIELDS,
@@ -460,7 +463,8 @@ def format_file_size(size_bytes: int | None) -> str:
 
 _ADMIN_CHIP_GOOD = {"ready", "active", "public", "paid", "completed", "admin"}
 _ADMIN_CHIP_WARN = {"queued", "pending", "processing"}
-_ADMIN_CHIP_BAD = {"failed", "replacement_failed", "expired", "cancelled", "refunded", "private", "deleted", "disabled", "suspended"}
+# "private" is a normal choice, not an error: it gets the neutral chip.
+_ADMIN_CHIP_BAD = {"failed", "replacement_failed", "expired", "cancelled", "refunded", "deleted", "disabled", "suspended", "revoked", "exhausted"}
 
 
 def admin_chip_class(value) -> str:
@@ -725,7 +729,7 @@ def seed_builtin_blog_posts(app: Flask) -> None:
     survive every restart — mirrors seed_license_plans.
     """
     try:
-        existing = {slug for (slug,) in db.session.query(BlogPost.slug).all()}
+        existing = {slug for (slug,) in db.session.query(BlogPost.slug).all()} | deleted_builtin_blog_slugs()
         to_insert = [
             BlogPost(
                 slug=p["slug"],
@@ -758,6 +762,43 @@ def day_label(value: datetime) -> str:
 
 def month_label(value: datetime) -> str:
     return value.strftime("%Y-%m")
+
+
+def paid_revenue_by_currency(*filters) -> dict[str, int]:
+    """Paid Payment totals (minor units) per currency. Amounts in different
+    currencies (USD self-serve checkouts, TRY institution contracts) must
+    never be added together."""
+    rows = (
+        db.session.query(Payment.currency, func.coalesce(func.sum(Payment.amount_kurus), 0))
+        .filter(Payment.status == "paid", *filters)
+        .group_by(Payment.currency)
+        .all()
+    )
+    totals = {}
+    for currency, amount in rows:
+        key = (currency or current_app.config.get("PAYMENT_CURRENCY") or "USD").upper()
+        totals[key] = totals.get(key, 0) + int(amount or 0)
+    return totals
+
+
+def format_money_by_currency(totals: dict[str, int] | None) -> str:
+    """"2586.51 USD · 25000.00 TRY" (or "0.00 <site currency>")."""
+    if not totals or not any(totals.values()):
+        return f"0.00 {current_app.config.get('PAYMENT_CURRENCY', 'USD')}"
+    return " · ".join(f"{amount / 100:.2f} {currency}" for currency, amount in sorted(totals.items()) if amount)
+
+
+def last_n_month_starts(now: datetime, count: int) -> list[datetime]:
+    """First day of each of the last ``count`` calendar months, oldest first
+    (stepping by 31 days skipped and repeated months)."""
+    year, month = now.year, now.month
+    starts = []
+    for _ in range(count):
+        starts.append(now.replace(year=year, month=month, day=1, hour=0, minute=0, second=0, microsecond=0))
+        month -= 1
+        if month == 0:
+            year, month = year - 1, 12
+    return list(reversed(starts))
 
 
 def scan_folder_size(path: str) -> tuple[int, int]:
@@ -1507,11 +1548,25 @@ def _code_blogpost_to_view(p: dict) -> dict:
     return {**p, "tags": list(p.get("tags") or []), "source": "code"}
 
 
+def deleted_builtin_blog_slugs() -> set[str]:
+    """Slugs an admin deleted (from the blog_post_deleted audit trail). A
+    built-in post deleted from the admin panel must not be re-seeded or served
+    from code again."""
+    rows = AuditLog.query.filter_by(event_type="blog_post_deleted").all()
+    return {(row.details or {}).get("slug") for row in rows if isinstance(row.details, dict)} - {None}
+
+
+def _builtin_blog_fallback_blocked() -> set[str]:
+    """Code posts are only a fallback for slugs with no DB row at all: a row
+    that exists but is unpublished (a draft) or was deleted hides the post."""
+    return {slug for (slug,) in db.session.query(BlogPost.slug).all()} | deleted_builtin_blog_slugs()
+
+
 def merged_blog_posts() -> list[dict]:
     """Published DB posts + built-in code posts, newest first (DB wins on slug)."""
     db_views = [_db_blogpost_to_view(b) for b in BlogPost.query.filter_by(is_published=True).all()]
-    db_slugs = {v["slug"] for v in db_views}
-    code_views = [_code_blogpost_to_view(p) for p in get_all_posts() if p["slug"] not in db_slugs]
+    blocked = _builtin_blog_fallback_blocked()
+    code_views = [_code_blogpost_to_view(p) for p in get_all_posts() if p["slug"] not in blocked]
     return sorted(db_views + code_views, key=lambda v: v["date"], reverse=True)
 
 
@@ -1519,6 +1574,8 @@ def find_blog_post(slug: str) -> dict | None:
     bp = BlogPost.query.filter_by(slug=slug, is_published=True).first()
     if bp is not None:
         return _db_blogpost_to_view(bp)
+    if slug in _builtin_blog_fallback_blocked():
+        return None
     code_post = get_post(slug)
     return _code_blogpost_to_view(code_post) if code_post else None
 
@@ -1680,6 +1737,20 @@ def upload_funding_context() -> dict:
     institution = membership.institution
     can_fund, reason = institution_can_fund_upload(institution, 0)
     return {"kind": "institutional" if can_fund else "free", "institution": institution, "reason": reason}
+
+
+def join_invite_institution() -> Institution | None:
+    """On login/register reached from an institution invite (?next=/institution/
+    join/<token>), the institution being joined, so the page can say which
+    email to use. None for any other next, or an invalid invite."""
+    next_page = request.args.get("next") or ""
+    prefix = "/institution/join/"
+    if not next_page.startswith(prefix):
+        return None
+    from institution_panel import _load_valid_invite
+
+    invite = _load_valid_invite(next_page[len(prefix):].split("?", 1)[0])
+    return invite.institution if invite is not None else None
 
 
 def request_project_supports_feature(project: Paper | None, feature: str) -> bool:
@@ -3500,15 +3571,15 @@ def register_routes(app: Flask) -> None:
         now = datetime.now(UTC)
         MB = 1024 * 1024
         demo_inst = Institution(
-            name="Bogazici University — Research Computing",
+            name="Northfield University — Research Computing",
             slug=None,  # no live public showcase for the demo; hides /i/<slug> links
-            email_domains="boun.edu.tr, std.boun.edu.tr",
+            email_domains="northfield.edu, students.northfield.edu",
             status="active",
             contract_starts_at=now - timedelta(days=95),
             contract_ends_at=now + timedelta(days=270),
             quota_model_count=20,
             quota_storage_bytes=8 * 1024 * MB,
-            public_description="Interactive 3D & AR models from Bogazici University research groups.",
+            public_description="Interactive 3D & AR models from Northfield University research groups.",
             logo_path=None,
         )
 
@@ -3521,14 +3592,14 @@ def register_routes(app: Flask) -> None:
             )
 
         people = [
-            _person(101, "Elif Demir", "elif.demir@boun.edu.tr", "admin", 214),
-            _person(102, "Prof. Kenan Aksoy", "kenan.aksoy@boun.edu.tr", "admin", 176),
-            _person(103, "Dr. Marco Rossi", "marco.rossi@boun.edu.tr", "member", 132),
-            _person(104, "Zeynep Kaya", "zeynep.kaya@std.boun.edu.tr", "member", 61),
-            _person(105, "Ayşe Yıldız", "ayse.yildiz@boun.edu.tr", "member", 33),
-            _person(106, "Can Öztürk", "can.ozturk@boun.edu.tr", "member", 22),
-            _person(107, "Dr. Leyla Şahin", "leyla.sahin@boun.edu.tr", "member", 13),
-            _person(108, "Mehmet Arı", "mehmet.ari@std.boun.edu.tr", "member", 6),
+            _person(101, "Elif Demir", "elif.demir@northfield.edu", "admin", 214),
+            _person(102, "Prof. Kenan Aksoy", "kenan.aksoy@northfield.edu", "admin", 176),
+            _person(103, "Dr. Marco Rossi", "marco.rossi@northfield.edu", "member", 132),
+            _person(104, "Zeynep Kaya", "zeynep.kaya@students.northfield.edu", "member", 61),
+            _person(105, "Ayşe Yıldız", "ayse.yildiz@northfield.edu", "member", 33),
+            _person(106, "Can Öztürk", "can.ozturk@northfield.edu", "member", 22),
+            _person(107, "Dr. Leyla Şahin", "leyla.sahin@northfield.edu", "member", 13),
+            _person(108, "Mehmet Arı", "mehmet.ari@students.northfield.edu", "member", 6),
         ]
         by_name = {p.user.username: p for p in people}
         recent_members = sorted(people, key=lambda p: p.joined_at, reverse=True)[:5]
@@ -3800,8 +3871,16 @@ def register_routes(app: Flask) -> None:
     @app.route("/blog/<slug>")
     def blog_post(slug):
         post = find_blog_post(slug)
+        draft_preview = False
+        if not post and current_user.is_authenticated and current_user.is_admin:
+            # Admins can preview a draft before publishing it.
+            draft = BlogPost.query.filter_by(slug=slug, is_published=False).first()
+            if draft is not None:
+                post, draft_preview = _db_blogpost_to_view(draft), True
         if not post:
             abort(404)
+        if draft_preview:
+            flash("Draft preview: this post is not published, so visitors get a 404.", "info")
         cache_key = (
             f"db:{post['id']}:{post['updated_at']}" if post.get("source") == "db" else post["slug"]
         )
@@ -3833,7 +3912,16 @@ def register_routes(app: Flask) -> None:
             .limit(200)
             .all()
         )
-        model_count, _bytes_used = institution_usage(institution.id)
+        # Public count: funded models a visitor can actually open (public
+        # project, access window active) — not private or expired ones.
+        model_count = sum(
+            1
+            for paper in papers
+            for model in paper.models
+            if model.institution_id == institution.id
+            and model.license_type == "institutional"
+            and model_is_accessible(model)
+        )
         member_count = InstitutionMember.query.filter_by(institution_id=institution.id).count()
         normalized_department_groups = {}
         for paper in papers:
@@ -5168,12 +5256,7 @@ def register_routes(app: Flask) -> None:
         now = datetime.now(UTC)
         last_7_days = now - timedelta(days=7)
         last_30_days = now - timedelta(days=30)
-        paid_revenue = (
-            db.session.query(func.coalesce(func.sum(Payment.amount_kurus), 0))
-            .filter(Payment.status == "paid")
-            .scalar()
-            or 0
-        )
+        paid_revenue = format_money_by_currency(paid_revenue_by_currency())
         totals = {
             "users": User.query.count(),
             "admins": User.query.filter_by(is_admin=True).count(),
@@ -5221,12 +5304,7 @@ def register_routes(app: Flask) -> None:
             key = status or "pending"
             job_counts[key] = job_counts.get(key, 0) + count
         total_model_storage = db.session.query(func.coalesce(func.sum(Model3D.file_size), 0)).scalar() or 0
-        revenue_30_days = (
-            db.session.query(func.coalesce(func.sum(Payment.amount_kurus), 0))
-            .filter(Payment.status == "paid", Payment.paid_at >= last_30_days)
-            .scalar()
-            or 0
-        )
+        revenue_30_days = format_money_by_currency(paid_revenue_by_currency(Payment.paid_at >= last_30_days))
         papers_with_doi = active_paper_query().filter(Paper.doi.isnot(None), Paper.doi != "").count()
         papers_with_pmid = active_paper_query().filter(Paper.pmid.isnot(None), Paper.pmid != "").count()
         private_papers = max(totals["papers"] - totals["public_papers"], 0)
@@ -5305,16 +5383,19 @@ def register_routes(app: Flask) -> None:
                 }
             )
         monthly_revenue = []
-        for offset in range(11, -1, -1):
-            month_seed = (now.replace(day=1, hour=0, minute=0, second=0, microsecond=0) - timedelta(days=offset * 31)).replace(day=1)
+        site_currency = (current_app.config.get("PAYMENT_CURRENCY") or "USD").upper()
+        for month_seed in last_n_month_starts(now, 12):
             next_month = (month_seed.replace(day=28) + timedelta(days=4)).replace(day=1)
-            amount = (
-                db.session.query(func.coalesce(func.sum(Payment.amount_kurus), 0))
-                .filter(Payment.status == "paid", Payment.paid_at >= month_seed, Payment.paid_at < next_month)
-                .scalar()
-                or 0
-            )
-            monthly_revenue.append({"label": month_label(month_seed), "amount": amount})
+            by_currency = paid_revenue_by_currency(Payment.paid_at >= month_seed, Payment.paid_at < next_month)
+            monthly_revenue.append({
+                "label": month_label(month_seed),
+                "amount": by_currency.get(site_currency, 0),
+                "summary": format_money_by_currency(by_currency),
+            })
+        _max_month = max((m["amount"] for m in monthly_revenue), default=0) or 1
+        for m in monthly_revenue:
+            # Bar height in px, scaled to the busiest month (site currency).
+            m["bar_px"] = 8 + int(132 * m["amount"] / _max_month)
         top_viewed_rows = (
             db.session.query(AuditLog.resource_id, func.count(AuditLog.id))
             .filter(AuditLog.event_type == "public_model_viewed", AuditLog.resource_id.isnot(None))
@@ -5648,10 +5729,10 @@ def register_routes(app: Flask) -> None:
             query = query.outerjoin(User, Paper.user_id == User.id).filter(
                 or_(func.lower(Paper.title).like(pattern), func.lower(Paper.slug).like(pattern), func.lower(User.email).like(pattern))
             )
-        if paper_visibility_filter == "public":
-            query = query.filter(Paper.is_public.is_(True))
-        elif paper_visibility_filter == "private":
-            query = query.filter(Paper.is_public.is_(False))
+        # Same filter as the Projects page (Paper.visibility: private /
+        # unlisted "review link" / public), so the CSV matches the table.
+        if paper_visibility_filter in PROJECT_VISIBILITIES:
+            query = query.filter(Paper.visibility == paper_visibility_filter)
         if paper_status_filter == "active":
             query = query.filter(or_(Paper.status.is_(None), Paper.status != "deleted"))
         elif paper_status_filter == "deleted":
@@ -5659,14 +5740,14 @@ def register_routes(app: Flask) -> None:
         rows = [
             {
                 "id": p.id, "title": p.title, "slug": p.slug, "owner_email": (p.author.email if p.author else None),
-                "is_public": p.is_public, "status": p.status, "field": p.field, "year": p.year,
+                "visibility": project_visibility(p), "status": p.status, "field": p.field, "year": p.year,
                 "created_at": p.created_at,
             }
             for p in query.order_by(Paper.created_at.desc()).limit(ADMIN_CSV_EXPORT_ROW_LIMIT).all()
         ]
         if len(rows) >= ADMIN_CSV_EXPORT_ROW_LIMIT:
             flash(f"Export truncated to the first {ADMIN_CSV_EXPORT_ROW_LIMIT} matching rows.", "warning")
-        return _csv_response(rows, ["id", "title", "slug", "owner_email", "is_public", "status", "field", "year", "created_at"], "publications.csv")
+        return _csv_response(rows, ["id", "title", "slug", "owner_email", "visibility", "status", "field", "year", "created_at"], "projects.csv")
 
     @app.route("/admin/revenue/export.csv")
     @login_required
@@ -5938,9 +6019,12 @@ def register_routes(app: Flask) -> None:
         values, error = _institution_form_values()
         if error:
             flash(error, "danger")
-            return redirect(url_for("admin_dashboard", admin_page="institutions"))
+            # Keep what the admin typed: the list page refills the form.
+            session["institution_form_draft"] = {k: v for k, v in request.form.items() if k != "csrf_token"}
+            return redirect(url_for("admin_dashboard", admin_page="institutions") + "#create")
         existing = Institution.query.filter(func.lower(Institution.name) == values["name"].lower()).first()
         if existing is not None:
+            session["institution_form_draft"] = {k: v for k, v in request.form.items() if k != "csrf_token"}
             flash("An institution with that name already exists.", "danger")
             return redirect(url_for("admin_dashboard", admin_page="institutions"))
         institution = Institution(slug=make_institution_slug(values["name"]), **values)
@@ -6040,14 +6124,22 @@ def register_routes(app: Flask) -> None:
         require_admin()
         institution = _institution_or_404(institution_id)
         expired = end_institution_access_now(institution, datetime.now(UTC))
+        # Without this the institution would still look active and fund new
+        # member uploads right after its access was cut.
+        was_active = institution.status == "active"
+        institution.status = "suspended"
         db.session.commit()
         log_audit(
             "institution_access_ended",
             user_id=current_user.id,
             resource_id=str(institution.id),
-            details={"models_expired": expired},
+            details={"models_expired": expired, "suspended": was_active},
         )
-        flash(f"Access ended now on {expired} model(s).", "success")
+        flash(
+            f"Access ended now on {expired} model(s) and the institution is suspended, so new uploads "
+            "are not covered. To restore: set a new contract end date, then reactivate.",
+            "success",
+        )
         return redirect(url_for("admin_institution_detail", institution_id=institution.id))
 
     @app.route("/admin/institutions/<int:institution_id>/admins", methods=["POST"])
@@ -6077,6 +6169,12 @@ def register_routes(app: Flask) -> None:
             details={"member_user_id": user.id},
         )
         flash(f"{user.email} is now an institution admin.", "success")
+        if not institution.email_matches_domains(user.email):
+            flash(
+                f"Note: {user.email} is outside this institution's email domains "
+                f"({', '.join(institution.domain_list())}). Check this is the right person.",
+                "warning",
+            )
         return redirect(url_for("admin_institution_detail", institution_id=institution.id))
 
     @app.route("/admin/institutions/<int:institution_id>/members/<int:member_id>/remove", methods=["POST"])
@@ -6187,6 +6285,16 @@ def register_routes(app: Flask) -> None:
                 return redirect_target
         except OSError:
             pass
+        # Check the bytes, not just the extension, before replacing a working
+        # logo (a renamed text file broke the showcase and viewer attribution).
+        from PIL import Image, UnidentifiedImageError
+        try:
+            with Image.open(dest) as img:
+                img.verify()
+        except (UnidentifiedImageError, OSError):
+            cleanup_file(dest)
+            flash("That file is not a valid PNG, JPG, or WEBP image. The current logo was kept.", "danger")
+            return redirect_target
         old_path = institution.logo_path
         institution.logo_path = filename
         db.session.commit()
@@ -6401,6 +6509,9 @@ def register_routes(app: Flask) -> None:
         if paper.status == "deleted":
             paper.is_public = False
             paper.visibility = "private"
+            if previous["status"] != "deleted":
+                paper.deleted_at = datetime.now(UTC)
+                paper.deleted_by_user_id = current_user.id
         try:
             db.session.commit()
         except SQLAlchemyError:
@@ -6427,6 +6538,20 @@ def register_routes(app: Flask) -> None:
         paper.status = "active"
         paper.deleted_at = None
         paper.deleted_by_user_id = None
+        # An admin delete forces the project private; bring back the
+        # visibility it had right before that delete.
+        last_delete = (
+            AuditLog.query.filter_by(event_type="admin_paper_visibility_changed", resource_id=str(paper.id))
+            .order_by(AuditLog.timestamp.desc())
+            .first()
+        )
+        details = (last_delete.details or {}) if last_delete else {}
+        before = details.get("from") or {}
+        if (details.get("to") or {}).get("status") == "deleted" and before.get("visibility") in PROJECT_VISIBILITIES:
+            paper.visibility = before["visibility"]
+            paper.is_public = paper.visibility == "public"
+            if paper.visibility == "unlisted" and not paper.share_token:
+                paper.share_token = new_project_share_token()
         try:
             db.session.commit()
         except SQLAlchemyError:
@@ -6439,7 +6564,7 @@ def register_routes(app: Flask) -> None:
             resource_id=str(paper.id),
             details={"from": previous, "to": {"status": paper.status}},
         )
-        flash(f"Project restored: {paper.title}.", "success")
+        flash(f"Project restored: {paper.title} ({visibility_label(paper)}).", "success")
         return redirect(url_for("admin_dashboard", admin_page="content"))
 
     def _admin_model_redirect(next_hint, model, default_page="models"):
@@ -8543,6 +8668,21 @@ def register_routes(app: Flask) -> None:
             cleanup_dir(upload_dir)
             flash(size_error, "danger")
             return redirect(url_for("project_detail", slug=model.paper.slug))
+
+        # An institution-funded model may not grow past the contract's
+        # storage quota by swapping in a larger file.
+        funding = model.institution if model.license_type == "institutional" else None
+        if funding is not None and funding.quota_storage_bytes is not None:
+            _count, bytes_used = institution_usage(funding.id)
+            growth = os.path.getsize(source_path) - (model.file_size or 0)
+            if growth > 0 and bytes_used + growth > funding.quota_storage_bytes:
+                cleanup_dir(upload_dir)
+                flash(
+                    f"This file would exceed {funding.name}'s storage quota. Ask your institution admin "
+                    "to raise it, or upload a smaller file.",
+                    "danger",
+                )
+                return redirect(url_for("model_edit", model_id=model.id))
 
         # Archive the new source under uploads/<model_id>/v<n>/ so we have a
         # tamper-evident trail of every replacement attempt.

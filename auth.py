@@ -69,7 +69,7 @@ def init_oauth(app):
 
 
 class LoginForm(FlaskForm):
-    email = StringField("Email", validators=[DataRequired(), Email()], render_kw={"autocomplete": "email"})
+    email = StringField("Email", validators=[DataRequired(), Email()], render_kw={"autocomplete": "email", "type": "email"})
     password = PasswordField("Password", validators=[DataRequired()], render_kw={"autocomplete": "current-password"})
     remember = BooleanField("Remember me")
     submit = SubmitField("Log in")
@@ -77,7 +77,7 @@ class LoginForm(FlaskForm):
 
 class RegistrationForm(FlaskForm):
     username = StringField("Full name", validators=[DataRequired(), Length(min=2, max=80)], render_kw={"autocomplete": "name"})
-    email = StringField("Email", validators=[DataRequired(), Email()], render_kw={"autocomplete": "email"})
+    email = StringField("Email", validators=[DataRequired(), Email()], render_kw={"autocomplete": "email", "type": "email"})
     password = PasswordField(
         "Password",
         render_kw={"autocomplete": "new-password"},
@@ -108,7 +108,7 @@ class RegistrationForm(FlaskForm):
 
 
 class ForgotPasswordForm(FlaskForm):
-    email = StringField("Email", validators=[DataRequired(), Email()])
+    email = StringField("Email", validators=[DataRequired(), Email()], render_kw={"autocomplete": "email", "type": "email"})
     submit = SubmitField("Send reset link")
 
 
@@ -415,6 +415,11 @@ def logout():
     _rotate_session()
     logout_user()
     flash("Logged out.", "info")
+    # "Log out and switch account" on an institution invite returns to the
+    # invite's login screen so the invite isn't lost. Only invite paths.
+    next_page = request.form.get("next") or ""
+    if next_page.startswith("/institution/join/") and is_safe_redirect_url(next_page):
+        return redirect(url_for("auth.login", next=next_page))
     return redirect(url_for("landing"))
 
 

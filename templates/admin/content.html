@@ -116,7 +116,7 @@
               <td>{{ paper.models|length }}</td>
               <td>
                 <div class="admin-actions">
-                  <form method="POST" action="{{ url_for('admin_paper_visibility_update', paper_id=paper.id) }}">
+                  <form method="POST" action="{{ url_for('admin_paper_visibility_update', paper_id=paper.id) }}" onsubmit="return this.elements.status.value !== 'deleted' || window.confirm('Mark this project deleted? Its pages, models and QR codes go offline for visitors.');">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <select name="visibility" class="field-select compact-select">
                       <option value="private" {% if project_visibility(paper) == 'private' %}selected{% endif %}>Private</option>

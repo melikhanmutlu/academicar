@@ -80,7 +80,7 @@
               {% set _viewable = md.paper and (md.paper.is_public or (current_user.is_authenticated and md.paper.user_id == current_user.id)) %}
               {% if demo and _viewable %}
                 {% set _model_href = url_for('demo_mitochondria_ar') %}
-                {% set _paper_href = url_for('auth.register') %}
+                {% set _paper_href = url_for('institutional_inquiry') %}
               {% elif _viewable %}
                 {% set _model_href = url_for('view_model', model_id=md.id) %}
                 {% set _paper_href = url_for('paper_public', slug=md.paper.slug) if md.paper.slug else none %}
@@ -179,7 +179,7 @@
         <span class="inst-field-label">Showcase description (max 1000 characters)</span>
         <textarea rows="2" readonly style="width:100%;border:1px solid var(--color-light-pearl);padding:8px 10px;font-size:14px;background:var(--color-cloud-whisper)">{{ institution.public_description or '' }}</textarea>
       </label>
-      <p class="inst-note"><a href="{{ url_for('auth.register') }}" class="dashboard-institution-link">Sign up</a> to edit your showcase.</p>
+      <p class="inst-note"><a href="{{ url_for('institutional_inquiry') }}" class="dashboard-institution-link">Request institutional access</a> to edit your showcase.</p>
     {% else %}
       <form method="POST" action="{{ url_for('institution.showcase_settings') }}" class="inst-invite-form" style="align-items:flex-end">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

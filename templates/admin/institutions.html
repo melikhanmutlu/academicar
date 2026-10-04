@@ -72,52 +72,54 @@
         <p>Contract price, quota, and dates are set here; assign an institution admin from the detail page afterwards.</p>
       </div>
     </div>
-    <form method="POST" action="{{ url_for('admin_institution_create') }}" class="admin-editor-body">
+    {# Refill after a validation error (admin_institution_create). #}
+    {% set draft = session.pop('institution_form_draft', {}) %}
+    <form method="POST" action="{{ url_for('admin_institution_create') }}" class="admin-editor-body" id="create">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="admin-editor-actions" style="flex-wrap:wrap;gap:12px">
         <label class="admin-editor-field" style="flex:1;min-width:220px">
           <span>Name</span>
-          <input type="text" name="name" required maxlength="200" placeholder="Bogazici University">
+          <input type="text" name="name" required maxlength="200" placeholder="Example University" value="{{ draft.get('name', '') }}">
         </label>
         <label class="admin-editor-field" style="flex:1;min-width:220px">
           <span>Email domains (comma-separated, optional)</span>
-          <input type="text" name="email_domains" placeholder="boun.edu.tr, alumni.boun.edu.tr">
+          <input type="text" name="email_domains" placeholder="example.edu, alumni.example.edu" value="{{ draft.get('email_domains', '') }}">
         </label>
       </div>
       <div class="admin-editor-actions" style="flex-wrap:wrap;gap:12px">
         <label class="admin-editor-field">
           <span>Contract starts</span>
-          <input type="date" name="contract_starts_at">
+          <input type="date" name="contract_starts_at" value="{{ draft.get('contract_starts_at', '') }}">
         </label>
         <label class="admin-editor-field">
           <span>Contract ends (blank = open-ended)</span>
-          <input type="date" name="contract_ends_at">
+          <input type="date" name="contract_ends_at" value="{{ draft.get('contract_ends_at', '') }}">
         </label>
         <label class="admin-editor-field">
           <span>Annual price</span>
-          <input type="number" name="annual_price" step="0.01" min="0" placeholder="25000">
+          <input type="number" name="annual_price" step="0.01" min="0" placeholder="25000" value="{{ draft.get('annual_price', '') }}">
         </label>
         <label class="admin-editor-field">
           <span>Currency</span>
-          <input type="text" name="currency" value="TRY" maxlength="3" style="width:70px">
+          <input type="text" name="currency" value="{{ draft.get('currency', 'TRY') }}" maxlength="3" style="width:70px">
         </label>
       </div>
       <div class="admin-editor-actions" style="flex-wrap:wrap;gap:12px">
         <label class="admin-editor-field">
           <span>Model quota (blank = unlimited)</span>
-          <input type="number" name="quota_model_count" min="0" step="1" placeholder="200">
+          <input type="number" name="quota_model_count" min="0" step="1" placeholder="200" value="{{ draft.get('quota_model_count', '') }}">
         </label>
         <label class="admin-editor-field">
           <span>Storage quota MB (blank = unlimited)</span>
-          <input type="number" name="quota_storage_mb" min="0" step="1" placeholder="10240">
+          <input type="number" name="quota_storage_mb" min="0" step="1" placeholder="10240" value="{{ draft.get('quota_storage_mb', '') }}">
         </label>
         <label class="admin-editor-field" style="flex:1;min-width:220px">
           <span>Notes (internal)</span>
-          <input type="text" name="notes" maxlength="5000" placeholder="Contact, procurement reference...">
+          <input type="text" name="notes" maxlength="5000" placeholder="Contact, procurement reference..." value="{{ draft.get('notes', '') }}">
         </label>
       </div>
       <div class="admin-editor-actions">
-        <button type="submit" class="admin-btn compact">Create institution</button>
+        <button type="submit" class="admin-btn admin-btn-primary compact">Create institution</button>
       </div>
     </form>
   </section>

@@ -878,12 +878,12 @@ def test_panel_member_management_and_models_list(client):
         member_id = member_row.id
 
     promote = client.post(f"/institution/members/{member_id}/role", data={"role": "admin"}, follow_redirects=True)
-    assert b"role updated" in promote.data
+    assert b"is now an institution admin" in promote.data
     with client.application.app_context():
         assert InstitutionMember.query.filter_by(id=member_id).one().role == "admin"
 
     remove = client.post(f"/institution/members/{member_id}/remove", follow_redirects=True)
-    assert b"Member removed" in remove.data
+    assert b"was removed" in remove.data
     with client.application.app_context():
         assert InstitutionMember.query.filter_by(id=member_id).count() == 0
 
@@ -1016,6 +1016,10 @@ def test_showcase_lists_only_public_funded_papers(client):
     assert b"Public Funded Paper" in page.data
     assert b"Private Funded Paper" not in page.data
     assert b"Test University" in page.data
+    # The public "Funded 3D models" figure counts only what visitors can open.
+    import re
+    funded = re.search(r'Funded 3D models</span>\s*<strong class="metric-value-compact">(\d+)</strong>', page.get_data(as_text=True))
+    assert funded and funded.group(1) == "1"
 
     assert client.get("/i/no-such-institution").status_code == 404
 
@@ -1203,8 +1207,11 @@ def test_admin_logo_upload_validation_and_removal(client):
         institution = create_institution()
         institution_id = institution.id
 
-    # Minimal valid PNG header bytes are enough for storage-level testing.
-    png_bytes = b"\x89PNG\r\n\x1a\n" + b"0" * 64
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (4, 4), "white").save(buffer, format="PNG")
+    png_bytes = buffer.getvalue()
     bad = client.post(
         f"/admin/institutions/{institution_id}/logo",
         data={"logo": (io.BytesIO(b"not an image"), "logo.txt")},
@@ -1230,6 +1237,17 @@ def test_admin_logo_upload_validation_and_removal(client):
         logo_filename = institution.logo_path
 
     assert client.get(f"/institution-logos/{logo_filename}").status_code == 200
+
+    # A non-image renamed to .png is rejected and the working logo is kept.
+    renamed = client.post(
+        f"/admin/institutions/{institution_id}/logo",
+        data={"logo": (io.BytesIO(b"not an image at all"), "bad.png")},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert b"not a valid PNG, JPG, or WEBP image" in renamed.data
+    with client.application.app_context():
+        assert db.session.get(Institution, institution_id).logo_path == logo_filename
 
     removed = client.post(
         f"/admin/institutions/{institution_id}/logo",
@@ -1501,3 +1519,74 @@ def test_member_badge_and_panel_notice_reflect_quota_and_suspension(client):
         db.session.commit()
         assert "paused" in institution_coverage_label(institution)
         assert institution_status_notice(institution)["title"] == "Institutional access is paused"
+
+
+def test_replacing_a_funded_model_respects_the_storage_quota(client):
+    from tests.conftest import register, upload_file_bytes, valid_ascii_stl_bytes
+
+    register(client)
+    with client.application.app_context():
+        from models import User
+
+        user = User.query.one()
+        institution = create_institution(quota_storage_bytes=5 * MB)
+        add_member(institution, user)
+
+    model_id = upload_model_for(client)
+    with client.application.app_context():
+        model = db.session.get(Model3D, model_id)
+        assert model.license_type == "institutional"
+        institution = Institution.query.one()
+        # Leave just a few bytes of headroom.
+        used = institution_usage(institution.id)[1]
+        institution.quota_storage_bytes = used + 10
+        model.file_size = 10
+        db.session.commit()
+
+    big = valid_ascii_stl_bytes() * 3
+    response = client.post(
+        f"/models/{model_id}/replace",
+        data={"file": upload_file_bytes(big, "bigger.stl"), "compliance_confirm": "yes", "source_unit": "cm"},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert b"exceed Test University&#39;s storage quota" in response.data
+
+
+def test_admin_create_form_keeps_input_after_an_error(client):
+    make_admin(client)
+    client.post(
+        "/admin/institutions/create",
+        data={"name": "Kept University", "contract_starts_at": "2026-05-01", "contract_ends_at": "2026-01-01",
+              "currency": "EUR", "notes": "procurement ref 42"},
+        follow_redirects=False,
+    )
+    html = client.get("/admin/institutions").get_data(as_text=True)
+    assert 'value="Kept University"' in html
+    assert 'value="procurement ref 42"' in html
+    assert 'value="EUR"' in html
+    # Shown once only.
+    assert 'value="Kept University"' not in client.get("/admin/institutions").get_data(as_text=True)
+
+
+def test_invite_context_survives_login_and_switch_account(client):
+    from tests.conftest import register
+
+    with client.application.app_context():
+        institution = create_institution(name="Context University", email_domains="ctx.edu")
+        token = make_invite(institution).token
+    login_page = client.get(f"/auth/login?next=/institution/join/{token}").get_data(as_text=True)
+    assert "Joining <strong>Context University</strong>" in login_page
+    assert "@ctx.edu" in login_page
+    assert "Joining" not in client.get("/auth/login?next=/institution/join/not-a-token").get_data(as_text=True)
+
+    register(client, email="someone@gmail.com")
+    page = client.get(f"/institution/join/{token}").get_data(as_text=True)
+    assert f'name="next" value="/institution/join/{token}"' in page
+    response = client.post("/auth/logout", data={"next": f"/institution/join/{token}"})
+    assert response.status_code == 302
+    assert f"next=/institution/join/{token}" in response.headers["Location"].replace("%2F", "/")
+    # Any other next is ignored.
+    register(client, email="other@gmail.com")
+    response = client.post("/auth/logout", data={"next": "https://evil.example/"})
+    assert response.headers["Location"].endswith("/")

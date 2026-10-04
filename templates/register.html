@@ -7,6 +7,10 @@
     <section class="surface rounded-xl p-6 sm:p-8 lg:p-10">
       <h1 class="font-serif text-4xl font-bold text-[#111827] mt-5">Create an account</h1>
       <p class="text-[#5c6473] mt-2 mb-7">Start turning academic 3D models into publication-ready viewer and AR links.</p>
+      {% set _joining = join_invite_institution() %}
+      {% if _joining %}
+        <p class="inst-note mb-6" data-joining-institution>Joining <strong>{{ _joining.name }}</strong>{% if _joining.email_domains %} &mdash; use your @{{ _joining.domain_list()|join(", @") }} email address{% endif %}.</p>
+      {% endif %}
 
       {% if google_oauth_enabled %}
       <a href="{{ url_for('auth.google_login') }}" class="btn-secondary w-full mb-5">

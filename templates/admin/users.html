@@ -44,7 +44,7 @@
               <td>{{ user.created_at.strftime("%Y-%m-%d") if user.created_at else "-" }}</td>
               <td>
                 <div class="admin-actions">
-                  <form method="POST" action="{{ url_for('admin_user_role_update', user_id=user.id) }}">
+                  <form method="POST" action="{{ url_for('admin_user_role_update', user_id=user.id) }}"{% if not user.is_admin %} onsubmit="return window.confirm('Give this user full admin access to every account, payment and setting?');"{% endif %}>
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="is_admin" value="{{ '0' if user.is_admin else '1' }}">
                     <button type="submit" class="admin-btn admin-btn-secondary compact">{{ "Remove admin" if user.is_admin else "Make admin" }}</button>

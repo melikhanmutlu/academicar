@@ -50,7 +50,7 @@
         </label>
         <label class="admin-editor-field" style="flex:1;min-width:220px">
           <span>Email domains (comma-separated, optional)</span>
-          <input type="text" name="email_domains" value="{{ institution.email_domains or '' }}" placeholder="boun.edu.tr">
+          <input type="text" name="email_domains" value="{{ institution.email_domains or '' }}" placeholder="example.edu">
         </label>
       </div>
       <div class="admin-editor-actions" style="flex-wrap:wrap;gap:12px">
@@ -92,7 +92,7 @@
         </label>
       </div>
       <div class="admin-editor-actions">
-        <button type="submit" class="admin-btn compact">Save contract</button>
+        <button type="submit" class="admin-btn admin-btn-primary compact">Save contract</button>
       </div>
     </form>
     <div class="admin-editor-actions" style="margin-top:12px;align-items:center;gap:12px">
@@ -118,7 +118,7 @@
         <input type="hidden" name="status" value="{{ 'suspended' if institution.status == 'active' else 'active' }}">
         <button type="submit" class="admin-btn admin-btn-secondary compact">{{ "Suspend (block new uploads)" if institution.status == "active" else "Reactivate" }}</button>
       </form>
-      <form method="POST" action="{{ url_for('admin_institution_end_access', institution_id=institution.id) }}" onsubmit="return confirm('End access now? Every model funded by this institution expires immediately.')">
+      <form method="POST" action="{{ url_for('admin_institution_end_access', institution_id=institution.id) }}" onsubmit="return window.confirm('End access now? Every model funded by this institution goes offline immediately and the institution is suspended (no new funded uploads).')">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="admin-btn admin-btn-danger compact">End access now</button>
       </form>
@@ -140,7 +140,7 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <label class="admin-editor-field" style="flex:1;min-width:220px">
         <span>Assign institution admin by account email</span>
-        <input type="email" name="email" required placeholder="dekan@boun.edu.tr">
+        <input type="email" name="email" required placeholder="dean@example.edu">
       </label>
       <button type="submit" class="admin-btn admin-btn-secondary compact">Make institution admin</button>
     </form>
@@ -225,8 +225,8 @@
               <td>{{ invite.expires_at.strftime("%Y-%m-%d") if invite.expires_at else "Never" }}</td>
               <td>{{ invite.use_count }}{% if invite.max_uses is not none %} / {{ invite.max_uses }}{% endif %}</td>
               <td>
-                {% if invite.revoked_at %}<span class="status-chip is-failed">Revoked</span>
-                {% else %}<span class="status-chip is-ready">Active</span>{% endif %}
+                {% set _state = invite_state(invite) %}
+                <span class="status-chip {{ admin_chip_class(_state) }}">{{ _state|title }}</span>
               </td>
             </tr>
           {% else %}

@@ -7,36 +7,36 @@
     <div class="inst-section-head">
       <h2>Members</h2>
       <span>
-        <a href="{{ url_for('auth.register') if demo else url_for('institution.members_csv') }}" class="dashboard-institution-link">Download CSV</a>
+        <a href="{{ url_for('institutional_inquiry') if demo else url_for('institution.members_csv') }}" class="dashboard-institution-link">Download CSV</a>
         &middot; {{ members_pagination.total }} member(s)
       </span>
     </div>
     <p class="inst-note">Removing a member stops future institutional uploads; models they already uploaded keep their access.</p>
     <div class="table-wrap">
-      <table class="data-table">
+      <table class="data-table inst-stack-table">
         <thead>
           <tr><th>User</th><th>Role</th><th>Joined</th><th>Actions</th></tr>
         </thead>
         <tbody>
           {% for member in members_pagination.items %}
             <tr>
-              <td>
+              <td data-label="User">
                 <strong>{{ member.user.username }}</strong>
                 <small class="inst-cell-sub">{{ member.user.email }}</small>
               </td>
-              <td><span class="status-chip">{{ "Institution admin" if member.role == "admin" else "Member" }}</span></td>
-              <td>{{ member.joined_at.strftime("%Y-%m-%d") if member.joined_at else "-" }}</td>
-              <td>
+              <td data-label="Role"><span class="status-chip">{{ "Institution admin" if member.role == "admin" else "Member" }}</span></td>
+              <td data-label="Joined">{{ member.joined_at.strftime("%Y-%m-%d") if member.joined_at else "-" }}</td>
+              <td data-label="Actions">
                 {% if demo %}
-                  <a href="{{ url_for('auth.register') }}" class="dashboard-institution-link">Manage &#8599;</a>
+                  <a href="{{ url_for('institutional_inquiry') }}" class="dashboard-institution-link">Manage &#8599;</a>
                 {% elif member.user_id != current_user.id %}
                   <div class="inst-row-actions">
-                    <form method="POST" action="{{ url_for('institution.member_role', member_id=member.id) }}">
+                    <form method="POST" action="{{ url_for('institution.member_role', member_id=member.id) }}"{% if member.role != 'admin' %} onsubmit="return window.confirm('Make this member an institution admin? They will be able to manage members, invites and the showcase.')"{% endif %}>
                       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                       <input type="hidden" name="role" value="{{ 'member' if member.role == 'admin' else 'admin' }}">
                       <button type="submit" class="btn-secondary btn-compact">{{ "Make member" if member.role == "admin" else "Make admin" }}</button>
                     </form>
-                    <form method="POST" action="{{ url_for('institution.member_remove', member_id=member.id) }}" onsubmit="return confirm('Remove this member from {{ institution.name }}?')">
+                    <form method="POST" action="{{ url_for('institution.member_remove', member_id=member.id) }}" onsubmit="return window.confirm('Remove this member? Their uploaded models stay covered; new uploads will not be.')">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                       <button type="submit" class="btn-secondary btn-compact">Remove</button>
                     </form>

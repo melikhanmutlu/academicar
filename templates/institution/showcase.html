@@ -53,7 +53,7 @@
 
   {% if department_groups %}
     <section class="surface reveal-up inst-publications-section">
-      <div class="section-heading-row"><div><span class="landing-eyebrow">Institutional scholarship</span><h2>Publications by department</h2><p>Articles produced across the institution, connected to their interactive 3D topic workspaces.</p></div><span>{{ department_groups.values()|map('length')|sum }} articles</span></div>
+      <div class="section-heading-row"><div><span class="landing-eyebrow">Institutional scholarship</span><h2>Publications by department</h2><p>Articles produced across the institution, connected to their interactive 3D topic workspaces.</p></div>{% set _article_total = department_groups.values()|map('length')|sum %}<span>{{ _article_total }} article{{ '' if _article_total == 1 else 's' }}</span></div>
       <div class="inst-department-list">
         {% for department, items in department_groups|dictsort %}
           <section class="inst-department-group">

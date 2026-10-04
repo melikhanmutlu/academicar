@@ -21,7 +21,7 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div>
           <label class="field-label" for="institution_name">Institution name</label>
-          <input class="field-input" id="institution_name" name="institution_name" value="{{ inquiry.get('institution_name', '') if inquiry is defined else '' }}" required maxlength="200" placeholder="Bogazici University — Neuroscience Lab">
+          <input class="field-input" id="institution_name" name="institution_name" value="{{ inquiry.get('institution_name', '') if inquiry is defined else '' }}" required maxlength="200" placeholder="Example University — Neuroscience Lab">
         </div>
         <div class="grid sm:grid-cols-2 gap-5">
           <div>
@@ -30,7 +30,7 @@
           </div>
           <div>
             <label class="field-label" for="email">Work email</label>
-            <input class="field-input" id="email" name="email" value="{{ inquiry.get('email', '') if inquiry is defined else '' }}" type="email" required maxlength="200" placeholder="ayse.yilmaz@boun.edu.tr">
+            <input class="field-input" id="email" name="email" value="{{ inquiry.get('email', '') if inquiry is defined else '' }}" type="email" required maxlength="200" placeholder="name.surname@example.edu">
           </div>
         </div>
         <div>

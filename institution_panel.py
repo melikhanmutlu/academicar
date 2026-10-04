@@ -17,8 +17,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import selectinload
 
 from extensions import limiter
-from institutions import institution_recent_activity, institution_usage
-from licensing import is_access_expired
+from institutions import institution_recent_activity, institution_usage, invite_state
 from models import Institution, InstitutionInvite, InstitutionMember, Model3D, Paper, db
 from url_helpers import public_url
 
@@ -44,14 +43,7 @@ def _require_institution_admin() -> tuple[InstitutionMember, Institution]:
     return membership, membership.institution
 
 
-def _invite_state(invite) -> str:
-    if invite.revoked_at is not None:
-        return "revoked"
-    if is_access_expired(invite.expires_at):
-        return "expired"
-    if invite.max_uses is not None and invite.use_count >= invite.max_uses:
-        return "exhausted"
-    return "active"
+_invite_state = invite_state
 
 
 def _load_valid_invite(token: str):
@@ -165,6 +157,7 @@ def member_remove(member_id):
         flash("You cannot remove yourself. Ask the platform team if you need to leave.", "danger")
         return redirect(url_for("institution.members"))
     removed_user_id = member.user_id
+    removed_label = member.user.email if member.user else "The member"
     db.session.delete(member)
     db.session.commit()
     _log_audit(
@@ -173,7 +166,11 @@ def member_remove(member_id):
         resource_id=str(institution.id),
         details={"member_user_id": removed_user_id, "removed_by": "institution_admin"},
     )
-    flash("Member removed. Models they already uploaded keep their institutional access.", "success")
+    flash(
+        f"{removed_label} was removed. Models they already uploaded keep their institutional access. "
+        "They can rejoin with any active invite link, so revoke links you no longer need.",
+        "success",
+    )
     return redirect(url_for("institution.members"))
 
 
@@ -202,7 +199,8 @@ def member_role(member_id):
         resource_id=str(institution.id),
         details={"member_user_id": member.user_id, "from": previous, "to": new_role},
     )
-    flash("Member role updated.", "success")
+    who = member.user.email if member.user else "Member"
+    flash(f"{who} is now {'an institution admin' if new_role == 'admin' else 'a member'}.", "success")
     return redirect(url_for("institution.members"))
 
 

@@ -17,7 +17,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import func, or_
 from sqlalchemy.orm import selectinload
 
-from licensing import apply_model_license_defaults
+from licensing import apply_model_license_defaults, is_access_expired
 from models import AuditLog, Institution, InstitutionMember, Model3D, Paper, User, db
 
 logger = logging.getLogger(__name__)
@@ -29,6 +29,17 @@ def get_active_membership(user_id) -> InstitutionMember | None:
     if not user_id:
         return None
     return InstitutionMember.query.filter_by(user_id=user_id).first()
+
+
+def invite_state(invite) -> str:
+    """active / revoked / expired / exhausted, for panel and admin listings."""
+    if invite.revoked_at is not None:
+        return "revoked"
+    if is_access_expired(invite.expires_at):
+        return "expired"
+    if invite.max_uses is not None and invite.use_count >= invite.max_uses:
+        return "exhausted"
+    return "active"
 
 
 def institution_admin_emails(institution_id) -> list[str]:

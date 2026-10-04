@@ -112,13 +112,20 @@ def test_unpublished_post_is_hidden_publicly(client, app):
     with app.app_context():
         post_id = BlogPost.query.filter_by(slug=slug).first().id
 
-    # Toggle to draft -> 404 publicly and absent from the listing.
+    # Toggle to draft -> 404 publicly and absent from the listing (the admin
+    # still gets a draft preview).
     client.post(f"/admin/blog/{post_id}/publish")
+    assert client.get(f"/blog/{slug}").status_code == 200
+    client.post("/auth/logout")
     assert client.get(f"/blog/{slug}").status_code == 404
     assert "Draft Article" not in client.get("/blog").get_data(as_text=True)
 
     # Toggle back to published -> visible again.
+    from tests.conftest import login
+
+    login(client, email="admin@example.com", password="password123")
     client.post(f"/admin/blog/{post_id}/publish")
+    client.post("/auth/logout")
     assert client.get(f"/blog/{slug}").status_code == 200
 
 

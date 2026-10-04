@@ -29,7 +29,7 @@ def test_demo_institution_public_and_populated(client):
     response = client.get("/demo/institution")
     assert response.status_code == 200
     body = response.get_data(as_text=True)
-    assert "Bogazici University" in body
+    assert "Northfield University" in body
     # Quota usage + contract surfaced
     assert "Funded models" in body
     assert "Quota usage" in body
@@ -56,9 +56,9 @@ def test_demo_institution_public_and_populated(client):
 def test_demo_institution_overview_links_are_interactive_and_privacy_aware(client):
     body = client.get("/demo/institution").get_data(as_text=True)
     # Public funded models link out to a real viewer experience; publications
-    # resolve to the sign-up CTA.
+    # resolve to the institutional inquiry CTA.
     assert "/demo/mitochondria/ar" in body
-    assert "/auth/register" in body
+    assert "/institutional" in body
     # A private upload is surfaced but marked private (never linked publicly).
     assert "Patient-Specific Aortic Aneurysm" in body
     assert "Private" in body
@@ -69,12 +69,12 @@ def test_demo_institution_members_tab(client):
     assert response.status_code == 200
     body = response.get_data(as_text=True)
     assert "Elif Demir" in body
-    assert "elif.demir@boun.edu.tr" in body
+    assert "elif.demir@northfield.edu" in body
     assert "Institution admin" in body  # admin role chip
-    # Management actions become a sign-up CTA; no login-gated member routes leak.
+    # Management actions point to the institutional inquiry; no login-gated member routes leak.
     assert "/institution/members/" not in body
     assert "/institution/members.csv" not in body
-    assert "/auth/register" in body
+    assert "/institutional" in body
 
 
 def test_demo_institution_invites_tab(client):
@@ -83,9 +83,11 @@ def test_demo_institution_invites_tab(client):
     body = response.get_data(as_text=True)
     assert "Create invite link" in body
     assert "Invite links" in body
-    # Create/revoke are login-gated in reality → demo routes them to sign-up.
+    # Create/revoke are login-gated in reality → the demo routes prospects to
+    # the institutional inquiry (self sign-up never yields an institution).
     assert "/institution/invites/create" not in body
-    assert "Sign up to create invites" in body
+    assert "Get institutional access" in body
+    assert "/institutional" in body
 
 
 def test_demo_institution_models_tab(client):

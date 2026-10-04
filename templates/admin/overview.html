@@ -27,7 +27,7 @@
     <div class="admin-metric">
       <span>Payments</span>
       <strong>{{ totals.payments }}</strong>
-      <small>{{ "%.2f"|format(totals.paid_revenue / 100) }} {{ config.PAYMENT_CURRENCY }} paid</small>
+      <small>{{ totals.paid_revenue }} paid</small>
     </div>
     <div class="admin-metric">
       <span>Jobs</span>
@@ -67,8 +67,8 @@
       </div>
       <div class="admin-insight-card">
         <span>Revenue</span>
-        <strong>{{ "%.2f"|format(stats.revenue_30_days / 100) }}</strong>
-        <small>{{ config.PAYMENT_CURRENCY }} paid in the last 30 days</small>
+        <strong class="is-text">{{ stats.revenue_30_days }}</strong>
+        <small>paid in the last 30 days</small>
       </div>
       <div class="admin-insight-card">
         <span>Security</span>

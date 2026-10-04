@@ -21,7 +21,7 @@
             {% set _viewable = model.paper and (model.paper.is_public or (current_user.is_authenticated and model.paper.user_id == current_user.id)) %}
             {% if demo and _viewable %}
               {% set _model_href = url_for('demo_mitochondria_ar') %}
-              {% set _paper_href = url_for('auth.register') %}
+              {% set _paper_href = url_for('institutional_inquiry') %}
             {% elif _viewable %}
               {% set _model_href = url_for('view_model', model_id=model.id) %}
               {% set _paper_href = url_for('paper_public', slug=model.paper.slug) if (model.paper and model.paper.slug) else none %}

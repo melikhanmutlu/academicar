@@ -10,7 +10,7 @@
       Anyone with the link can request to join{% if institution.email_domains %} — but only accounts with a
       @{{ institution.domain_list()|join(", @") }} email can accept{% endif %}.
     </p>
-    <form method="POST" action="{{ url_for('auth.register') if demo else url_for('institution.invite_create') }}" class="inst-invite-form"{% if demo %} onsubmit="return false"{% endif %}>
+    <form method="POST" action="{{ url_for('institutional_inquiry') if demo else url_for('institution.invite_create') }}" class="inst-invite-form"{% if demo %} onsubmit="return false"{% endif %}>
       {% if not demo %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
       <label>
         <span class="inst-field-label">Valid for (days)</span>
@@ -22,10 +22,10 @@
       </label>
       <label style="min-width:220px">
         <span class="inst-field-label">Email invite to (optional)</span>
-        <input type="email" name="send_to" maxlength="200" placeholder="colleague@boun.edu.tr" style="width:100%"{% if demo %} disabled{% endif %}>
+        <input type="email" name="send_to" maxlength="200" placeholder="colleague@{{ institution.domain_list()[0] if institution.domain_list() else 'university.edu' }}" style="width:100%"{% if demo %} disabled{% endif %}>
       </label>
       {% if demo %}
-        <a href="{{ url_for('auth.register') }}" class="btn-primary">Sign up to create invites</a>
+        <a href="{{ url_for('institutional_inquiry') }}" class="btn-primary">Get institutional access</a>
       {% else %}
         <button type="submit" class="btn-primary">Create invite</button>
       {% endif %}
@@ -38,28 +38,33 @@
       <span>{{ invites|length }} total</span>
     </div>
     <div class="table-wrap">
-      <table class="data-table">
+      <table class="data-table inst-stack-table">
         <thead>
           <tr><th>Link</th><th>Expires</th><th>Uses</th><th>Status</th><th>Actions</th></tr>
         </thead>
         <tbody>
           {% for row in invites %}
             <tr>
-              <td>
+              <td data-label="Link">
                 {% if row.state == "active" %}
-                  <input type="text" class="inst-invite-url" value="{{ row.join_url }}" readonly onclick="this.select()">
+                  <span class="inst-invite-copy">
+                    <input type="text" class="inst-invite-url" value="{{ row.join_url }}" readonly onclick="this.select()" aria-label="Invite link">
+                    <button type="button" class="btn-secondary btn-compact" data-copy-invite>Copy</button>
+                  </span>
                 {% else %}
                   <span class="inst-cell-sub">{{ row.join_url }}</span>
                 {% endif %}
               </td>
-              <td>{{ row.invite.expires_at.strftime("%Y-%m-%d") if row.invite.expires_at else "Never" }}</td>
-              <td>{{ row.invite.use_count }}{% if row.invite.max_uses is not none %} / {{ row.invite.max_uses }}{% endif %}</td>
-              <td><span class="status-chip inst-invite-{{ row.state }}">{{ row.state|title }}</span></td>
-              <td>
+              <td data-label="Expires">{{ row.invite.expires_at.strftime("%Y-%m-%d") if row.invite.expires_at else "Never" }}</td>
+              <td data-label="Uses">{{ row.invite.use_count }}{% if row.invite.max_uses is not none %} / {{ row.invite.max_uses }}{% endif %}</td>
+              {# While the institution is suspended nobody can join, whatever the link's own state. #}
+              {% set _paused = row.state == "active" and institution.status != "active" %}
+              <td data-label="Status"><span class="status-chip inst-invite-{{ 'paused' if _paused else row.state }}"{% if _paused %} title="Invites are paused while institutional access is suspended"{% endif %}>{{ 'Paused' if _paused else row.state|title }}</span></td>
+              <td data-label="Actions">
                 {% if demo %}
-                  {% if row.state == "active" %}<a href="{{ url_for('auth.register') }}" class="dashboard-institution-link">Revoke</a>{% endif %}
+                  {% if row.state == "active" %}<a href="{{ url_for('institutional_inquiry') }}" class="dashboard-institution-link">Revoke</a>{% endif %}
                 {% elif row.invite.revoked_at is none %}
-                  <form method="POST" action="{{ url_for('institution.invite_revoke', invite_id=row.invite.id) }}" onsubmit="return confirm('Revoke this invite link?')">
+                  <form method="POST" action="{{ url_for('institution.invite_revoke', invite_id=row.invite.id) }}" onsubmit="return window.confirm('Revoke this invite link? People who have it can no longer join.')">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn-secondary btn-compact">Revoke</button>
                   </form>
@@ -73,4 +78,19 @@
       </table>
     </div>
   </section>
+  <script>
+    document.querySelectorAll('[data-copy-invite]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const input = button.parentElement.querySelector('input');
+        try {
+          await navigator.clipboard.writeText(input.value);
+        } catch (e) {
+          input.select();
+          document.execCommand && document.execCommand('copy');
+        }
+        button.textContent = 'Copied';
+        setTimeout(() => { button.textContent = 'Copy'; }, 1600);
+      });
+    });
+  </script>
 {% endblock %}

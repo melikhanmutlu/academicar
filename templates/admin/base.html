@@ -44,8 +44,17 @@
       var open = sidebar.classList.toggle('is-open');
       toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
+    function close() { sidebar.classList.remove('is-open'); toggle.setAttribute('aria-expanded', 'false'); }
     sidebar.addEventListener('click', function (e) {
-      if (e.target.closest('a')) { sidebar.classList.remove('is-open'); toggle.setAttribute('aria-expanded', 'false'); }
+      if (e.target.closest('a')) close();
+    });
+    // The dimmed backdrop is the sidebar's box-shadow: a click outside the
+    // drawer (and not on the toggle) closes it, as does Escape.
+    document.addEventListener('click', function (e) {
+      if (sidebar.classList.contains('is-open') && !sidebar.contains(e.target) && !toggle.contains(e.target)) close();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && sidebar.classList.contains('is-open')) { close(); toggle.focus(); }
     });
   })();
 </script>

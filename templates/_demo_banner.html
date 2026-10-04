@@ -10,6 +10,10 @@
     {% if demo_cross_url %}
       <a href="{{ demo_cross_url }}" class="demo-banner-cross">See the {{ demo_cross_label or 'other example' }} &rarr;</a>
     {% endif %}
-    <a href="{{ url_for('auth.register') }}" class="btn-primary compact">Create free account</a>
+    {% if request.endpoint == 'demo_institution' %}
+      <a href="{{ url_for('institutional_inquiry') }}" class="btn-primary compact">Get institutional access</a>
+    {% else %}
+      <a href="{{ url_for('auth.register') }}" class="btn-primary compact">Create free account</a>
+    {% endif %}
   </div>
 </div>
