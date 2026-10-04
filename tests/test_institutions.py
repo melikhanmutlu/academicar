@@ -268,6 +268,33 @@ def test_expired_institutional_model_shows_unavailable(client):
     assert response.status_code == 410
 
 
+def test_expired_institutional_model_tells_owner_to_ask_their_admin(client):
+    """The owner must not hit a dead end: no purchasable plan applies, so the
+    page names the institution and links to its admins."""
+    from tests.conftest import create_user, register
+
+    register(client)
+    with client.application.app_context():
+        from models import User
+
+        user = User.query.filter_by(email="user@example.com").one()
+        institution = create_institution(name="Bogazici Lab")
+        add_member(institution, user)
+        lab_admin = create_user(email="labadmin@example.com", username="Lab Admin")
+        add_member(institution, lab_admin, role="admin")
+
+    model_id = upload_model_for(client)
+    with client.application.app_context():
+        model = db.session.get(Model3D, model_id)
+        model.access_expires_at = datetime.now(UTC) - timedelta(hours=1)
+        db.session.commit()
+
+    html = client.get(f"/view/{model_id}").get_data(as_text=True)
+    assert "Bogazici Lab" in html
+    assert "mailto:labadmin@example.com" in html
+    assert "Email your institution admin" in html
+
+
 def test_renew_contract_bulk_updates_only_owned_institutional_models(client):
     from tests.conftest import register
 
@@ -443,7 +470,8 @@ def test_admin_contract_renewal_bulk_updates_models(client):
     assert b"refreshed on 1 model(s)" in response.data
     with client.application.app_context():
         model = db.session.get(Model3D, model_id)
-        assert model.access_expires_at == datetime(2030, 6, 30)
+        # The end date is inclusive: access lasts through 30 June.
+        assert model.access_expires_at == datetime(2030, 6, 30, 23, 59, 59)
 
 
 def test_admin_end_access_and_suspend(client):
@@ -474,6 +502,76 @@ def test_admin_end_access_and_suspend(client):
     with client.application.app_context():
         model = db.session.get(Model3D, model_id)
         assert model_access_status(model) == "expired"
+
+
+def test_renewing_after_end_access_reactivates_models(client):
+    """"End access now" marks models expired; a later renewal must bring
+    them back, not just move the date while they stay offline."""
+    from tests.conftest import register
+
+    register(client, email="member@example.com", username="Member")
+    with client.application.app_context():
+        from models import User
+
+        user = User.query.filter_by(email="member@example.com").one()
+        institution = create_institution()
+        add_member(institution, user)
+        institution_id = institution.id
+
+    model_id = upload_model_for(client)
+    client.post("/auth/logout")
+    make_admin(client)
+    client.post(f"/admin/institutions/{institution_id}/end-access", follow_redirects=True)
+    future = (datetime.now(UTC) + timedelta(days=400)).strftime("%Y-%m-%d")
+    client.post(
+        f"/admin/institutions/{institution_id}/update",
+        data={"name": "Test University", "contract_ends_at": future, "currency": "TRY"},
+        follow_redirects=True,
+    )
+    with client.application.app_context():
+        model = db.session.get(Model3D, model_id)
+        assert model_access_status(model) == "active"
+    assert client.get(f"/view/{model_id}").status_code == 200
+
+
+def test_editing_other_fields_does_not_undo_end_access(client):
+    from tests.conftest import register
+
+    register(client, email="member@example.com", username="Member")
+    with client.application.app_context():
+        from models import User
+
+        user = User.query.filter_by(email="member@example.com").one()
+        institution = create_institution(contract_ends_at=datetime(2031, 1, 15))
+        add_member(institution, user)
+        institution_id = institution.id
+
+    model_id = upload_model_for(client)
+    client.post("/auth/logout")
+    make_admin(client)
+    client.post(f"/admin/institutions/{institution_id}/end-access", follow_redirects=True)
+    client.post(
+        f"/admin/institutions/{institution_id}/update",
+        data={"name": "Renamed University", "contract_ends_at": "2031-01-15", "currency": "TRY"},
+        follow_redirects=True,
+    )
+    with client.application.app_context():
+        assert db.session.get(Institution, institution_id).contract_ends_at == datetime(2031, 1, 15)
+        assert model_access_status(db.session.get(Model3D, model_id)) == "expired"
+
+
+def test_contract_end_date_covers_the_whole_day(client):
+    make_admin(client)
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
+    client.post(
+        "/admin/institutions/create",
+        data={"name": "Same Day University", "contract_ends_at": today, "currency": "TRY"},
+        follow_redirects=True,
+    )
+    with client.application.app_context():
+        institution = Institution.query.filter_by(name="Same Day University").one()
+        assert institution.contract_ends_at.strftime("%Y-%m-%d") == today
+        assert institution.contract_is_current()
 
 
 def test_admin_assign_institution_admin_by_email(client):
@@ -871,7 +969,7 @@ def test_dashboard_shows_institution_badge(client):
     register(client, email="dean@boun.edu.tr", username="Dean")
 
     no_badge = client.get("/dashboard")
-    assert b"Institutional access" not in no_badge.data
+    assert b"Uploads covered" not in no_badge.data
 
     with client.application.app_context():
         from models import User
@@ -882,7 +980,7 @@ def test_dashboard_shows_institution_badge(client):
 
     badge = client.get("/dashboard")
     assert b"Test University" in badge.data
-    assert b"Institutional access until 2027-01-15" in badge.data
+    assert b"Uploads covered until Jan 15, 2027" in badge.data
     assert b"Manage institution" in badge.data
 
 
@@ -1342,3 +1440,64 @@ def test_institution_usage_excludes_soft_deleted_papers(client):
         count, used = institution_usage(institution.id)
         assert count == 0
         assert used == 0
+
+
+def test_upload_forms_show_institutional_coverage_for_members(client):
+    """Members must not be told every upload "Starts on Free access"."""
+    from tests.conftest import register
+
+    register(client)
+    with client.application.app_context():
+        from models import User
+
+        user = User.query.one()
+        institution = create_institution(name="Coverage University", quota_model_count=1)
+        add_member(institution, user)
+
+    html = client.get("/projects/new").get_data(as_text=True)
+    assert "Covered by Coverage University" in html
+    assert "Starts on Free access" not in html
+
+    upload_model_for(client)
+    with client.application.app_context():
+        slug = Paper.query.filter_by(title="Inst Paper").one().slug
+    html = client.get(f"/projects/{slug}").get_data(as_text=True)
+    assert "Coverage University's quota is currently full" in html
+    assert "Starts on Free access" in html
+
+
+def test_upload_forms_show_free_for_non_members(client):
+    from tests.conftest import register
+
+    register(client)
+    html = client.get("/projects/new").get_data(as_text=True)
+    assert "Starts on Free access" in html
+    assert "Covered by" not in html
+
+
+def test_member_badge_and_panel_notice_reflect_quota_and_suspension(client):
+    from institutions import institution_coverage_label, institution_status_notice
+    from tests.conftest import register
+
+    register(client)
+    with client.application.app_context():
+        from models import User
+
+        user = User.query.one()
+        institution = create_institution(name="Notice University", quota_model_count=1)
+        add_member(institution, user, role="admin")
+        institution_id = institution.id
+        assert institution_coverage_label(institution).startswith("Uploads covered until")
+        assert institution_status_notice(institution) is None
+
+    upload_model_for(client)
+    assert b"Quota full: new uploads start on Free" in client.get("/dashboard").data
+    panel = client.get("/institution/").get_data(as_text=True)
+    assert "The model quota is full" in panel
+
+    with client.application.app_context():
+        institution = db.session.get(Institution, institution_id)
+        institution.status = "suspended"
+        db.session.commit()
+        assert "paused" in institution_coverage_label(institution)
+        assert institution_status_notice(institution)["title"] == "Institutional access is paused"

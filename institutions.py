@@ -31,6 +31,20 @@ def get_active_membership(user_id) -> InstitutionMember | None:
     return InstitutionMember.query.filter_by(user_id=user_id).first()
 
 
+def institution_admin_emails(institution_id) -> list[str]:
+    """Emails of an institution's panel admins, for "ask your admin" links."""
+    if not institution_id:
+        return []
+    rows = (
+        db.session.query(User.email)
+        .join(InstitutionMember, InstitutionMember.user_id == User.id)
+        .filter(InstitutionMember.institution_id == institution_id, InstitutionMember.role == "admin")
+        .order_by(InstitutionMember.joined_at)
+        .all()
+    )
+    return [email for (email,) in rows if email]
+
+
 def institution_usage(institution_id) -> tuple[int, int]:
     """(model_count, bytes_used) of the institution's funded models.
 
@@ -140,6 +154,80 @@ def institution_can_fund_upload(institution, file_size, usage=None) -> tuple[boo
     return True, None
 
 
+def institution_coverage_label(institution) -> str:
+    """One-line state of a member's coverage, for their dashboard badge."""
+    ok, reason = institution_can_fund_upload(institution, 0)
+    ends = institution.contract_ends_at if institution is not None else None
+    if ok:
+        return f"Uploads covered until {ends.strftime('%b %d, %Y')}" if ends else "Uploads covered"
+    if reason in ("quota_models", "quota_storage"):
+        return "Quota full: new uploads start on Free"
+    if reason == "suspended":
+        return "Institutional access paused: contact your institution admin"
+    if ends is not None and _as_utc(ends) < datetime.now(UTC):
+        return f"Contract ended {ends.strftime('%b %d, %Y')}: new uploads start on Free"
+    return "Contract not active yet: new uploads start on Free"
+
+
+def institution_status_notice(institution, usage=None, now=None) -> dict | None:
+    """Top-of-panel notice for institution admins: why uploads are not being
+    covered, or what will stop them soon. None when all is well. kind is
+    "warn" (members are affected now) or "info" (act soon)."""
+    if institution is None:
+        return None
+    now = now or datetime.now(UTC)
+    ends = _as_utc(institution.contract_ends_at) if institution.contract_ends_at else None
+    if institution.status != "active":
+        return {
+            "kind": "warn",
+            "title": "Institutional access is paused",
+            "body": "New member uploads start on the Free plan and invite links are not accepted. "
+                    "Models already funded keep their access until the contract end.",
+        }
+    if not institution.contract_is_current():
+        if ends is not None and ends < now:
+            return {
+                "kind": "warn",
+                "title": f"The contract ended on {ends.strftime('%b %d, %Y')}",
+                "body": "Funded models are offline and new uploads start on Free. "
+                        "Renewing brings every model back on the same links and QR codes.",
+            }
+        return {
+            "kind": "info",
+            "title": "The contract has not started yet",
+            "body": "Member uploads will be covered from the contract start date.",
+        }
+    model_count, bytes_used = usage if usage is not None else institution_usage(institution.id)
+    full = []
+    if institution.quota_model_count is not None and model_count >= institution.quota_model_count:
+        full.append("model")
+    if institution.quota_storage_bytes is not None and bytes_used >= institution.quota_storage_bytes:
+        full.append("storage")
+    if full:
+        return {
+            "kind": "warn",
+            "title": f"The {' and '.join(full)} quota is full",
+            "body": "New member uploads start on the Free plan until the quota is raised.",
+        }
+    near = (
+        (institution.quota_model_count and model_count >= 0.9 * institution.quota_model_count)
+        or (institution.quota_storage_bytes and bytes_used >= 0.9 * institution.quota_storage_bytes)
+    )
+    if near:
+        return {
+            "kind": "info",
+            "title": "The quota is almost used up",
+            "body": "Over 90% of the contract quota is in use.",
+        }
+    if ends is not None and ends <= now + timedelta(days=30):
+        return {
+            "kind": "info",
+            "title": f"The contract ends on {ends.strftime('%b %d, %Y')}",
+            "body": "Funded models go offline after that date unless the contract is renewed.",
+        }
+    return None
+
+
 def apply_institutional_license(model, institution) -> None:
     """Grant an institution-funded model the institutional plan.
 
@@ -170,21 +258,30 @@ def reapply_model_license(model) -> None:
     apply_model_license_defaults(model, model.license_type)
 
 
+def _as_utc(value: datetime) -> datetime:
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value
+
+
 def renew_institution_contract(institution, new_ends_at: datetime | None) -> int:
     """Set a new contract end date and propagate it to every model the
     institution funds. Returns the number of models updated.
 
     The license_type filter protects models an admin individually
-    re-licensed (their expiry is no longer the contract's business).
+    re-licensed (their expiry is no longer the contract's business). A new
+    end in the future also lifts an earlier "end access now" cutoff, which
+    marked the models expired.
     """
     institution.contract_ends_at = new_ends_at
+    changes = {"access_expires_at": new_ends_at}
+    if new_ends_at is None or _as_utc(new_ends_at) > datetime.now(UTC):
+        changes["license_status"] = "active"
     updated = (
         db.session.query(Model3D)
         .filter(
             Model3D.institution_id == institution.id,
             Model3D.license_type == "institutional",
         )
-        .update({"access_expires_at": new_ends_at}, synchronize_session=False)
+        .update(changes, synchronize_session=False)
     )
     return int(updated or 0)
 

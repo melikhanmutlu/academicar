@@ -75,3 +75,25 @@ def test_admin_models_list_marks_deleted_projects_instead_of_linking_to_404(clie
     html = client.get("/admin/models").data.decode()
     assert "Project deleted" in html
     assert f'href="/view/{model_id}"' not in html
+
+
+def test_admin_sees_poster_of_expired_model(client, app):
+    """The admin "view as user" dashboard shows the same thumbnails the owner
+    sees, including for models whose access window has ended."""
+    from datetime import datetime, timedelta
+    register(client)
+    model_id, _ = _private_model(app)
+    with app.app_context():
+        model = db.session.get(Model3D, model_id)
+        model.paper.visibility = "public"
+        model.paper.is_public = True
+        model.access_expires_at = datetime.utcnow() - timedelta(days=3)
+        folder = os.path.join(app.config["CONVERTED_FOLDER"], model_id)
+        with open(os.path.join(folder, "poster.png"), "wb") as fh:
+            fh.write(b"\x89PNG\r\n\x1a\n")
+        model.poster_path = os.path.join(folder, "poster.png")
+        db.session.commit()
+    client.post("/auth/logout")
+    assert client.get(f"/files/{model_id}/poster.png").status_code == 404
+    _login_admin(client)
+    assert client.get(f"/files/{model_id}/poster.png").status_code == 200

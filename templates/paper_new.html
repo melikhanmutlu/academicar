@@ -73,10 +73,8 @@
             <p class="text-xs text-[#5c6473] mt-1">STL and OBJ files carry no unit — choose the unit your model was made in (e.g. cm in 3ds Max / SketchUp). FBX/GLB already include real units, so “Embedded” is selected for you. You can change this later on the model’s edit page.</p>
           </div>
 
-          <div class="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4">
-            <p class="text-sm font-semibold text-[#111827]">Starts on Free access</p>
-            <p class="text-xs text-[#5c6473] mt-1">New models get a 3-day, watermarked viewer (up to 100 MB){% set free_limit = get_license_plan('free').max_models_per_project %}{% if free_limit %}; a Free project holds {{ free_limit }} model{{ '' if free_limit == 1 else 's' }}{% endif %}. Upgrade to Academic or Extended Archive any time after upload — the QR and viewer link stay the same.</p>
-          </div>
+          {% set upgrade_hint = "Upgrade to Academic or Extended Archive any time after upload — the QR and viewer link stay the same." %}
+          {% include "_upload_plan_note.html" %}
 
           <label class="color-optional-control" data-color-control>
             <input type="checkbox" name="color_enabled" value="yes" data-color-toggle>

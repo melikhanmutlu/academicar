@@ -313,7 +313,8 @@
 }
 
 .admin-pagination .is-disabled {
-  color: var(--color-light-pearl);
+  color: var(--color-silver-ash);
+  opacity: 0.7;
 }
 
 .admin-pagination .admin-pagination-gap {
@@ -418,6 +419,12 @@
   font-size: 13px;
   color: var(--color-silver-ash);
   margin: 0 0 16px;
+}
+
+/* Wide tables scroll inside their card instead of widening the page. */
+.admin-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 /* ---- Off-canvas sidebar on smaller screens -----------------------------

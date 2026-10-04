@@ -61,7 +61,9 @@
 
     <p class="model-unavail-subtitle">
       {% if status == "expired" %}
-        {% if is_owner %}
+        {% if is_owner and model.license_type == "institutional" and model.institution %}
+          This model was covered by {{ model.institution.name }}'s institutional license{% if model.access_expires_at %}, which ended on {{ model.access_expires_at.strftime('%b %d, %Y') }}{% endif %}. Ask your institution admin to renew the contract &mdash; the viewer, AR and QR code come back on automatically, with the same link and printed QR codes.
+        {% elif is_owner %}
           Your {{ get_license_plan(model.license_type).label }} plan{% if model.access_expires_at %} ended on {{ model.access_expires_at.strftime('%b %d, %Y') }}{% else %} has ended{% endif %}. Renew or upgrade to turn the viewer, AR and QR code back on &mdash; the link and any printed QR codes stay the same.
         {% else %}
           The access period for this model has ended. The QR code and viewer link stay reserved and will work again as soon as the project's authors renew access.
@@ -115,7 +117,15 @@
     <!-- CTAs -->
     <div class="model-unavail-actions">
       {% if status == "expired" %}
-        {% if is_owner %}
+        {% if is_owner and model.license_type == "institutional" and model.institution %}
+          {% set admin_emails = institution_admin_emails(model.institution_id) %}
+          {% if admin_emails %}
+            <a href="mailto:{{ admin_emails|join(',') }}?subject={{ ('AcademicAR: please renew ' ~ model.institution.name ~ ' access')|urlencode }}" class="btn-primary">Email your institution admin</a>
+          {% else %}
+            <a href="{{ url_for('contact_info') }}" class="btn-primary">Contact AcademicAR</a>
+          {% endif %}
+          <a href="{{ landing_url }}" class="btn-secondary">Go to project page</a>
+        {% elif is_owner %}
           {% set upgrade_options = model_upgrade_options(model) %}
           {# Open the plan page with this plan preselected (coupon field,
              plan details) instead of jumping straight to the payment form. #}

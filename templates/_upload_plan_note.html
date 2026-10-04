@@ -1,0 +1,18 @@
+{# What a new upload starts on. Members of an institution that can fund the
+   upload see their institutional coverage; everyone else sees Free. #}
+{% set funding = upload_funding_context() %}
+<div class="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-4" data-upload-plan-note="{{ funding.kind }}">
+  {% if funding.kind == "institutional" %}
+    <p class="text-sm font-semibold text-[#111827]">Covered by {{ funding.institution.name }}</p>
+    <p class="text-xs text-[#5c6473] mt-1">New models use your institution's license: no watermark{% if funding.institution.contract_ends_at %}, access until {{ funding.institution.contract_ends_at.strftime('%b %d, %Y') }}{% endif %}. The QR and viewer link stay the same if the contract is renewed.</p>
+  {% else %}
+    <p class="text-sm font-semibold text-[#111827]">Starts on Free access</p>
+    {% if funding.institution %}
+      <p class="text-xs text-[#5c6473] mt-1">
+        {%- if funding.reason in ("quota_models", "quota_storage") %}{{ funding.institution.name }}'s quota is currently full, so
+        {%- elif funding.reason == "suspended" %}{{ funding.institution.name }}'s institutional access is paused, so
+        {%- else %}{{ funding.institution.name }}'s contract is not active right now, so{% endif %} this upload is not covered by your institution. Ask your institution admin, or continue on Free.</p>
+    {% endif %}
+    <p class="text-xs text-[#5c6473] mt-1">New models get a 3-day, watermarked viewer (up to 100 MB){% set free_limit = get_license_plan('free').max_models_per_project %}{% if free_limit %}; a Free project holds {{ free_limit }} model{{ '' if free_limit == 1 else 's' }}{% endif %}. {{ upgrade_hint }}</p>
+  {% endif %}
+</div>

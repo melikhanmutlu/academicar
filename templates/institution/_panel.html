@@ -36,6 +36,17 @@
 
   {% if demo_mode is defined and demo_mode %}{% include "_demo_banner.html" %}{% endif %}
 
+  {% set _notice = None if (demo_mode is defined and demo_mode) else institution_status_notice(institution) %}
+  {% if _notice %}
+    <div class="inst-status-notice inst-status-notice--{{ _notice.kind }}" role="status">
+      <div>
+        <strong>{{ _notice.title }}</strong>
+        <p>{{ _notice.body }}</p>
+      </div>
+      <a href="mailto:{{ config.CONTACT_EMAIL or 'info@academicar.com' }}?subject={{ ('AcademicAR contract: ' ~ institution.name)|urlencode }}" class="btn-secondary btn-compact">Contact AcademicAR</a>
+    </div>
+  {% endif %}
+
   {% block panel_body %}{% endblock %}
 </div>
 {% endblock %}

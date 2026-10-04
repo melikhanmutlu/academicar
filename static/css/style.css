@@ -7613,6 +7613,8 @@ label.rounded-xl input[type="checkbox"] {
 
 .admin-metric {
   flex: 1 1 200px;
+  min-width: 0;
+  overflow-wrap: anywhere;
   min-height: 132px;
   border: 1px solid var(--color-light-pearl);
   background: var(--color-canvas-white);
@@ -7692,6 +7694,8 @@ label.rounded-xl input[type="checkbox"] {
 
 .admin-insight-card {
   flex: 1 1 200px;
+  min-width: 0;
+  overflow-wrap: anywhere;
   min-height: 128px;
   border: 1px solid var(--color-light-pearl);
   border-radius: 8px;
@@ -9389,12 +9393,12 @@ body.nav-menu-open {
 /* ===== Institution overview — activity & contributors ===== */
 .inst-activity-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 24px;
   margin-top: 4px;
 }
 @media (max-width: 768px) {
-  .inst-activity-grid { grid-template-columns: 1fr; gap: 20px; }
+  .inst-activity-grid { grid-template-columns: minmax(0, 1fr); gap: 20px; }
 }
 .inst-activity-title {
   font-size: 13px;
@@ -9924,4 +9928,37 @@ body.project-detail-page { overflow-x: clip; }
 }
 @media (max-width: 640px) {
   .model-unavail-plans .lp-btn { width: 100%; white-space: normal; text-align: center; }
+}
+
+/* ===== Institution panel — contract / quota notice ===== */
+.inst-status-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-light-pearl);
+  border-left: 3px solid var(--color-silver-ash);
+  border-radius: 8px;
+  background: var(--color-cloud-whisper);
+}
+.inst-status-notice--warn {
+  border-left-color: var(--color-sunset-orange);
+  background: var(--color-orange-wash);
+}
+.inst-status-notice strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-midnight-graphite);
+}
+.inst-status-notice p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--color-dark-shale);
+}
+.inst-status-notice .btn-secondary { flex-shrink: 0; }
+@media (max-width: 640px) {
+  .inst-status-notice { flex-direction: column; align-items: stretch; }
 }

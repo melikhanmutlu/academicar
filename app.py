@@ -73,7 +73,10 @@ from institutions import (
     apply_institutional_license,
     end_institution_access_now,
     get_active_membership,
+    institution_admin_emails,
     institution_can_fund_upload,
+    institution_coverage_label,
+    institution_status_notice,
     institution_usage,
     reapply_model_license,
     renew_institution_contract,
@@ -207,6 +210,10 @@ def create_app(test_config: dict | None = None) -> Flask:
             "model_resolver_url": model_resolver_url,
             "model_access_status": model_access_status,
             "model_upgrade_options": model_upgrade_options,
+            "institution_admin_emails": institution_admin_emails,
+            "upload_funding_context": upload_funding_context,
+            "institution_coverage_label": institution_coverage_label,
+            "institution_status_notice": institution_status_notice,
             "user_selectable_plan_keys": USER_SELECTABLE_PLAN_KEYS,
             "format_model_dimensions_cm": format_model_dimensions_cm,
             "academic_fields": ACADEMIC_FIELDS,
@@ -1657,6 +1664,22 @@ def intended_project_plan_for_user(user_id: int | None) -> str:
         if can_fund:
             return "institutional"
     return "free"
+
+
+def upload_funding_context() -> dict:
+    """What the current user's next upload starts on, for the upload forms.
+
+    kind is "institutional" (the member's institution covers it) or "free";
+    for a member whose institution cannot fund it, reason says why
+    (suspended / contract_expired / quota_models / quota_storage)."""
+    if not current_user.is_authenticated:
+        return {"kind": "free", "institution": None, "reason": None}
+    membership = get_active_membership(current_user.id)
+    if membership is None:
+        return {"kind": "free", "institution": None, "reason": None}
+    institution = membership.institution
+    can_fund, reason = institution_can_fund_upload(institution, 0)
+    return {"kind": "institutional" if can_fund else "free", "institution": institution, "reason": reason}
 
 
 def request_project_supports_feature(project: Paper | None, feature: str) -> bool:
@@ -4523,7 +4546,10 @@ def register_routes(app: Flask) -> None:
         # The owner's own dashboard/management pages show a thumbnail even once
         # the model's access window has expired (the public/QR viewer still
         # shows the graceful "unavailable" state via model_is_accessible below).
-        is_owner = current_user.is_authenticated and current_user.id == model.user_id
+        # Admins previewing a user's dashboard see the same thumbnails.
+        is_owner = current_user.is_authenticated and (
+            current_user.id == model.user_id or bool(current_user.is_admin)
+        )
         if not _paper_visible_to_request(model.paper) or not (is_owner or model_is_accessible(model)):
             abort(404)
         directory = os.path.join(app.config["CONVERTED_FOLDER"], unique_id)
@@ -4558,7 +4584,10 @@ def register_routes(app: Flask) -> None:
         model = db.session.get(Model3D, unique_id)
         if not model or not model.collage_path:
             abort(404)
-        is_owner = current_user.is_authenticated and current_user.id == model.user_id
+        # Admins previewing a user's dashboard see the same thumbnails.
+        is_owner = current_user.is_authenticated and (
+            current_user.id == model.user_id or bool(current_user.is_admin)
+        )
         if not _paper_visible_to_request(model.paper) or not (is_owner or model_is_accessible(model)):
             abort(404)
         directory = os.path.join(app.config["CONVERTED_FOLDER"], unique_id)
@@ -5771,16 +5800,21 @@ def register_routes(app: Flask) -> None:
                 seen.append(domain)
         return ", ".join(seen) or None
 
-    def _parse_institution_date(raw):
+    def _parse_institution_date(raw, end_of_day=False):
         raw = (raw or "").strip()
         if not raw:
             return None
-        for fmt in ("%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+        for fmt in ("%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M"):
             try:
                 return datetime.strptime(raw, fmt)
             except ValueError:
                 continue
-        raise ValueError(raw)
+        try:
+            day = datetime.strptime(raw, "%Y-%m-%d")
+        except ValueError:
+            raise ValueError(raw) from None
+        # A contract that "ends on" a date covers that whole day.
+        return day.replace(hour=23, minute=59, second=59) if end_of_day else day
 
     def _institution_form_values():
         """Parse and validate the shared create/update institution form.
@@ -5790,7 +5824,7 @@ def register_routes(app: Flask) -> None:
             return None, "Institution name is required."
         try:
             starts_at = _parse_institution_date(request.form.get("contract_starts_at"))
-            ends_at = _parse_institution_date(request.form.get("contract_ends_at"))
+            ends_at = _parse_institution_date(request.form.get("contract_ends_at"), end_of_day=True)
         except ValueError:
             return None, "Contract dates must be valid (YYYY-MM-DD)."
         if starts_at and ends_at and ends_at < starts_at:
@@ -5923,6 +5957,10 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("admin_institution_detail", institution_id=institution.id))
         previous_end = institution.contract_ends_at
         new_end = values.pop("contract_ends_at")
+        if previous_end and new_end and previous_end.date() == new_end.date():
+            # Same calendar day (e.g. a row stored at 00:00 before end dates
+            # became inclusive): not a renewal, keep the stored value.
+            new_end = previous_end
         for field, value in values.items():
             setattr(institution, field, value)
         if not institution.slug:
