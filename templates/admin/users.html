@@ -40,7 +40,7 @@
                 <strong><a href="{{ url_for('admin_user_detail', user_id=user.id) }}">{{ user.username }}</a></strong>
                 <small>{{ user.email }}</small>
               </td>
-              <td><span class="status-chip">{{ "Admin" if user.is_admin else "Member" }}</span></td>
+              <td><span class="status-chip">{{ "Admin" if user.is_admin else "Member" }}</span>{% if user.deactivated_at %} <span class="status-chip is-failed" title="Deactivated {{ user.deactivated_at.strftime('%Y-%m-%d') }}">Deactivated</span>{% endif %}</td>
               <td>{{ user.created_at.strftime("%Y-%m-%d") if user.created_at else "-" }}</td>
               <td>
                 <div class="admin-actions">
@@ -62,7 +62,7 @@
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="4">No users yet.</td></tr>
+            <tr><td colspan="4">{{ "No users match these filters." if (filters.user_q or filters.user_role != "all") else "No users yet." }}</td></tr>
           {% endfor %}
         </tbody>
       </table>

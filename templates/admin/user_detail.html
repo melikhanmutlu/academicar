@@ -103,7 +103,7 @@
                 <strong><a href="{{ url_for('paper_public', slug=paper.slug) }}" target="_blank" rel="noopener noreferrer">{{ paper.title }}</a></strong>
                 <small>{{ paper.slug }}</small>
               </td>
-              <td><span class="status-chip {{ admin_chip_class('public' if paper.is_public else 'private') }}">{{ "Public" if paper.is_public else "Private" }}</span></td>
+              <td><span class="status-chip {{ admin_chip_class(project_visibility(paper)) }}">{{ visibility_label(paper) }}</span></td>
               <td>{{ paper.models|length }}</td>
               <td>{{ paper.created_at.strftime("%Y-%m-%d") if paper.created_at else "-" }}</td>
               <td>

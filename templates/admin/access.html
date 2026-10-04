@@ -38,7 +38,7 @@
       <div class="admin-breakdown">
         <h3>Most viewed models</h3>
         {% for item in top_viewed_models %}
-          <div><span>{{ item.model.display_name if item.model else item.model_id }}</span><strong>{{ item.count }}</strong></div>
+          <div><span>{{ (item.model.display_name or item.model.original_filename or item.model_id) if item.model else item.model_id }}</span><strong>{{ item.count }}</strong></div>
         {% else %}
           <div><span>No viewer events yet</span><strong>0</strong></div>
         {% endfor %}
@@ -105,7 +105,7 @@
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="5">No QR records yet.</td></tr>
+            <tr><td colspan="5">{{ "No QR records match these filters." if (request.args.get('qr_q') or (filters.qr_status or 'all') != 'all') else "No QR records yet." }}</td></tr>
           {% endfor %}
         </tbody>
       </table>

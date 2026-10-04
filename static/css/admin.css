@@ -560,7 +560,7 @@
 
 .status-chip.is-queued {
   background: var(--color-warm-ivory);
-  color: var(--color-data-gold);
+  color: #6b5421; /* data-gold darkened: 4.3:1 -> 5.9:1 on warm ivory at 11px */
   font-weight: 600;
 }
 

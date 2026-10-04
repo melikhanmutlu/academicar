@@ -100,8 +100,9 @@
                   <strong>{{ paper.title }}</strong>
                   <small>Deleted{% if paper.deleted_at %} on {{ paper.deleted_at.strftime("%b %d, %Y") }}{% endif %}</small>
                 {% else %}
-                  <strong><a href="{{ url_for('paper_public', slug=paper.slug) }}" target="_blank" rel="noopener noreferrer">{{ paper.title }}</a></strong>
-                  <small><a href="{{ url_for('paper_public', slug=paper.slug) }}" target="_blank" rel="noopener noreferrer">{{ url_for('paper_public', slug=paper.slug, _external=True) }}</a></small>
+                  {# The link a visitor would use (review link for unlisted projects). #}
+                  <strong><a href="{{ project_landing_url(paper) }}" target="_blank" rel="noopener noreferrer">{{ paper.title }}</a></strong>
+                  <small><a href="{{ project_landing_url(paper) }}" target="_blank" rel="noopener noreferrer">{{ project_landing_url(paper, absolute=True) }}</a></small>
                 {% endif %}
               </td>
               <td>

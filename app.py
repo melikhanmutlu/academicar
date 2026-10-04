@@ -5430,8 +5430,9 @@ def register_routes(app: Flask) -> None:
         ]
         # Filesystem scanning (os.walk over four folders) and orphan detection
         # are expensive, so only run them on the pages that actually display the
-        # results: "overview" needs the orphan count for critical alerts, and
-        # "storage" renders the full breakdown. Other pages get cheap defaults.
+        # results: "overview" and "security" need the orphan count for critical
+        # alerts, and "storage" renders the full breakdown. Other pages get
+        # cheap defaults.
         orphan_counts = {"converted": 0, "pdf": 0, "qr": 0}
         storage_breakdown = {
             "uploads": {"size": 0, "files": 0},
@@ -5439,7 +5440,7 @@ def register_routes(app: Flask) -> None:
             "pdfs": {"size": 0, "files": 0},
             "qr": {"size": 0, "files": 0},
         }
-        if admin_page in {"overview", "storage"}:
+        if admin_page in {"overview", "storage", "security"}:
             upload_size, upload_files = scan_folder_size(app.config["UPLOAD_FOLDER"])
             converted_size, converted_files = scan_folder_size(app.config["CONVERTED_FOLDER"])
             qr_size, qr_files = scan_folder_size(app.config["QR_FOLDER"])
@@ -7205,7 +7206,7 @@ def register_routes(app: Flask) -> None:
             .order_by(ModelVersion.version_number.desc())
             .all()
         )
-        return render_template("admin/model_detail.html", model=model, versions=versions)
+        return render_template("admin/model_detail.html", model=model, versions=versions, active_page="models")
 
     @app.route("/admin/models/<model_id>/versions")
     @login_required

@@ -3,11 +3,21 @@
 {% block admin_subtitle %}Monitor platform health, review records, and run operational fixes from one place.{% endblock %}
 
 {% block admin_body %}
+  {% if critical_alerts %}
+    <section class="admin-section">
+      <div class="admin-breakdown">
+        <h3>Needs attention</h3>
+        {% for alert in critical_alerts %}
+          <div><span>{{ alert.text }}</span><a href="{{ alert.url }}" class="admin-btn admin-btn-secondary compact">Review</a></div>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
   <section class="admin-metrics">
     <div class="admin-metric">
       <span>Users</span>
       <strong>{{ totals.users }}</strong>
-      <small>{{ totals.admins }} admins</small>
+      <small>{{ totals.admins }} admin{{ '' if totals.admins == 1 else 's' }}</small>
     </div>
     <div class="admin-metric">
       <span>Projects</span>
