@@ -10,9 +10,9 @@
     </div>
     <p class="inst-note">Models uploaded by your members under the institutional license. They count against the contract quota even if the member later leaves.</p>
     <div class="table-wrap">
-      <table class="data-table">
+      <table class="data-table inst-stack-table">
         <thead>
-          <tr><th>Model</th><th>Project</th><th>Size</th><th>License</th><th>Access until</th><th></th></tr>
+          <tr><th>Model</th><th>Uploaded by</th><th>Project</th><th>Size</th><th>Status</th><th>Access until</th><th></th></tr>
         </thead>
         <tbody>
           {% for model in models_pagination.items %}
@@ -29,19 +29,22 @@
               {% set _model_href = none %}
               {% set _paper_href = none %}
             {% endif %}
+            {# Demo rows are plain namespaces: treat them as active. #}
+            {% set _state = 'active' if demo else model_access_status(model) %}
             <tr>
-              <td>
+              <td data-label="Model">
                 {% if _model_href %}<strong><a class="dashboard-institution-link" href="{{ _model_href }}"{% if not demo %} target="_blank" rel="noopener"{% endif %}>{{ model.display_name or model.original_filename or model.id }}</a></strong>{% else %}<strong>{{ model.display_name or model.original_filename or model.id }}</strong>{% endif %}
                 {% if model.paper and not model.paper.is_public %}<small class="inst-cell-sub"><span class="inst-visibility-chip">Private</span></small>{% endif %}
               </td>
-              <td>{% if _paper_href %}<a class="dashboard-institution-link" href="{{ _paper_href }}"{% if not demo %} target="_blank" rel="noopener"{% endif %}>{{ model.paper.title }}</a>{% elif model.paper %}{{ model.paper.title }}{% else %}-{% endif %}</td>
-              <td>{{ format_file_size(model.file_size) }}</td>
-              <td><span class="status-chip">{{ model.license_type|title }}</span></td>
-              <td>{{ model.access_expires_at.strftime("%Y-%m-%d") if model.access_expires_at else "Open-ended" }}</td>
-              <td>{% if _model_href %}<a href="{{ _model_href }}" class="btn-secondary btn-compact"{% if not demo %} target="_blank" rel="noopener"{% endif %}>View</a>{% else %}<span class="inst-cell-sub">Private</span>{% endif %}</td>
+              <td data-label="By">{{ model.user.username or model.user.email if model.user else '-' }}</td>
+              <td data-label="Project">{% if _paper_href %}<a class="dashboard-institution-link" href="{{ _paper_href }}"{% if not demo %} target="_blank" rel="noopener"{% endif %}>{{ model.paper.title }}</a>{% elif model.paper %}{{ model.paper.title }}{% else %}-{% endif %}</td>
+              <td data-label="Size">{{ format_file_size(model.file_size) }}</td>
+              <td data-label="Status">{% if model.license_type != 'institutional' %}<span class="status-chip" title="Re-licensed individually; no longer counts against the quota">{{ get_license_plan(model.license_type).label }}</span>{% else %}<span class="status-chip inst-model-{{ _state }}">{{ _state|title }}</span>{% endif %}</td>
+              <td data-label="Until">{{ model.access_expires_at.strftime("%Y-%m-%d") if model.access_expires_at else "Open-ended" }}</td>
+              <td data-label="">{% if _model_href %}<a href="{{ _model_href }}" class="btn-secondary btn-compact"{% if not demo %} target="_blank" rel="noopener"{% endif %}>View</a>{% else %}<span class="inst-cell-sub">Private</span>{% endif %}</td>
             </tr>
           {% else %}
-            <tr><td colspan="6">No institution-funded models yet.</td></tr>
+            <tr><td colspan="7">No institution-funded models yet.</td></tr>
           {% endfor %}
         </tbody>
       </table>

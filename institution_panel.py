@@ -330,7 +330,7 @@ def models_list():
     membership, institution = _require_institution_admin()
     page = max(request.args.get("page", type=int) or 1, 1)
     pagination = (
-        Model3D.query.options(selectinload(Model3D.paper))
+        Model3D.query.options(selectinload(Model3D.paper), selectinload(Model3D.user))
         .join(Paper, Model3D.paper_id == Paper.id)
         .filter(Model3D.institution_id == institution.id)
         .order_by(Model3D.created_at.desc())
