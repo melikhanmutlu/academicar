@@ -333,6 +333,41 @@
     }
     .annotation-hotspot:hover { background: rgba(255, 104, 44, 0.85); }
     .annotation-hotspot[data-hidden] { opacity: 0; pointer-events: none; transform: scale(0.8); }
+    /* Guided tour (presentation mode): one label at a time, the rest dimmed. */
+    .tour-mode .annotation-hotspot { opacity: 0.35; }
+    .tour-mode .annotation-hotspot[data-hidden] { opacity: 0.35; pointer-events: auto; transform: none; }
+    .tour-mode .annotation-hotspot.is-tour-active { opacity: 1; background: rgba(255, 104, 44, 0.92); border-color: transparent; }
+    .tour-mode .viewer-control-panel { display: none !important; }
+    .tour-bar {
+      position: absolute; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 45;
+      transform: translateX(-50%); width: min(720px, calc(100% - 24px));
+      display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center;
+      padding: 14px 16px; border-radius: 14px; color: #fff;
+      background: rgba(17, 17, 17, 0.92); border: 1px solid rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    }
+    .tour-bar[hidden] { display: none; }
+    .tour-step { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #ff8a5c; }
+    .tour-title { margin-top: 2px; font-size: 18px; font-weight: 700; line-height: 1.25; }
+    .tour-desc { margin-top: 4px; font-size: 14px; line-height: 1.45; color: rgba(255, 255, 255, 0.78); max-height: 4.4em; overflow-y: auto; }
+    .tour-desc:empty { display: none; }
+    .tour-controls { display: flex; gap: 6px; align-items: center; }
+    .tour-controls button {
+      min-width: 40px; height: 40px; padding: 0 12px; border-radius: 10px; font-size: 14px; font-weight: 600;
+      color: #fff; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.14);
+    }
+    .tour-controls button:hover { background: rgba(255, 255, 255, 0.18); }
+    .tour-controls .tour-next { background: #ff682c; border-color: transparent; }
+    .tour-controls button:disabled { opacity: 0.35; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .tour-bar { background: rgba(255, 255, 255, 0.95); color: #202020; border-color: #e8e8e8; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .tour-desc { color: #4d4d4d; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .tour-step { color: #c2410c; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .tour-controls button:not(.tour-next) { color: #202020; background: #f5f5f5; border-color: #e8e8e8; }
+    @media (max-width: 640px) {
+      .tour-bar { grid-template-columns: minmax(0, 1fr); bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+      .tour-controls { justify-content: space-between; }
+      .tour-controls .tour-next { flex: 1; }
+    }
     .annotation-delete-btn {
       display: none;
       background: none;
@@ -374,6 +409,7 @@
       font-size: 1.1rem; line-height: 1; cursor: pointer; padding: 2px;
     }
     .annotation-note-popover .note-close:hover { color: #fff; }
+    #measureBtn.is-active,
     #annotateBtn.is-active {
       background: #ff682c !important;
       border-color: #ff682c !important;
@@ -401,6 +437,22 @@
       max-width: calc(100vw - 32px);
     }
     .annotate-hint[hidden] { display: none; }
+    /* Measure tool: two surface points, a line and the distance. */
+    .measure-point {
+      width: 12px; height: 12px; border-radius: 50%; padding: 0; pointer-events: none;
+      background: #ff682c; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+    }
+    .measure-label {
+      pointer-events: none; padding: 4px 10px; border-radius: 999px; white-space: nowrap;
+      font-size: 13px; font-weight: 700; color: #fff; background: rgba(17, 17, 17, 0.9);
+      border: 1px solid rgba(255, 104, 44, 0.9); transform: translateY(-18px);
+    }
+    .measure-point[hidden], .measure-label[hidden] { display: none; }
+    /* Above the viewer (z-10), below the toolbar (z-30). */
+    .measure-line { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 11; overflow: visible; }
+    #measureHint { white-space: normal; border-radius: 16px; width: max-content; }
+    #measureHint .annotate-hint-text { min-width: 0; }
+    .measure-line line { stroke: #ff682c; stroke-width: 2.5; stroke-dasharray: 6 4; }
     .annotate-hint-dot {
       width: 9px; height: 9px; border-radius: 999px; background: #ff682c;
       animation: pulseDot 1.4s ease-in-out infinite;
@@ -1052,7 +1104,16 @@
         <span class="annotation-delete-btn" data-delete-ann="{{ ann.id }}" role="button" tabindex="0" title="Remove label" aria-label="Remove label {{ ann.label }}">×</span>
       </button>
       {% endfor %}{% endif %}
+      <div class="measure-point" slot="hotspot-measure-a" data-position="0m 0m 0m" hidden></div>
+      <div class="measure-point" slot="hotspot-measure-b" data-position="0m 0m 0m" hidden></div>
+      <div class="measure-label" slot="hotspot-measure-mid" data-position="0m 0m 0m" id="measureLabel" hidden></div>
     </model-viewer>
+    <svg class="measure-line" id="measureLine" aria-hidden="true" hidden><line x1="0" y1="0" x2="0" y2="0"></line></svg>
+    <div id="measureHint" class="annotate-hint" role="status" hidden>
+      <span class="annotate-hint-dot" aria-hidden="true"></span>
+      <span class="annotate-hint-text" id="measureHintText">Click or tap two points on the model</span>
+      <button type="button" id="measureHintDone" class="annotate-hint-done">Done</button>
+    </div>
     {% if has_usdz and 'ar' in viewer_features %}
     <a
       id="iosQuickLookLink"
@@ -1129,11 +1190,19 @@
         {% if annotations and 'annotations' in viewer_features %}<button id="annotationsBtn" class="viewer-tool-btn" type="button" aria-label="Labels" aria-pressed="true">
           <svg class="sm:hidden viewer-icon-labels" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h8M2 8h6M2 12h10"/><circle cx="13" cy="4" r="1.5"/></svg>
           <span class="hidden sm:inline">Labels</span>
+        </button>
+        <button id="tourBtn" class="viewer-tool-btn" type="button" aria-label="Tour: present the labels one by one" title="Present the labels one by one (arrow keys or a presentation clicker)">
+          <svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2.5v11l9-5.5z"/></svg>
+          <span class="hidden sm:inline">Tour</span>
         </button>{% endif %}
         {% if is_owner and 'annotations' in viewer_features %}<button id="annotateBtn" class="viewer-tool-btn" type="button" aria-label="Annotate">
           <svg class="sm:hidden viewer-icon-annotate" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 1.5l3 3L5 14H2v-3z"/></svg>
           <span class="hidden sm:inline">Annotate</span>
         </button>{% endif %}
+        <button id="measureBtn" class="viewer-tool-btn" type="button" aria-label="Measure a distance" aria-pressed="false" title="Measure the distance between two points">
+          <svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 11.5l10-10 3 3-10 10z"/><path d="M4.5 8.5l1.5 1.5M6.5 6.5l1 1M8.5 4.5l1.5 1.5"/></svg>
+          <span class="hidden sm:inline">Measure</span>
+        </button>
         {% if 'ar' in viewer_features %}<button id="arBtn" data-ar-btn class="viewer-tool-btn primary" type="button" aria-label="View in AR">
           <svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1L14 4.5v7L8 15L2 11.5v-7z"/><path d="M8 1v6.5M8 7.5L14 4.5M8 7.5L2 4.5"/></svg>
           <span class="hidden sm:inline">View in AR</span>
@@ -1439,6 +1508,21 @@
         </div>
       </div>
     </div>
+    {% if annotations and 'annotations' in viewer_features %}
+    <div class="tour-bar" id="tourBar" role="region" aria-label="Guided tour" aria-live="polite" hidden>
+      <div>
+        <p class="tour-step" id="tourStep"></p>
+        <p class="tour-title" id="tourTitle"></p>
+        <p class="tour-desc" id="tourDesc"></p>
+      </div>
+      <div class="tour-controls">
+        <button type="button" id="tourPrev" aria-label="Previous label">&larr;</button>
+        <button type="button" id="tourPlay" aria-pressed="false" title="Play automatically">Play</button>
+        <button type="button" class="tour-next" id="tourNext">Next &rarr;</button>
+        <button type="button" id="tourClose" aria-label="End tour">&times;</button>
+      </div>
+    </div>
+    {% endif %}
   </main>
 
   <script>
@@ -1706,6 +1790,193 @@
       });
     });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideAnnotationNote(); });
+
+    // --- Guided tour: step through the labels with the camera (presentations,
+    // teaching, kiosks). Arrow keys / PageUp-PageDown (presentation clickers) /
+    // Space; ?tour=1 opens it, ?tour=autoplay also plays it on a loop. ---
+    const tourBar = document.getElementById('tourBar');
+    const tourBtn = document.getElementById('tourBtn');
+    if (tourBar && viewer) {
+      const tourStops = Array.from(document.querySelectorAll('.annotation-hotspot'));
+      const tourEls = {
+        step: document.getElementById('tourStep'), title: document.getElementById('tourTitle'),
+        desc: document.getElementById('tourDesc'), prev: document.getElementById('tourPrev'),
+        next: document.getElementById('tourNext'), play: document.getElementById('tourPlay'),
+        close: document.getElementById('tourClose'),
+      };
+      const TOUR_INTERVAL_MS = 6000;
+      let tourIndex = -1;
+      let tourTimer = null;
+      const tourActive = () => tourIndex >= 0;
+      const setTourPlaying = (on) => {
+        clearInterval(tourTimer);
+        tourTimer = on ? setInterval(() => showTourStop((tourIndex + 1) % tourStops.length), TOUR_INTERVAL_MS) : null;
+        tourEls.play.textContent = on ? 'Pause' : 'Play';
+        tourEls.play.setAttribute('aria-pressed', on ? 'true' : 'false');
+      };
+      const showTourStop = (index) => {
+        if (!tourStops.length) return;
+        tourIndex = Math.max(0, Math.min(index, tourStops.length - 1));
+        const stop = tourStops[tourIndex];
+        tourStops.forEach((el) => el.classList.toggle('is-tour-active', el === stop));
+        if (stop.dataset.cameraOrbit) {
+          flyCameraToAnnotation(stop);
+        } else if (stop.dataset.position) {
+          // Older labels have no saved angle: at least centre on the label.
+          if (typeof setAutoRotateState === 'function') setAutoRotateState(false);
+          viewer.cameraTarget = stop.dataset.position.split(' ').map((v) => `${v}m`).join(' ');
+        }
+        tourEls.step.textContent = `${tourIndex + 1} / ${tourStops.length}`;
+        tourEls.title.textContent = stop.querySelector('.annotation-label')?.textContent || 'Label';
+        tourEls.desc.textContent = stop.dataset.annotationDesc || '';
+        tourEls.prev.disabled = tourIndex === 0;
+        tourEls.next.textContent = tourIndex === tourStops.length - 1 ? 'Finish' : 'Next \u2192';
+      };
+      const startTour = (autoplay = false) => {
+        if (!tourStops.length) return;
+        hideAnnotationNote();
+        // Fullscreen is requested on <main>; the bar lives inside it.
+        document.body.classList.add('tour-mode');
+        tourBtn?.classList.add('is-active');
+        tourBar.hidden = false;
+        showTourStop(0);
+        setTourPlaying(autoplay);
+        tourEls.next.focus({ preventScroll: true });
+      };
+      const endTour = () => {
+        setTourPlaying(false);
+        tourIndex = -1;
+        tourBar.hidden = true;
+        document.body.classList.remove('tour-mode');
+        tourBtn?.classList.remove('is-active');
+        tourStops.forEach((el) => el.classList.remove('is-tour-active'));
+        // Back to the framing the model opened with.
+        const home = initialCamera || { orbit: defaultCameraOrbit, target: 'auto auto auto', fov: defaultFieldOfView };
+        viewer.cameraOrbit = home.orbit;
+        viewer.cameraTarget = home.target;
+        viewer.fieldOfView = home.fov;
+        tourBtn?.focus({ preventScroll: true });
+      };
+      const nextTourStop = () => {
+        if (tourIndex >= tourStops.length - 1) { endTour(); return; }
+        showTourStop(tourIndex + 1);
+      };
+      tourBtn?.addEventListener('click', () => (tourActive() ? endTour() : startTour()));
+      tourEls.next.addEventListener('click', () => { setTourPlaying(false); nextTourStop(); });
+      tourEls.prev.addEventListener('click', () => { setTourPlaying(false); showTourStop(tourIndex - 1); });
+      tourEls.play.addEventListener('click', () => setTourPlaying(!tourTimer));
+      tourEls.close.addEventListener('click', endTour);
+      document.addEventListener('keydown', (e) => {
+        if (!tourActive() || e.target.closest?.('input, textarea, select')) return;
+        // Space on a focused button already clicks it.
+        if (e.key === ' ' && e.target.closest?.('button')) return;
+        if (['ArrowRight', 'PageDown', ' '].includes(e.key)) {
+          e.preventDefault(); setTourPlaying(false); nextTourStop();
+        } else if (['ArrowLeft', 'PageUp'].includes(e.key)) {
+          e.preventDefault(); setTourPlaying(false); showTourStop(tourIndex - 1);
+        } else if (e.key === 'Escape') {
+          endTour();
+        }
+      });
+      const tourParam = new URLSearchParams(window.location.search).get('tour');
+      if (tourParam === '1' || tourParam === 'autoplay') {
+        const openTour = () => setTimeout(() => startTour(tourParam === 'autoplay'), 400);
+        // A cached model can finish loading before this script runs.
+        if (viewer.loaded) openTour(); else viewer.addEventListener('load', openTour, { once: true });
+      }
+    }
+
+    // --- Measure: distance between two surface points. The GLB is in metres
+    // at real scale (the upload's source unit is applied at conversion). ---
+    const measureBtn = document.getElementById('measureBtn');
+    if (measureBtn && viewer) {
+      const measureHint = document.getElementById('measureHint');
+      const measureHintText = document.getElementById('measureHintText');
+      const measureLine = document.getElementById('measureLine');
+      const measureLabel = document.getElementById('measureLabel');
+      const pointA = viewer.querySelector('[slot="hotspot-measure-a"]');
+      const pointB = viewer.querySelector('[slot="hotspot-measure-b"]');
+      let measureMode = false;
+      let points = [];
+      const formatDistance = (metres) => {
+        const mm = metres * 1000;
+        if (mm < 10) return `${mm.toFixed(1)} mm`;
+        if (mm < 1000) return `${(mm / 10).toFixed(1)} cm`;
+        return `${(mm / 1000).toFixed(2)} m`;
+      };
+      const asPosition = (p) => `${p.x}m ${p.y}m ${p.z}m`;
+      const drawLine = () => {
+        if (points.length < 2 || measureLine.hasAttribute('hidden')) return;
+        const a = viewer.queryHotspot && viewer.queryHotspot('hotspot-measure-a');
+        const b = viewer.queryHotspot && viewer.queryHotspot('hotspot-measure-b');
+        if (!a || !b) return;
+        const host = measureLine.parentElement.getBoundingClientRect();
+        const rect = viewer.getBoundingClientRect();
+        const dx = rect.left - host.left;
+        const dy = rect.top - host.top;
+        const line = measureLine.querySelector('line');
+        line.setAttribute('x1', a.canvasPosition.x + dx);
+        line.setAttribute('y1', a.canvasPosition.y + dy);
+        line.setAttribute('x2', b.canvasPosition.x + dx);
+        line.setAttribute('y2', b.canvasPosition.y + dy);
+      };
+      const clearMeasure = () => {
+        points = [];
+        [pointA, pointB, measureLabel].forEach((el) => { el.hidden = true; });
+        // <svg> has no .hidden property; toggle the attribute.
+        measureLine.setAttribute('hidden', '');
+      };
+      const setMeasureMode = (on) => {
+        measureMode = on;
+        measureBtn.classList.toggle('is-active', on);
+        measureBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        measureHint.hidden = !on;
+        // Clicking the model normally re-centres the camera on that point,
+        // which would slide the first point away while picking the second.
+        viewer.toggleAttribute('disable-tap', on);
+        if (on) {
+          // Both tools place points with a click; only one at a time.
+          if (document.getElementById('annotateBtn')?.classList.contains('is-active')) document.getElementById('annotateBtn').click();
+          if (typeof setAutoRotateState === 'function') setAutoRotateState(false);
+          measureHintText.textContent = 'Click or tap two points on the model';
+        } else {
+          clearMeasure();
+        }
+      };
+      measureBtn.addEventListener('click', () => setMeasureMode(!measureMode));
+      document.getElementById('measureHintDone')?.addEventListener('click', () => setMeasureMode(false));
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && measureMode) setMeasureMode(false); });
+      viewer.addEventListener('click', (e) => {
+        if (!measureMode) return;
+        if (e.target.closest && e.target.closest('.annotation-hotspot')) return;
+        const rect = viewer.getBoundingClientRect();
+        const hit = viewer.positionAndNormalFromPoint(e.clientX - rect.left, e.clientY - rect.top);
+        if (!hit) return;
+        if (points.length >= 2) clearMeasure();
+        // Copy: model-viewer may reuse the returned vector on the next query.
+        points.push({ x: hit.position.x, y: hit.position.y, z: hit.position.z });
+        const point = points.length === 1 ? pointA : pointB;
+        // Unhide first: model-viewer skips hotspots that are display:none.
+        point.hidden = false;
+        viewer.updateHotspot({ name: points.length === 1 ? 'hotspot-measure-a' : 'hotspot-measure-b', position: asPosition(points[points.length - 1]) });
+        if (points.length === 1) {
+          measureHintText.textContent = 'Now the second point';
+          return;
+        }
+        const [a, b] = points;
+        const metres = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+        measureLabel.textContent = formatDistance(metres);
+        measureLabel.hidden = false;
+        viewer.updateHotspot({ name: 'hotspot-measure-mid', position: asPosition({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2 }) });
+        measureLine.removeAttribute('hidden');
+        measureHintText.textContent = `${formatDistance(metres)} · click again for a new measurement`;
+        // Hotspot screen positions update on the next rendered frames.
+        requestAnimationFrame(() => requestAnimationFrame(drawLine));
+        setTimeout(drawLine, 120);
+      });
+      viewer.addEventListener('camera-change', () => requestAnimationFrame(drawLine));
+      window.addEventListener('resize', () => requestAnimationFrame(drawLine));
+    }
 
     // --- Owner: interactive annotation placement ---
     const annotateBtn = document.getElementById('annotateBtn');

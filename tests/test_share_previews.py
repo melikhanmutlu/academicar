@@ -142,3 +142,30 @@ def test_qr_svg_decodes_to_the_resolver_url(app):
     reference.add_data(url)
     reference.make(fit=True)
     assert qr_matrix(url) == reference.get_matrix()
+
+
+def test_viewer_offers_a_guided_tour_when_the_model_has_labels(client, app):
+    from models import ModelAnnotation
+
+    register(client)
+    model_id, _ = _model(app)
+    client.post("/auth/logout")
+    assert 'id="tourBtn"' not in client.get(f"/view/{model_id}").get_data(as_text=True)
+    with app.app_context():
+        db.session.add(ModelAnnotation(model_id=model_id, position_x=0, position_y=0, position_z=0,
+                                       label="Pedicle", description="Bridge to the arch.", order_index=0,
+                                       camera_orbit="30deg 75deg auto"))
+        db.session.commit()
+    html = client.get(f"/view/{model_id}").get_data(as_text=True)
+    assert 'id="tourBtn"' in html
+    assert 'id="tourBar"' in html and "PageDown" in html
+
+
+def test_viewer_has_a_measure_tool(client, app):
+    register(client)
+    model_id, _ = _model(app)
+    client.post("/auth/logout")
+    html = client.get(f"/view/{model_id}").get_data(as_text=True)
+    assert 'id="measureBtn"' in html
+    assert 'slot="hotspot-measure-a"' in html and 'slot="hotspot-measure-b"' in html
+    assert "disable-tap" in html  # picking points must not re-centre the camera

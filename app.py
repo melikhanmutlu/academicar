@@ -282,8 +282,10 @@ def create_app(test_config: dict | None = None) -> Flask:
             if "already exists" not in str(exc).lower():
                 raise
             logger.warning("SQLite schema already existed during create_all; continuing with compatibility checks.")
-        sync_configured_admins(app)
+        # Add missing columns first: the admin sync below loads User rows,
+        # which select every mapped column.
         ensure_sqlite_schema(app)
+        sync_configured_admins(app)
         seed_license_plans(app)
         seed_builtin_blog_posts(app)
         stamp_alembic_version_if_needed(app)
