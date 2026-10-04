@@ -279,7 +279,7 @@
                 {% if replacement_failed %}<p class="text-sm text-red-600 mt-2">The replacement file could not be processed; the previous version is still live.{% if m.replacement_error %} {{ m.replacement_error }}{% endif %}</p>{% endif %}
                 {% if m.collage_path %}
                   <a href="{{ url_for('serve_collage', unique_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-collage-link">
-                    <img src="{{ url_for('serve_collage', unique_id=m.id) }}" alt="Combined view of {{ m.display_name or m.original_filename }}" loading="lazy">
+                    <img src="{{ url_for('serve_collage', unique_id=m.id) }}" alt="Combined view of {{ m.display_name or m.original_filename }}" loading="lazy" onerror="this.closest('a').style.display = 'none';">
                     <span>Combined view</span>
                   </a>
                 {% endif %}

@@ -39,7 +39,8 @@
         <div class="grid sm:grid-cols-2 gap-4">
           <div>
             {{ form.password.label(class="field-label") }}
-            {{ form.password(class="field-input") }}
+            {{ form.password(class="field-input", **{"aria-describedby": "password-hint"}) }}
+            <p id="password-hint" class="text-xs text-[#6b6b6b] mt-1">At least {{ form.password.flags.minlength or 8 }} characters.</p>
             {% for e in form.password.errors %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
           </div>
           <div>

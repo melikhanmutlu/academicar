@@ -13,6 +13,7 @@ from datetime import UTC, datetime, timedelta
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_limiter.util import get_remote_address
 from flask_login import current_user, login_required
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import selectinload
 
@@ -386,7 +387,17 @@ def join(token):
             role="member",
             invite_id=invite.id,
         )
-        invite.use_count += 1
+        # Claim a use atomically: two joins racing on the last use of a
+        # limited invite must not both succeed.
+        claimed = (
+            InstitutionInvite.query.filter(
+                InstitutionInvite.id == invite.id,
+                or_(InstitutionInvite.max_uses.is_(None), InstitutionInvite.use_count < InstitutionInvite.max_uses),
+            ).update({"use_count": InstitutionInvite.use_count + 1}, synchronize_session=False)
+        )
+        if not claimed:
+            db.session.rollback()
+            return render_template("institution/join.html", invite=None), 404
         db.session.add(member)
         try:
             db.session.commit()
