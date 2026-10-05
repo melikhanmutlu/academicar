@@ -73,6 +73,7 @@ from blog_content import code_post_slugs, get_all_posts, get_post, render_body
 from discipline_content import all_disciplines, discipline_slugs, get_discipline, related_disciplines
 from institution_panel import institution_bp
 from layer_editor import layer_editor_bp, model_has_layers
+from comparisons import comparisons_bp
 from collaborators import (
     add_collaborator,
     can_edit_project,
@@ -231,6 +232,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.register_blueprint(auth_bp)
     app.register_blueprint(institution_bp)
     app.register_blueprint(layer_editor_bp)
+    app.register_blueprint(comparisons_bp)
 
     @app.context_processor
     def inject_globals():
