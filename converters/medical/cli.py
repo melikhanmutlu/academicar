@@ -16,7 +16,7 @@ import sys
 import tempfile
 import warnings
 
-from .common import MEDICAL_PRESETS, MedicalError, safe_extract
+from .common import MedicalError, parse_presets, safe_extract
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +37,7 @@ def run_conversion(kind: str, input_path: str, output_path: str, preset: str | N
         # The parent may pass its own directory so a killed child leaves nothing behind.
         with tempfile.TemporaryDirectory(dir=workdir_root or out_dir, prefix=".medical_") as workdir:
             if kind == "dicom":
-                preset = preset or "auto"
-                if preset not in MEDICAL_PRESETS:
-                    raise MedicalError("Unknown preset.")
+                parse_presets(preset)  # "bone,skin": validate before unpacking anything
                 if not _is_zip(input_path):
                     raise MedicalError("Upload the whole DICOM series as a ZIP file (a single .dcm file holds only one slice).")
                 source = load_series(safe_extract(input_path, workdir), preset)

@@ -664,7 +664,12 @@
         if (unit && ['glb', 'fbx', 'step', 'stp', 'zip', 'nii', 'gz', 'nrrd', 'dcm'].includes(ext)) unit.value = 'embedded';
         else if (unit && unit.value === 'embedded' && ['stl', 'obj'].includes(ext)) unit.value = '';
         const nameInput = uploadForm.querySelector('[name="display_name"]');
-        if (nameInput && (!nameInput.value.trim() || nameInput.value === nameInput.dataset.autoName)) {
+        // Scan filenames often carry patient names: never copy them into the model name.
+        const isMedicalFile = ['zip', 'nii', 'gz', 'nrrd', 'dcm'].includes(ext);
+        if (nameInput && isMedicalFile && nameInput.value === nameInput.dataset.autoName) {
+          nameInput.value = '';
+          nameInput.dataset.autoName = '';
+        } else if (nameInput && !isMedicalFile && (!nameInput.value.trim() || nameInput.value === nameInput.dataset.autoName)) {
           const base = file.name.replace(/\.nii\.gz$/i, '').replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ').trim();
           nameInput.value = base;
           nameInput.dataset.autoName = base;

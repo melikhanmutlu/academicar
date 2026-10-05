@@ -29,7 +29,7 @@ MEDICAL_PRESETS: dict[str, dict] = {
     },
     "skin": {
         "label": "Skin",
-        "description": "Outer body surface (CT, -300 HU and above). The scanner table can be included.",
+        "description": "Outer body surface (CT, -300 HU and above). Only the largest connected piece (the body) is kept.",
         "color": "#FFCBA4",
         "modality": "CT",
         "threshold_hu": -300,
@@ -39,7 +39,8 @@ MEDICAL_PRESETS: dict[str, dict] = {
         "label": "Contrast vessels",
         "description": (
             "Contrast-filled vessels (CT, 150 HU and above). Bone is included as well because "
-            "thresholding cannot separate bright vessels from bone."
+            "thresholding cannot separate bright vessels from bone, unless you also choose Bone: "
+            "then bone is left out of this layer so the two layers do not overlap."
         ),
         "color": "#CC2222",
         "modality": "CT",
@@ -76,6 +77,18 @@ NRRD_SUFFIX = ".nrrd"
 
 class MedicalError(Exception):
     """A user-facing problem with the uploaded scan. The message is shown as-is."""
+
+
+def parse_presets(value) -> list[str]:
+    """Preset keys from a comma-separated string ("bone,skin"); empty -> ["auto"], duplicates dropped."""
+    keys: list[str] = []
+    for part in str(value or "").split(","):
+        key = part.strip().lower()
+        if key and key not in keys:
+            keys.append(key)
+    if any(k not in MEDICAL_PRESETS for k in keys):
+        raise MedicalError("Unknown preset.")
+    return keys or ["auto"]
 
 
 def _env_int(name: str, default: int) -> int:

@@ -10,8 +10,9 @@ import math
 
 import numpy as np
 
-from .common import MEDICAL_PRESETS, MedicalError, max_voxels
+from .common import MEDICAL_PRESETS, MedicalError, max_voxels, parse_presets
 from .meshing import Grid, LayerSource, Source, choose_strides, fmt_mm
+from .segmentation import _load_dicom_seg
 
 _PREFERRED_MODALITIES = ("CT", "MR")
 _MIN_SLICES = 3
@@ -95,8 +96,33 @@ def _read_slice(path, as_int):
     return hu
 
 
+def _use_segmentation(segs):
+    """Source for the DICOM-SEG with the most frames, or (None, note) when it cannot be read."""
+    best = max(segs, key=lambda h: h["frames"])
+    try:
+        source = _load_dicom_seg(best["path"])
+    except MedicalError as exc:
+        reason = str(exc).rstrip(".")
+        return None, f"The DICOM segmentation in this ZIP could not be used ({reason}); a threshold was used instead."
+    source.notes.append("Used the DICOM segmentation found in the ZIP instead of a threshold.")
+    if len(segs) > 1:
+        source.notes.append(f"This ZIP has {len(segs)} DICOM segmentations; used the one with the most frames.")
+    return source, None
+
+
 def load_series(paths, preset: str) -> Source:
+    """``preset`` is one preset key or a comma-separated list ("bone,skin"); each becomes a layer."""
+    presets = parse_presets(preset)
     headers = [h for h in (_header(p) for p in paths) if h]
+    notes = []
+    # A DICOM-SEG exported next to the CT (3D Slicer, OHIF) is what the user wants to see.
+    segs = [h for h in headers if h["modality"] == "SEG"]
+    headers = [h for h in headers if h["modality"] != "SEG"]
+    if segs:
+        source, note = _use_segmentation(segs)
+        if source is not None:
+            return source
+        notes.append(note)
     if not headers:
         raise MedicalError(_NO_SLICES)
     group = _pick_series(headers)
@@ -130,6 +156,9 @@ def load_series(paths, preset: str) -> Source:
     group = unique
     if len(group) < _MIN_SLICES:
         raise MedicalError(f"At least {_MIN_SLICES} slices are needed to build a 3D model; this series has {len(group)}.")
+    series_count = len({h["series"] for h in headers})
+    if series_count > 1:  # counts only: no series descriptions or UIDs
+        notes.append(f"This ZIP has {series_count} image series; used the one with {len(group)} slices.")
 
     positions = np.array([h["ipp"] for h in group])
     steps = np.diff(positions, axis=0)
@@ -155,7 +184,6 @@ def load_series(paths, preset: str) -> Source:
     # Voxel cap: stride the grid while reading, slice by slice, so the full
     # volume never has to fit in memory.
     si, sj, sk = choose_strides((cols, rows, n), np.linalg.norm(affine[:3, :3], axis=0), max_voxels())
-    notes = []
     if (si, sj, sk) != (1, 1, 1):
         affine[:3, 0] *= si
         affine[:3, 1] *= sj
@@ -171,51 +199,81 @@ def load_series(paths, preset: str) -> Source:
     for k, h in enumerate(chosen):
         volume[:, :, k] = _read_slice(h["path"], as_int)[::sj, ::si].T
 
-    preset_info, preset_notes = _resolve_preset(preset, modality)
+    infos, preset_notes = _resolve_presets(presets, modality)
     notes.extend(preset_notes)
-    layer = _threshold_layer(volume, preset_info)
     return Source(
         grid=Grid(shape=shape, affine=affine, frame="LPS"),
-        layers=[layer],
+        layers=_threshold_layers(volume, infos),
         notes=notes,
         empty_error="No structure matched the selected preset in this scan.",
         modality=modality,
     )
 
 
-def _resolve_preset(preset: str, modality):
-    info = MEDICAL_PRESETS[preset]
-    if info["modality"] == "CT" and modality != "CT":
+def _resolve_presets(presets, modality):
+    """Preset keys to build, in order. Without Hounsfield units (not CT) every HU preset becomes "auto"."""
+    keys, fallback = [], []
+    for key in presets:
+        info = MEDICAL_PRESETS[key]
+        if info["modality"] == "CT" and modality != "CT":
+            fallback.append(info["label"])
+            key = "auto"
+        if key not in keys:
+            keys.append(key)
+    notes = []
+    if fallback:
         shown = modality or "unknown"
-        return MEDICAL_PRESETS["auto"], [
+        plural = "s" if len(fallback) > 1 else ""
+        notes.append(
             f"This scan is not CT ({shown}) and has no Hounsfield units, so the automatic threshold "
-            f"was used instead of the {info['label']} preset."
-        ]
-    return info, []
+            f"was used instead of the {', '.join(fallback)} preset{plural}."
+        )
+    return keys, notes
 
 
-def _threshold_layer(volume: np.ndarray, preset_info: dict) -> LayerSource:
+def _threshold_layers(volume: np.ndarray, keys) -> list:
+    from scipy import ndimage
     from skimage.filters import threshold_otsu
 
     cache: dict = {}
 
-    def load():
-        if "mask" not in cache:
-            if preset_info["mode"] == "otsu":
+    def mask_for(key):
+        if key not in cache:
+            info = MEDICAL_PRESETS[key]
+            if info["mode"] == "otsu":
                 threshold = float(threshold_otsu(volume))
             else:
-                threshold = preset_info["threshold_hu"]
-            mask = volume >= threshold if preset_info["mode"] == "min" else volume > threshold
-            if preset_info is MEDICAL_PRESETS["skin"]:
+                threshold = info["threshold_hu"]
+            mask = volume >= threshold if info["mode"] == "min" else volume > threshold
+            if key == "contrast" and "bone" in keys:
+                # Bone (plus one voxel of partial-volume rim) belongs to the Bone layer only.
+                mask &= ~ndimage.binary_dilation(mask_for("bone"))
+            if key == "skin":
                 # Fill the lungs / airways per axial slice so only the outer skin surface is meshed.
-                from scipy import ndimage
-
                 for k in range(mask.shape[2]):
                     mask[:, :, k] = ndimage.binary_fill_holes(mask[:, :, k])
-            cache["mask"] = _clean(mask)
-        return cache["mask"]
+                mask = _largest_component(mask)  # the body, not the scanner table
+            else:
+                mask = _clean(mask)
+            cache[key] = mask
+        return cache[key]
 
-    return LayerSource(name=preset_info["label"], color=preset_info["color"], load=load)
+    return [
+        LayerSource(name=MEDICAL_PRESETS[k]["label"], color=MEDICAL_PRESETS[k]["color"], load=lambda k=k: mask_for(k))
+        for k in keys
+    ]
+
+
+def _largest_component(mask: np.ndarray) -> np.ndarray:
+    """Keep only the biggest connected component (26-connectivity)."""
+    from scipy import ndimage
+
+    labels, count = ndimage.label(mask, structure=np.ones((3, 3, 3), dtype=bool))
+    if count == 0:
+        return mask
+    sizes = np.bincount(labels.ravel())
+    sizes[0] = 0
+    return labels == sizes.argmax()
 
 
 def _clean(mask: np.ndarray) -> np.ndarray:

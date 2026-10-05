@@ -7,6 +7,7 @@ at once.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 
@@ -17,6 +18,7 @@ from .meshing import Grid, LayerSource, Source, rgb_to_hex
 
 _NIFTI_SUFFIXES = (".nii.gz", ".nii")
 _NOT_SEGMENTATION = "This file does not look like a segmentation (it contains continuous image intensities)."
+_ONLY_IMAGES = "This ZIP contains no mask files (only images)."
 _UNREADABLE = "This segmentation file could not be read."
 _NO_LABELS = "No structures were found in this segmentation."
 
@@ -73,24 +75,155 @@ def _label_counts(arr: np.ndarray) -> dict:
     return {int(v): int(c) for v, c in zip(values, counts) if v}
 
 
-def _array_layers(arr: np.ndarray) -> list[LayerSource]:
-    """Layers for a 3D label map (or binary mask), named "Label N"."""
+# More distinct values than this means an image, not a label map (TotalSegmentator has ~120 classes).
+_MAX_LABELS = 255
+
+
+def _classify(arr: np.ndarray):
+    """What a volume's values say it is: ("mask" | "labels" | "image", {label: voxels} or None).
+
+    Binary data (0/1, bool, floats in [0, 1]) and volumes with a single non-zero
+    value are masks; integer maps with two or more non-zero labels are label
+    maps; continuous intensities (non-integer floats, negative values such as
+    HU, hundreds of distinct values) are images.
+    """
     if arr.dtype == np.bool_:
         arr = arr.astype(np.uint8)
+    if arr.size == 0:
+        return "image", None
     if np.issubdtype(arr.dtype, np.floating):
         if not np.isfinite(arr).all():
-            raise MedicalError(_NOT_SEGMENTATION)
+            return "image", None
         if arr.min() >= 0 and arr.max() <= 1.0 + 1e-6:
-            # Binary float mask (e.g. a resampled or probability-style mask).
-            return [LayerSource("Label 1", None, lambda: arr > 0.5)]
+            return "mask", None  # binary float mask (e.g. resampled or probability-style)
         if not np.array_equal(arr, np.rint(arr)):
-            raise MedicalError(_NOT_SEGMENTATION)
+            return "image", None
         arr = arr.astype(np.int32)
+    elif not np.issubdtype(arr.dtype, np.integer):
+        return "image", None
+    if arr.min() < 0:
+        return "image", None
     counts = _label_counts(arr)
-    return [
-        LayerSource(f"Label {v}", None, (lambda v=v: arr == v), count=c)
-        for v, c in sorted(counts.items())
-    ]
+    if len(counts) > _MAX_LABELS:
+        return "image", None
+    return ("labels" if len(counts) >= 2 else "mask"), counts
+
+
+def _array_layers(arr: np.ndarray, table: dict | None = None) -> list[LayerSource]:
+    """Layers for a 3D label map (or binary mask), named "Label N" unless ``table`` names N."""
+    kind, counts = _classify(arr)
+    if kind == "image":
+        raise MedicalError(_NOT_SEGMENTATION)
+    if counts is None:
+        return [LayerSource("Label 1", None, lambda: arr > 0.5)]
+    layers = []
+    for v, c in sorted(counts.items()):
+        name, color = (table or {}).get(v, (None, None))
+        layers.append(LayerSource(name or f"Label {v}", color, (lambda v=v: arr == v), count=c))
+    return layers
+
+
+# --------------------------------------------------------------- label tables
+#
+# Optional names (and colours) for label values: an ITK-SNAP label description
+# file, a 3D Slicer colour table or a JSON object. A table is a dict
+# {value: (name or None, "#RRGGBB" or None)}; anything unparseable is ignored.
+
+_TABLE_SUFFIXES = (".txt", ".ctbl", ".json", ".lut")
+_TABLE_MAX_BYTES = 1 << 20
+_ITK_SNAP_LINE = re.compile(r'(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+[\d.]+\s+\d+\s+\d+\s+"(.*)"')
+_SLICER_LINE = re.compile(r"(\d+)\s+(.+?)\s+(\d+)\s+(\d+)\s+(\d+)\s+\d+")
+
+
+def _rgb_hex(r, g, b) -> str | None:
+    try:
+        return rgb_to_hex((int(r), int(g), int(b)))
+    except (ValueError, TypeError):
+        return None
+
+
+def _table_from_text(text: str) -> dict:
+    itk, slicer = {}, {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        m = _ITK_SNAP_LINE.fullmatch(line)
+        if m:
+            itk[int(m.group(1))] = (m.group(5).strip() or None, _rgb_hex(*m.group(2, 3, 4)))
+            continue
+        m = _SLICER_LINE.fullmatch(line)
+        if m and not m.group(2).isdigit():  # a name, not just more numbers
+            slicer[int(m.group(1))] = (m.group(2).strip(), _rgb_hex(*m.group(3, 4, 5)))
+    return itk or slicer
+
+
+def _json_color(value) -> str | None:
+    if isinstance(value, str) and re.fullmatch(r"#?[0-9a-fA-F]{6}", value.strip()):
+        return "#" + value.strip().lstrip("#").upper()
+    if isinstance(value, list) and len(value) == 3:
+        return _rgb_hex(*value)
+    return None
+
+
+def _table_from_json(data) -> dict:
+    """{"1": "liver"} or {"1": {"name": "liver", "color": "#aa0000"}}; every key must be an integer."""
+    if not isinstance(data, dict) or not data:
+        return {}
+    table = {}
+    for key, value in data.items():
+        try:
+            number = int(key)
+        except (ValueError, TypeError):
+            return {}
+        if isinstance(value, str):
+            table[number] = (value.strip() or None, None)
+        elif isinstance(value, dict) and isinstance(value.get("name"), str):
+            table[number] = (value["name"].strip() or None, _json_color(value.get("color")))
+        else:
+            return {}
+    return table
+
+
+def _table_from_bytes(raw: bytes) -> dict:
+    try:
+        text = raw.rstrip(b"\x00").decode("utf-8", errors="replace")
+        try:
+            return _table_from_json(json.loads(text))
+        except ValueError:
+            return _table_from_text(text)
+    except Exception:
+        return {}
+
+
+def _read_label_tables(paths) -> dict:
+    table: dict = {}
+    for path in sorted(paths, key=_natural_key):
+        try:
+            with open(path, "rb") as fh:
+                raw = fh.read(_TABLE_MAX_BYTES)
+        except OSError:
+            continue
+        table.update(_table_from_bytes(raw))
+    table.pop(0, None)
+    return table
+
+
+def _nifti_header_labels(img) -> dict:
+    """Label names some tools store as JSON ({"1": "liver"}) in a NIfTI header extension."""
+    try:
+        for ext in img.header.extensions:
+            content = ext.get_content()
+            if isinstance(content, str):
+                content = content.encode("utf-8", errors="replace")
+            data = json.loads(bytes(content).rstrip(b"\x00").decode("utf-8"))
+            if isinstance(data, dict) and all(isinstance(v, str) for v in data.values()):
+                table = _table_from_json(data)
+                if table:
+                    return table
+    except Exception:
+        pass  # not a label table (or not JSON at all): ignore it
+    return {}
 
 
 # ------------------------------------------------------------------ NIfTI
@@ -136,10 +269,10 @@ def _read_nifti_array(img, shape) -> np.ndarray:
         raise MedicalError(_UNREADABLE)
 
 
-def _load_nifti(path: str, workdir: str) -> Source:
+def _load_nifti(path: str, workdir: str, table: dict | None = None) -> Source:
     img = _open_nifti(path, workdir)
     shape, affine = _nifti_geometry(img)
-    layers = _array_layers(_read_nifti_array(img, shape))
+    layers = _array_layers(_read_nifti_array(img, shape), {**_nifti_header_labels(img), **(table or {})})
     return Source(Grid(shape, affine, "RAS"), layers, empty_error=_NO_LABELS)
 
 
@@ -189,7 +322,7 @@ def _parse_color(text) -> str | None:
     return rgb_to_hex((r * 255, g * 255, b * 255))
 
 
-def _load_nrrd(path: str) -> Source:
+def _load_nrrd(path: str, table: dict | None = None) -> Source:
     import nrrd
 
     try:
@@ -221,7 +354,7 @@ def _load_nrrd(path: str) -> Source:
     else:
         if layer_axis:
             raise MedicalError("4D NRRD files are only supported when they come from 3D Slicer (.seg.nrrd).")
-        layers = _array_layers(data)
+        layers = _array_layers(data, table)
     return Source(Grid(shape, affine, frame), layers, notes=notes, empty_error=_NO_LABELS)
 
 
@@ -382,7 +515,7 @@ def _natural_key(path: str):
 
 
 def _mask_reader(path: str, workdir: str):
-    """(shape, affine, frame, load) for one binary mask file; load() returns a bool array."""
+    """(shape, affine, frame, read, names) for one mask file; read() returns the raw array."""
     lowered = path.lower()
     if lowered.endswith(".nrrd"):
         import nrrd
@@ -395,17 +528,17 @@ def _mask_reader(path: str, workdir: str):
             raise MedicalError("Each mask file must be a single 3D volume.")
         _spatial, shape, affine, frame, _notes = _nrrd_geometry(header)
 
-        def load():
+        def read():
             try:
                 data, _h = nrrd.read(path)
             except Exception:
                 raise MedicalError(_UNREADABLE)
-            return _to_mask(data)
+            return data
 
-        return shape, affine, frame, load
+        return shape, affine, frame, read, {}
     img = _open_nifti(path, workdir)
     shape, affine = _nifti_geometry(img)
-    return shape, affine, "RAS", lambda: _to_mask(_read_nifti_array(img, shape))
+    return shape, affine, "RAS", lambda: _read_nifti_array(img, shape), _nifti_header_labels(img)
 
 
 def _to_mask(data: np.ndarray) -> np.ndarray:
@@ -414,19 +547,64 @@ def _to_mask(data: np.ndarray) -> np.ndarray:
     return data != 0
 
 
+class _LastVolume:
+    """Keeps only the most recently read volume, so a ZIP of masks never sits in memory at once."""
+
+    def __init__(self):
+        self.key = self.data = None
+
+    def get(self, key, read):
+        if self.key != key:
+            self.key = self.data = None  # release the previous volume before reading the next
+            self.data = read()
+            self.key = key
+        return self.data
+
+
+def _load_single_mask_file(path: str, workdir: str, table: dict) -> Source:
+    """A ZIP with one segmentation file is that file uploaded directly (same layer names)."""
+    try:
+        if path.lower().endswith(".nrrd"):
+            return _load_nrrd(path, table)
+        return _load_nifti(path, workdir, table)
+    except MedicalError as exc:
+        if str(exc) == _NOT_SEGMENTATION:
+            raise MedicalError(_ONLY_IMAGES)
+        raise
+
+
 def _load_mask_zip(zip_path: str, workdir: str) -> Source:
-    extracted = [p for p in safe_extract(zip_path, workdir) if is_segmentation_name(p)]
-    if not extracted:
+    extracted = safe_extract(zip_path, workdir)
+    files = sorted((p for p in extracted if is_segmentation_name(p)), key=_natural_key)
+    if not files:
         raise MedicalError("This ZIP contains no .nii, .nii.gz or .nrrd mask files.")
-    extracted.sort(key=_natural_key)
+    table = _read_label_tables([p for p in extracted if p.lower().endswith(_TABLE_SUFFIXES)])
+    if len(files) == 1:
+        return _load_single_mask_file(files[0], workdir, table)
 
     grid = None
-    layers = []
-    for path in extracted:
-        shape, affine, frame, load = _mask_reader(path, workdir)
+    layers, notes = [], []
+    volumes = _LastVolume()
+    for path in files:
+        shape, affine, frame, read, header_names = _mask_reader(path, workdir)
+        kind, counts = _classify(volumes.get(path, read))
+        if kind == "image":  # e.g. the CT zipped next to its masks
+            notes.append(f"Skipped {os.path.basename(path)[:60]}: it looks like an image, not a mask.")
+            continue
         if grid is None:
             grid = Grid(shape, affine, frame)
         elif shape != grid.shape or frame != grid.frame or not np.allclose(affine, grid.affine, atol=1e-3):
             raise MedicalError("The mask files in this ZIP do not share the same size and orientation.")
-        layers.append(LayerSource(_mask_name(path), None, load))
-    return Source(grid, layers, empty_error=_NO_LABELS)
+        stem = _mask_name(path)
+        if kind == "mask":
+            layers.append(LayerSource(stem, None, lambda p=path, r=read: _to_mask(volumes.get(p, r))))
+            continue
+        names = {**header_names, **table}
+        for value, count in sorted(counts.items()):
+            name, color = names.get(value, (None, None))
+            layers.append(
+                LayerSource(name or f"{stem} {value}", color, (lambda p=path, r=read, v=value: volumes.get(p, r) == v), count=count)
+            )
+    if grid is None:
+        raise MedicalError(_ONLY_IMAGES)
+    return Source(grid, layers, notes=notes, empty_error=_NO_LABELS)

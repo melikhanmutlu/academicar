@@ -3,16 +3,16 @@
    (data-dropzone-input or [name=file] / [name=model_file]). #}
 <div class="rounded-xl border border-[#e2e8f0] bg-white p-4 text-sm text-[#475569]" data-medical-options hidden>
   <p class="font-semibold text-[#111827]">Medical scan</p>
-  <div class="mt-3" data-medical-preset-row>
-    <label class="field-label" for="medical_preset_{{ medical_options_id|default('upload') }}">What to extract <span class="text-[#ff682c]">*</span></label>
-    <select name="medical_preset" id="medical_preset_{{ medical_options_id|default('upload') }}" class="field-input">
-      <option value="bone">Bone (CT)</option>
-      <option value="skin">Skin / body surface (CT)</option>
-      <option value="contrast">Contrast-filled vessels, with bone (CT)</option>
-      <option value="auto">Automatic threshold (MR or other scans)</option>
-    </select>
-    <p class="text-xs text-[#5c6473] mt-1">Used for a DICOM series (ZIP). A segmentation (NIfTI, NRRD, DICOM-SEG, or a ZIP of masks) keeps its own structures, one layer each.</p>
-  </div>
+  <fieldset class="mt-3" data-medical-preset-row>
+    <legend class="field-label">What to extract <span class="text-[#ff682c]">*</span></legend>
+    <div class="mt-1 space-y-2">
+      <label class="flex items-center gap-2"><input type="checkbox" name="medical_preset" value="bone" checked> <span>Bone (CT)</span></label>
+      <label class="flex items-center gap-2"><input type="checkbox" name="medical_preset" value="skin"> <span>Skin / body surface (CT)</span></label>
+      <label class="flex items-center gap-2"><input type="checkbox" name="medical_preset" value="contrast"> <span>Contrast-filled vessels, with bone (CT)</span></label>
+      <label class="flex items-center gap-2"><input type="checkbox" name="medical_preset" value="auto"> <span>Automatic threshold (MR or other scans)</span></label>
+    </div>
+    <p class="text-xs text-[#5c6473] mt-1">Used for a DICOM series (ZIP). Pick several to get one layer per structure; you can fade each layer in the viewer. Choosing differently later means uploading the scan again, because the raw scan is deleted after processing. A segmentation (NIfTI, NRRD, DICOM-SEG, or a ZIP of masks) keeps its own structures, one layer each.</p>
+  </fieldset>
   <label class="flex items-start gap-3 mt-3">
     <input type="checkbox" name="medical_confirm" value="yes" class="mt-1" data-medical-confirm>
     <span>I removed patient-identifying information from this scan and understand the 3D result is for education and presentation, not diagnosis. The raw scan is deleted after processing.</span>
@@ -33,6 +33,12 @@
       box.hidden = !medical;
       confirm.required = medical;
       presetRow.hidden = ext !== 'zip';
+      // Scans take their colours from the preset / segmentation, so the colour
+      // picker (where the form has one) is hidden while a scan is selected.
+      form.querySelectorAll('[data-color-control], [data-color-input], [data-color-presets], [data-color-hex]').forEach((el) => {
+        // style, not [hidden]: these classes set their own display.
+        el.style.display = medical ? 'none' : '';
+      });
       // STEP and medical files carry real-world units.
       const unit = form.querySelector('[name="source_unit"]');
       if (unit && (medical || ['step', 'stp'].includes(ext))) unit.value = 'embedded';

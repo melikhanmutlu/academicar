@@ -156,3 +156,21 @@ def test_replacing_a_mesh_with_a_segmentation(client, tmp_path):
         assert len(model.layer_info["layers"]) == 2
         assert model.current_source_path is None
         assert not os.path.isdir(os.path.join(client.application.config["UPLOAD_FOLDER"], model_id, "v2"))
+
+
+def test_bone_and_skin_from_one_ct_become_two_layers(client, tmp_path):
+    slug = _project(client)
+    write_ct_series(tmp_path / "series", spheres=((32.0, 32.0, 40.0, 15.0),), fg=1000)
+    path = zip_folder(tmp_path / "series", tmp_path / "ct.zip")
+    with open(path, "rb") as handle:
+        client.post(
+            f"/papers/{slug}/upload-model",
+            data={"file": (handle, "ct.zip"), "compliance_confirm": "yes", "medical_confirm": "yes",
+                  "medical_preset": ["skin", "bone"]},
+            content_type="multipart/form-data",
+            follow_redirects=True,
+        )
+    with client.application.app_context():
+        model = Model3D.query.one()
+        assert model.processing_status == "ready", model.processing_error
+        assert [layer["name"] for layer in model.layer_info["layers"]] == ["Bone", "Skin"]

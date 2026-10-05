@@ -106,6 +106,10 @@ class Config:
     PDF_FOLDER = runtime_folder("PDF_FOLDER", "pdfs", _runtime_base)
     BLOG_IMAGE_FOLDER = runtime_folder("BLOG_IMAGE_FOLDER", "blog_images", _runtime_base)
     INSTITUTION_LOGO_FOLDER = runtime_folder("INSTITUTION_LOGO_FOLDER", "institution_logos", _runtime_base)
+    # Raw medical scans wait here until the worker converts and deletes them.
+    # Deliberately outside UPLOAD_FOLDER: backups zip (and mirror offsite) the
+    # whole upload folder and must never contain a patient scan.
+    MEDICAL_STAGING_FOLDER = runtime_folder("MEDICAL_STAGING_FOLDER", "medical_staging", _runtime_base)
 
     # S3-compatible mirror (best-effort backup). Silently disabled if unset.
     # Works with Cloudflare R2 (set R2_ACCOUNT_ID) or any S3 provider such as
@@ -278,6 +282,7 @@ class Config:
             app.config["PDF_FOLDER"],
             app.config["BLOG_IMAGE_FOLDER"],
             app.config["INSTITUTION_LOGO_FOLDER"],
+            app.config["MEDICAL_STAGING_FOLDER"],
             app.config["STORAGE_ROOT"],
         ):
             os.makedirs(folder, exist_ok=True)

@@ -70,6 +70,7 @@ from licensing import (
 from blog_content import code_post_slugs, get_all_posts, get_post, render_body
 from discipline_content import all_disciplines, discipline_slugs, get_discipline, related_disciplines
 from institution_panel import institution_bp
+from layer_editor import layer_editor_bp, model_has_layers
 from collaborators import (
     add_collaborator,
     can_edit_project,
@@ -158,6 +159,12 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.config.from_object(Config)
     if test_config:
         app.config.update(test_config)
+        # A configured UPLOAD_FOLDER (tests) moves the medical staging folder
+        # with it unless that folder was configured explicitly.
+        if "UPLOAD_FOLDER" in test_config and "MEDICAL_STAGING_FOLDER" not in test_config:
+            app.config["MEDICAL_STAGING_FOLDER"] = os.path.join(
+                os.path.dirname(os.path.abspath(test_config["UPLOAD_FOLDER"])), "medical_staging"
+            )
     app_env = str(app.config.get("APP_ENV", "development")).lower()
     if app.config.get("TESTING"):
         app.config["RATELIMIT_STORAGE_URI"] = "memory://"
@@ -211,6 +218,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     init_oauth(app)
     app.register_blueprint(auth_bp)
     app.register_blueprint(institution_bp)
+    app.register_blueprint(layer_editor_bp)
 
     @app.context_processor
     def inject_globals():
@@ -1361,8 +1369,42 @@ def medical_upload_error(medical_confirm: str | None) -> str | None:
     return None
 
 
-def inspect_medical_upload(path: str, original_name: str, file_size: int, preset: str | None) -> tuple[str | None, str | None, str | None]:
-    """(source_format, preset, error) for a saved medical upload."""
+def medical_neutral_name(original_name: str) -> str:
+    """Neutral on-disk / stored name for a medical upload.
+
+    Scan filenames often carry patient names (``Smith_John_CT_1970.zip``), so
+    the user's filename is never stored or shown. Only the extension that
+    format detection needs is kept."""
+    name = (original_name or "").lower()
+    ext = model_upload_extension(name)
+    if ext == "nii.gz":
+        return "segmentation.nii.gz"
+    if ext == "nii":
+        return "segmentation.nii"
+    if ext == "nrrd":
+        return "segmentation.seg.nrrd" if name.endswith(".seg.nrrd") else "segmentation.nrrd"
+    return f"scan.{ext}"
+
+
+MEDICAL_PRESET_ORDER = ("bone", "skin", "contrast", "auto")
+MEDICAL_DEFAULT_NAMES = {"dicom": "CT/MR scan", "segmentation": "Segmentation"}
+
+
+def normalize_medical_presets(values) -> str | None:
+    """Comma-joined presets in canonical order (``"bone,skin"``), or None when
+    nothing valid was chosen. Accepts a list of form values or one string."""
+    if isinstance(values, str):
+        values = [values]
+    chosen = {part.strip().lower() for value in (values or []) for part in str(value).split(",") if part.strip()}
+    if not chosen or not chosen <= set(MEDICAL_PRESET_ORDER):
+        return None
+    return ",".join(name for name in MEDICAL_PRESET_ORDER if name in chosen)
+
+
+def inspect_medical_upload(path: str, original_name: str, file_size: int, presets) -> tuple[str | None, str | None, str | None]:
+    """(source_format, presets, error) for a saved medical upload. ``presets``
+    is the list of chosen structures; the result is the canonical comma-joined
+    string stored in the job payload."""
     if MEDICAL_UPLOAD_MAX_BYTES and file_size > MEDICAL_UPLOAD_MAX_BYTES:
         limit_mb = MEDICAL_UPLOAD_MAX_BYTES // (1024 * 1024)
         return None, None, (
@@ -1374,10 +1416,8 @@ def inspect_medical_upload(path: str, original_name: str, file_size: int, preset
         return None, None, error
     if source_format != "dicom":
         return source_format, None, None
-    from converters.medical import MEDICAL_PRESETS
-
-    preset = (preset or "bone").strip().lower()
-    if preset not in MEDICAL_PRESETS:
+    preset = normalize_medical_presets(presets)
+    if preset is None:
         return None, None, "Choose what to extract from the scan (bone, skin, contrast or automatic)."
     return source_format, preset, None
 
@@ -2827,7 +2867,7 @@ def verified_layer_info(glb_path: str, layers: list[dict], notes: list[str] | No
     if any(name not in present for layer in layers for name in layer.get("materials", [])):
         logger.warning("Layer materials did not survive optimization for %s; hiding the layer panel", glb_path)
         return {"layers": [], "notes": notes} if notes else None
-    keep = ("name", "materials", "color", "volume_ml")
+    keep = ("name", "materials", "color", "volume_ml", "count")
     return {"layers": [{key: layer[key] for key in keep if layer.get(key) is not None} for layer in layers], "notes": notes}
 
 
@@ -3390,7 +3430,7 @@ def _create_model_for_paper(
     color: str | None,
     source_unit: str | None,
     compliance_confirm: str | None,
-    medical_preset: str | None = None,
+    medical_preset=None,
     medical_confirm: str | None = None,
 ) -> tuple[bool, str]:
     """Shared model upload pipeline used by paper_new (first-model) and the
@@ -3432,6 +3472,9 @@ def _create_model_for_paper(
         error = medical_upload_error(medical_confirm)
         if error:
             return False, error
+        # The user's filename may carry patient data: never store or show it.
+        original_name = medical_neutral_name(original_name)
+        color = None  # scans take their colours from the preset / segmentation
 
     # Source unit. STL/OBJ are unitless, so the user must explicitly declare
     # mm/cm/m (no magnitude guessing). FBX/GLB/STEP and medical scans already
@@ -3444,7 +3487,11 @@ def _create_model_for_paper(
     else:
         source_unit_norm = "embedded"
 
-    upload_dir = os.path.join(current_app.config["UPLOAD_FOLDER"], unique_id)
+    # Raw scans are staged outside UPLOAD_FOLDER so backups never include them.
+    upload_dir = os.path.join(
+        current_app.config["MEDICAL_STAGING_FOLDER"] if is_medical_upload else current_app.config["UPLOAD_FOLDER"],
+        unique_id,
+    )
     converted_dir = os.path.join(current_app.config["CONVERTED_FOLDER"], unique_id)
     os.makedirs(upload_dir, exist_ok=True)
     os.makedirs(converted_dir, exist_ok=True)
@@ -3476,6 +3523,7 @@ def _create_model_for_paper(
             cleanup_dir(converted_dir)
             return False, error
         medical_preset = preset
+        display_name = display_name or MEDICAL_DEFAULT_NAMES[source_format]
     else:
         medical_preset = None
 
@@ -3487,7 +3535,9 @@ def _create_model_for_paper(
     institutional_fallback_reason = None
     membership = get_active_membership(paper.user_id)
     if membership is not None:
-        can_fund, reason = institution_can_fund_upload(membership.institution, file_size)
+        # A raw scan is not stored (only the resulting GLB, whose size is not
+        # known yet), so it must not count against the storage quota.
+        can_fund, reason = institution_can_fund_upload(membership.institution, 0 if is_medical_upload else file_size)
         if can_fund:
             license_normalized = "institutional"
             funding_institution = membership.institution
@@ -3558,7 +3608,9 @@ def _create_model_for_paper(
         storage_provider=current_app.config.get("STORAGE_PROVIDER", "railway_volume"),
         storage_key=os.path.relpath(glb_path, current_app.config["CONVERTED_FOLDER"]).replace("\\", "/"),
         qr_code_path=None,
-        file_size=file_size,
+        # A raw scan is not stored (only its GLB, sized by the worker), so it
+        # must not count toward institution storage while queued.
+        file_size=0 if is_medical_upload else file_size,
         source_format=source_format,
         source_unit=source_unit_norm,
         appearance_color=color,
@@ -3585,7 +3637,7 @@ def _create_model_for_paper(
         source_path=archived_source,
         glb_path=glb_path,
         source_format=source_format,
-        file_size=file_size,
+        file_size=0 if is_medical_upload else file_size,
         material_color=color,
         storage_provider=model.storage_provider,
         storage_key=model.storage_key,
@@ -8739,7 +8791,7 @@ def register_routes(app: Flask) -> None:
                     color=request.form.get("color") if request.form.get("color_enabled") == "yes" else None,
                     source_unit=request.form.get("source_unit"),
                     compliance_confirm=request.form.get("compliance_confirm"),
-                    medical_preset=request.form.get("medical_preset"),
+                    medical_preset=request.form.getlist("medical_preset"),
                     medical_confirm=request.form.get("medical_confirm"),
                 )
                 if ok:
@@ -9140,7 +9192,7 @@ def register_routes(app: Flask) -> None:
             color=request.form.get("color") if request.form.get("color_enabled") == "yes" else None,
             source_unit=request.form.get("source_unit"),
             compliance_confirm=request.form.get("compliance_confirm"),
-            medical_preset=request.form.get("medical_preset"),
+            medical_preset=request.form.getlist("medical_preset"),
             medical_confirm=request.form.get("medical_confirm"),
         )
         flash(message, "success" if ok else "danger")
@@ -9186,11 +9238,18 @@ def register_routes(app: Flask) -> None:
         original_name = secure_filename(file.filename)
         upload_ext = model_upload_extension(original_name)
         source_format = "step" if upload_ext in STEP_MODEL_EXTENSIONS else upload_ext
+        if is_medical_upload:
+            # The user's filename may carry patient data: never store or show it.
+            original_name = medical_neutral_name(original_name)
         next_version = (model.version or 1) + 1
 
         # Stage upload in a temporary scratch dir so the previous source files
-        # are kept intact until the new version is committed.
-        upload_dir = os.path.join(app.config["UPLOAD_FOLDER"], f"_replace_{uuid.uuid4().hex}")
+        # are kept intact until the new version is committed. Raw scans are
+        # staged outside UPLOAD_FOLDER so backups never include them.
+        upload_dir = os.path.join(
+            app.config["MEDICAL_STAGING_FOLDER"] if is_medical_upload else app.config["UPLOAD_FOLDER"],
+            f"_replace_{uuid.uuid4().hex}",
+        )
         os.makedirs(upload_dir, exist_ok=True)
         source_path = os.path.join(upload_dir, original_name)
         try:
@@ -9217,7 +9276,7 @@ def register_routes(app: Flask) -> None:
         medical_preset = None
         if is_medical_upload:
             source_format, medical_preset, error = inspect_medical_upload(
-                source_path, original_name, os.path.getsize(source_path), request.form.get("medical_preset")
+                source_path, original_name, os.path.getsize(source_path), request.form.getlist("medical_preset")
             )
             size_error = error
         else:
@@ -9231,9 +9290,10 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("project_detail", slug=model.paper.slug))
 
         # An institution-funded model may not grow past the contract's
-        # storage quota by swapping in a larger file.
+        # storage quota by swapping in a larger file. Raw scans are skipped:
+        # only the resulting GLB is stored and its size is not known yet.
         funding = model.institution if model.license_type == "institutional" else None
-        if funding is not None and funding.quota_storage_bytes is not None:
+        if funding is not None and funding.quota_storage_bytes is not None and not is_medical_upload:
             _count, bytes_used = institution_usage(funding.id)
             growth = os.path.getsize(source_path) - (model.file_size or 0)
             if growth > 0 and bytes_used + growth > funding.quota_storage_bytes:
@@ -9271,6 +9331,8 @@ def register_routes(app: Flask) -> None:
         # the currently-active GLB. process_model_upload_job() rolls these
         # back via mark_model_failed() if conversion fails (see test).
         model.original_filename = original_name
+        if is_medical_upload and not model.display_name:
+            model.display_name = MEDICAL_DEFAULT_NAMES[source_format]
         model.original_source_path = archived_source
         model.current_source_path = archived_source
         model.source_format = source_format
@@ -9317,7 +9379,9 @@ def register_routes(app: Flask) -> None:
             )
         else:
             flash("Model file replaced.", "success")
-        cleanup_dir(upload_dir)
+        if not is_medical_upload:
+            # A queued raw scan is still read by the worker, which deletes it.
+            cleanup_dir(upload_dir)
         return redirect(url_for("project_detail", slug=model.paper.slug))
 
     @app.route("/models/<model_id>/appearance", methods=["POST"])
@@ -9333,6 +9397,11 @@ def register_routes(app: Flask) -> None:
         # registry) when a safe same-site path is provided, else the model page.
         next_url = request.form.get("next") or ""
         dest = next_url if (next_url.startswith("/") and not next_url.startswith("//")) else url_for("model_edit", model_id=model.id)
+        form_tracks_changes = "color_changed" in request.form or "finish_changed" in request.form
+        if model_has_layers(model) and (not form_tracks_changes or request.form.get("color_changed") == "1"):
+            # One colour on every material would wipe the per-layer colours.
+            flash("Colours are set per layer. Use the Layers card to recolour this model.", "danger")
+            return redirect(dest)
         ok, message, category, changes = _apply_model_appearance_change(model, request.form)
         if ok:
             log_audit("model_appearance_updated", user_id=current_user.id, resource_id=model_id, details=changes)
@@ -9355,6 +9424,8 @@ def register_routes(app: Flask) -> None:
             abort(404)
         if not plan_supports_feature(model.license_type, "medical_colors"):
             return jsonify({"ok": False, "error": "Medical colours are disabled for this plan."}), 403
+        if model_has_layers(model):
+            return jsonify({"ok": False, "error": "Colours are set per layer for this model."}), 400
         data = request.get_json(silent=True) or {}
         color = (data.get("color") or "").strip()
         if HEX_COLOR_PATTERN.fullmatch(color) is None:
