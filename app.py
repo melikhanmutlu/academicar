@@ -108,6 +108,7 @@ from analytics import (
     apply_analytics_cookie,
     browser_event_is_duplicate,
     funnel_snapshot,
+    model_snapshot,
     track_event,
 )
 from utils.security import require_model_editor, require_model_ownership, require_paper_editor, require_paper_ownership
@@ -5274,9 +5275,26 @@ def register_routes(app: Flask) -> None:
     @login_required
     def insights():
         days = _insights_days()
+        project_id = _insights_project_id()
         return render_template(
             "insights.html",
-            analytics=analytics_snapshot(current_user.id, days=days),
+            analytics=analytics_snapshot(current_user.id, days=days, project_id=project_id),
+            generated_on=datetime.now(UTC).strftime("%d %b %Y"),
+        )
+
+    @app.route("/insights/model/<model_id>")
+    @login_required
+    def insights_model(model_id):
+        if not is_uuid(model_id):
+            abort(404)
+        model = db.session.get(Model3D, model_id)
+        if not model or model.user_id != current_user.id or (model.paper and model.paper.deleted_at):
+            abort(404)
+        days = _insights_days()
+        return render_template(
+            "insights_model.html",
+            model=model,
+            analytics=model_snapshot(model, days=days),
             generated_on=datetime.now(UTC).strftime("%d %b %Y"),
         )
 
@@ -5286,12 +5304,22 @@ def register_routes(app: Flask) -> None:
         days = request.args.get("days", type=int) or 30
         return days if days in INSIGHTS_PERIODS else 30
 
+    def _insights_project_id() -> int | None:
+        """Optional project filter; only the signed-in user's own live projects."""
+        project_id = request.args.get("project", type=int)
+        if project_id is None:
+            return None
+        paper = db.session.get(Paper, project_id)
+        if not paper or paper.user_id != current_user.id or paper.deleted_at:
+            return None
+        return project_id
+
     @app.route("/insights/export.csv")
     @login_required
     def insights_export():
         """Per-model numbers for the chosen period, for grant reports and CVs."""
         days = _insights_days()
-        analytics = analytics_snapshot(current_user.id, days=days)
+        analytics = analytics_snapshot(current_user.id, days=days, project_id=_insights_project_id())
         rows = [
             {
                 "model": item["model"].display_name or item["model"].original_filename or item["model"].id,
@@ -5302,7 +5330,7 @@ def register_routes(app: Flask) -> None:
                 "qr_scans": item["qr_scans"],
                 "ar_starts": item["ar_starts"],
                 "link_copies": item["shares"],
-                "engagement_rate_percent": item["engagement_rate"],
+                "engagement_rate_percent": "" if item["engagement_rate"] is None else item["engagement_rate"],
                 "last_viewed_at": item["last_viewed_at"],
             }
             for item in analytics["model_metrics"]
