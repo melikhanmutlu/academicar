@@ -1,0 +1,38 @@
+{# Styles for the chunked-upload panel and the processing progress panel
+   (static/js/chunked-upload.js). Page-level on purpose: no new Tailwind utilities. #}
+<style>
+  .cu-panel, .pp-panel {
+    border: 1px solid var(--color-light-pearl);
+    border-radius: 8px;
+    background: var(--color-cloud-whisper);
+    padding: 14px 16px;
+    font-family: var(--font-inter);
+    font-size: 14px;
+    line-height: 1.4;
+    color: var(--color-midnight-graphite);
+    min-width: 0;
+  }
+  .cu-panel[hidden], .pp-panel[hidden], .cu-panel [hidden], .pp-panel [hidden] { display: none; }
+  .cu-head, .pp-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .cu-step, .pp-stage { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+  .cu-percent, .pp-percent { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+  .cu-bar, .pp-bar { height: 8px; margin: 10px 0 8px; border-radius: 8px; background: var(--color-light-pearl); overflow: hidden; }
+  .cu-fill, .pp-fill { display: block; height: 100%; width: 0; border-radius: 8px; background: var(--color-sunset-orange); transition: width .4s ease; }
+  .cu-meta { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--color-dark-shale); font-variant-numeric: tabular-nums; }
+  .cu-note, .pp-note { margin: 10px 0 0; font-size: 13px; color: var(--color-silver-ash); }
+  .cu-error { margin: 10px 0 0; font-size: 13px; color: #b42318; }
+  .cu-actions { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; }
+  .cu-actions button {
+    appearance: none; background: transparent; border: 0; border-bottom: 2px solid var(--color-midnight-graphite);
+    padding: 2px 0; font: inherit; font-size: 14px; color: var(--color-midnight-graphite); cursor: pointer;
+  }
+  .cu-actions button.cu-cancel { border-bottom-color: transparent; color: var(--color-silver-ash); }
+  .cu-actions button:focus-visible { outline: 2px solid var(--color-midnight-graphite); outline-offset: 3px; }
+  .pp-panel { margin-top: 12px; padding: 10px 12px; }
+  .pp-panel .pp-bar { margin: 8px 0 6px; }
+  .pp-queue { font-size: 13px; color: var(--color-dark-shale); }
+  .pp-card-note { font-size: 12px; color: var(--color-silver-ash); margin: 6px 0 0; }
+  #processingProgress { margin-bottom: 20px; }
+  #processingProgress .pp-panel { margin-top: 0; }
+  @media (prefers-reduced-motion: reduce) { .cu-fill, .pp-fill { transition: none; } }
+</style>

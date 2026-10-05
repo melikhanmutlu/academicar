@@ -3,6 +3,7 @@
 
 {% block head %}
 <script type="module" src="https://unpkg.com/@google/model-viewer@4.3.0/dist/model-viewer.min.js" crossorigin="anonymous"></script>
+{% include "_upload_progress_styles.html" %}
 {% endblock %}
 
 {% block content %}
@@ -25,6 +26,21 @@
       <span class="detail-action detail-action-muted" title="The viewer is unavailable while this model is {{ model_access_status(model) }}">Viewer {{ model_access_status(model) }}</span>
     {% endif %}
   </div>
+
+    {% if model_status in ('queued', 'processing') or model.replacement_status == 'replacement_processing' %}
+    {% set pp_percent = model.processing_progress or 0 %}
+    <div class="surface model-edit-card" id="processingProgress">
+      <div class="model-edit-card-head">
+        <h2>{{ 'Replacement processing' if model_status == 'ready' else 'Processing' }}</h2>
+        <p>{{ 'The current version stays live until the replacement is ready. ' if model_status == 'ready' else '' }}You can leave this page: processing continues on our servers and the progress shows here when you return.</p>
+      </div>
+      <div class="pp-panel" data-progress-panel data-progress-reload>
+        <div class="pp-head"><span class="pp-stage" data-progress-stage>{{ model.processing_stage or ('Waiting for the converter' if model_status == 'queued' else 'Processing') }}</span><span class="pp-percent" data-progress-percent>{{ pp_percent }}%</span></div>
+        <div class="pp-bar" role="progressbar" aria-label="Processing progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ pp_percent }}"><span class="pp-fill" data-progress-fill style="width: {{ pp_percent }}%"></span></div>
+        <div class="pp-queue" data-progress-queue hidden></div>
+      </div>
+    </div>
+    {% endif %}
 
   <div class="model-edit-layout">
     <main class="model-edit-main">
@@ -471,7 +487,7 @@
         {% endif %}
       </div>
 
-      <form method="POST" action="{{ url_for('model_replace', model_id=model.id) }}" enctype="multipart/form-data" class="surface model-edit-card">
+      <form method="POST" action="{{ url_for('model_replace', model_id=model.id) }}" enctype="multipart/form-data" class="surface model-edit-card" data-chunked-upload='{{ {"model_id": model.id}|tojson }}'>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="model-edit-card-head">
           <h2>Update model, keep link</h2>
@@ -497,6 +513,7 @@
           <input type="checkbox" name="compliance_confirm" value="yes" required class="mt-1">
           <span>I confirm that this replacement model is anonymized, that I have the right to share/publish it, and that I am responsible for all required ethical approval and consent processes.</span>
         </label>
+        <div data-upload-progress-host></div>
         <div class="model-edit-actions">
           <button type="submit" class="detail-action detail-action-primary">Replace Model File</button>
         </div>
@@ -534,7 +551,26 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/chunked-upload.js', v=asset_version) }}"></script>
 <script>
+  // Live processing progress: stored by the worker, so it is also here when you come back.
+  (function () {
+    const panel = document.querySelector('[data-progress-reload]');
+    if (!panel) return;
+    const poll = async () => {
+      try {
+        const response = await fetch('{{ url_for("model_status", model_id=model.id) }}', { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+        if (response.ok) {
+          const payload = await response.json();
+          if (['ready', 'failed'].includes(payload.status) && !payload.replacing) { window.location.reload(); return; }
+          window.AcademicARProgress.update(panel, payload);
+        }
+      } catch (error) { /* try again */ }
+      setTimeout(poll, 1500);
+    };
+    setTimeout(poll, 600);
+  })();
+
   const replaceFileInput = document.querySelector('[data-replace-file]');
   const companionReplace = document.querySelector('[data-companion-section-replace]');
   if (replaceFileInput && companionReplace) {

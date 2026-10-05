@@ -27,6 +27,19 @@ class BaseConverter:
         self.end_time: Optional[datetime] = None
         self.logger = logging.getLogger(__name__)
         self.max_dimension: float = 0  # No scaling by default - only scale if user explicitly sets it
+        # Optional ``callback(percent, stage)`` the caller sets to follow a long
+        # conversion (percent is 0-100 of this converter's own work; stage is a
+        # short label with no filenames or patient data).
+        self.progress_callback = None
+
+    def report_progress(self, percent: float, stage: str) -> None:
+        callback = self.progress_callback
+        if callback is None:
+            return
+        try:
+            callback(percent, stage)
+        except Exception:  # progress is cosmetic: never fail a conversion over it
+            self.logger.debug("progress callback failed", exc_info=True)
 
     def validate(self, file_path: str) -> bool:
         """

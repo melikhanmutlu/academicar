@@ -7,6 +7,7 @@
 {# Drop body's overflow-x clip so the sticky decorative aside has a single
    scroll container (see body.project-form-page in style.css). #}
 {% block body_class %}project-form-page{% endblock %}
+{% block head %}{% if not is_edit %}{% include "_upload_progress_styles.html" %}{% endif %}{% endblock %}
 
 {% block content %}
 <div class="app-shell py-10">
@@ -17,7 +18,7 @@
 
   <div class="project-new-layout">
     <div class="project-new-main">
-    <form method="POST" enctype="multipart/form-data" class="surface rounded-xl p-6 sm:p-8 space-y-6" data-upload-form>
+    <form method="POST" enctype="multipart/form-data" class="surface rounded-xl p-6 sm:p-8 space-y-6" data-upload-form{% if not is_edit %} data-chunked-upload='{"new_project": true}'{% endif %}>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
       <div>
@@ -309,6 +310,7 @@
       <input type="hidden" name="doi" value="">
       <input type="hidden" name="pmid" value="">
 
+      {% if not is_edit %}<div data-upload-progress-host></div>{% endif %}
       <div class="paper-form-actions flex items-center justify-between gap-3 pt-4 border-t border-[#141821]/10">
         {% if is_edit and is_project_owner %}
           <button type="button" class="detail-action detail-action-danger" data-delete-paper-open>Delete project</button>
@@ -386,6 +388,7 @@
 {% endblock %}
 
 {% block scripts %}
+{% if not is_edit %}<script src="{{ url_for('static', filename='js/chunked-upload.js', v=asset_version) }}"></script>{% endif %}
 <script>
   // Delete dialog
   const deleteDialog = document.querySelector('[data-delete-paper-dialog]');

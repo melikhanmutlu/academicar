@@ -243,6 +243,10 @@ class Model3D(db.Model):
     uploaded_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     processing_status = db.Column(db.String(30), nullable=False, default="ready")
     processing_error = db.Column(db.Text, nullable=True)
+    # Live worker progress (0-100) and a short stage label, written by the
+    # worker while a conversion runs so the UI can show real progress.
+    processing_progress = db.Column(db.Integer, nullable=True)
+    processing_stage = db.Column(db.String(120), nullable=True)
     anonymization_confirmed = db.Column(db.Boolean, nullable=False, default=False)
     rights_confirmed = db.Column(db.Boolean, nullable=False, default=False)
     ethics_responsibility_confirmed = db.Column(db.Boolean, nullable=False, default=False)

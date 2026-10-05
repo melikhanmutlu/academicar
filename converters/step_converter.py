@@ -92,8 +92,10 @@ class STEPConverter(BaseConverter):
         # failed run never leaves (or mistakes) a stale output_path.
         work_path = output_path + ".step-tmp.glb"  # extension decides GLB vs glTF
         try:
+            self.report_progress(5, "Converting STEP geometry")
             if not self._run_cascadio(input_path, work_path):
                 return False
+            self.report_progress(85, "Checking the converted geometry")
             if not self._post_process(work_path, color):
                 return False
             os.replace(work_path, output_path)

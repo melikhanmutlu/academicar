@@ -16,6 +16,7 @@ import sys
 import tempfile
 import warnings
 
+from . import progress
 from .common import MedicalError, parse_presets, safe_extract
 
 logger = logging.getLogger(__name__)
@@ -23,8 +24,25 @@ logger = logging.getLogger(__name__)
 _UNEXPECTED = "The scan could not be processed (out of memory or unreadable data)."
 
 
-def run_conversion(kind: str, input_path: str, output_path: str, preset: str | None = None, workdir_root: str | None = None) -> dict:
-    """Convert one upload to a layered GLB. Returns the result dict (never raises on bad input)."""
+def run_conversion(
+    kind: str,
+    input_path: str,
+    output_path: str,
+    preset: str | None = None,
+    workdir_root: str | None = None,
+    progress_path: str | None = None,
+) -> dict:
+    """Convert one upload to a layered GLB. Returns the result dict (never raises on bad input).
+
+    ``progress_path``: file the parent polls for ``{"percent", "stage"}`` (see progress.py)."""
+    progress.set_sink(progress_path)
+    try:
+        return _run_conversion(kind, input_path, output_path, preset, workdir_root)
+    finally:
+        progress.set_sink(None)
+
+
+def _run_conversion(kind: str, input_path: str, output_path: str, preset: str | None, workdir_root: str | None) -> dict:
     from .dicom_series import load_series
     from .meshing import build_glb
     from .segmentation import load_segmentation
@@ -40,8 +58,10 @@ def run_conversion(kind: str, input_path: str, output_path: str, preset: str | N
                 parse_presets(preset)  # "bone,skin": validate before unpacking anything
                 if not _is_zip(input_path):
                     raise MedicalError("Upload the whole DICOM series as a ZIP file (a single .dcm file holds only one slice).")
+                progress.report(1, "Unpacking the ZIP", force=True)
                 source = load_series(safe_extract(input_path, workdir), preset)
             elif kind == "segmentation":
+                progress.report(2, "Reading the segmentation", force=True)
                 source = load_segmentation(input_path, workdir)
             else:
                 raise MedicalError("Unsupported medical upload type.")
@@ -79,13 +99,14 @@ def main(argv=None) -> int:
     parser.add_argument("--preset", default="")
     parser.add_argument("--result", required=True)
     parser.add_argument("--workdir", default="")
+    parser.add_argument("--progress", default="")
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, stream=sys.stderr, format="%(levelname)s %(name)s: %(message)s")
     # pydicom warnings can quote header values (which may be patient data); keep stderr clean.
     warnings.simplefilter("ignore")
     logging.getLogger("pydicom").setLevel(logging.CRITICAL)
-    result = run_conversion(args.kind, args.input_path, args.output_path, args.preset or None, args.workdir or None)
+    result = run_conversion(args.kind, args.input_path, args.output_path, args.preset or None, args.workdir or None, args.progress or None)
     with open(args.result, "w", encoding="utf-8") as fh:
         json.dump(result, fh)
     return 0 if result["ok"] else 1

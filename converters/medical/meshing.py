@@ -14,6 +14,7 @@ from typing import Callable, Optional
 
 import numpy as np
 
+from . import progress
 from .common import LAYER_PALETTE, MAX_LAYERS, MedicalError, max_faces, max_voxels
 
 # glTF is Y-up. DICOM/NRRD LPS (x=L, y=P, z=S) -> (X=L, Y=S, Z=A) = (x, z, -y);
@@ -41,6 +42,9 @@ class LayerSource:
     color: Optional[str]
     load: Callable[[], np.ndarray]  # full-resolution boolean mask on the Grid
     count: Optional[int] = None  # voxel count when known cheaply (for the layer cap)
+    # True for built-in preset labels (Bone, Skin, ...), which may be shown in progress text;
+    # a segmentation's own structure names are not.
+    public_name: bool = False
 
 
 @dataclass
@@ -156,7 +160,11 @@ def _mesh_layers(source: Source, strides: tuple, layers: list):
     built = []
     notes = []
     total_faces = 0
-    for layer in layers:
+    for index, layer in enumerate(layers):
+        # Surfaces take most of the time: 55-92% of the child's work, split per structure.
+        start = 55 + 37 * index / len(layers)
+        label = f"{layer.name} surface" if layer.public_name else "structure surface"
+        progress.report(start, f"Extracting {label} ({index + 1} / {len(layers)})", force=True)
         full = np.asarray(layer.load())
         mask = full[sl]
         voxels = int(mask.sum())
@@ -164,6 +172,7 @@ def _mesh_layers(source: Source, strides: tuple, layers: list):
             if full.any():  # present at full resolution but stepped over by the stride
                 notes.append(f"{layer.name} is too thin to display at this resolution.")
             continue
+        progress.report(start + 18.5 / len(layers), "Smoothing and simplifying", force=True)
         result = _mesh_mask(mask, affine)
         del mask
         if result is None:
@@ -242,7 +251,9 @@ def build_glb(source: Source, output_path: str):
     for _l, mesh, _v in built:
         mesh.apply_translation(-centre)
 
+    progress.report(93, "Writing model", force=True)
     _export(built, names, colors, output_path)
+    progress.report(100, "Writing model", force=True)
     info = [
         {"name": n, "color": c, "volume_ml": round(float(ml), 2)}
         for n, c, (_l, _m, ml) in zip(names, colors, built)
