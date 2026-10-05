@@ -118,7 +118,13 @@ flask db downgrade base
 - **Stable QR resolver** (`/m/<public_id>`): QRLink model maps public_id to model_id. QR codes survive replacements, upgrades, and color changes.
 - **Model versioning**: ModelVersion table tracks replacement history per model. Replace-model flow preserves model ID, QR public ID, and resolver URL.
 - **Converter pipeline**: GLB direct upload + STL/OBJ/FBX to GLB conversion via STLConverter (trimesh) and ExternalConverter (Node CLI wrappers), STEP/STP via STEPConverter, CT/MR and segmentations via MedicalConverter. USDZ companion generated for iOS AR. Multi-part models get a Layers panel in the viewer.
-- **Background worker** (`worker.py`): polls ConversionJob rows. Production web processes only enqueue work.
+- **Viewer tools (paid plans only; plan keys `scenes`, `scene_ar`, `section_plane`, `layer_metrics`, `figure_export`, `comparison` in `licensing.PAID_ONLY_FEATURES`, backfilled into existing plan rows by migration `b6c7d8e9f0a1`)**:
+  - `window.viewerView` (`templates/viewer.html`) gets/applies the view state (labels, layers by name, camera, background, section); `viewerInternals` reaches model-viewer's three.js scene/renderer.
+  - Scenes (`scenes.py`, `ModelScene`): up to 12 saved views per model, `/s/<public_id>` link + QR, tour plays them; `clean_scene_state` whitelists the state. Layer renames rename scene keys.
+  - Scene AR (`converters/scene_variant.py`, job `scene_ar`): per-scene GLB/USDZ with only the visible layers in `converted/<id>/scenes/`, counted in institution quota, re-queued on replace/rescale/recolour.
+  - Layer measurements (`converters/layer_metrics.py`, computed before Draco; backfill job `layer_metrics` from the admin storage page) live in `layer_info["metrics"]`; `metrics_public` lets the owner hide them.
+  - Section plane and figure export are client-side only. Comparisons (`comparisons.py`, `ModelComparison`, `/c/<public_id>`) pair two models from projects the user can edit.
+- **Background worker** (`worker.py`): polls ConversionJob rows. Production web processes only enqueue work. Optional job types (`layer_metrics`, `scene_ar`) fail without failing the model.
 - **Railway deployment**: web + worker in single container via `railway.json`, PostgreSQL, Redis for rate limits, persistent volume for files.
 
 ### Non-Negotiable Preservation Rules

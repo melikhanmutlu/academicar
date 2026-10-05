@@ -2994,6 +2994,17 @@ FAQ_ITEMS = (
              "education and presentation, not diagnosis.",
     },
     {
+        "q": "Can I prepare views for a talk, a poster or a paper figure?",
+        "a": "Yes, on paid plans. Save up to 12 scenes per model (which layers "
+             "are shown or faded, the camera angle, labels and a section plane); "
+             "each scene gets its own link and QR code, opens in AR with only "
+             "its visible structures, and plays as a presentation. You can also "
+             "cut the model with a section plane, read structure sizes and the "
+             "shortest distance between structures, export a high-resolution "
+             "figure with a scale bar and legend, and share a before / after "
+             "comparison of two models behind one link.",
+    },
+    {
         "q": "Do my readers need to install an app to view the model?",
         "a": "No. The viewer runs in any modern browser. On most phones and "
              "tablets, readers can also tap to place the model in augmented "
