@@ -3,6 +3,8 @@
 {# Viewer layers (STEP parts, segmented structures, multi-part meshes): one named material each. #}
 {% set viewer_layers = ((model.layer_info or {}).get('layers') or []) if model.layer_info is mapping else [] %}
 {% set is_medical_model = model.source_format in ('dicom', 'segmentation') %}
+{# Per-layer measurements (paid plans; passed by view_model already filtered for who may see them). #}
+{% set viewer_metrics = viewer_metrics|default(none) %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -483,6 +485,23 @@
     @media (max-width: 640px) {
       .layers-panel { top: auto; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: auto; max-height: 50%; }
     }
+    /* Layers panel "Distances": shortest distance between two nearby layers. */
+    .layers-dist { flex: none; border-top: 1px solid rgba(255, 255, 255, 0.1); padding: 4px 6px; }
+    .layers-dist-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 8px; font-size: 13px; font-weight: 600; color: inherit; background: none; border: 0; cursor: pointer; }
+    .layers-dist-toggle svg { transition: transform 0.15s; }
+    .layers-dist-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+    .layers-dist-body { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: center; gap: 8px; padding: 0 8px 10px; font-size: 13px; }
+    .layers-dist-body[hidden] { display: none; }
+    .layers-dist-body select { min-width: 0; width: 100%; padding: 6px 8px; font-size: 13px; border-radius: 8px; color: #fff; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.18); }
+    .layers-dist-body select option { color: #202020; background: #fff; }
+    .layers-dist-body select:disabled { opacity: 0.55; }
+    .layers-dist-result { grid-column: 1 / -1; margin: 0; font-size: 13px; font-weight: 600; color: #ff9a6c; }
+    .layers-dist-result:empty { display: none; }
+    .layers-note + .layers-note { border-top: 0; padding-top: 0; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layers-dist { border-color: #e8e8e8; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layers-dist-body select { color: #202020; background: #f5f5f5; border-color: #d4d4d4; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layers-dist-result { color: #c2410c; }
+    .tour-mode .layers-dist-line { display: none; }
     /* Scenes panel: saved views of the model (reuses the layers panel shell). */
     #tourBtn[hidden] { display: none; }
     .tour-mode .scenes-panel { display: none !important; }
@@ -1201,8 +1220,14 @@
       <div class="measure-point" slot="hotspot-measure-a" data-position="0m 0m 0m" hidden></div>
       <div class="measure-point" slot="hotspot-measure-b" data-position="0m 0m 0m" hidden></div>
       <div class="measure-label" slot="hotspot-measure-mid" data-position="0m 0m 0m" id="measureLabel" hidden></div>
+      {% if viewer_metrics and viewer_metrics.pairs %}
+      <div class="measure-point" slot="hotspot-dist-a" data-position="0m 0m 0m" hidden></div>
+      <div class="measure-point" slot="hotspot-dist-b" data-position="0m 0m 0m" hidden></div>
+      <div class="measure-label" slot="hotspot-dist-mid" data-position="0m 0m 0m" id="distLabel" hidden></div>
+      {% endif %}
     </model-viewer>
     <svg class="measure-line" id="measureLine" aria-hidden="true" hidden><line x1="0" y1="0" x2="0" y2="0"></line></svg>
+    {% if viewer_metrics and viewer_metrics.pairs %}<svg class="measure-line layers-dist-line" id="distLine" aria-hidden="true" hidden><line x1="0" y1="0" x2="0" y2="0"></line></svg>{% endif %}
     <div id="measureHint" class="annotate-hint" role="status" hidden>
       <span class="annotate-hint-dot" aria-hidden="true"></span>
       <span class="annotate-hint-text" id="measureHintText">Click or tap two points on the model</span>
@@ -1667,7 +1692,20 @@
         </div>
       </div>
       <ul class="layers-list" data-layers-list></ul>
+      {% if viewer_metrics and viewer_metrics.pairs %}
+      <div class="layers-dist" data-dist>
+        <button type="button" class="layers-dist-toggle" data-dist-toggle aria-expanded="false" aria-controls="layersDistBody">Distances
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6l5 5 5-5"/></svg></button>
+        <div class="layers-dist-body" id="layersDistBody" hidden>
+          <label for="layersDistA">From</label><select id="layersDistA" data-dist-a></select>
+          <label for="layersDistB">To</label><select id="layersDistB" data-dist-b></select>
+          <p class="layers-dist-result" data-dist-result role="status" aria-live="polite"></p>
+        </div>
+      </div>
+      {% endif %}
       {% if is_medical_model %}<p class="layers-note">For education and presentation only — not for diagnosis.{% if viewer_layers|selectattr('volume_ml')|list %} Volumes are estimated from the segmentation.{% endif %}</p>{% endif %}
+      {% if viewer_metrics and is_medical_model %}<p class="layers-note">Approximate measurements for education, not for diagnosis.</p>{% endif %}
+      {% if viewer_metrics and viewer_metrics.truncated %}<p class="layers-note">Some distances were not measured.</p>{% endif %}
     </section>
     {% endif %}
   </main>
@@ -2137,6 +2175,9 @@
         return Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, '0');
       }).join('');
       const formatVolume = (ml) => ml >= 1000 ? `${(ml / 1000).toFixed(2)} L` : ml >= 100 ? `${Math.round(ml)} mL` : `${ml.toFixed(1)} mL`;
+      // Per-layer measurements (paid plans, when the viewer may see them): sizes in mm.
+      const layerMetrics = {{ viewer_metrics|tojson }};
+      const formatLength = (mm) => mm < 1 ? `${mm.toFixed(2)} mm` : mm < 100 ? `${mm.toFixed(1)} mm` : `${(mm / 10).toFixed(1)} cm`;
       const resolveMaterials = () => {
         if (mats || !viewer.model) return mats;
         const byName = new Map();
@@ -2231,10 +2272,14 @@
           count.textContent = `×${layer.count}`;
           nameLabel.appendChild(count);
         }
-        if (layer.volume_ml != null) {
+        const sizeParts = [];
+        if (layer.volume_ml != null) sizeParts.push(formatVolume(layer.volume_ml));
+        const diameter = layerMetrics?.layers?.[layer.name]?.max_diameter_mm;
+        if (diameter != null) sizeParts.push(`⌀ ${formatLength(diameter)}`);
+        if (sizeParts.length) {
           const vol = document.createElement('span');
           vol.className = 'layer-volume';
-          vol.textContent = formatVolume(layer.volume_ml);
+          vol.textContent = sizeParts.join(' · ');
           nameLabel.appendChild(vol);
         }
         row.querySelector('.layer-swatch').style.background = layer.color || '#cccccc';
@@ -2259,8 +2304,111 @@
           if (live && swatch && !entries[0].material.pbrMetallicRoughness.baseColorTexture?.texture) swatch.style.background = toSrgbHex(live);
         });
       };
+      // --- Distances: the shortest distance between two nearby layers, drawn
+      // like Measure (two hotspots, a label hotspot and an SVG line over the
+      // viewer) on their own hotspot slots. Points are model-space metres. ---
+      let clearDistance = () => {};
+      const distBox = layersPanel.querySelector('[data-dist]');
+      if (distBox && layerMetrics?.pairs?.length) {
+        const distToggle = distBox.querySelector('[data-dist-toggle]');
+        const distBody = distBox.querySelector('.layers-dist-body');
+        const selectA = distBox.querySelector('[data-dist-a]');
+        const selectB = distBox.querySelector('[data-dist-b]');
+        const distResult = distBox.querySelector('[data-dist-result]');
+        const distLine = document.getElementById('distLine');
+        const distLabel = document.getElementById('distLabel');
+        const distPoints = ['a', 'b'].map((key) => viewer.querySelector(`[slot="hotspot-dist-${key}"]`));
+        const lineEl = distLine.querySelector('line');
+        const pairsOf = (name) => layerMetrics.pairs
+          .filter((p) => p.a === name || p.b === name)
+          .map((p) => (p.a === name ? { other: p.b, mm: p.min_distance_mm, from: p.point_a, to: p.point_b } : { other: p.a, mm: p.min_distance_mm, from: p.point_b, to: p.point_a }));
+        const makeOption = (value, text, disabled = false) => {
+          const option = document.createElement('option');
+          option.value = value;
+          option.textContent = text;
+          option.disabled = disabled;
+          return option;
+        };
+        const asPos = (p) => `${p[0]}m ${p[1]}m ${p[2]}m`;
+        const drawDistLine = () => {
+          if (distLine.hasAttribute('hidden')) return;
+          const a = viewer.queryHotspot && viewer.queryHotspot('hotspot-dist-a');
+          const b = viewer.queryHotspot && viewer.queryHotspot('hotspot-dist-b');
+          if (!a || !b) return;
+          const host = distLine.parentElement.getBoundingClientRect();
+          const rect = viewer.getBoundingClientRect();
+          const dx = rect.left - host.left;
+          const dy = rect.top - host.top;
+          lineEl.setAttribute('x1', a.canvasPosition.x + dx);
+          lineEl.setAttribute('y1', a.canvasPosition.y + dy);
+          lineEl.setAttribute('x2', b.canvasPosition.x + dx);
+          lineEl.setAttribute('y2', b.canvasPosition.y + dy);
+        };
+        const hideLine = () => {
+          [...distPoints, distLabel].forEach((el) => { el.hidden = true; });
+          distLine.setAttribute('hidden', ''); // <svg> has no .hidden property
+        };
+        clearDistance = () => {
+          hideLine();
+          distResult.textContent = '';
+          selectA.value = '';
+          fillB('');
+        };
+        function fillB(name) {
+          selectB.replaceChildren();
+          const partners = name ? pairsOf(name).sort((x, y) => x.mm - y.mm) : [];
+          if (!name) {
+            selectB.append(makeOption('', 'Choose a layer first', true));
+          } else if (!partners.length) {
+            selectB.append(makeOption('', 'Not measured (more than 5 cm apart)', true));
+          } else {
+            selectB.append(makeOption('', 'Choose a layer'));
+            partners.forEach((p) => selectB.append(makeOption(p.other, p.other)));
+          }
+          selectB.value = '';
+          selectB.disabled = !partners.length;
+        }
+        const showPair = () => {
+          hideLine();
+          distResult.textContent = '';
+          const pair = selectA.value && selectB.value ? pairsOf(selectA.value).find((p) => p.other === selectB.value) : null;
+          if (!pair) {
+            if (selectA.value && selectB.disabled) distResult.textContent = 'Not measured: these layers are more than 5 cm apart.';
+            return;
+          }
+          distResult.textContent = pair.mm < 0.005 ? 'Shortest distance 0 mm (the layers touch)' : `Shortest distance ${formatLength(pair.mm)}`;
+          // Unhide first: model-viewer skips hotspots that are display:none.
+          [...distPoints, distLabel].forEach((el) => { el.hidden = false; });
+          viewer.updateHotspot({ name: 'hotspot-dist-a', position: asPos(pair.from) });
+          viewer.updateHotspot({ name: 'hotspot-dist-b', position: asPos(pair.to) });
+          viewer.updateHotspot({ name: 'hotspot-dist-mid', position: asPos(pair.from.map((v, k) => (v + pair.to[k]) / 2)) });
+          distLabel.textContent = pair.mm < 0.005 ? '0 mm' : formatLength(pair.mm);
+          distLine.removeAttribute('hidden');
+          // Hotspot screen positions update on the next rendered frames.
+          requestAnimationFrame(() => requestAnimationFrame(drawDistLine));
+          setTimeout(drawDistLine, 120);
+        };
+        selectA.append(makeOption('', 'Choose a layer'));
+        layerData.forEach((layer) => selectA.append(makeOption(layer.name, layer.name)));
+        fillB('');
+        selectA.addEventListener('change', () => {
+          fillB(selectA.value);
+          if (!selectB.disabled && selectB.options.length > 1) selectB.selectedIndex = 1; // the nearest partner
+          showPair();
+        });
+        selectB.addEventListener('change', showPair);
+        distToggle.addEventListener('click', () => {
+          const open = distBody.hidden;
+          distBody.hidden = !open;
+          distToggle.setAttribute('aria-expanded', String(open));
+          if (!open) clearDistance();
+        });
+        viewer.addEventListener('camera-change', () => requestAnimationFrame(drawDistLine));
+        window.addEventListener('resize', () => requestAnimationFrame(drawDistLine));
+      }
       const setOpen = (open) => {
         if (open) refreshSwatches();
+        else clearDistance();
         layersPanel.hidden = !open;
         layersBtn.setAttribute('aria-expanded', String(open));
         layersBtn.classList.toggle('is-active', open);

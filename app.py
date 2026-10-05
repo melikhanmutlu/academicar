@@ -73,7 +73,7 @@ from licensing import (
 from blog_content import code_post_slugs, get_all_posts, get_post, render_body
 from discipline_content import all_disciplines, discipline_slugs, get_discipline, related_disciplines
 from institution_panel import institution_bp
-from layer_editor import layer_editor_bp, model_has_layers, model_layers
+from layer_editor import layer_editor_bp, model_has_layers, model_layers, viewer_layer_metrics
 from comparisons import comparisons_bp
 from scenes import scenes_bp, scenes_for_viewer
 from collaborators import (
@@ -5459,6 +5459,7 @@ def register_routes(app: Flask) -> None:
             is_owner=can_edit,
             scenes=scenes,
             active_scene_id=active_scene_id,
+            viewer_metrics=viewer_layer_metrics(model, can_edit),
         )
 
     @app.route("/m/<public_id>")
