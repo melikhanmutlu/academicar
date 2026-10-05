@@ -6,6 +6,14 @@
   {%- else -%}{{ '%.1f'|format(value) }}%{%- endif -%}
 {%- endmacro %}
 
+{% macro period(days) -%}{{ '12 months' if days == 365 else days ~ ' days' }}{%- endmacro %}
+
+{% macro engagement_sub(a) -%}
+  {%- if a.unique_visitors -%}{{ a.engaged_visitors }} of {{ a.unique_visitors }} {{ 'visitor' if a.unique_visitors == 1 else 'visitors' }} rotated, went fullscreen, started AR or shared
+    {%- if a.ar_visitors %} &middot; {{ a.ar_visitors }} started AR{% endif -%}
+  {%- endif -%}
+{%- endmacro %}
+
 {% macro partial_note(a) -%}
   {%- if a.engagement_partial and a.engagement_since -%}
     <span class="ins-note">Rotation and fullscreen are counted since {{ a.engagement_since.strftime('%-d %b %Y') }}.</span>
@@ -14,9 +22,9 @@
 
 {% macro change_line(change, current, days) -%}
   {%- if change and change.pct is not none -%}
-    {%- if change.direction == 'up' -%}<span class="ins-change is-up">&#9650; {{ change.pct }}% vs previous {{ days }} days</span>
-    {%- elif change.direction == 'down' -%}<span class="ins-change is-down">&#9660; {{ change.pct|abs }}% vs previous {{ days }} days</span>
-    {%- elif current -%}<span class="ins-change">No change vs previous {{ days }} days</span>{%- endif -%}
+    {%- if change.direction == 'up' -%}<span class="ins-change is-up">&#9650; {{ change.pct }}% vs previous {{ period(days) }}</span>
+    {%- elif change.direction == 'down' -%}<span class="ins-change is-down">&#9660; {{ change.pct|abs }}% vs previous {{ period(days) }}</span>
+    {%- elif current -%}<span class="ins-change">No change vs previous {{ period(days) }}</span>{%- endif -%}
   {%- elif change and current -%}<span class="ins-change">New this period</span>
   {%- endif -%}
 {%- endmacro %}
@@ -50,7 +58,7 @@
         </div>
         <span class="ins-legend"><span class="ins-key is-now"></span>This period <span class="ins-key is-prev" id="ins-key-prev"></span><span id="ins-key-prev-t">Previous period</span></span>
       </div>
-      {% else %}<span>Last {{ analytics.days }} days</span>{% endif %}
+      {% else %}<span>Last {{ period(analytics.days) }}</span>{% endif %}
     </div>
     {% if max_views %}
       <div class="ins-chart">
@@ -77,42 +85,19 @@
         </div>
       </div>
     {% else %}
-      <p class="ins-empty">No views in the last {{ analytics.days }} days yet. Share the viewer link{% if qr_url %} or <a class="ins-link" href="{{ qr_url }}">print the QR code</a>{% else %} or put the QR code{% endif %} on a poster or slide to start collecting activity.</p>
+      <p class="ins-empty">No views in the last {{ period(analytics.days) }} yet. Share the viewer link{% if qr_url %} or <a class="ins-link" href="{{ qr_url }}">print the QR code</a>{% else %} or put the QR code{% endif %} on a poster or slide to start collecting activity.</p>
     {% endif %}
   </section>
 {% endmacro %}
 
-{% macro funnel(analytics) %}
-  {% set steps = analytics.funnel %}
-  <section class="ins-card">
-    {% set collapsed = steps[1].count == 0 and steps[2].count == 0 %}
-    <div class="ins-card-head"><h2>Engagement funnel</h2>{% if not collapsed %}<span>Share of visitors</span>{% endif %}</div>
-    {% if collapsed %}
-      <p class="ins-strip"><strong>{{ steps[0].count }}</strong> {{ 'visitor' if steps[0].count == 1 else 'visitors' }} &middot; no interactions recorded yet</p>
-    {% else %}
-    <div class="ins-funnel">
-      {% for step in steps %}
-        <div class="ins-step">
-          <span class="ins-step-label">{{ step.label }}</span>
-          <strong>{{ step.count }}</strong>
-          <span class="ins-bar"><i style="width: {{ step.pct or 0 }}%"></i></span>
-          <span class="ins-step-pct">{{ pct(step.pct) }}</span>
-        </div>
-      {% endfor %}
-    </div>
-      {{ partial_note(analytics) }}
-    {% endif %}
-  </section>
-{% endmacro %}
-
-{% macro breakdown(title, rows, empty_text) %}
+{% macro breakdown(title, rows, empty_text, regions=false) %}
   <section class="ins-card">
     <div class="ins-card-head"><h2>{{ title }}</h2></div>
     {% if rows %}
       <ul class="ins-rows">
         {% for row in rows %}
           <li>
-            <div><span>{{ row.label }}</span><strong>{{ row.count }} <small>{{ pct(row.pct) }}</small></strong></div>
+            <div><span{% if regions %} data-region="{{ row.label }}" title="{{ row.label }}"{% endif %}>{{ row.label }}</span><strong>{{ row.count }} <small>{{ pct(row.pct) }}</small></strong></div>
             <span class="ins-bar"><i style="width: {{ row.pct or 0 }}%"></i></span>
           </li>
         {% endfor %}
@@ -145,6 +130,14 @@
 {# Chart series toggle: Views | QR scans. #}
 {% macro chart_script() %}
 <script>
+(function () {
+  // Country codes (TR) to names (Türkiye); the code stays if the browser can't.
+  if (!window.Intl || !Intl.DisplayNames) return;
+  var names = new Intl.DisplayNames([document.documentElement.lang || 'en'], { type: 'region' });
+  document.querySelectorAll('[data-region]').forEach(function (el) {
+    try { el.textContent = names.of(el.dataset.region) || el.textContent; } catch (e) {}
+  });
+})();
 (function () {
   var card = document.getElementById('ins-chart-card'), plot = document.getElementById('ins-plot');
   if (!card || !plot) return;
