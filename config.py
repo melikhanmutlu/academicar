@@ -148,6 +148,22 @@ class Config:
     BACKUP_RETENTION_COUNT = int(os.environ.get("BACKUP_RETENTION_COUNT", 14))
     # How often the worker checks for today's archive / a manual request.
     BACKUP_CHECK_INTERVAL_SECONDS = int(os.environ.get("BACKUP_CHECK_INTERVAL_SECONDS", 60))
+    # Archives kept on the volume itself. Unset = 2 when the offsite (R2/B2)
+    # mirror is on, else BACKUP_RETENTION_COUNT; resolved at runtime by
+    # backup_local_retention() in app.py. Older local copies are deleted locally
+    # only; the mirror keeps up to BACKUP_RETENTION_COUNT.
+    BACKUP_LOCAL_RETENTION_COUNT = (
+        int(os.environ["BACKUP_LOCAL_RETENTION_COUNT"])
+        if os.environ.get("BACKUP_LOCAL_RETENTION_COUNT", "").strip()
+        else None
+    )
+    # Free space kept on the storage volume. Uploads need this much on top of
+    # their own size (x2, x4 for medical scans), and backups are skipped
+    # when an archive would eat into it.
+    STORAGE_MIN_FREE_BYTES = int(os.environ.get("STORAGE_MIN_FREE_BYTES", 512 * 1024 * 1024))
+    # Conversion scratch files (and staging dirs) older than this that no
+    # pending/processing job owns are removed by the worker.
+    TEMP_ARTIFACT_MAX_AGE_SECONDS = int(os.environ.get("TEMP_ARTIFACT_MAX_AGE_SECONDS", 6 * 3600))
     if APP_ENV in {"production", "prod", "pilot"}:
         DEV_INLINE_JOBS = os.environ.get("ALLOW_PRODUCTION_INLINE_JOBS", "0").lower() in {
             "1",

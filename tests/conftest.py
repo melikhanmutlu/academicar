@@ -33,6 +33,8 @@ def app():
             "INSTITUTION_LOGO_FOLDER": str(institution_logo_dir.resolve()),
             "SECRET_KEY": "test-secret",
             "UPLOAD_RATE_LIMIT_COUNT": 1000,
+            # Tests must not depend on the free space of the machine running them.
+            "STORAGE_MIN_FREE_BYTES": 0,
         }
     )
     limiter.reset()

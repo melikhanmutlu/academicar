@@ -1,5 +1,6 @@
 """AcademicAR Flask application entry point."""
 import hashlib
+import json
 import logging
 import os
 import re
@@ -8,6 +9,7 @@ import shutil
 import struct
 import subprocess
 import tempfile
+import time
 import types
 import uuid
 import zipfile
@@ -93,6 +95,7 @@ from institutions import (
     renew_institution_contract,
 )
 from models import AnalyticsEvent, AuditLog, BlogPost, ConversionJob, Coupon, Institution, InstitutionInvite, InstitutionMember, LicensePlanConfig, Model3D, ModelAnnotation, ModelVersion, Paper, Payment, ProjectArticle, ProjectAttachment, ProjectCollaborator, QRLink, User, db
+from services.r2_mirror import _is_enabled as r2_mirror_enabled
 from services.r2_mirror import mirror_file, mirror_directory, mirror_directory_sync, mirror_delete, ensure_local
 from services.monitoring import init_error_monitoring
 from services import qr_assets
@@ -114,7 +117,15 @@ from analytics import (
     track_event,
 )
 from utils.security import require_model_editor, require_model_ownership, require_paper_editor, require_paper_ownership
-from services.storage_service import StorageError, safe_move_file, safe_save_file, save_companion_files
+from services.storage_service import (
+    STORAGE_FULL_MESSAGE,
+    StorageError,
+    is_out_of_space_error,
+    safe_move_file,
+    safe_save_file,
+    save_companion_files,
+    upload_space_shortfall,
+)
 
 
 _log_level = getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper(), logging.INFO)
@@ -984,17 +995,50 @@ def list_backup_archives(app: Flask) -> list[dict]:
     return sorted(backups, key=lambda item: item["created_at"], reverse=True)
 
 
+def iter_backup_files(folder: str):
+    """Files of ``folder`` that belong in a backup. Conversion scratch (medical
+    ``.medical*`` work dirs, ``*.step-tmp.glb``, ``*.optimized.glb``) and
+    ``_replace_*`` staging dirs are transient, can be huge, and are skipped."""
+    if not folder or not os.path.exists(folder):
+        return
+    for root, dirs, files in os.walk(folder):
+        dirs[:] = [d for d in dirs if not d.startswith((".medical", "_replace_"))]
+        for filename in files:
+            if filename.endswith((".step-tmp.glb", ".optimized.glb")):
+                continue
+            yield os.path.join(root, filename)
+
+
 def add_folder_to_zip(zip_file: zipfile.ZipFile, folder: str, archive_prefix: str) -> int:
     added = 0
-    if not folder or not os.path.exists(folder):
-        return added
-    for root, _, files in os.walk(folder):
-        for filename in files:
-            file_path = os.path.join(root, filename)
-            arcname = os.path.join(archive_prefix, os.path.relpath(file_path, folder))
-            zip_file.write(file_path, arcname)
-            added += 1
+    for file_path in iter_backup_files(folder):
+        arcname = os.path.join(archive_prefix, os.path.relpath(file_path, folder))
+        zip_file.write(file_path, arcname)
+        added += 1
     return added
+
+
+def estimate_backup_size(app: Flask) -> int:
+    """Upper bound (no compression) of the next archive: every file it will
+    include plus the SQLite database file."""
+    total = 0
+    for key in ("UPLOAD_FOLDER", "CONVERTED_FOLDER", "QR_FOLDER", "PDF_FOLDER"):
+        for file_path in iter_backup_files(app.config[key]):
+            try:
+                total += os.path.getsize(file_path)
+            except OSError:
+                continue
+    db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    if db_uri.startswith("sqlite:///"):
+        try:
+            total += os.path.getsize(db_uri.replace("sqlite:///", "", 1))
+        except OSError:
+            pass
+    return total
+
+
+class BackupSkippedLowDisk(Exception):
+    """The archive would not fit with STORAGE_MIN_FREE_BYTES to spare."""
 
 
 def _dump_postgres_into_zip(zip_file: zipfile.ZipFile, db_uri: str) -> bool:
@@ -1043,6 +1087,23 @@ def _dump_postgres_into_zip(zip_file: zipfile.ZipFile, db_uri: str) -> bool:
 
 def create_backup_archive(app: Flask, created_by_user_id: int | None = None, reason: str = "manual") -> str:
     folder = backup_folder(app)
+    estimated = estimate_backup_size(app)
+    min_free = int(app.config.get("STORAGE_MIN_FREE_BYTES") or 0)
+    free = shutil.disk_usage(folder).free
+    if free < estimated + min_free:
+        details = {
+            "reason": reason,
+            "estimated_bytes": estimated,
+            "free_bytes": free,
+            "min_free_bytes": min_free,
+            "required_bytes": estimated + min_free,
+        }
+        logger.error(
+            "Backup skipped, not enough free disk: archive needs ~%d bytes + %d reserve, %d free",
+            estimated, min_free, free,
+        )
+        log_audit("admin_backup_skipped_low_disk", user_id=created_by_user_id, details=details)
+        raise BackupSkippedLowDisk(f"{free} bytes free, {estimated + min_free} required")
     timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     filename = f"academic_ar_backup_{timestamp}.zip"
     archive_path = os.path.join(folder, filename)
@@ -1058,23 +1119,32 @@ def create_backup_archive(app: Flask, created_by_user_id: int | None = None, rea
         qr_manifest.append(
             f"{qr.public_id}\t{qr.status}\t{model_resolver_url(qr.model)}\t{qr.model_id}\t{qr.target_type}"
         )
-    with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
-        if db_uri.startswith("sqlite:///"):
-            db_path = db_uri.replace("sqlite:///", "", 1)
-            if os.path.exists(db_path):
-                zip_file.write(db_path, "database/academic_ar.db")
-                manifest_lines.append("database=sqlite")
-        elif _dump_postgres_into_zip(zip_file, db_uri):
-            manifest_lines.append("database=postgres_dump")
-        else:
-            manifest_lines.append("database=unavailable")
-        manifest_lines.append(f"uploads_files={add_folder_to_zip(zip_file, app.config['UPLOAD_FOLDER'], 'uploads')}")
-        manifest_lines.append(f"converted_files={add_folder_to_zip(zip_file, app.config['CONVERTED_FOLDER'], 'converted')}")
-        manifest_lines.append(f"qr_files={add_folder_to_zip(zip_file, app.config['QR_FOLDER'], 'qr_codes')}")
-        manifest_lines.append(f"pdf_files={add_folder_to_zip(zip_file, app.config['PDF_FOLDER'], 'pdfs')}")
-        zip_file.writestr("manifest.txt", "\n".join(manifest_lines) + "\n")
-        zip_file.writestr("qr_links.tsv", "public_id\tstatus\tresolver_url\tmodel_id\ttarget_type\n" + "\n".join(qr_manifest) + "\n")
+    try:
+        with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as zip_file:
+            db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
+            if db_uri.startswith("sqlite:///"):
+                db_path = db_uri.replace("sqlite:///", "", 1)
+                if os.path.exists(db_path):
+                    zip_file.write(db_path, "database/academic_ar.db")
+                    manifest_lines.append("database=sqlite")
+            elif _dump_postgres_into_zip(zip_file, db_uri):
+                manifest_lines.append("database=postgres_dump")
+            else:
+                manifest_lines.append("database=unavailable")
+            manifest_lines.append(f"uploads_files={add_folder_to_zip(zip_file, app.config['UPLOAD_FOLDER'], 'uploads')}")
+            manifest_lines.append(f"converted_files={add_folder_to_zip(zip_file, app.config['CONVERTED_FOLDER'], 'converted')}")
+            manifest_lines.append(f"qr_files={add_folder_to_zip(zip_file, app.config['QR_FOLDER'], 'qr_codes')}")
+            manifest_lines.append(f"pdf_files={add_folder_to_zip(zip_file, app.config['PDF_FOLDER'], 'pdfs')}")
+            zip_file.writestr("manifest.txt", "\n".join(manifest_lines) + "\n")
+            zip_file.writestr("qr_links.tsv", "public_id\tstatus\tresolver_url\tmodel_id\ttarget_type\n" + "\n".join(qr_manifest) + "\n")
+    except Exception:
+        # A half-written archive (typically ENOSPC) would only eat more disk.
+        try:
+            os.remove(archive_path)
+        except OSError:
+            pass
+        raise
+    _record_backup_in_index(app, filename)
     log_audit(
         "admin_backup_created",
         user_id=created_by_user_id,
@@ -1092,23 +1162,109 @@ def ensure_daily_backup(app: Flask, created_by_user_id: int | None = None) -> st
     return create_backup_archive(app, created_by_user_id=created_by_user_id, reason="daily")
 
 
-def prune_backup_archives(app: Flask, keep: int | None = None) -> list[str]:
+BACKUP_INDEX_FILENAME = "backup_index.json"
+BACKUP_RETRY_AFTER_SECONDS = 3600
+# backup folder -> time.monotonic() before which the worker will not retry a
+# daily backup that failed or was skipped (it runs every BACKUP_CHECK_INTERVAL_SECONDS).
+_backup_retry_not_before: dict[str, float] = {}
+
+
+def backup_local_retention(app: Flask) -> int:
+    """Archives kept on the volume: BACKUP_LOCAL_RETENTION_COUNT, else 2 when
+    the offsite mirror holds the rest, else BACKUP_RETENTION_COUNT."""
+    configured = app.config.get("BACKUP_LOCAL_RETENTION_COUNT")
+    if configured is not None:
+        return max(1, int(configured))
+    retention = int(app.config.get("BACKUP_RETENTION_COUNT") or 14)
+    return min(2, retention) if r2_mirror_enabled() else retention
+
+
+def _read_backup_index(app: Flask) -> dict[str, datetime]:
+    """Archive names (and creation times) the offsite mirror may hold, which
+    survive the local copy being deleted."""
+    try:
+        with open(os.path.join(backup_folder(app), BACKUP_INDEX_FILENAME), encoding="utf-8") as handle:
+            rows = json.load(handle).get("archives", [])
+        return {
+            row["filename"]: datetime.fromisoformat(row["created_at"]).replace(tzinfo=UTC)
+            for row in rows
+            if str(row.get("filename", "")).endswith(".zip")
+        }
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return {}
+
+
+def _write_backup_index(app: Flask, entries: dict[str, datetime]) -> None:
+    path = os.path.join(backup_folder(app), BACKUP_INDEX_FILENAME)
+    rows = [
+        {"filename": name, "created_at": created.astimezone(UTC).replace(tzinfo=None).isoformat()}
+        for name, created in sorted(entries.items(), key=lambda item: item[1], reverse=True)
+    ]
+    tmp_path = path + ".tmp"
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as handle:
+            json.dump({"archives": rows}, handle)
+        os.replace(tmp_path, path)
+    except OSError:
+        logger.warning("Could not update the backup index", exc_info=True)
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+
+
+def _record_backup_in_index(app: Flask, filename: str) -> None:
+    entries = _read_backup_index(app)
+    entries[filename] = datetime.now(UTC)
+    _write_backup_index(app, entries)
+
+
+def _forget_backup_in_index(app: Flask, filename: str) -> None:
+    entries = _read_backup_index(app)
+    if entries.pop(filename, None) is not None:
+        _write_backup_index(app, entries)
+
+
+def prune_backup_archives(app: Flask, keep: int | None = None, local_keep: int | None = None) -> list[str]:
     """Keep the newest ``keep`` archives (BACKUP_RETENTION_COUNT, default 14)
-    locally and in the R2/B2 mirror; delete older ones. Returns the removed
-    filenames."""
+    in the R2/B2 mirror and the newest ``local_keep`` (backup_local_retention)
+    on the volume. Older ones are deleted; names already gone locally are still
+    known from the backup index so the mirror is pruned too. Returns the
+    removed filenames."""
     keep = keep if keep is not None else int(app.config.get("BACKUP_RETENTION_COUNT") or 14)
     if keep < 1:
         return []
+    local_keep = min(local_keep if local_keep is not None else backup_local_retention(app), keep)
+    local = list_backup_archives(app)
+    local_names = {item["filename"] for item in local}
+    known = {item["filename"]: item["created_at"] for item in local}
+    for name, created in _read_backup_index(app).items():
+        known.setdefault(name, created)
+    ordered = sorted(known.items(), key=lambda item: item[1], reverse=True)
+    retained, expired = ordered[:keep], ordered[keep:]
+    # Record the names before any local copy goes, so the mirror can still be
+    # pruned later. (A failed write only costs a stale offsite copy.)
+    if {name for name, _ in retained} != set(_read_backup_index(app)):
+        _write_backup_index(app, dict(retained))
     removed = []
-    for item in list_backup_archives(app)[keep:]:
-        path = os.path.join(backup_folder(app), item["filename"])
-        try:
-            os.remove(path)
-        except OSError:
-            logger.warning("Could not delete old backup %s", path, exc_info=True)
-            continue
-        mirror_delete(f"admin_backups/{item['filename']}")
-        removed.append(item["filename"])
+    folder = backup_folder(app)
+    for name, _ in expired:
+        if name in local_names:
+            try:
+                os.remove(os.path.join(folder, name))
+            except OSError:
+                logger.warning("Could not delete old backup %s", name, exc_info=True)
+                continue
+        mirror_delete(f"admin_backups/{name}")
+        removed.append(name)
+    for name, _ in retained[local_keep:]:
+        if name in local_names:
+            try:
+                os.remove(os.path.join(folder, name))
+            except OSError:
+                logger.warning("Could not delete old local backup %s", name, exc_info=True)
+                continue
+            removed.append(name)
     if removed:
         logger.info("Pruned %d old backup archive(s): %s", len(removed), removed)
     return removed
@@ -1123,30 +1279,178 @@ def pending_backup_request() -> AuditLog | None:
     if request_row is None:
         return None
     answered = AuditLog.query.filter(
-        AuditLog.event_type.in_(("admin_backup_created", "admin_backup_failed")),
+        AuditLog.event_type.in_(("admin_backup_created", "admin_backup_failed", "admin_backup_skipped_low_disk")),
         AuditLog.timestamp >= request_row.timestamp,
     ).first()
     return None if answered is not None else request_row
 
 
+def latest_backup_skip() -> AuditLog | None:
+    """The newest "skipped, disk too full" audit row, unless a later archive
+    was created since."""
+    skipped = (
+        AuditLog.query.filter_by(event_type="admin_backup_skipped_low_disk").order_by(AuditLog.timestamp.desc()).first()
+    )
+    if skipped is None:
+        return None
+    made = AuditLog.query.filter(
+        AuditLog.event_type == "admin_backup_created", AuditLog.timestamp >= skipped.timestamp
+    ).first()
+    return None if made is not None else skipped
+
+
 def run_scheduled_backups(app: Flask) -> str | None:
-    """Worker entry point: answer a pending manual request, otherwise make
-    sure today's daily archive exists; then apply retention. Zipping the
-    database and every stored file is heavy, so it never runs in a web
-    request in production."""
+    """Worker entry point: apply retention, answer a pending manual request,
+    otherwise make sure today's daily archive exists; then apply retention
+    again. Pruning first matters: a full disk cannot take a new archive, so
+    only freeing old ones can ever fix it. Zipping the database and every
+    stored file is heavy, so it never runs in a web request in production.
+
+    A daily archive that failed or was skipped for lack of space is retried at
+    most once an hour; a manual request is always answered (the failure or skip
+    audit row answers it)."""
+    try:
+        prune_backup_archives(app)
+    except Exception:
+        logger.exception("Backup retention pruning failed")
     request_row = pending_backup_request()
+    folder = backup_folder(app)
+    if request_row is None and time.monotonic() < _backup_retry_not_before.get(folder, 0.0):
+        return None
     try:
         if request_row is not None:
             filename = create_backup_archive(app, created_by_user_id=request_row.user_id, reason="manual")
         else:
             filename = ensure_daily_backup(app)
+    except BackupSkippedLowDisk:
+        # Already logged and audited (which also answers a manual request).
+        _backup_retry_not_before[folder] = time.monotonic() + BACKUP_RETRY_AFTER_SECONDS
+        return None
     except Exception as exc:
         logger.exception("Backup archive failed")
         log_audit("admin_backup_failed", details={"error": f"{type(exc).__name__}: {exc}"[:300]})
+        _backup_retry_not_before[folder] = time.monotonic() + BACKUP_RETRY_AFTER_SECONDS
         return None
     if filename:
         prune_backup_archives(app)
     return filename
+
+
+def storage_disk_status(app: Flask) -> dict | None:
+    """Total/used/free of the volume holding STORAGE_ROOT and whether it is
+    low: under STORAGE_MIN_FREE_BYTES or under 10% free. None if unreadable."""
+    try:
+        usage = shutil.disk_usage(app.config["STORAGE_ROOT"])
+    except OSError:
+        return None
+    min_free = int(app.config.get("STORAGE_MIN_FREE_BYTES") or 0)
+    return {
+        "total": usage.total,
+        "used": usage.used,
+        "free": usage.free,
+        "free_percent": round(100 * usage.free / usage.total, 1) if usage.total else 0.0,
+        "min_free_bytes": min_free,
+        "below_min_free": usage.free < min_free,
+        "low": usage.free < min_free or (usage.total > 0 and usage.free < usage.total * 0.10),
+    }
+
+
+def warn_if_storage_low(app: Flask) -> bool:
+    """Worker hook (hourly): WARNING when the volume has less than
+    STORAGE_MIN_FREE_BYTES free, so it shows in logs before uploads start
+    being refused. Returns True when it warned."""
+    status = storage_disk_status(app)
+    if status is None or not status["below_min_free"]:
+        return False
+    logger.warning(
+        "Storage volume is low: %d of %d bytes free (minimum %d). Uploads and backups will be refused; "
+        "delete old backups or stale files.",
+        status["free"], status["total"], status["min_free_bytes"],
+    )
+    return True
+
+
+def _active_job_paths(app: Flask) -> list[str]:
+    """Paths owned by pending/processing conversion jobs: every absolute path in
+    the payload plus the per-model folders of their model ids."""
+    paths: list[str] = []
+    for job in ConversionJob.query.filter(ConversionJob.status.in_(("pending", "processing"))).all():
+        for value in (job.payload or {}).values():
+            if isinstance(value, str) and os.path.isabs(value):
+                paths.append(os.path.abspath(value))
+        for key in ("CONVERTED_FOLDER", "UPLOAD_FOLDER", "MEDICAL_STAGING_FOLDER"):
+            paths.append(os.path.abspath(os.path.join(app.config[key], job.model_id)))
+    return paths
+
+
+def _newest_mtime(path: str) -> float:
+    newest = os.path.getmtime(path)
+    if os.path.isdir(path):
+        for root, dirs, files in os.walk(path):
+            for name in dirs + files:
+                try:
+                    newest = max(newest, os.path.getmtime(os.path.join(root, name)))
+                except OSError:
+                    continue
+    return newest
+
+
+def sweep_orphaned_temp_artifacts(app: Flask, max_age_seconds: int | None = None) -> dict:
+    """Remove conversion scratch left by a worker that died mid-job, once it is
+    older than TEMP_ARTIFACT_MAX_AGE_SECONDS: ``.medical*`` work dirs,
+    ``*.step-tmp.glb`` and ``*.optimized.glb`` under CONVERTED_FOLDER,
+    ``_replace_*`` staging dirs under UPLOAD_FOLDER, and everything in
+    MEDICAL_STAGING_FOLDER (raw scans). Nothing a pending/processing job owns is
+    touched. Logs counts and bytes only (staging holds patient scans)."""
+    if max_age_seconds is None:
+        max_age_seconds = int(app.config.get("TEMP_ARTIFACT_MAX_AGE_SECONDS") or 0)
+    result = {"removed": 0, "freed_bytes": 0}
+    if max_age_seconds <= 0:
+        return result
+    cutoff = time.time() - max_age_seconds
+    candidates: set[str] = set()
+    converted = app.config["CONVERTED_FOLDER"]
+    if os.path.isdir(converted):
+        for root, dirs, files in os.walk(converted):
+            for name in [d for d in dirs if d.startswith(".medical")]:
+                dirs.remove(name)
+                candidates.add(os.path.join(root, name))
+            candidates.update(os.path.join(root, f) for f in files if f.endswith((".step-tmp.glb", ".optimized.glb")))
+    for folder, only_replace_dirs in ((app.config["UPLOAD_FOLDER"], True), (app.config["MEDICAL_STAGING_FOLDER"], False)):
+        if not os.path.isdir(folder):
+            continue
+        for name in os.listdir(folder):
+            if not only_replace_dirs or name.startswith("_replace_"):
+                candidates.add(os.path.join(folder, name))
+    if not candidates:
+        return result
+    active = _active_job_paths(app)
+    for path in sorted(candidates):
+        candidate = os.path.abspath(path)
+        if any(
+            candidate == other or other.startswith(candidate + os.sep) or candidate.startswith(other + os.sep)
+            for other in active
+        ):
+            continue
+        try:
+            if _newest_mtime(candidate) > cutoff:
+                continue
+            size = scan_folder_size(candidate)[0] if os.path.isdir(candidate) else os.path.getsize(candidate)
+            if os.path.isdir(candidate):
+                shutil.rmtree(candidate)
+            else:
+                os.remove(candidate)
+        except OSError:
+            logger.warning("Could not remove stale temp artifact", exc_info=True)
+            continue
+        result["removed"] += 1
+        result["freed_bytes"] += size
+    if result["removed"]:
+        logger.info(
+            "Swept %d temp artifact(s) older than %ds, freed %d bytes",
+            result["removed"], max_age_seconds, result["freed_bytes"],
+        )
+    return result
 
 
 def validate_secret_key(app: Flask) -> None:
@@ -3421,6 +3725,36 @@ def run_next_conversion_job(app: Flask) -> bool:
     return True
 
 
+def _upload_space_is_short(folder: str, *, medical: bool, what: str) -> bool:
+    """True (after logging an ERROR with the numbers, which reaches Sentry)
+    when the volume cannot take this request's upload plus the free-space
+    reserve. Checked before anything is written."""
+    shortfall = upload_space_shortfall(
+        folder,
+        request.content_length,
+        medical=medical,
+        min_free=int(current_app.config.get("STORAGE_MIN_FREE_BYTES") or 0),
+    )
+    if shortfall is None:
+        return False
+    logger.error(
+        "Storage low: refusing %s (free=%d bytes, required=%d = request %d x %d + reserve %d)",
+        what, shortfall["free"], shortfall["required"], shortfall["request_bytes"], shortfall["factor"], shortfall["min_free"],
+    )
+    return True
+
+
+def _storage_failure_message(exc: BaseException) -> str:
+    """Friendly message for a failed upload write. Out-of-space errors become
+    STORAGE_FULL_MESSAGE; any other OSError is a real bug and propagates."""
+    if isinstance(exc, StorageError):
+        return str(exc)
+    if is_out_of_space_error(exc):
+        logger.error("Storage full while saving an upload: %s", exc)
+        return STORAGE_FULL_MESSAGE
+    raise exc
+
+
 def _create_model_for_paper(
     paper: Paper,
     file,
@@ -3494,26 +3828,33 @@ def _create_model_for_paper(
         unique_id,
     )
     converted_dir = os.path.join(current_app.config["CONVERTED_FOLDER"], unique_id)
-    os.makedirs(upload_dir, exist_ok=True)
-    os.makedirs(converted_dir, exist_ok=True)
+    if _upload_space_is_short(os.path.dirname(upload_dir), medical=is_medical_upload, what="model upload"):
+        return False, STORAGE_FULL_MESSAGE
+    try:
+        os.makedirs(upload_dir, exist_ok=True)
+        os.makedirs(converted_dir, exist_ok=True)
+    except OSError as e:
+        cleanup_dir(upload_dir)
+        cleanup_dir(converted_dir)
+        return False, _storage_failure_message(e)
     source_path = os.path.join(upload_dir, original_name)
     glb_path = os.path.join(converted_dir, "model.glb")
     usdz_path = os.path.join(converted_dir, "model.usdz")
 
     try:
         safe_save_file(file, source_path)
-    except StorageError as e:
+    except (StorageError, OSError) as e:
         cleanup_dir(upload_dir)
         cleanup_dir(converted_dir)
-        return False, str(e)
+        return False, _storage_failure_message(e)
 
     if source_format == "obj" and companion_files:
         try:
             save_companion_files(companion_files, upload_dir, COMPANION_FILE_EXTENSIONS)
-        except StorageError as e:
+        except (StorageError, OSError) as e:
             cleanup_dir(upload_dir)
             cleanup_dir(converted_dir)
-            return False, str(e)
+            return False, _storage_failure_message(e)
 
     file_size = os.path.getsize(source_path)
 
@@ -3580,20 +3921,25 @@ def _create_model_for_paper(
     # rerun and replacements can be audited later. Raw medical scans are never
     # archived: they may carry patient data and are deleted once converted.
     archive_root = os.path.join(current_app.config["UPLOAD_FOLDER"], unique_id, "v1")
-    if is_medical_upload:
-        archived_source = source_path
-    else:
-        os.makedirs(archive_root, exist_ok=True)
-        archived_source = os.path.join(archive_root, original_name)
-        shutil.copy2(source_path, archived_source)
-    if source_format == "obj":
-        for entry in os.listdir(upload_dir):
-            full = os.path.join(upload_dir, entry)
-            if not os.path.isfile(full) or full == source_path:
-                continue
-            ext = os.path.splitext(entry)[1].lower()
-            if ext in COMPANION_FILE_EXTENSIONS:
-                shutil.copy2(full, os.path.join(archive_root, entry))
+    try:
+        if is_medical_upload:
+            archived_source = source_path
+        else:
+            os.makedirs(archive_root, exist_ok=True)
+            archived_source = os.path.join(archive_root, original_name)
+            shutil.copy2(source_path, archived_source)
+        if source_format == "obj":
+            for entry in os.listdir(upload_dir):
+                full = os.path.join(upload_dir, entry)
+                if not os.path.isfile(full) or full == source_path:
+                    continue
+                ext = os.path.splitext(entry)[1].lower()
+                if ext in COMPANION_FILE_EXTENSIONS:
+                    shutil.copy2(full, os.path.join(archive_root, entry))
+    except OSError as e:
+        cleanup_dir(upload_dir)
+        cleanup_dir(converted_dir)
+        return False, _storage_failure_message(e)
 
     model = Model3D(
         id=unique_id,
@@ -3813,7 +4159,13 @@ def register_routes(app: Flask) -> None:
     def health():
         try:
             db.session.execute(db.text("SELECT 1"))
-            return jsonify({"status": "ok"}), 200
+            body = {"status": "ok"}
+            # Informational only: a full volume must not make the platform
+            # restart-loop the web process, so it never changes the status code.
+            disk = storage_disk_status(app)
+            if disk is not None:
+                body["disk"] = {"free_bytes": disk["free"], "total_bytes": disk["total"], "low_disk": disk["low"]}
+            return jsonify(body), 200
         except Exception:
             return jsonify({"status": "error"}), 500
 
@@ -6000,7 +6352,21 @@ def register_routes(app: Flask) -> None:
             if admin_page == "storage"
             else []
         )
+        # statvfs is cheap, so the volume status is read on every admin page
+        # (the overview shows a warning); the folder scans stay storage-only.
+        storage_disk = storage_disk_status(app)
+        storage_extra = {"backups": 0, "medical_staging": 0}
+        if admin_page == "storage":
+            storage_extra = {
+                "backups": scan_folder_size(backup_folder(app))[0],
+                "medical_staging": scan_folder_size(app.config["MEDICAL_STAGING_FOLDER"])[0],
+            }
         critical_alerts = []
+        if storage_disk and storage_disk["low"]:
+            critical_alerts.append({
+                "text": f"Storage volume is nearly full ({format_file_size(storage_disk['free'])} free)",
+                "url": url_for("admin_dashboard", admin_page="storage"),
+            })
         if totals["failed_jobs"]:
             critical_alerts.append({
                 "text": f"{totals['failed_jobs']} failed conversion job(s)",
@@ -6067,6 +6433,7 @@ def register_routes(app: Flask) -> None:
         # Daily archives are made by the worker (run_scheduled_backups).
         backups = list_backup_archives(app) if admin_page == "backups" else []
         backup_requested = pending_backup_request() if admin_page == "backups" else None
+        backup_skipped = latest_backup_skip() if admin_page == "backups" else None
         if admin_page == "blog":
             # Self-heal on every visit (cheap, idempotent).
             seed_builtin_blog_posts(app)
@@ -6166,6 +6533,8 @@ def register_routes(app: Flask) -> None:
             top_viewed_models=top_viewed_models,
             storage_by_user=storage_by_user,
             storage_breakdown=storage_breakdown,
+            storage_disk=storage_disk,
+            storage_extra=storage_extra,
             orphan_counts=orphan_counts,
             mirror_failed_count=mirror_failed_count,
             mirror_failed_models=mirror_failed_models,
@@ -6173,6 +6542,8 @@ def register_routes(app: Flask) -> None:
             critical_alerts=critical_alerts,
             backups=backups,
             backup_requested=backup_requested,
+            backup_skipped=backup_skipped,
+            backup_local_retention=backup_local_retention(app),
             blog_posts=blog_posts,
             editing_post=editing_post,
             institutions=institutions_rows,
@@ -6951,7 +7322,11 @@ def register_routes(app: Flask) -> None:
         require_admin()
         if app.config.get("TESTING") or app.config.get("DEV_INLINE_JOBS"):
             # Tests and explicit local dev build the archive inline.
-            filename = create_backup_archive(app, created_by_user_id=current_user.id, reason="manual")
+            try:
+                filename = create_backup_archive(app, created_by_user_id=current_user.id, reason="manual")
+            except BackupSkippedLowDisk:
+                flash("Backup skipped: not enough free disk space. Delete old backups or free space first.", "danger")
+                return redirect(url_for("admin_dashboard", admin_page="backups"))
             prune_backup_archives(app)
             flash(f"Backup created: {filename}", "success")
             return redirect(url_for("admin_dashboard", admin_page="backups"))
@@ -6967,6 +7342,27 @@ def register_routes(app: Flask) -> None:
         safe_name = os.path.basename(filename)
         log_audit("admin_backup_downloaded", user_id=current_user.id, resource_id=safe_name)
         return send_from_directory(backup_folder(app), safe_name, as_attachment=True)
+
+    @app.route("/admin/backups/<filename>/delete", methods=["POST"])
+    @login_required
+    def admin_backup_delete(filename):
+        """Free volume space: delete one archive locally and from the mirror."""
+        require_admin()
+        safe_name = os.path.basename(filename)
+        archive_path = os.path.join(backup_folder(app), safe_name)
+        if safe_name != filename or not safe_name.endswith(".zip") or not os.path.isfile(archive_path):
+            abort(404)
+        try:
+            os.remove(archive_path)
+        except OSError:
+            logger.warning("Could not delete backup %s", safe_name, exc_info=True)
+            flash("The backup could not be deleted. Please try again.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="backups"))
+        _forget_backup_in_index(app, safe_name)
+        mirror_delete(f"admin_backups/{safe_name}")
+        log_audit("admin_backup_deleted", user_id=current_user.id, resource_id=safe_name)
+        flash(f"Backup deleted: {safe_name}", "success")
+        return redirect(url_for("admin_dashboard", admin_page="backups"))
 
     @app.route("/admin/users/<int:user_id>/role", methods=["POST"])
     @login_required
@@ -9278,13 +9674,16 @@ def register_routes(app: Flask) -> None:
             app.config["MEDICAL_STAGING_FOLDER"] if is_medical_upload else app.config["UPLOAD_FOLDER"],
             f"_replace_{uuid.uuid4().hex}",
         )
-        os.makedirs(upload_dir, exist_ok=True)
+        if _upload_space_is_short(os.path.dirname(upload_dir), medical=is_medical_upload, what="model replacement"):
+            flash(STORAGE_FULL_MESSAGE, "danger")
+            return redirect(url_for("project_detail", slug=model.paper.slug))
         source_path = os.path.join(upload_dir, original_name)
         try:
+            os.makedirs(upload_dir, exist_ok=True)
             safe_save_file(file, source_path)
-        except StorageError as e:
+        except (StorageError, OSError) as e:
             cleanup_dir(upload_dir)
-            flash(str(e), "danger")
+            flash(_storage_failure_message(e), "danger")
             return redirect(url_for("project_detail", slug=model.paper.slug))
 
         # OBJ companions live alongside the source so the converter can resolve
@@ -9296,9 +9695,9 @@ def register_routes(app: Flask) -> None:
                     upload_dir,
                     COMPANION_FILE_EXTENSIONS,
                 )
-            except StorageError as e:
+            except (StorageError, OSError) as e:
                 cleanup_dir(upload_dir)
-                flash(str(e), "danger")
+                flash(_storage_failure_message(e), "danger")
                 return redirect(url_for("project_detail", slug=model.paper.slug))
 
         medical_preset = None
@@ -9339,7 +9738,16 @@ def register_routes(app: Flask) -> None:
         if is_medical_upload:
             archived_source = source_path
         else:
-            archived_source = archive_source_file(model, source_path, next_version, app)
+            archive_dir = os.path.join(app.config["UPLOAD_FOLDER"], model.id, f"v{next_version}")
+            archive_existed = os.path.isdir(archive_dir)
+            try:
+                archived_source = archive_source_file(model, source_path, next_version, app)
+            except OSError as e:
+                cleanup_dir(upload_dir)
+                if not archive_existed:
+                    cleanup_dir(archive_dir)
+                flash(_storage_failure_message(e), "danger")
+                return redirect(url_for("project_detail", slug=model.paper.slug))
 
         version_row = ModelVersion(
             model_id=model.id,
