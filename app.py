@@ -5709,6 +5709,17 @@ def register_routes(app: Flask) -> None:
             abort(404)
         if not _paper_visible_to_request(model.paper):
             abort(404)
+        scene_id = request.args.get("scene", type=int)
+        if scene_id is not None:
+            # QR of one saved scene's link (publication figures); same visibility as the model's QR.
+            from models import ModelScene
+            from scenes import scene_url, scenes_enabled
+
+            scene = db.session.get(ModelScene, scene_id)
+            if scenes_enabled(model) and scene and scene.model_id == model.id:
+                response = Response(qr_assets.qr_png(scene_url(scene), 1000), mimetype="image/png")
+                response.headers["Cache-Control"] = "private, no-cache"
+                return response
         ensure_model_qr_link(model)
         qr_name = os.path.basename(model.qr_code_path or f"qr_{model.id}.png")
         local_path = os.path.join(app.config["QR_FOLDER"], qr_name)
