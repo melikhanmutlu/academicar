@@ -18,6 +18,7 @@ from flask_login import current_user, login_required
 from pygltflib import GLTF2
 from sqlalchemy.exc import SQLAlchemyError
 
+from converters.layer_metrics import rename_metrics_layers
 from converters.stl_converter import _srgb_to_linear
 from models import Model3D, db
 from utils.security import require_model_editor
@@ -144,6 +145,10 @@ def update_layers(model_id):
         updated.append(item)
     info = dict(model.layer_info)
     info["layers"] = updated
+    if info.get("metrics"):  # measurements are keyed by layer name
+        renames = {l["name"]: names[i] for i, l in enumerate(layers) if l.get("name") != names[i]}
+        if renames:
+            info["metrics"] = rename_metrics_layers(info["metrics"], renames)
     model.layer_info = info  # new dict: JSON columns do not track in-place changes
     try:
         if new_colors:

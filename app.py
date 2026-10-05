@@ -46,6 +46,7 @@ from converters.glb_quality import (
 from converters.glb_optimize import normalize_specular_glossiness, optimize_glb
 from converters.glb_scale import clamp_oversized_glb
 from converters.poster import generate_poster
+from converters.layer_metrics import compute_layer_metrics, restrict_metrics
 from converters.layers import normalize_layers, read_layers
 from converters.stl_converter import convert_glb_to_usdz, enrich_glb_for_ar
 from licensing import (
@@ -70,7 +71,7 @@ from licensing import (
 from blog_content import code_post_slugs, get_all_posts, get_post, render_body
 from discipline_content import all_disciplines, discipline_slugs, get_discipline, related_disciplines
 from institution_panel import institution_bp
-from layer_editor import layer_editor_bp, model_has_layers
+from layer_editor import layer_editor_bp, model_has_layers, model_layers
 from collaborators import (
     add_collaborator,
     can_edit_project,
@@ -2853,10 +2854,13 @@ def merge_converter_layer_details(layers: list[dict], converter) -> list[dict]:
     return layers
 
 
-def verified_layer_info(glb_path: str, layers: list[dict], notes: list[str] | None = None) -> dict | None:
+def verified_layer_info(
+    glb_path: str, layers: list[dict], notes: list[str] | None = None, metrics: dict | None = None
+) -> dict | None:
     """Layer info stored on the model, or None. Re-read after optimization:
     the panel toggles materials by name, so every layer's materials must
-    still be there."""
+    still be there. ``metrics`` (see converters/layer_metrics.py) is kept for
+    the layers that remain."""
     notes = [note for note in (notes or []) if note]
     if not layers:
         return {"layers": [], "notes": notes} if notes else None
@@ -2869,7 +2873,12 @@ def verified_layer_info(glb_path: str, layers: list[dict], notes: list[str] | No
         logger.warning("Layer materials did not survive optimization for %s; hiding the layer panel", glb_path)
         return {"layers": [], "notes": notes} if notes else None
     keep = ("name", "materials", "color", "volume_ml", "count")
-    return {"layers": [{key: layer[key] for key in keep if layer.get(key) is not None} for layer in layers], "notes": notes}
+    info = {"layers": [{key: layer[key] for key in keep if layer.get(key) is not None} for layer in layers], "notes": notes}
+    metrics = restrict_metrics(metrics, (layer.get("name") for layer in layers))
+    if metrics:
+        info["metrics"] = metrics
+        info["metrics_public"] = True
+    return info
 
 
 def _run_converter(converter, source_path: str, glb_path: str, *, color: str | None, source_unit: str) -> bool:
@@ -3080,6 +3089,12 @@ def process_model_upload_job(
                 logger.exception("normalize_layers failed for model %s; continuing without layers", model_id)
             layers = merge_converter_layer_details(layers, converter)
 
+            # Measurements need the uncompressed geometry, so they are taken
+            # before finalize_converted_glb() applies Draco. Best-effort.
+            layer_metrics = compute_layer_metrics(target_glb, layers) if len(layers) >= 2 else None
+            if len(layers) >= 2 and layer_metrics is None:
+                logger.warning("Layer measurements unavailable for model %s", model_id)
+
             try:
                 finalize_converted_glb(target_glb, source_dir=os.path.dirname(source_path), keep_layers=bool(layers))
             except GLBQualityError as e:
@@ -3128,7 +3143,10 @@ def process_model_upload_job(
                 model.poster_path = poster_png
             model.processing_status = "ready"
             model.processing_error = None
-            model.layer_info = verified_layer_info(glb_path, layers, getattr(converter, "notes", None))
+            previous_info = model.layer_info if isinstance(model.layer_info, dict) else {}
+            model.layer_info = verified_layer_info(glb_path, layers, getattr(converter, "notes", None), layer_metrics)
+            if model.layer_info and model.layer_info.get("metrics") and "metrics_public" in previous_info:
+                model.layer_info["metrics_public"] = bool(previous_info["metrics_public"])  # kept across replacements
             if color:
                 model.appearance_color = color
             if is_replacement:
@@ -3255,6 +3273,67 @@ def process_usdz_regen_job(
                 db.session.rollback()
 
 
+def process_layer_metrics_job(
+    app: Flask,
+    *,
+    model_id: str,
+    glb_path: str,
+    job_id: int | None = None,
+) -> None:
+    """Backfill per-layer measurements for a model processed before they existed.
+
+    Reads the stored GLB (decompressing a Draco copy into a temp dir first, as
+    trimesh cannot read Draco geometry) and writes ``layer_info["metrics"]``.
+    The GLB itself is never touched. Skips quietly when the model has fewer
+    than two layers or its GLB is missing.
+    """
+    from converters.glb_optimize import decompress_glb, glb_has_draco
+
+    with app.app_context():
+        model = db.session.get(Model3D, model_id)
+        job = db.session.get(ConversionJob, job_id) if job_id is not None else None
+        if job is not None and job.status != "processing":
+            job.status = "processing"
+            job.started_at = datetime.now(UTC)
+            job.attempts = (job.attempts or 0) + 1
+            db.session.commit()
+        try:
+            layers = model_layers(model) if model is not None else []
+            if len(layers) >= 2:
+                ensure_local(glb_path, f"converted/{model_id}/model.glb")
+            if len(layers) < 2 or not os.path.exists(glb_path):
+                logger.info("Layer measurements skipped for model %s: no layers or GLB missing", model_id)
+            else:
+                with tempfile.TemporaryDirectory(prefix="academicar-metrics-") as tmp:
+                    source = glb_path
+                    if glb_has_draco(glb_path):
+                        plain = os.path.join(tmp, "plain.glb")
+                        source = plain if decompress_glb(glb_path, plain) else None
+                    metrics = compute_layer_metrics(source, layers) if source else None
+                if metrics is None:
+                    logger.warning("Layer measurements unavailable for model %s", model_id)
+                else:
+                    db.session.refresh(model)  # the layer editor may have run meanwhile
+                    current = model_layers(model)
+                    metrics = restrict_metrics(metrics, (layer.get("name") for layer in current))
+                    if metrics:
+                        info = dict(model.layer_info)
+                        info["metrics"] = metrics
+                        info.setdefault("metrics_public", True)
+                        model.layer_info = info  # new dict: JSON columns do not track in-place changes
+        except Exception:
+            db.session.rollback()
+            logger.exception("Layer measurements job failed for model %s", model_id)
+        if job is not None:
+            job.status = "completed"
+            job.error = None
+            job.finished_at = datetime.now(UTC)
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+
+
 def enqueue_conversion_job(
     app: Flask,
     *,
@@ -3283,6 +3362,8 @@ def enqueue_conversion_job(
         # so uploads appear immediately without a separate worker process.
         if job_type == "usdz_regen":
             process_usdz_regen_job(app, **job_kwargs)
+        elif job_type == "layer_metrics":
+            process_layer_metrics_job(app, **job_kwargs)
         else:
             process_model_upload_job(app, **job_kwargs)
     # Otherwise the ConversionJob row stays "pending" for the isolated worker
@@ -3339,6 +3420,12 @@ def reclaim_stuck_conversion_jobs(app: Flask) -> int:
                 "Reaping stuck conversion job %s (model=%s, attempts=%s): retry limit reached, marking failed.",
                 job.id, job.model_id, job.attempts,
             )
+            if job.job_type == "layer_metrics":
+                job.status = "failed"  # optional backfill: the model itself is fine
+                job.error = "Layer measurements did not finish (worker stopped)."
+                job.finished_at = datetime.now(UTC)
+                reclaimed += 1
+                continue
             mark_model_failed(
                 job.model_id,
                 "Conversion did not finish (worker stopped) and the retry limit was reached.",
@@ -3395,6 +3482,12 @@ def run_next_conversion_job(app: Flask) -> bool:
         # deterministically-failing conversion cannot loop forever. Preserve the
         # replacement semantics so a failed model_replace keeps serving the old
         # GLB instead of breaking the live viewer.
+        if job.job_type == "layer_metrics" and (job.attempts or 0) >= (job.max_attempts or 3):
+            job.status = "failed"
+            job.error = "Layer measurements failed repeatedly."
+            job.finished_at = datetime.now(UTC)
+            db.session.commit()
+            return True
         if (job.attempts or 0) >= (job.max_attempts or 3):
             mark_model_failed(
                 job.model_id,
@@ -3416,6 +3509,8 @@ def run_next_conversion_job(app: Flask) -> bool:
         job_kind = job.job_type
     if job_kind == "usdz_regen":
         process_usdz_regen_job(app, **payload)
+    elif job_kind == "layer_metrics":
+        process_layer_metrics_job(app, **payload)
     else:
         process_model_upload_job(app, **payload)
     return True
@@ -6959,6 +7054,46 @@ def register_routes(app: Flask) -> None:
             log_audit("admin_backup_requested", user_id=current_user.id)
         flash("Backup requested. The worker builds it in the background; refresh this page in a minute or two.", "success")
         return redirect(url_for("admin_dashboard", admin_page="backups"))
+
+    @app.route("/admin/layer-metrics/backfill", methods=["POST"])
+    @login_required
+    def admin_layer_metrics_backfill():
+        require_admin()
+        busy = {
+            row.model_id
+            for row in ConversionJob.query.filter(
+                ConversionJob.job_type == "layer_metrics",
+                ConversionJob.status.in_(("pending", "processing")),
+            )
+        }
+        candidates = [
+            model
+            for model in Model3D.query.filter(
+                Model3D.processing_status == "ready", Model3D.layer_info.isnot(None)
+            )
+            if model_has_layers(model) and not model.layer_info.get("metrics") and model.id not in busy
+        ]
+        queued = 0
+        for model in candidates:
+            try:
+                enqueue_conversion_job(
+                    app,
+                    model=model,
+                    job_kwargs={"model_id": model.id, "glb_path": model.glb_path},
+                    job_type="layer_metrics",
+                )
+                queued += 1
+            except SQLAlchemyError:
+                db.session.rollback()
+                logger.exception("Could not enqueue layer measurements for model %s", model.id)
+        log_audit("admin_layer_metrics_backfill", user_id=current_user.id, details={"queued": queued})
+        flash(
+            f"Queued layer measurements for {queued} model{'s' if queued != 1 else ''}."
+            if queued
+            else "No models need layer measurements.",
+            "success",
+        )
+        return redirect(url_for("admin_dashboard", admin_page="storage"))
 
     @app.route("/admin/backups/<filename>")
     @login_required
