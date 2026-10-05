@@ -162,10 +162,23 @@ def test_presets_are_documented():
     assert "bone" in MEDICAL_PRESETS["contrast"]["description"].lower()
 
 
-def test_compressed_transfer_syntax_rejected(tmp_path):
+def test_undecodable_compression_is_explained(tmp_path):
+    # The fixture wraps raw pixels in a JPEG 2000 container, which no decoder can read.
     result, _ = convert_in_process("dicom", make_ct_zip(tmp_path, compressed=True), tmp_path, "bone")
     assert not result["ok"]
-    assert "compressed DICOM" in result["error"]
+    assert "cannot be decoded" in result["error"] and "JPEG 2000" in result["error"]
+
+
+@pytest.mark.parametrize("syntax", ["JPEGLosslessProcess14_1", "JPEGLSLossless", "JPEG2000Lossless", "RLELossless"])
+def test_compressed_series_convert_like_uncompressed(tmp_path, syntax):
+    from tests.medical_fixtures import compress_series
+
+    plain, _ = convert_in_process("dicom", make_ct_zip(tmp_path / "plain"), tmp_path / "plain", "bone")
+    folder = write_ct_series(tmp_path / "packed" / "series")
+    compress_series(folder, syntax)
+    packed, _ = convert_in_process("dicom", zip_folder(folder, tmp_path / "packed.zip"), tmp_path / "packed", "bone")
+    assert packed["ok"], packed["error"]
+    assert packed["layers"][0]["volume_ml"] == plain["layers"][0]["volume_ml"]
 
 
 def test_too_few_slices_rejected(tmp_path):

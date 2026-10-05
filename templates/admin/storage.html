@@ -11,7 +11,33 @@
       </div>
       <span>File inventory</span>
     </div>
+    {% if storage_disk and storage_disk.low %}
+    <div class="admin-breakdown">
+      <h3>Storage is nearly full</h3>
+      <div>
+        <span>Only {{ format_file_size(storage_disk.free) }} ({{ storage_disk.free_percent }}%) of the volume is free; uploads are refused below {{ format_file_size(storage_disk.min_free_bytes) }} plus about twice the file size. Delete old backups or stale files.</span>
+        <a href="{{ url_for('admin_dashboard', admin_page='backups') }}" class="admin-btn admin-btn-secondary compact">Backups</a>
+      </div>
+    </div>
+    {% endif %}
     <div class="admin-insight-grid">
+      {% if storage_disk %}
+      <div class="admin-insight-card">
+        <span>Volume</span>
+        <strong>{{ format_file_size(storage_disk.free) }} free</strong>
+        <small>{{ format_file_size(storage_disk.used) }} used of {{ format_file_size(storage_disk.total) }} ({{ storage_disk.free_percent }}% free)</small>
+      </div>
+      {% endif %}
+      <div class="admin-insight-card">
+        <span>Backups</span>
+        <strong>{{ format_file_size(storage_extra.backups) }}</strong>
+        <small>archives in admin_backups</small>
+      </div>
+      <div class="admin-insight-card">
+        <span>Medical staging</span>
+        <strong>{{ format_file_size(storage_extra.medical_staging) }}</strong>
+        <small>raw scans waiting for conversion</small>
+      </div>
       <div class="admin-insight-card">
         <span>Total model files</span>
         <strong>{{ format_file_size(stats.total_model_storage) }}</strong>

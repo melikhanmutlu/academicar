@@ -7,7 +7,7 @@
     <div class="admin-section-head">
       <div>
         <h2>Backups</h2>
-        <p>The worker makes a daily archive (database dump, uploads, converted models, PDFs, QR images and a QR resolver manifest) and keeps the newest {{ config.BACKUP_RETENTION_COUNT or 14 }}, locally and in the offsite mirror.</p>
+        <p>The worker makes a daily archive (database dump, uploads, converted models, PDFs, QR images and a QR resolver manifest) and keeps the newest {{ config.BACKUP_RETENTION_COUNT or 14 }} in the offsite mirror{% if backup_local_retention != (config.BACKUP_RETENTION_COUNT or 14) %} (only the newest {{ backup_local_retention }} stay on the server volume){% endif %}. Delete archives you no longer need to free space.</p>
       </div>
       <span>{{ backups|length }} archives</span>
     </div>
@@ -15,6 +15,7 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button type="submit" class="admin-btn admin-btn-primary compact"{% if backup_requested %} disabled{% endif %}>Create backup now</button>
       {% if backup_requested %}<span class="admin-editor-note">Requested {{ backup_requested.timestamp.strftime("%Y-%m-%d %H:%M") }} UTC &mdash; the worker is building it.</span>{% endif %}
+      {% if backup_skipped %}<span class="admin-editor-note">Last backup skipped {{ backup_skipped.timestamp.strftime("%Y-%m-%d %H:%M") }} UTC: not enough free disk space. Delete old backups or free space.</span>{% endif %}
     </form>
     <div class="table-wrap">
       <table class="data-table admin-table">
@@ -32,7 +33,13 @@
               <td>{{ backup.filename }}</td>
               <td>{{ backup.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
               <td>{{ format_file_size(backup.size) }}</td>
-              <td><a href="{{ url_for('admin_backup_download', filename=backup.filename) }}" class="admin-btn admin-btn-secondary compact">Download</a></td>
+              <td class="admin-blog-row-actions">
+                <a href="{{ url_for('admin_backup_download', filename=backup.filename) }}" class="admin-btn admin-btn-secondary compact">Download</a>
+                <form method="POST" action="{{ url_for('admin_backup_delete', filename=backup.filename) }}" style="display:inline" onsubmit="return confirm('Delete this backup permanently, here and in the offsite mirror?')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="admin-btn admin-btn-danger compact">Delete</button>
+                </form>
+              </td>
             </tr>
           {% else %}
             <tr><td colspan="4">No backup archives yet.</td></tr>

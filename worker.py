@@ -10,7 +10,14 @@ from __future__ import annotations
 import os
 import time
 
-from app import create_app, process_next_attachment_preview, run_next_conversion_job, run_scheduled_backups
+from app import (
+    create_app,
+    process_next_attachment_preview,
+    run_next_conversion_job,
+    run_scheduled_backups,
+    sweep_orphaned_temp_artifacts,
+    warn_if_storage_low,
+)
 
 
 def main() -> None:
@@ -23,6 +30,10 @@ def main() -> None:
     last_report_check = 0.0
     backup_check_interval = float(app.config.get("BACKUP_CHECK_INTERVAL_SECONDS", 60))
     last_backup_check = 0.0
+    # Hourly housekeeping (also at startup): sweep scratch files a dead worker
+    # left behind and warn when the storage volume is nearly full.
+    maintenance_interval = float(os.environ.get("WORKER_MAINTENANCE_INTERVAL", "3600"))
+    last_maintenance = float("-inf")
     app.logger.info("AcademicAR worker booted. Polling conversion_jobs every %.1fs.", interval)
     while True:
         try:
@@ -82,6 +93,18 @@ def main() -> None:
                         app.logger.info("Sent %d model renewal reminder(s).", reminders)
             except Exception:
                 app.logger.exception("Unexpected error in model renewal reminders")
+        if time.monotonic() - last_maintenance >= maintenance_interval:
+            last_maintenance = time.monotonic()
+            try:
+                with app.app_context():
+                    sweep_orphaned_temp_artifacts(app)
+            except Exception:
+                app.logger.exception("Unexpected error sweeping temp artifacts")
+            try:
+                with app.app_context():
+                    warn_if_storage_low(app)
+            except Exception:
+                app.logger.exception("Unexpected error checking storage space")
         if not processed and time.monotonic() - last_backup_check >= backup_check_interval:
             # Daily archive + manual "Create backup now" requests (zipping the
             # database and every stored file must stay out of web requests).

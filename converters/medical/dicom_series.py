@@ -18,7 +18,13 @@ _PREFERRED_MODALITIES = ("CT", "MR")
 _MIN_SLICES = 3
 _MAX_TILT_DEG = 1.0
 _NO_SLICES = "No readable DICOM image slices were found in this ZIP."
-_COMPRESSED = "This series uses compressed DICOM (JPEG/JPEG 2000). Export it uncompressed and upload again."
+# Compressed series (JPEG Lossless, JPEG-LS, JPEG 2000, RLE) decode through
+# the GDCM plugin (python-gdcm); this message is only for the rare syntaxes it
+# cannot read (e.g. 12-bit JPEG Extended).
+_COMPRESSED = (
+    "This series uses a DICOM compression that cannot be decoded ({name}). "
+    "Export it uncompressed and upload again."
+)
 _MULTIFRAME = (
     "This series is stored as a multi-frame (enhanced) DICOM. "
     "Export it as a classic series with one file per slice and upload again."
@@ -81,8 +87,14 @@ def _read_slice(path, as_int):
         ds = pydicom.dcmread(path, force=True)
         if getattr(getattr(ds, "file_meta", None), "TransferSyntaxUID", None) is None:
             ds.file_meta.TransferSyntaxUID = ImplicitVRLittleEndian
+    except Exception:
+        raise MedicalError("A slice of this series could not be decoded. Export the series again and retry.")
+    try:
         arr = ds.pixel_array
     except Exception:
+        ts = ds.file_meta.TransferSyntaxUID
+        if ts.is_compressed:
+            raise MedicalError(_COMPRESSED.format(name=ts.name))
         raise MedicalError("A slice of this series could not be decoded. Export the series again and retry.")
     hu = arr.astype(np.float32)
     slope = float(getattr(ds, "RescaleSlope", 1) or 1)
@@ -126,8 +138,6 @@ def load_series(paths, preset: str) -> Source:
     if not headers:
         raise MedicalError(_NO_SLICES)
     group = _pick_series(headers)
-    if any(h["compressed"] for h in group):
-        raise MedicalError(_COMPRESSED)
     if any(h["frames"] > 1 for h in group):
         raise MedicalError(_MULTIFRAME)
     if any(h["samples"] != 1 for h in group):

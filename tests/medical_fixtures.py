@@ -192,3 +192,25 @@ def write_dicom_seg(path, masks, labels, colors, shape=(64, 64, 40)):
     ds.PixelData = pack_bits(np.stack(frames), pad=True)
     ds.save_as(path)
     return str(path)
+
+
+def compress_series(folder, syntax):
+    """Re-encode every slice in ``folder`` with GDCM (syntax: a gdcm.TransferSyntax constant name,
+    e.g. "JPEGLosslessProcess14_1", "JPEGLSLossless", "JPEG2000Lossless", "RLELossless")."""
+    import gdcm
+
+    for name in sorted(os.listdir(folder)):
+        path = os.path.join(folder, name)
+        reader = gdcm.ImageReader()
+        reader.SetFileName(path)
+        assert reader.Read()
+        change = gdcm.ImageChangeTransferSyntax()
+        change.SetTransferSyntax(gdcm.TransferSyntax(getattr(gdcm.TransferSyntax, syntax)))
+        change.SetInput(reader.GetImage())
+        assert change.Change()
+        writer = gdcm.ImageWriter()
+        writer.SetFile(reader.GetFile())
+        writer.SetImage(change.GetOutput())
+        writer.SetFileName(path)
+        assert writer.Write()
+    return folder

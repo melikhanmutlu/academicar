@@ -12,7 +12,7 @@ Alınan kararlar: STEP parçaları tek modelde ayrı katman; ham DICOM/segmentas
 - **Segmentasyon:** NIfTI, NRRD / Slicer .seg.nrrd (ad + renk), DICOM-SEG (ad + renk), ZIP içinde maske dosyaları (TotalSegmentator; dosya adı = yapı adı). Her etiket bir katman, hacmi mL.
 - **Gizlilik:** ek `medical_confirm` onayı; ham veri arşivlenmez, R2'ye aynalanmaz, dönüşüm sonrası (başarılı/başarısız, takılan iş dahil) silinir; hasta bilgisi log/GLB'ye yazılmaz (testle doğrulandı). Viewer'da "tanı amaçlı değildir" notu.
 
-Bilinen sınırlar: sıkıştırılmış (JPEG/JPEG2000) ve çok kareli (enhanced) DICOM, gantry tilt, 4D NIfTI desteklenmez (anlaşılır hata). Gizlenen katmanlar ölçüm/etiket tıklamasında hâlâ "yakalanabilir" (model-viewer raycast görünürlüğü dikkate almıyor). Katman kontrolleri yalnızca web viewer'da; AR modeli olduğu gibi gösterir.
+Sıkıştırılmış DICOM (JPEG Lossless, JPEG-LS, JPEG 2000, RLE) python-gdcm ile okunur. Bilinen sınırlar: 12-bit JPEG Extended gibi nadir sıkıştırmalar, çok kareli (enhanced) DICOM, gantry tilt ve 4D NIfTI desteklenmez (anlaşılır hata). Katman kontrolleri yalnızca web viewer'da; AR modeli olduğu gibi gösterir.
 
 ## 0. Ortak ilkeler (CLAUDE.md'den)
 
