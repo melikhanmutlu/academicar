@@ -301,6 +301,54 @@
         </div>
       </div>
 
+      <div class="surface model-edit-card" id="scenesSection">
+        <div class="model-edit-card-head">
+          <h2>Scenes</h2>
+          {% if scenes_enabled(model) %}
+          <p>Saved views of this model, each with its own link and QR code. Arrange layers and camera in the viewer, then choose "Save this view" in the Scenes panel.</p>
+          {% else %}
+          <p>Saved scenes (a view with its own link and QR code, plus a presentation mode) are available on paid plans.{% if is_project_owner and model.license_type != 'institutional' %} <a href="{{ url_for('model_upgrade_page', model_id=model.id) }}" class="underline">Upgrade this model</a> to use them.{% endif %}</p>
+          {% endif %}
+        </div>
+        {% if model.scenes %}
+        <div class="space-y-2" id="sceneList">
+          {% for scene in model.scenes %}
+          {% set scene_info = scene_dict(scene, model) %}
+          <div class="rounded-lg border border-[#e2e8f0] px-3 py-2 text-sm" data-scene-id="{{ scene.id }}">
+            <div class="flex items-center justify-between gap-3">
+              <div class="min-w-0">
+                <strong>{{ scene.title }}</strong>
+                {% if scene.description %}<span class="text-[#64748b] ml-2">{{ scene.description[:60] }}{% if scene.description|length > 60 %}...{% endif %}</span>{% endif %}
+                {% if scene_info.stale %}<span class="block text-xs" style="color:#c2410c">Layers changed &mdash; open the viewer and use "Update view" to re-save this scene.</span>{% endif %}
+              </div>
+              <button type="button" class="text-red-500 hover:text-red-700 text-xs font-semibold" onclick="deleteScene({{ scene.id }})">Remove</button>
+            </div>
+            <div class="copy-field mt-2" title="{{ scene_info.url }}">
+              <span>{{ scene_info.url }}</span>
+              <button type="button" data-copy-link="{{ scene_info.url }}">Copy</button>
+            </div>
+            <div class="model-edit-actions mt-2">
+              <a href="{{ url_for('scenes.scene_qr_asset', scene_id=scene.id, asset='qr.svg') }}" class="detail-action">QR SVG</a>
+              <a href="{{ url_for('scenes.scene_qr_asset', scene_id=scene.id, asset='qr-print.png') }}" class="detail-action">QR PNG</a>
+              <a href="{{ url_for('scenes.scene_qr_asset', scene_id=scene.id, asset='label.png') }}" class="detail-action">QR label</a>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% elif scenes_enabled(model) %}
+        <p class="text-sm text-[#64748b]">No scenes yet.</p>
+        {% endif %}
+        {% if scenes_enabled(model) %}
+        <div class="model-edit-actions mt-4">
+          {% if model_access_status(model) == 'active' %}
+            <a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action detail-action-primary">Open Viewer to Save a View</a>
+          {% else %}
+            <span class="detail-action detail-action-muted" title="The viewer must be active to save a view">Viewer unavailable</span>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+
       <form method="POST" action="{{ url_for('model_replace', model_id=model.id) }}" enctype="multipart/form-data" class="surface model-edit-card">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="model-edit-card-head">
@@ -386,6 +434,19 @@
       });
       if (resp.ok) { location.reload(); }
       else { alert('Failed to remove annotation.'); }
+    } catch (e) { alert('Network error.'); }
+  };
+
+  window.deleteScene = async function(sceneId) {
+    if (!confirm('Delete this scene? Its link and QR code will stop working.')) return;
+    try {
+      const resp = await fetch(`/models/${modelId}/scenes/${sceneId}/delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: '{}',
+      });
+      if (resp.ok) { location.reload(); }
+      else { alert('Failed to delete the scene.'); }
     } catch (e) { alert('Network error.'); }
   };
 

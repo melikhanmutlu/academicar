@@ -73,6 +73,7 @@ from blog_content import code_post_slugs, get_all_posts, get_post, render_body
 from discipline_content import all_disciplines, discipline_slugs, get_discipline, related_disciplines
 from institution_panel import institution_bp
 from layer_editor import layer_editor_bp, model_has_layers
+from scenes import scenes_bp, scenes_for_viewer
 from collaborators import (
     add_collaborator,
     can_edit_project,
@@ -231,6 +232,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.register_blueprint(auth_bp)
     app.register_blueprint(institution_bp)
     app.register_blueprint(layer_editor_bp)
+    app.register_blueprint(scenes_bp)
 
     @app.context_processor
     def inject_globals():
@@ -5329,11 +5331,18 @@ def register_routes(app: Flask) -> None:
         if not can_edit and not _is_admin_preview(model.user_id):
             track_event("model_viewed", owner_user_id=model.user_id, project_id=model.paper_id, model_id=model.id)
         scale_ref = human_scale_reference(format_model_dimensions_cm(model))
+        # Saved scenes (paid plans); ?scene=<id> opens the viewer on one of them.
+        scenes = scenes_for_viewer(model)
+        active_scene_id = request.args.get("scene", type=int)
+        if active_scene_id not in {scene["id"] for scene in scenes}:
+            active_scene_id = None
         return render_template(
             "viewer.html", model=model, paper=model.paper, has_usdz=has_usdz,
             annotations=annotations, scale_reference=scale_ref,
             dimensions_cm=format_model_dimensions_cm(model),
             is_owner=can_edit,
+            scenes=scenes,
+            active_scene_id=active_scene_id,
         )
 
     @app.route("/m/<public_id>")

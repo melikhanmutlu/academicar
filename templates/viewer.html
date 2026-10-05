@@ -414,6 +414,7 @@
     .annotation-note-popover .note-close:hover { color: #fff; }
     #measureBtn.is-active,
     #layersBtn.is-active,
+    #scenesBtn.is-active,
     #annotateBtn.is-active {
       background: #ff682c !important;
       border-color: #ff682c !important;
@@ -482,6 +483,48 @@
     @media (max-width: 640px) {
       .layers-panel { top: auto; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: auto; max-height: 50%; }
     }
+    /* Scenes panel: saved views of the model (reuses the layers panel shell). */
+    #tourBtn[hidden] { display: none; }
+    .tour-mode .scenes-panel { display: none !important; }
+    .scene-row { padding: 6px 8px; border-radius: 10px; }
+    .scene-row:hover { background: rgba(255, 255, 255, 0.06); }
+    .scene-row.is-active { background: rgba(255, 104, 44, 0.16); }
+    .scene-main { display: block; width: 100%; min-width: 0; text-align: left; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+    .scene-title { display: block; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .scene-desc { display: block; margin-top: 2px; font-size: 12px; line-height: 1.4; color: rgba(255, 255, 255, 0.6); overflow-wrap: anywhere; }
+    .scene-stale { display: block; margin-top: 3px; font-size: 11.5px; color: #ff8a5c; }
+    .scene-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+    .scene-actions button, .scene-actions a, .scene-foot button, .scene-form button {
+      font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; color: #fff; text-decoration: none;
+      background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.14); cursor: pointer;
+    }
+    .scene-actions button:hover, .scene-actions a:hover, .scene-foot button:hover { background: rgba(255, 255, 255, 0.18); }
+    .scene-actions button:disabled { opacity: 0.35; cursor: default; }
+    .scene-foot { padding: 8px 14px 12px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+    .scene-foot button { font-size: 12px; padding: 6px 12px; background: #ff682c; border-color: transparent; }
+    .scene-foot button:hover { background: #ff7d49; }
+    .scene-foot button:disabled { opacity: 0.45; cursor: default; }
+    .scene-form { padding: 10px 14px 12px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+    .scene-form[hidden] { display: none; }
+    .scene-form input, .scene-form textarea {
+      display: block; width: 100%; margin-top: 6px; padding: 7px 9px; border-radius: 8px; font-size: 13px; color: #fff;
+      background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.16);
+    }
+    .scene-form-actions { display: flex; gap: 6px; margin-top: 8px; }
+    .scene-form .scene-save { background: #ff682c; border-color: transparent; }
+    .scene-error { margin-top: 6px; font-size: 12px; color: #ff8a5c; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .scenes-panel { background: rgba(255, 255, 255, 0.96); color: #202020; border-color: #e8e8e8; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .scene-row:hover { background: #f5f5f5; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .scene-row.is-active { background: #fff1ea; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .scene-desc { color: #6b6b6b; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .scene-stale { color: #c2410c; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .scene-actions button,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .scene-actions a,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .scene-form button:not(.scene-save) { color: #202020; background: #f5f5f5; border-color: #e8e8e8; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .scene-foot,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .scene-form { border-color: #e8e8e8; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .scene-form input,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .scene-form textarea { color: #202020; background: #fff; border-color: #d4d4d4; }
     /* Measure tool: two surface points, a line and the distance. */
     .measure-point {
       width: 12px; height: 12px; border-radius: 50%; padding: 0; pointer-events: none;
@@ -1039,7 +1082,7 @@
          buttons (Download screenshot / image, Save to project) keep text. */
       header .viewer-tool-btn, .native-ar-button { padding: 0.45rem; font-size: 0; justify-content: center; }
       .viewer-tool-btn svg { display: block; }
-      .viewer-toolbar { gap: 0.35rem; flex-wrap: nowrap; }
+      .viewer-toolbar { gap: 0.35rem; flex-wrap: wrap; }
       header { padding-top: calc(0.75rem + env(safe-area-inset-top, 0px)) !important; padding-left: calc(0.75rem + env(safe-area-inset-left, 0px)) !important; padding-right: calc(0.75rem + env(safe-area-inset-right, 0px)) !important; }
       model-viewer { left: 0 !important; right: 0 !important; width: 100vw !important; transform: none !important; }
       .info-drawer { left: 0 !important; right: 0 !important; width: 100vw !important; max-width: 100vw !important; }
@@ -1098,6 +1141,12 @@
 </head>
 <body class="bg-[#050505] text-white min-h-screen overflow-hidden max-w-[100vw]">
   {% set viewer_features = get_license_plan(model.license_type).features %}
+  {# Saved scenes (paid plans): readers see them, editors also manage them (not inside an embed). #}
+  {% set viewer_scenes = (scenes or []) if (scenes is defined and 'scenes' in viewer_features) else [] %}
+  {% set scenes_edit = is_owner and 'scenes' in viewer_features and not is_embed %}
+  {% set show_scenes = viewer_scenes or scenes_edit %}
+  {% set has_label_tour = annotations and 'annotations' in viewer_features %}
+  {% set has_tour = has_label_tour or viewer_scenes %}
 
   <main class="relative h-screen w-screen">
     <div class="absolute inset-0 volumetric-grid opacity-25 z-0"></div>
@@ -1204,6 +1253,7 @@
         <span class="font-serif font-semibold text-white/90 hidden sm:inline">AcademicAR</span>
       </div>
       <div class="pointer-events-auto flex items-center gap-2">
+        {% if show_scenes %}<button id="scenesBtn" class="viewer-tool-btn !py-1.5 !px-3 !text-xs" type="button" aria-label="Scenes" aria-expanded="false" aria-controls="scenesPanel">Scenes</button>{% endif %}
         {% if viewer_layers|length > 1 %}<button id="layersBtn" class="viewer-tool-btn !py-1.5 !px-3 !text-xs" type="button" aria-label="Layers" aria-expanded="false" aria-controls="layersPanel">Layers</button>{% endif %}
         {% if 'ar' in viewer_features %}<button id="arBtn" data-ar-btn class="viewer-tool-btn primary !py-1.5 !px-4 !text-xs" type="button">
           <span class="hidden sm:inline">View in AR</span>
@@ -1236,14 +1286,18 @@
         {% if annotations and 'annotations' in viewer_features %}<button id="annotationsBtn" class="viewer-tool-btn" type="button" aria-label="Labels" aria-pressed="true">
           <svg class="sm:hidden viewer-icon-labels" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h8M2 8h6M2 12h10"/><circle cx="13" cy="4" r="1.5"/></svg>
           <span class="hidden sm:inline">Labels</span>
-        </button>
-        <button id="tourBtn" class="viewer-tool-btn" type="button" aria-label="Tour: present the labels one by one" title="Present the labels one by one (arrow keys or a presentation clicker)">
+        </button>{% endif %}
+        {% if has_tour or scenes_edit %}<button id="tourBtn" class="viewer-tool-btn" type="button"{% if not has_tour %} hidden{% endif %} aria-label="{{ 'Tour: present the saved scenes one by one' if viewer_scenes else 'Tour: present the labels one by one' }}" title="{{ 'Present the saved scenes one by one' if viewer_scenes else 'Present the labels one by one' }} (arrow keys or a presentation clicker)">
           <svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2.5v11l9-5.5z"/></svg>
           <span class="hidden sm:inline">Tour</span>
         </button>{% endif %}
         {% if is_owner and 'annotations' in viewer_features %}<button id="annotateBtn" class="viewer-tool-btn" type="button" aria-label="Annotate">
           <svg class="sm:hidden viewer-icon-annotate" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 1.5l3 3L5 14H2v-3z"/></svg>
           <span class="hidden sm:inline">Annotate</span>
+        </button>{% endif %}
+        {% if show_scenes %}<button id="scenesBtn" class="viewer-tool-btn" type="button" aria-label="Scenes" aria-expanded="false" aria-controls="scenesPanel" title="Saved views of this model">
+          <svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="3" width="13" height="10" rx="1.5"/><path d="M1.5 6.5h13M5 3v3.5M9 3v3.5"/></svg>
+          <span class="hidden sm:inline">Scenes</span>
         </button>{% endif %}
         {% if viewer_layers|length > 1 %}<button id="layersBtn" class="viewer-tool-btn" type="button" aria-label="Layers" aria-expanded="false" aria-controls="layersPanel" title="Show or hide the parts of this model">
           <svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.5l6.5 3.5L8 8.5 1.5 5z"/><path d="M1.5 8L8 11.5 14.5 8"/><path d="M1.5 11L8 14.5 14.5 11"/></svg>
@@ -1563,7 +1617,7 @@
         </div>
       </div>
     </div>
-    {% if annotations and 'annotations' in viewer_features %}
+    {% if has_tour or scenes_edit %}
     <div class="tour-bar" id="tourBar" role="region" aria-label="Guided tour" aria-live="polite" hidden>
       <div>
         <p class="tour-step" id="tourStep"></p>
@@ -1577,6 +1631,31 @@
         <button type="button" id="tourClose" aria-label="End tour">&times;</button>
       </div>
     </div>
+    {% endif %}
+    {% if show_scenes %}
+    <section id="scenesPanel" class="layers-panel scenes-panel{% if is_embed %} is-embed{% endif %}" aria-label="Saved scenes" hidden>
+      <div class="layers-head">
+        <h2>Scenes <span class="font-normal" data-scenes-count></span></h2>
+        <div class="layers-head-actions">
+          <button type="button" data-scenes-present hidden>Present</button>
+          <button type="button" data-scenes-close aria-label="Close scenes">×</button>
+        </div>
+      </div>
+      <ul class="layers-list" data-scenes-list></ul>
+      <p class="layers-note" data-scenes-empty hidden>{% if scenes_edit %}Arrange the model, then save the view as a scene with its own link and QR code.{% else %}No saved scenes yet.{% endif %}</p>
+      {% if scenes_edit %}
+      <form class="scene-form" data-scene-form hidden>
+        <input type="text" name="title" maxlength="120" required placeholder="Scene title" aria-label="Scene title" autocomplete="off">
+        <textarea name="description" rows="2" maxlength="500" placeholder="Description (optional, shown in the tour)" aria-label="Scene description"></textarea>
+        <p class="scene-error" role="alert" data-scene-error hidden></p>
+        <div class="scene-form-actions">
+          <button type="submit" class="scene-save">Save</button>
+          <button type="button" data-scene-cancel>Cancel</button>
+        </div>
+      </form>
+      <div class="scene-foot"><button type="button" data-scene-save-view>Save this view</button></div>
+      {% endif %}
+    </section>
     {% endif %}
     {% if viewer_layers|length > 1 %}
     <section id="layersPanel" class="layers-panel{% if is_embed %} is-embed{% endif %}" aria-label="Model layers" hidden>
@@ -1913,13 +1992,18 @@
     });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideAnnotationNote(); });
 
-    // --- Guided tour: step through the labels with the camera (presentations,
-    // teaching, kiosks). Arrow keys / PageUp-PageDown (presentation clickers) /
-    // Space; ?tour=1 opens it, ?tour=autoplay also plays it on a loop. ---
+    // --- Guided tour: step through the saved scenes (when the model has any)
+    // or else the labels with the camera (presentations, teaching, kiosks).
+    // Arrow keys / PageUp-PageDown (presentation clickers) / Space; ?tour=1
+    // opens it, ?tour=autoplay also plays it on a loop. ---
     const tourBar = document.getElementById('tourBar');
     const tourBtn = document.getElementById('tourBtn');
     if (tourBar && viewer) {
-      const tourStops = Array.from(document.querySelectorAll('.annotation-hotspot'));
+      // Scene objects (see the Scenes block) or label hotspots, chosen per tour.
+      let tourStops = [];
+      let tourScenes = false;
+      let tourRestore = null;
+      let tourPrevScene = null;
       const tourEls = {
         step: document.getElementById('tourStep'), title: document.getElementById('tourTitle'),
         desc: document.getElementById('tourDesc'), prev: document.getElementById('tourPrev'),
@@ -1940,6 +2024,16 @@
         if (!tourStops.length) return;
         tourIndex = Math.max(0, Math.min(index, tourStops.length - 1));
         const stop = tourStops[tourIndex];
+        if (tourScenes) {
+          if (typeof setAutoRotateState === 'function') setAutoRotateState(false);
+          window.viewerScenes.show(stop);
+          tourEls.step.textContent = `${tourIndex + 1} / ${tourStops.length}`;
+          tourEls.title.textContent = stop.title;
+          tourEls.desc.textContent = stop.description || '';
+          tourEls.prev.disabled = tourIndex === 0;
+          tourEls.next.textContent = tourIndex === tourStops.length - 1 ? 'Finish' : 'Next \u2192';
+          return;
+        }
         tourStops.forEach((el) => el.classList.toggle('is-tour-active', el === stop));
         if (stop.dataset.cameraOrbit) {
           flyCameraToAnnotation(stop);
@@ -1955,7 +2049,15 @@
         tourEls.next.textContent = tourIndex === tourStops.length - 1 ? 'Finish' : 'Next \u2192';
       };
       const startTour = (autoplay = false) => {
+        const scenes = window.viewerScenes ? window.viewerScenes.list() : [];
+        tourScenes = scenes.length > 0;
+        tourStops = tourScenes ? scenes : Array.from(document.querySelectorAll('.annotation-hotspot'));
         if (!tourStops.length) return;
+        if (tourScenes) {
+          // Remember the view the tour started from, to come back to it.
+          tourRestore = window.viewerView.getState();
+          tourPrevScene = window.viewerScenes.activeId();
+        }
         hideAnnotationNote();
         // Fullscreen is requested on <main>; the bar lives inside it.
         document.body.classList.add('tour-mode');
@@ -1971,6 +2073,14 @@
         tourBar.hidden = true;
         document.body.classList.remove('tour-mode');
         tourBtn?.classList.remove('is-active');
+        if (tourScenes) {
+          if (tourRestore) window.viewerView.applyState(tourRestore);
+          window.viewerScenes.markActive(tourPrevScene);
+          tourScenes = false;
+          tourRestore = null;
+          tourBtn?.focus({ preventScroll: true });
+          return;
+        }
         tourStops.forEach((el) => el.classList.remove('is-tour-active'));
         // Back to the framing the model opened with.
         const home = initialCamera || { orbit: defaultCameraOrbit, target: 'auto auto auto', fov: defaultFieldOfView };
@@ -3716,6 +3826,258 @@
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') closeShotPreview();
     });
+
+    // --- Scenes: saved views of the model. A scene is a state captured with
+    // viewerView.getState() and re-applied with viewerView.applyState(); its
+    // link (/s/<id>) opens the viewer with ?scene=<id>. Editors save, rename,
+    // reorder, re-save and delete here; readers only open them. The tour
+    // steps through the scenes when the model has any. ---
+    const scenesBtn = document.getElementById('scenesBtn');
+    const scenesPanel = document.getElementById('scenesPanel');
+    if (scenesBtn && scenesPanel && viewer) {
+      const canEditScenes = {{ 'true' if scenes_edit else 'false' }};
+      const MAX_SCENES = 12;
+      let scenes = {{ viewer_scenes|tojson }};
+      let activeSceneId = {{ (active_scene_id if active_scene_id is defined else none)|tojson }};
+      const sceneList = scenesPanel.querySelector('[data-scenes-list]');
+      const sceneCount = scenesPanel.querySelector('[data-scenes-count]');
+      const sceneEmpty = scenesPanel.querySelector('[data-scenes-empty]');
+      const scenePresent = scenesPanel.querySelector('[data-scenes-present]');
+      const sceneForm = scenesPanel.querySelector('[data-scene-form]');
+      const sceneFormError = scenesPanel.querySelector('[data-scene-error]');
+      const sceneSaveView = scenesPanel.querySelector('[data-scene-save-view]');
+      const scenesUrl = `/models/${modelId}/scenes`;
+      let sceneFormMode = null; // null | 'create' | scene id being edited
+      let sceneBusy = false;
+
+      const sceneRequest = async (url, body) => {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+          body: JSON.stringify(body || {}),
+        });
+        let data = {};
+        try { data = await response.json(); } catch (e) { /* non-JSON error page */ }
+        if (!response.ok) throw new Error(data.error || 'Something went wrong. Please try again.');
+        return data;
+      };
+      const copyText = async (text) => {
+        try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* fall back below */ }
+        const area = document.createElement('textarea');
+        area.value = text;
+        area.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+        document.body.appendChild(area);
+        area.select();
+        let ok = false;
+        try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+        area.remove();
+        return ok;
+      };
+      const waitForViewerLoad = () => (viewer.loaded ? Promise.resolve() : new Promise((resolve) => viewer.addEventListener('load', resolve, { once: true })));
+
+      const markActiveScene = (id) => {
+        activeSceneId = id == null ? null : id;
+        sceneList.querySelectorAll('.scene-row').forEach((row) => {
+          const active = Number(row.dataset.sceneId) === activeSceneId;
+          row.classList.toggle('is-active', active);
+          row.querySelector('.scene-main').setAttribute('aria-current', active ? 'true' : 'false');
+        });
+      };
+      const showScene = async (scene) => {
+        markActiveScene(scene.id);
+        await waitForViewerLoad();
+        await window.viewerView.applyState(scene.state);
+      };
+
+      const syncSceneChrome = () => {
+        sceneCount.textContent = scenes.length ? `(${scenes.length})` : '';
+        sceneEmpty.hidden = scenes.length > 0;
+        if (scenePresent) scenePresent.hidden = !scenes.length || !tourBtn;
+        if (sceneSaveView) sceneSaveView.disabled = scenes.length >= MAX_SCENES;
+        if (sceneSaveView) sceneSaveView.title = scenes.length >= MAX_SCENES ? `A model can have at most ${MAX_SCENES} scenes.` : '';
+        if (tourBtn) {
+          tourBtn.hidden = !scenes.length && !document.querySelector('.annotation-hotspot');
+          const label = scenes.length ? 'Present the saved scenes one by one' : 'Present the labels one by one';
+          tourBtn.title = `${label} (arrow keys or a presentation clicker)`;
+          tourBtn.setAttribute('aria-label', `Tour: ${label.toLowerCase()}`);
+        }
+      };
+
+      const openSceneForm = (mode) => {
+        if (!sceneForm) return;
+        sceneFormMode = mode;
+        const scene = mode === 'create' ? null : scenes.find((item) => item.id === mode);
+        sceneForm.elements.title.value = scene ? scene.title : '';
+        sceneForm.elements.description.value = scene ? scene.description : '';
+        sceneFormError.hidden = true;
+        sceneForm.hidden = false;
+        sceneSaveView.parentElement.hidden = true;
+        sceneForm.elements.title.focus({ preventScroll: true });
+      };
+      const closeSceneForm = () => {
+        if (!sceneForm) return;
+        sceneFormMode = null;
+        sceneForm.hidden = true;
+        sceneSaveView.parentElement.hidden = false;
+      };
+
+      const sceneButton = (label, onClick, options = {}) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = label;
+        if (options.title) button.title = options.title;
+        if (options.disabled) button.disabled = true;
+        button.addEventListener('click', onClick);
+        return button;
+      };
+      const moveScene = async (index, delta) => {
+        const order = scenes.map((scene) => scene.id);
+        const target = index + delta;
+        if (target < 0 || target >= order.length) return;
+        [order[index], order[target]] = [order[target], order[index]];
+        try {
+          const data = await sceneRequest(`${scenesUrl}/reorder`, { order });
+          scenes = data.scenes;
+          renderScenes();
+        } catch (error) { window.alert(error.message); }
+      };
+      const resaveScene = async (scene) => {
+        if (!window.confirm(`Replace the saved view of "${scene.title}" with the current view?`)) return;
+        try {
+          const data = await sceneRequest(`${scenesUrl}/${scene.id}`, { state: window.viewerView.getState() });
+          scenes = scenes.map((item) => (item.id === scene.id ? data.scene : item));
+          renderScenes();
+        } catch (error) { window.alert(error.message); }
+      };
+      const deleteScene = async (scene) => {
+        if (!window.confirm(`Delete the scene "${scene.title}"? Its link and QR code will stop working.`)) return;
+        try {
+          await sceneRequest(`${scenesUrl}/${scene.id}/delete`);
+          scenes = scenes.filter((item) => item.id !== scene.id);
+          if (activeSceneId === scene.id) activeSceneId = null;
+          renderScenes();
+        } catch (error) { window.alert(error.message); }
+      };
+
+      const renderScenes = () => {
+        sceneList.replaceChildren();
+        scenes.forEach((scene, index) => {
+          const row = document.createElement('li');
+          row.className = 'scene-row';
+          row.dataset.sceneId = String(scene.id);
+          const main = document.createElement('button');
+          main.type = 'button';
+          main.className = 'scene-main';
+          const title = document.createElement('span');
+          title.className = 'scene-title';
+          title.textContent = scene.title;
+          main.appendChild(title);
+          if (scene.description) {
+            const desc = document.createElement('span');
+            desc.className = 'scene-desc';
+            desc.textContent = scene.description;
+            main.appendChild(desc);
+          }
+          if (canEditScenes && scene.stale) {
+            const stale = document.createElement('span');
+            stale.className = 'scene-stale';
+            stale.textContent = 'Layers changed — re-save';
+            main.appendChild(stale);
+          }
+          main.addEventListener('click', () => showScene(scene));
+          row.appendChild(main);
+          if (canEditScenes) {
+            const actions = document.createElement('div');
+            actions.className = 'scene-actions';
+            actions.append(
+              sceneButton('Up', () => moveScene(index, -1), { disabled: index === 0, title: 'Move up' }),
+              sceneButton('Down', () => moveScene(index, 1), { disabled: index === scenes.length - 1, title: 'Move down' }),
+              sceneButton('Edit', () => openSceneForm(scene.id), { title: 'Rename or change the description' }),
+              sceneButton('Update view', () => resaveScene(scene), { title: 'Replace this scene with the current view' }),
+            );
+            const copy = sceneButton('Copy link', async () => {
+              const ok = await copyText(scene.url);
+              copy.textContent = ok ? 'Copied' : 'Copy failed';
+              setTimeout(() => { copy.textContent = 'Copy link'; }, 1600);
+            });
+            const qr = document.createElement('a');
+            qr.href = scene.qr_label_url;
+            qr.textContent = 'QR';
+            qr.title = 'Download a printable QR label for this scene';
+            qr.setAttribute('download', '');
+            actions.append(copy, qr, sceneButton('Delete', () => deleteScene(scene)));
+            row.appendChild(actions);
+          }
+          sceneList.appendChild(row);
+        });
+        markActiveScene(activeSceneId);
+        syncSceneChrome();
+      };
+
+      if (sceneForm) {
+        sceneSaveView.addEventListener('click', () => openSceneForm('create'));
+        scenesPanel.querySelector('[data-scene-cancel]').addEventListener('click', closeSceneForm);
+        sceneForm.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          if (sceneBusy) return;
+          const body = { title: sceneForm.elements.title.value.trim(), description: sceneForm.elements.description.value.trim() };
+          if (!body.title) { sceneFormError.textContent = 'Give the scene a title.'; sceneFormError.hidden = false; return; }
+          sceneBusy = true;
+          try {
+            if (sceneFormMode === 'create') {
+              body.state = window.viewerView.getState();
+              const data = await sceneRequest(scenesUrl, body);
+              scenes = [...scenes, data.scene];
+              activeSceneId = data.scene.id;
+            } else {
+              const data = await sceneRequest(`${scenesUrl}/${sceneFormMode}`, body);
+              scenes = scenes.map((item) => (item.id === data.scene.id ? data.scene : item));
+            }
+            closeSceneForm();
+            renderScenes();
+          } catch (error) {
+            sceneFormError.textContent = error.message;
+            sceneFormError.hidden = false;
+          } finally { sceneBusy = false; }
+        });
+      }
+
+      const setScenesOpen = (open) => {
+        if (open) {
+          // The layers panel sits in the same corner: one panel at a time.
+          const layersToggle = document.getElementById('layersBtn');
+          if (layersToggle && layersToggle.getAttribute('aria-expanded') === 'true') layersToggle.click();
+        }
+        scenesPanel.hidden = !open;
+        scenesBtn.setAttribute('aria-expanded', String(open));
+        scenesBtn.classList.toggle('is-active', open);
+      };
+      scenesBtn.addEventListener('click', () => setScenesOpen(scenesPanel.hidden));
+      scenesPanel.querySelector('[data-scenes-close]').addEventListener('click', () => setScenesOpen(false));
+      document.getElementById('layersBtn')?.addEventListener('click', () => {
+        if (!scenesPanel.hidden) setScenesOpen(false);
+      });
+      scenePresent?.addEventListener('click', () => { setScenesOpen(false); tourBtn?.click(); });
+
+      window.viewerScenes = {
+        list: () => scenes.slice(),
+        activeId: () => activeSceneId,
+        markActive: markActiveScene,
+        show: (scene) => { markActiveScene(scene.id); return window.viewerView.applyState(scene.state); },
+      };
+      renderScenes();
+
+      // ?scene=<id> (from a scene link or QR): apply it once the model is
+      // loaded and the viewer has captured its opening camera.
+      const initialScene = scenes.find((scene) => scene.id === activeSceneId);
+      if (initialScene) {
+        (async () => {
+          await waitForViewerLoad();
+          for (let i = 0; i < 60 && !initialCamera; i += 1) await new Promise((resolve) => setTimeout(resolve, 50));
+          await showScene(initialScene);
+        })();
+      }
+    }
 
     // Discourage casual download attempts. None of these stop a determined
     // user with DevTools — the browser must fetch the GLB to render it —
