@@ -14,9 +14,10 @@ Registered in create_app next to the layer editor blueprint.
 import json
 import logging
 import math
+import os
 import re
 
-from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, abort, current_app, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -114,6 +115,74 @@ def scenes_enabled(model) -> bool:
     return plan_supports_feature(model.license_type, "scenes")
 
 
+def scene_ar_signature(state) -> list:
+    """What an AR variant depends on: the layers a scene hides or fades, as a
+    sorted list. Empty means the full model is already the right AR view."""
+    layers = (state or {}).get("layers") if isinstance(state, dict) else None
+    if not isinstance(layers, dict):
+        return []
+    return sorted(
+        [name, entry.get("visible") is not False, entry.get("opacity", 1.0)]
+        for name, entry in layers.items()
+        if isinstance(entry, dict) and (entry.get("visible") is False or (entry.get("opacity", 1.0) or 0) < 1)
+    )
+
+
+def scene_ar_enabled(model) -> bool:
+    return plan_supports_feature(model.license_type, "scene_ar")
+
+
+def scene_ar_keys(model_id: str, scene_id: int) -> list[str]:
+    """R2 keys of a scene's AR variant (GLB, USDZ), mirroring converted/<model>/scenes/."""
+    return [f"converted/{model_id}/scenes/{scene_id}.glb", f"converted/{model_id}/scenes/{scene_id}.usdz"]
+
+
+def remove_scene_ar_files(folder: str, model_id: str, scene_id: int) -> None:
+    """Delete a scene's local variant files and their R2 copies."""
+    from services.r2_mirror import mirror_delete
+
+    for key in scene_ar_keys(model_id, scene_id):
+        try:
+            os.remove(os.path.join(folder, model_id, "scenes", key.rsplit("/", 1)[1]))
+        except FileNotFoundError:
+            pass
+        except OSError:
+            logger.warning("Could not remove scene AR file %s", key, exc_info=True)
+        mirror_delete(key)
+
+
+def queue_scene_ar(scene: ModelScene, model) -> None:
+    """Mark the scene's AR variant as queued and hand it to the worker."""
+    from app import enqueue_conversion_job
+
+    scene.ar_status = "queued"
+    db.session.commit()
+    enqueue_conversion_job(
+        current_app._get_current_object(), model=model, job_kwargs={"scene_id": scene.id}, job_type="scene_ar"
+    )
+
+
+def refresh_scene_ar(scene: ModelScene, model, previous_signature) -> None:
+    """After a scene's state was saved: queue its AR variant when the hidden/faded
+    layers changed (and the plan has scene AR); drop a variant that is no longer
+    needed. Never fails the save: the scene is already stored."""
+    if not scene_ar_enabled(model):
+        return
+    signature = scene_ar_signature(scene.state)
+    if signature == previous_signature:
+        return
+    try:
+        if signature:
+            queue_scene_ar(scene, model)
+        elif scene.ar_status != "none" or scene.ar_glb_path or scene.ar_usdz_path:
+            remove_scene_ar_files(current_app.config["CONVERTED_FOLDER"], model.id, scene.id)
+            scene.ar_status, scene.ar_glb_path, scene.ar_usdz_path, scene.ar_file_size = "none", None, None, None
+            db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        logger.exception("Could not queue the AR variant of scene %s", scene.id)
+
+
 def scene_url(scene: ModelScene) -> str:
     from url_helpers import public_url
 
@@ -131,7 +200,7 @@ def scene_is_stale(scene: ModelScene, model) -> bool:
 
 def scene_to_dict(scene: ModelScene, model=None) -> dict:
     model = model or scene.model
-    return {
+    data = {
         "id": scene.id,
         "public_id": scene.public_id,
         "title": scene.title,
@@ -141,7 +210,16 @@ def scene_to_dict(scene: ModelScene, model=None) -> dict:
         "url": scene_url(scene),
         "qr_label_url": url_for("scenes.scene_qr_asset", scene_id=scene.id, asset="label.png"),
         "stale": scene_is_stale(scene, model),
+        "ar_status": scene.ar_status or "none",
+        "ar_glb_url": None,
+        "ar_usdz_url": None,
     }
+    if scene.ar_status == "ready" and scene_ar_enabled(model):
+        if scene.ar_glb_path:
+            data["ar_glb_url"] = url_for("scenes.serve_scene_ar", unique_id=model.id, scene_id=scene.id, ext="glb")
+        if scene.ar_usdz_path:
+            data["ar_usdz_url"] = url_for("scenes.serve_scene_ar", unique_id=model.id, scene_id=scene.id, ext="usdz")
+    return data
 
 
 def scenes_for_viewer(model) -> list[dict]:
@@ -230,6 +308,7 @@ def create_scene(model_id):
         logger.exception("Scene could not be saved for model %s", model.id)
         return _error("The scene could not be saved.", 500)
     log_audit("model_scene_created", user_id=current_user.id, resource_id=model.id, details={"scene_id": scene.id})
+    refresh_scene_ar(scene, model, [])
     return jsonify({"scene": scene_to_dict(scene, model)}), 201
 
 
@@ -291,6 +370,7 @@ def update_scene(model_id, scene_id):
         if error:
             return _error(error, 400)
         scene.description = description or None
+    previous_signature = scene_ar_signature(scene.state)
     if payload.get("state") is not None:
         try:
             scene.state = clean_scene_state(payload["state"], model)
@@ -303,6 +383,7 @@ def update_scene(model_id, scene_id):
         logger.exception("Scene %s could not be updated", scene_id)
         return _error("The scene could not be saved.", 500)
     log_audit("model_scene_updated", user_id=current_user.id, resource_id=model.id, details={"scene_id": scene.id})
+    refresh_scene_ar(scene, model, previous_signature)
     return jsonify({"scene": scene_to_dict(scene, model)})
 
 
@@ -322,8 +403,46 @@ def delete_scene(model_id, scene_id):
         db.session.rollback()
         logger.exception("Scene %s could not be deleted", scene_id)
         return _error("The scene could not be deleted.", 500)
+    remove_scene_ar_files(current_app.config["CONVERTED_FOLDER"], model.id, scene_id)
     log_audit("model_scene_deleted", user_id=current_user.id, resource_id=model.id, details={"scene_id": scene_id})
     return jsonify({"ok": True})
+
+
+@scenes_bp.route("/files/<unique_id>/scenes/<int:scene_id>.<any(glb,usdz):ext>")
+def serve_scene_ar(unique_id, scene_id, ext):
+    """A scene's AR variant, under the same access rules as the model's own
+    GLB/USDZ (``serve_glb``): visible project, live access window, plan with AR
+    (and scene AR); only while the variant is ready."""
+    from flask import send_from_directory
+
+    from app import is_uuid, paper_visible_to_request
+    from licensing import model_is_accessible
+    from services.r2_mirror import ensure_local
+
+    if not is_uuid(unique_id):
+        abort(404)
+    model = db.session.get(Model3D, unique_id)
+    scene = db.session.get(ModelScene, scene_id)
+    if not model or not scene or scene.model_id != model.id or scene.ar_status != "ready":
+        abort(404)
+    if not paper_visible_to_request(model.paper) or not model_is_accessible(model):
+        abort(404)
+    if not scene_ar_enabled(model):
+        abort(404)
+    if ext == "usdz" and not plan_supports_feature(model.license_type, "ar"):
+        abort(403)
+    filename = f"{scene_id}.{ext}"
+    directory = os.path.join(current_app.config["CONVERTED_FOLDER"], unique_id, "scenes")
+    target = os.path.join(directory, filename)
+    ensure_local(target, f"converted/{unique_id}/scenes/{filename}")
+    if not os.path.exists(target):
+        abort(404)
+    mimetype = "model/vnd.usdz+zip" if ext == "usdz" else "model/gltf-binary"
+    response = send_from_directory(directory, filename, mimetype=mimetype, conditional=True)
+    response.headers["Content-Disposition"] = f'inline; filename="{filename}"'
+    response.headers["Cache-Control"] = "private, no-cache"
+    response.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+    return response
 
 
 @scenes_bp.route("/s/<public_id>")

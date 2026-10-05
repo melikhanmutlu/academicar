@@ -50,6 +50,7 @@ from converters.glb_scale import clamp_oversized_glb
 from converters.poster import generate_poster
 from converters.layer_metrics import compute_layer_metrics, restrict_metrics
 from converters.layers import normalize_layers, read_layers
+from converters.scene_variant import build_scene_variant
 from converters.stl_converter import convert_glb_to_usdz, enrich_glb_for_ar
 from licensing import (
     PLAN_FEATURES,
@@ -75,7 +76,14 @@ from discipline_content import all_disciplines, discipline_slugs, get_discipline
 from institution_panel import institution_bp
 from layer_editor import layer_editor_bp, model_has_layers, model_layers, viewer_layer_metrics
 from comparisons import comparisons_bp
-from scenes import scenes_bp, scenes_for_viewer
+from scenes import (
+    remove_scene_ar_files,
+    scene_ar_enabled,
+    scene_ar_keys,
+    scene_ar_signature,
+    scenes_bp,
+    scenes_for_viewer,
+)
 from collaborators import (
     add_collaborator,
     can_edit_project,
@@ -93,13 +101,14 @@ from institutions import (
     institution_coverage_label,
     institution_status_notice,
     invite_state,
+    institution_scene_ar_bytes,
     institution_usage,
     reapply_model_license,
     renew_institution_contract,
 )
-from models import AnalyticsEvent, AuditLog, BlogPost, ConversionJob, Coupon, Institution, InstitutionInvite, InstitutionMember, LicensePlanConfig, Model3D, ModelAnnotation, ModelVersion, Paper, Payment, ProjectArticle, ProjectAttachment, ProjectCollaborator, QRLink, User, db
+from models import AnalyticsEvent, AuditLog, BlogPost, ConversionJob, Coupon, Institution, InstitutionInvite, InstitutionMember, LicensePlanConfig, Model3D, ModelAnnotation, ModelScene, ModelVersion, Paper, Payment, ProjectArticle, ProjectAttachment, ProjectCollaborator, QRLink, User, db
 from services.r2_mirror import _is_enabled as r2_mirror_enabled
-from services.r2_mirror import mirror_file, mirror_directory, mirror_directory_sync, mirror_delete, ensure_local
+from services.r2_mirror import mirror_file, mirror_file_sync, mirror_directory, mirror_directory_sync, mirror_delete, ensure_local
 from services.monitoring import init_error_monitoring
 from services import qr_assets
 from payments import (
@@ -3557,6 +3566,8 @@ def process_model_upload_job(
             )
             model.r2_mirror_failed_at = None if mirror_ok else datetime.now(UTC)
             db.session.commit()
+            if is_replacement:
+                requeue_scene_ar(app, model)  # scene AR variants were cut from the old geometry
             if not mirror_ok:
                 logger.error(
                     "R2 mirror incomplete for model %s; converted files may be "
@@ -3692,6 +3703,163 @@ def process_layer_metrics_job(
             db.session.rollback()
 
 
+def _scene_ar_materials(scene: ModelScene, model: Model3D) -> tuple[set, dict]:
+    """(hidden material names, faded material name -> opacity) of a saved scene.
+    Layer names the model no longer has (a stale scene) are ignored."""
+    by_name = {str(layer.get("name")): layer.get("materials") or [] for layer in model_layers(model)}
+    hidden: set = set()
+    faded: dict = {}
+    layers = (scene.state or {}).get("layers")
+    for name, entry in (layers.items() if isinstance(layers, dict) else []):
+        if name not in by_name or not isinstance(entry, dict):
+            continue
+        if entry.get("visible") is False:
+            hidden.update(by_name[name])
+        elif (entry.get("opacity", 1.0) or 0) < 1:
+            for material in by_name[name]:
+                faded[material] = min(faded.get(material, 1.0), float(entry["opacity"]))
+    return hidden, {m: o for m, o in faded.items() if m not in hidden}
+
+
+def _set_scene_ar(scene: ModelScene, status: str, glb: str | None = None, usdz: str | None = None) -> None:
+    scene.ar_status = status
+    scene.ar_glb_path = glb
+    scene.ar_usdz_path = usdz
+    sizes = [os.path.getsize(p) for p in (glb, usdz) if p and os.path.exists(p)]
+    scene.ar_file_size = sum(sizes) if sizes else None
+
+
+def process_scene_ar_job(app: Flask, *, scene_id: int, job_id: int | None = None) -> None:
+    """Build a saved scene's AR variant: a GLB (and iOS USDZ) with only the
+    layers the scene shows.
+
+    Android Scene Viewer / iOS Quick Look have no layer controls, so a scene
+    that hides or fades layers needs its own file. Files go to
+    converted/<model>/scenes/<scene>.glb|usdz and are mirrored to R2. Optional
+    like the layer-metrics backfill: a failure leaves ``ar_status`` "failed"
+    (the viewer then opens the full model in AR) and never touches the model.
+    """
+    with app.app_context():
+        scene = db.session.get(ModelScene, scene_id)
+        job = db.session.get(ConversionJob, job_id) if job_id is not None else None
+        if job is not None and job.status != "processing":
+            job.status = "processing"
+            job.started_at = datetime.now(UTC)
+            job.attempts = (job.attempts or 0) + 1
+            db.session.commit()
+        try:
+            model = scene.model if scene is not None else None
+            if scene is None or model is None:
+                logger.info("Scene AR skipped: scene %s no longer exists", scene_id)
+            else:
+                _build_scene_ar(app, scene, model)
+        except Exception:
+            db.session.rollback()
+            logger.exception("Scene AR job failed for scene %s", scene_id)
+            scene = db.session.get(ModelScene, scene_id)
+            if scene is not None:
+                remove_scene_ar_files(app.config["CONVERTED_FOLDER"], scene.model_id, scene.id)
+                _set_scene_ar(scene, "failed")
+        if job is not None:
+            job.status = "completed"
+            job.error = None
+            job.finished_at = datetime.now(UTC)
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+
+
+def _build_scene_ar(app: Flask, scene: ModelScene, model: Model3D) -> None:
+    folder = app.config["CONVERTED_FOLDER"]
+    scene_dir = os.path.join(folder, model.id, "scenes")
+    final_glb = os.path.join(scene_dir, f"{scene.id}.glb")
+    final_usdz = os.path.join(scene_dir, f"{scene.id}.usdz")
+    signature = scene_ar_signature(scene.state)
+    hidden, faded = _scene_ar_materials(scene, model)
+
+    if not scene_ar_enabled(model) or not (hidden or faded):
+        # Nothing to build: the full model is already this scene's AR view.
+        remove_scene_ar_files(folder, model.id, scene.id)
+        _set_scene_ar(scene, "none")
+        return
+
+    source = model.glb_path
+    ensure_local(source, f"converted/{model.id}/model.glb")
+    if not os.path.exists(source):
+        logger.warning("Scene AR failed for scene %s: model GLB is missing", scene.id)
+        remove_scene_ar_files(folder, model.id, scene.id)
+        _set_scene_ar(scene, "failed")
+        return
+    # GLB + USDZ + working copies; same reserve rule as an upload.
+    shortfall = upload_space_shortfall(
+        folder, os.path.getsize(source), medical=False, min_free=int(app.config.get("STORAGE_MIN_FREE_BYTES") or 0)
+    )
+    if shortfall is not None:
+        logger.error(
+            "Storage low: skipping AR variant of scene %s (free=%d bytes, required=%d)",
+            scene.id, shortfall["free"], shortfall["required"],
+        )
+        remove_scene_ar_files(folder, model.id, scene.id)
+        _set_scene_ar(scene, "failed")
+        return
+
+    ok = build_scene_variant(source, final_glb, hidden, faded)
+    usdz_ok = False
+    if ok:
+        with tempfile.TemporaryDirectory(prefix="academicar-scene-ar-") as tmp:
+            usdz_source = final_glb
+            if faded:
+                # Quick Look's BLEND support is uncertain: the USDZ gets faded layers
+                # rounded to visible/hidden (see converters/scene_variant.py).
+                usdz_source = os.path.join(tmp, "usdz_source.glb")
+                if not build_scene_variant(source, usdz_source, hidden, faded, round_faded=True, compress=False):
+                    usdz_source = None
+            tmp_usdz = os.path.join(tmp, "scene.usdz")
+            try:
+                usdz_ok = bool(usdz_source) and bool(convert_glb_to_usdz(usdz_source, tmp_usdz)) and os.path.exists(tmp_usdz)
+            except Exception:  # USDZ is a best-effort companion, as for the full model.
+                logger.exception("Scene USDZ failed for scene %s", scene.id)
+            if usdz_ok:
+                part = final_usdz + ".part"
+                shutil.copyfile(tmp_usdz, part)
+                os.replace(part, final_usdz)
+    if not usdz_ok:
+        cleanup_file(final_usdz)
+
+    db.session.refresh(scene)
+    if scene_ar_signature(scene.state) != signature:
+        return  # saved again meanwhile: the job queued by that save builds the current view
+    if not ok:
+        remove_scene_ar_files(folder, model.id, scene.id)
+        _set_scene_ar(scene, "failed")
+        return
+    glb_key, usdz_key = scene_ar_keys(model.id, scene.id)
+    if not mirror_file_sync(final_glb, glb_key):
+        logger.error("R2 mirror failed for scene %s AR variant", scene.id)
+    if usdz_ok:
+        mirror_file_sync(final_usdz, usdz_key)
+    else:
+        mirror_delete(usdz_key)
+    _set_scene_ar(scene, "ready", final_glb, final_usdz if usdz_ok else None)
+
+
+def requeue_scene_ar(app: Flask, model: Model3D) -> None:
+    """A new GLB (replacement, rescale, unit change) makes every scene variant
+    stale: rebuild the ones whose scene hides or fades layers."""
+    if not scene_ar_enabled(model):
+        return
+    try:
+        for scene in list(model.scenes):
+            if scene_ar_signature(scene.state):
+                scene.ar_status = "queued"
+                db.session.commit()
+                enqueue_conversion_job(app, model=model, job_kwargs={"scene_id": scene.id}, job_type="scene_ar")
+    except SQLAlchemyError:
+        db.session.rollback()
+        logger.exception("Could not re-queue scene AR variants for model %s", model.id)
+
+
 def requeue_layer_metrics(app: Flask, model: Model3D) -> None:
     """Layer measurements are taken in the GLB's units, so a rescale or unit
     change leaves them stale: drop them and let the worker measure again."""
@@ -3709,6 +3877,17 @@ def requeue_layer_metrics(app: Flask, model: Model3D) -> None:
     except SQLAlchemyError:
         db.session.rollback()
         logger.exception("Could not re-queue layer measurements for model %s", model.id)
+
+
+# Jobs that only add a convenience (measurements, scene AR files): when they run
+# out of attempts they are failed on their own and never fail the model.
+OPTIONAL_JOB_TYPES = ("layer_metrics", "scene_ar")
+
+
+def _fail_scene_ar(job: ConversionJob) -> None:
+    scene = db.session.get(ModelScene, (job.payload or {}).get("scene_id"))
+    if scene is not None and scene.ar_status == "queued":
+        scene.ar_status = "failed"  # the viewer falls back to the full model
 
 
 def enqueue_conversion_job(
@@ -3741,6 +3920,8 @@ def enqueue_conversion_job(
             process_usdz_regen_job(app, **job_kwargs)
         elif job_type == "layer_metrics":
             process_layer_metrics_job(app, **job_kwargs)
+        elif job_type == "scene_ar":
+            process_scene_ar_job(app, **job_kwargs)
         else:
             process_model_upload_job(app, **job_kwargs)
     # Otherwise the ConversionJob row stays "pending" for the isolated worker
@@ -3797,10 +3978,12 @@ def reclaim_stuck_conversion_jobs(app: Flask) -> int:
                 "Reaping stuck conversion job %s (model=%s, attempts=%s): retry limit reached, marking failed.",
                 job.id, job.model_id, job.attempts,
             )
-            if job.job_type == "layer_metrics":
-                job.status = "failed"  # optional backfill: the model itself is fine
-                job.error = "Layer measurements did not finish (worker stopped)."
+            if job.job_type in OPTIONAL_JOB_TYPES:
+                job.status = "failed"  # optional job: the model itself is fine
+                job.error = "Background job did not finish (worker stopped)."
                 job.finished_at = datetime.now(UTC)
+                if job.job_type == "scene_ar":
+                    _fail_scene_ar(job)
                 reclaimed += 1
                 continue
             mark_model_failed(
@@ -3859,10 +4042,12 @@ def run_next_conversion_job(app: Flask) -> bool:
         # deterministically-failing conversion cannot loop forever. Preserve the
         # replacement semantics so a failed model_replace keeps serving the old
         # GLB instead of breaking the live viewer.
-        if job.job_type == "layer_metrics" and (job.attempts or 0) >= (job.max_attempts or 3):
+        if job.job_type in OPTIONAL_JOB_TYPES and (job.attempts or 0) >= (job.max_attempts or 3):
             job.status = "failed"
-            job.error = "Layer measurements failed repeatedly."
+            job.error = "Background job failed repeatedly."
             job.finished_at = datetime.now(UTC)
+            if job.job_type == "scene_ar":
+                _fail_scene_ar(job)
             db.session.commit()
             return True
         if (job.attempts or 0) >= (job.max_attempts or 3):
@@ -3888,6 +4073,8 @@ def run_next_conversion_job(app: Flask) -> bool:
         process_usdz_regen_job(app, **payload)
     elif job_kind == "layer_metrics":
         process_layer_metrics_job(app, **payload)
+    elif job_kind == "scene_ar":
+        process_scene_ar_job(app, **payload)
     else:
         process_model_upload_job(app, **payload)
     return True
@@ -6625,8 +6812,10 @@ def register_routes(app: Flask) -> None:
                     .group_by(Model3D.institution_id)
                     .all()
                 )
+                scene_ar_bytes = institution_scene_ar_bytes(institution_ids)
                 institution_usage_map = {
-                    row[0]: {"models": int(row[1] or 0), "bytes": int(row[2] or 0)} for row in usage_rows
+                    row[0]: {"models": int(row[1] or 0), "bytes": int(row[2] or 0) + scene_ar_bytes.get(row[0], 0)}
+                    for row in usage_rows
                 }
         system_health = _admin_system_health() if admin_page == "system" else {}
         analytics = analytics_snapshot(days=30) if admin_page == "analytics" else None
@@ -10145,6 +10334,7 @@ def register_routes(app: Flask) -> None:
                 model.poster_path = poster_png
             db.session.commit()
             requeue_layer_metrics(app, model)
+            requeue_scene_ar(app, model)
             # Re-mirror the rescaled GLB, USDZ, and refreshed poster to R2.
             mirror_file(glb_path, f"converted/{model_id}/model.glb")
             if usdz_ok and os.path.exists(usdz_path):
@@ -10230,6 +10420,7 @@ def register_routes(app: Flask) -> None:
                 model.poster_path = poster_png
             db.session.commit()
             requeue_layer_metrics(app, model)
+            requeue_scene_ar(app, model)
             mirror_file(glb_path, f"converted/{model_id}/model.glb")
             if usdz_ok and os.path.exists(usdz_path):
                 mirror_file(usdz_path, f"converted/{model_id}/model.usdz")
@@ -10388,6 +10579,7 @@ def register_routes(app: Flask) -> None:
             abort(404)
         slug = model.paper.slug
         file_paths = collect_model_file_paths(app, model)
+        scene_ar_r2_keys = [key for scene in model.scenes for key in scene_ar_keys(model_id, scene.id)]
         try:
             db.session.delete(model)
             db.session.commit()
@@ -10402,6 +10594,8 @@ def register_routes(app: Flask) -> None:
         mirror_delete(f"converted/{model_id}/model.usdz")
         mirror_delete(f"converted/{model_id}/poster.png")
         mirror_delete(f"qr_codes/qr_{model_id}.png")
+        for key in scene_ar_r2_keys:
+            mirror_delete(key)
         flash("Model deleted.", "info")
         return redirect(url_for("project_detail", slug=slug))
 

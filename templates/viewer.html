@@ -1282,6 +1282,12 @@
       <span class="annotate-hint-text" id="measureHintText">Click or tap two points on the model</span>
       <button type="button" id="measureHintDone" class="annotate-hint-done">Done</button>
     </div>
+    {% if 'ar' in viewer_features %}
+    <div id="sceneArNote" class="annotate-hint" role="status" style="white-space:normal;border-radius:16px;width:max-content" hidden>
+      <span class="annotate-hint-dot" aria-hidden="true"></span>
+      <span class="annotate-hint-text">AR view of this scene is being prepared — showing the full model</span>
+    </div>
+    {% endif %}
     {% if has_usdz and 'ar' in viewer_features %}
     <a
       id="iosQuickLookLink"
@@ -2873,7 +2879,8 @@
     const launchIOSQuickLook = (url) => {
       const anchor = document.createElement('a');
       anchor.setAttribute('rel', 'ar');
-      anchor.setAttribute('href', url);
+      // The active saved scene's own USDZ (when ready) replaces the full model's.
+      anchor.setAttribute('href', (window.viewerSceneAr && window.viewerSceneAr.usdzUrl()) || url);
       anchor.appendChild(document.createElement('img'));
       anchor.style.display = 'none';
       document.body.appendChild(anchor);
@@ -2886,6 +2893,10 @@
     // native button is used (useNativeIOSArButton).
     if (arBtn && !useNativeIOSArButton && !useIOSAnchorButton) {
       arBtn.addEventListener('click', () => {
+        // The active saved scene may have its own AR files (window.viewerSceneAr,
+        // set up by the scenes block below); this only warns while they are queued.
+        const sceneAr = window.viewerSceneAr;
+        if (sceneAr) sceneAr.notePreparing();
         // iOS only reaches here without a USDZ anchor (no Quick Look possible). Try the
         // programmatic launcher as a safety net if a USDZ somehow exists, else fall
         // back to the QR so the button is never dead.
@@ -2901,8 +2912,11 @@
         // handler async) breaks the browser's user-activation check and the
         // launch is silently ignored — the button then looks dead. So we call
         // it directly and only handle rejection on the returned promise.
-        if (viewer && viewer.canActivateAR) {
-          viewer.activateAR().catch(showQrFallback);
+        // With a ready scene variant the hidden scene-AR viewer (src = the scene's
+        // GLB) is used instead: Scene Viewer takes its file from the element's src.
+        const arViewer = (sceneAr && sceneAr.androidViewer()) || viewer;
+        if (arViewer && arViewer.canActivateAR) {
+          arViewer.activateAR().catch(showQrFallback);
           return;
         }
         // No on-device AR (desktop, or a phone where AR can't start): offer the
@@ -2914,7 +2928,7 @@
     // If AR was launched but the session genuinely failed to start on the
     // device (Scene Viewer missing/erroring, Quick Look refused), fall back to
     // the QR so the visitor still has a path onto an AR-capable phone.
-    viewer.addEventListener('ar-status', (event) => {
+    const onArStatus = (event) => {
       if (event.detail && event.detail.status === 'session-started') {
         fetch('/analytics/event', {
           method: 'POST',
@@ -2924,7 +2938,8 @@
         }).catch(() => {});
       }
       if (event.detail && event.detail.status === 'failed') showQrFallback();
-    });
+    };
+    viewer.addEventListener('ar-status', onArStatus);
 
     // Count one "rotated" engagement per page load, only for real visitor
     // interaction (auto-rotate and programmatic camera moves are ignored).
@@ -4144,6 +4159,7 @@
           row.classList.toggle('is-active', active);
           row.querySelector('.scene-main').setAttribute('aria-current', active ? 'true' : 'false');
         });
+        syncSceneAr();
       };
       const showScene = async (scene) => {
         markActiveScene(scene.id);
@@ -4320,6 +4336,67 @@
         if (!scenesPanel.hidden) setScenesOpen(false);
       });
       scenePresent?.addEventListener('click', () => { setScenesOpen(false); tourBtn?.click(); });
+
+      // --- AR for the active scene. Android Scene Viewer / iOS Quick Look have no
+      // layer controls, so a scene that hides or fades layers has its own GLB/USDZ
+      // (built by the worker; ar_status "ready"). iOS: the Quick Look anchors and
+      // ios-src point at the scene USDZ. Android: Scene Viewer reads the file from
+      // the src of the model-viewer that activateAR() is called on, and that call
+      // must stay synchronous in the click, so a hidden, lazy (never downloaded)
+      // second model-viewer carries the scene GLB and the AR button activates it.
+      // While the variant is still "queued" the full model opens, with a note. ---
+      const fullIosSrc = viewer.getAttribute('ios-src');
+      const sceneArNote = document.getElementById('sceneArNote');
+      let sceneArViewer = null;
+      let sceneArNoteTimer = null;
+      const activeScene = () => scenes.find((scene) => scene.id === activeSceneId) || null;
+      const sceneArFile = (key) => {
+        const scene = activeScene();
+        return scene && scene.ar_status === 'ready' && scene[key] ? scene[key] : null;
+      };
+      const setHref = (anchor, url) => {
+        if (!anchor.dataset.fullHref) anchor.dataset.fullHref = anchor.getAttribute('href') || '';
+        anchor.setAttribute('href', url || anchor.dataset.fullHref);
+      };
+      function syncSceneAr() {
+        const usdz = sceneArFile('ar_usdz_url');
+        iosArButtons.forEach((anchor) => setHref(anchor, usdz));
+        if (iosQuickLookLink) setHref(iosQuickLookLink, usdz);
+        if (fullIosSrc != null) viewer.setAttribute('ios-src', usdz || fullIosSrc);
+        const glb = isIOS || !arBtn ? null : sceneArFile('ar_glb_url');
+        if (!glb) {
+          if (sceneArViewer) { sceneArViewer.remove(); sceneArViewer = null; }
+          return;
+        }
+        if (!sceneArViewer) {
+          sceneArViewer = document.createElement('model-viewer');
+          sceneArViewer.id = 'sceneArViewer';
+          sceneArViewer.setAttribute('ar', '');
+          sceneArViewer.setAttribute('ar-modes', 'scene-viewer');
+          sceneArViewer.setAttribute('ar-scale', 'auto');
+          sceneArViewer.setAttribute('ar-placement', viewer.getAttribute('ar-placement') || 'floor');
+          sceneArViewer.setAttribute('loading', 'lazy');
+          sceneArViewer.setAttribute('reveal', 'manual');
+          sceneArViewer.setAttribute('alt', viewer.getAttribute('alt') || '3D model');
+          sceneArViewer.hidden = true;
+          sceneArViewer.addEventListener('ar-status', onArStatus);
+          viewer.parentElement.appendChild(sceneArViewer);
+        }
+        if (sceneArViewer.getAttribute('src') !== glb) sceneArViewer.setAttribute('src', glb);
+      }
+      const notePreparing = () => {
+        const scene = activeScene();
+        if (!sceneArNote || !scene || scene.ar_status !== 'queued') return;
+        sceneArNote.hidden = false;
+        clearTimeout(sceneArNoteTimer);
+        sceneArNoteTimer = setTimeout(() => { sceneArNote.hidden = true; }, 6000);
+      };
+      iosArButtons.forEach((anchor) => anchor.addEventListener('click', notePreparing));
+      window.viewerSceneAr = {
+        androidViewer: () => (sceneArViewer && sceneArViewer.canActivateAR ? sceneArViewer : null),
+        usdzUrl: () => sceneArFile('ar_usdz_url'),
+        notePreparing,
+      };
 
       window.viewerScenes = {
         list: () => scenes.slice(),
