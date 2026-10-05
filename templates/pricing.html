@@ -159,7 +159,7 @@
         <tbody>
           <tr><td>Access window</td><td>{{ license_plans['free'].duration_days }} days</td><td>{{ (license_plans['academic'].duration_days / 365) | round(0, 'floor') | int }} years</td><td>{{ (license_plans['extended_archive'].duration_days / 365) | round(0, 'floor') | int }} years</td></tr>
           <tr><td>Model storage</td><td>{{ (license_plans['free'].storage_limit_bytes / 1024 / 1024) | round(0, 'floor') | int }} MB</td><td>{{ (license_plans['academic'].storage_limit_bytes / 1024 / 1024) | round(0, 'floor') | int }} MB</td><td>{{ (license_plans['extended_archive'].storage_limit_bytes / 1024 / 1024) | round(0, 'floor') | int }} MB</td></tr>
-          <tr><td>Supported uploads</td><td>GLB, STL, OBJ, FBX</td><td>GLB, STL, OBJ, FBX</td><td>GLB, STL, OBJ, FBX</td></tr>
+          <tr><td>Supported uploads</td><td>GLB, STL, OBJ, FBX, STEP, DICOM</td><td>GLB, STL, OBJ, FBX, STEP, DICOM</td><td>GLB, STL, OBJ, FBX, STEP, DICOM</td></tr>
           <tr><td>QR resolver</td><td>Included</td><td>Persistent</td><td>Persistent</td></tr>
           <tr><td>Viewer screenshots</td><td>Included</td><td>Included</td><td>Included</td></tr>
           <tr><td>Mobile AR</td><td>Included</td><td>Included</td><td>Included</td></tr>
@@ -177,7 +177,7 @@
     <h2 class="landing-h2">A plan follows the model, not the whole account.</h2>
     <div class="plans-flow-grid">
       <div><span>01</span><strong>Create a project</strong><p>Start with context and models; DOI/PMID fields and documents remain optional.</p></div>
-      <div><span>02</span><strong>Upload models</strong><p>Each GLB, STL, OBJ, or FBX asset becomes its own model registry item.</p></div>
+      <div><span>02</span><strong>Upload models</strong><p>Each GLB, STL, OBJ, FBX, STEP or medical-scan asset becomes its own model registry item.</p></div>
       <div><span>03</span><strong>Choose access</strong><p>Select Free, Academic, or Extended per model based on how long it should stay active.</p></div>
       <div><span>04</span><strong>Share durable links</strong><p>Use the project page, review link, model viewer, QR resolver, screenshots, and mobile AR entry point.</p></div>
     </div>

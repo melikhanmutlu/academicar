@@ -47,12 +47,17 @@ def optimize_glb(
     *,
     draco: bool = True,
     texture_compress: bool = _TEXTURE_WEBP,
+    keep_layers: bool = False,
 ) -> bool:
     """Optimize a GLB file in-place using gltf-transform.
 
     Steps applied: weld → dedup → prune → (draco) → (texture webp).
     The original file is only replaced when optimization succeeds.
     Returns True on success, False on failure (original file preserved).
+
+    keep_layers: the model's parts are viewer layers (one named material each).
+    `optimize` joins meshes and dedups identical materials, which would merge
+    same-coloured parts into one, so only Draco geometry compression runs.
     """
     if not os.path.exists(glb_path):
         logger.warning("optimize_glb: file not found: %s", glb_path)
@@ -61,12 +66,16 @@ def optimize_glb(
     original_size = os.path.getsize(glb_path)
     tmp_output = glb_path + ".optimized.glb"
 
-    cmd = _find_cli() + ["optimize", glb_path, tmp_output]
-
-    if draco:
-        cmd += ["--compress", "draco"]
-    if texture_compress:
-        cmd += ["--texture-compress", "webp"]
+    if keep_layers:
+        if not draco:
+            return False
+        cmd = _find_cli() + ["draco", glb_path, tmp_output]
+    else:
+        cmd = _find_cli() + ["optimize", glb_path, tmp_output]
+        if draco:
+            cmd += ["--compress", "draco"]
+        if texture_compress:
+            cmd += ["--texture-compress", "webp"]
 
     try:
         result = subprocess.run(

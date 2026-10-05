@@ -30,14 +30,14 @@
         <section class="rounded-xl border border-[#e8e8e8] bg-[#f8f8f8] p-5 space-y-4">
           <div>
             <h2 class="font-serif text-2xl font-semibold text-[#111827]">Add your 3D model</h2>
-            <p class="text-sm text-[#5c6473] mt-2">Optional now — you can also create the project first and add the model later. GLB, STL, OBJ or FBX.</p>
+            <p class="text-sm text-[#5c6473] mt-2">Optional now — you can also create the project first and add the model later. GLB, STL, OBJ, FBX, STEP/STP, or a medical scan (DICOM series as ZIP, NIfTI, NRRD, DICOM-SEG).</p>
           </div>
 
           <label class="upload-dropzone">
             <span class="block text-[#111827] font-semibold">Select model file</span>
             <span class="block text-sm text-[#64748b] mt-1" data-dropzone-copy>Drag and drop a model here, or choose a file. The model gets its own license, QR resolver link, and processing job.</span>
             <span class="file-picker-control mt-4"><span>Choose file</span><small data-file-name>No file selected</small></span>
-            <input type="file" name="model_file" accept=".glb,.stl,.obj,.fbx" class="native-file-input" data-dropzone-input>
+            <input type="file" name="model_file" accept=".glb,.stl,.obj,.fbx,.step,.stp,.zip,.nii,.nii.gz,.gz,.nrrd,.dcm" class="native-file-input" data-dropzone-input>
           </label>
 
           <div class="companion-files-section" data-companion-section style="display: none;">
@@ -70,9 +70,9 @@
               <option value="mm">Millimeters (mm)</option>
               <option value="cm">Centimeters (cm)</option>
               <option value="m">Meters (m)</option>
-              <option value="embedded">Embedded units (FBX / GLB)</option>
+              <option value="embedded">Embedded units (FBX / GLB / STEP / scans)</option>
             </select>
-            <p class="text-xs text-[#5c6473] mt-1">STL and OBJ files carry no unit — choose the unit your model was made in (e.g. cm in 3ds Max / SketchUp). FBX/GLB already include real units, so “Embedded” is selected for you. You can change this later on the model’s edit page.</p>
+            <p class="text-xs text-[#5c6473] mt-1">STL and OBJ files carry no unit — choose the unit your model was made in (e.g. cm in 3ds Max / SketchUp). FBX, GLB, STEP and medical scans already include real units, so “Embedded” is selected for you. You can change this later on the model’s edit page.</p>
           </div>
 
           {% set upgrade_hint = "Upgrade to Academic or Extended Archive any time after upload — the QR and viewer link stay the same." %}
@@ -85,6 +85,8 @@
           </label>
           <input type="color" name="color" value="#cccccc" disabled aria-label="Model color" class="color-optional-picker" data-color-input>
 
+          {% set medical_options_id = 'new' %}
+          {% include "_medical_upload_options.html" %}
           <label class="flex items-start gap-3 rounded-xl border border-[#e2e8f0] bg-white p-4 text-sm text-[#475569]">
             <input type="checkbox" name="compliance_confirm" value="yes" class="mt-1" data-model-required>
             <span>I confirm that this model has been anonymized, that I have the right to share/publish it, and that I am responsible for all required ethical approval and consent processes.</span>
@@ -407,7 +409,7 @@
     const colorToggle = uploadForm.querySelector('[data-color-toggle]');
     const colorInput = uploadForm.querySelector('[data-color-input]');
     const colorControl = uploadForm.querySelector('[data-color-control]');
-    const modelExtensions = ['glb', 'stl', 'obj', 'fbx'];
+    const modelExtensions = ['glb', 'stl', 'obj', 'fbx', 'step', 'stp', 'zip', 'nii', 'gz', 'nrrd', 'dcm'];
     const companionExtensions = ['mtl', 'png', 'jpg', 'jpeg', 'webp'];
     const updateFileName = (input, emptyLabel = 'No file selected') => {
       const label = input && input.closest('label') ? input.closest('label').querySelector('[data-file-name]') : null;
@@ -480,7 +482,7 @@
       const modelFiles = dropped.filter((file) => modelExtensions.includes(extensionFor(file)));
       const companionFiles = dropped.filter((file) => companionExtensions.includes(extensionFor(file)));
       if (!modelFiles.length) {
-        if (dropzoneCopy) dropzoneCopy.textContent = 'Please choose a GLB, STL, OBJ, or FBX model file.';
+        if (dropzoneCopy) dropzoneCopy.textContent = 'Please choose a GLB, STL, OBJ, FBX, STEP or medical scan file.';
         if (dropzone) dropzone.classList.add('is-invalid');
         return;
       }
@@ -517,11 +519,11 @@
         if (!file) return;
         const ext = extensionFor(file);
         const unit = uploadForm.querySelector('[name="source_unit"]');
-        if (unit && ['glb', 'fbx'].includes(ext)) unit.value = 'embedded';
+        if (unit && ['glb', 'fbx', 'step', 'stp', 'zip', 'nii', 'gz', 'nrrd', 'dcm'].includes(ext)) unit.value = 'embedded';
         else if (unit && unit.value === 'embedded' && ['stl', 'obj'].includes(ext)) unit.value = '';
         const nameInput = uploadForm.querySelector('[name="model_display_name"]');
         if (nameInput && (!nameInput.value.trim() || nameInput.value === nameInput.dataset.autoName)) {
-          const base = file.name.replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ').trim();
+          const base = file.name.replace(/\.nii\.gz$/i, '').replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ').trim();
           nameInput.value = base;
           nameInput.dataset.autoName = base;
         }

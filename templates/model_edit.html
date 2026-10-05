@@ -255,12 +255,12 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="model-edit-card-head">
           <h2>Update model, keep link</h2>
-          <p>Upload a replacement GLB, STL, OBJ, or FBX. The model ID, QR image, resolver URL, and place in the project remain the same.</p>
+          <p>Upload a replacement GLB, STL, OBJ, FBX, STEP/STP or medical scan. The model ID, QR image, resolver URL, and place in the project remain the same.</p>
         </div>
         <label class="upload-dropzone model-edit-dropzone">
           <span>Select replacement model file</span>
-          <small>Choose a GLB, STL, OBJ, or FBX file. OBJ textures can be attached below after selecting an OBJ.</small>
-          <input type="file" name="file" accept=".glb,.stl,.obj,.fbx" required>
+          <small>GLB, STL, OBJ, FBX, STEP/STP, or a DICOM series (ZIP), NIfTI, NRRD or DICOM-SEG. OBJ textures can be attached below after selecting an OBJ.</small>
+          <input type="file" name="file" accept=".glb,.stl,.obj,.fbx,.step,.stp,.zip,.nii,.nii.gz,.gz,.nrrd,.dcm" required data-replace-file>
         </label>
         <div class="companion-files-section" data-companion-section-replace style="display: none;">
           <label class="field-label">MTL and Texture files <span class="text-[#64748b] font-normal">(optional companion files for OBJ)</span></label>
@@ -271,6 +271,8 @@
           <span>Model color</span>
           <input type="color" name="color" value="{{ model.appearance_color or '#cccccc' }}" aria-label="Replacement model color">
         </label>
+        {% set medical_options_id = 'replace' %}
+        {% include "_medical_upload_options.html" %}
         <label class="model-edit-confirm">
           <input type="checkbox" name="compliance_confirm" value="yes" required class="mt-1">
           <span>I confirm that this replacement model is anonymized, that I have the right to share/publish it, and that I am responsible for all required ethical approval and consent processes.</span>
@@ -313,7 +315,7 @@
 
 {% block scripts %}
 <script>
-  const replaceFileInput = document.querySelector('[name="file"][accept=".glb,.stl,.obj,.fbx"]');
+  const replaceFileInput = document.querySelector('[data-replace-file]');
   const companionReplace = document.querySelector('[data-companion-section-replace]');
   if (replaceFileInput && companionReplace) {
     replaceFileInput.addEventListener('change', () => {

@@ -1,5 +1,8 @@
 {# ?embed=true (and ?embed=1, which the security headers already treat as an embed) #}
 {% set is_embed = request.args.get('embed') in ('true', '1') %}
+{# Viewer layers (STEP parts, segmented structures, multi-part meshes): one named material each. #}
+{% set viewer_layers = ((model.layer_info or {}).get('layers') or []) if model.layer_info is mapping else [] %}
+{% set is_medical_model = model.source_format in ('dicom', 'segmentation') %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -410,6 +413,7 @@
     }
     .annotation-note-popover .note-close:hover { color: #fff; }
     #measureBtn.is-active,
+    #layersBtn.is-active,
     #annotateBtn.is-active {
       background: #ff682c !important;
       border-color: #ff682c !important;
@@ -437,6 +441,45 @@
       max-width: calc(100vw - 32px);
     }
     .annotate-hint[hidden] { display: none; }
+    /* Layers panel: show / hide / fade the parts of a multi-part model. */
+    .layers-panel {
+      position: absolute; z-index: 35; top: 84px; right: 24px; width: 320px; max-height: calc(100% - 200px);
+      display: flex; flex-direction: column; border-radius: 14px; color: #fff;
+      background: rgba(17, 17, 17, 0.9); border: 1px solid rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    }
+    .layers-panel[hidden] { display: none; }
+    .layers-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px 8px; }
+    .layers-head h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255, 255, 255, 0.6); }
+    .layers-head-actions { display: flex; gap: 6px; }
+    .layers-head-actions button { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; color: #fff; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.14); }
+    .layers-head-actions button:hover { background: rgba(255, 255, 255, 0.18); }
+    .layers-list { list-style: none; margin: 0; padding: 0 6px 8px; overflow-y: auto; }
+    .layer-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) 72px; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 10px; }
+    .layer-row:hover { background: rgba(255, 255, 255, 0.06); }
+    .layer-row.is-hidden .layer-name { opacity: 0.45; }
+    .layer-eye { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; color: #fff; background: transparent; border: 1px solid rgba(255, 255, 255, 0.14); }
+    .layer-eye[aria-pressed="false"] { color: rgba(255, 255, 255, 0.4); }
+    .layer-name { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 14px; text-align: left; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+    .layer-name span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .layer-swatch { flex: none; width: 12px; height: 12px; border-radius: 3px; border: 1px solid rgba(255, 255, 255, 0.35); }
+    .layer-volume { display: block; font-size: 11px; color: rgba(255, 255, 255, 0.55); }
+    .layer-opacity { width: 72px; accent-color: #ff682c; }
+    .layers-note { padding: 8px 14px 12px; font-size: 11.5px; line-height: 1.45; color: rgba(255, 255, 255, 0.6); border-top: 1px solid rgba(255, 255, 255, 0.1); }
+    .tour-mode .layers-panel { display: none !important; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layers-panel { background: rgba(255, 255, 255, 0.96); color: #202020; border-color: #e8e8e8; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layers-head h2,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layer-volume,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layers-note { color: #6b6b6b; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layers-head-actions button,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layer-eye { color: #202020; background: #f5f5f5; border-color: #e8e8e8; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layer-eye[aria-pressed="false"] { color: #9b9b9b; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layer-row:hover { background: #f5f5f5; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layers-note { border-color: #e8e8e8; }
+    .layers-panel.is-embed { top: 60px; right: 12px; max-height: calc(100% - 120px); }
+    @media (max-width: 640px) {
+      .layers-panel { top: auto; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: auto; max-height: 50%; }
+    }
     /* Measure tool: two surface points, a line and the distance. */
     .measure-point {
       width: 12px; height: 12px; border-radius: 50%; padding: 0; pointer-events: none;
@@ -1159,6 +1202,7 @@
         <span class="font-serif font-semibold text-white/90 hidden sm:inline">AcademicAR</span>
       </div>
       <div class="pointer-events-auto flex items-center gap-2">
+        {% if viewer_layers|length > 1 %}<button id="layersBtn" class="viewer-tool-btn !py-1.5 !px-3 !text-xs" type="button" aria-label="Layers" aria-expanded="false" aria-controls="layersPanel">Layers</button>{% endif %}
         {% if 'ar' in viewer_features %}<button id="arBtn" data-ar-btn class="viewer-tool-btn primary !py-1.5 !px-4 !text-xs" type="button">
           <span class="hidden sm:inline">View in AR</span>
           <span class="sm:hidden">AR</span>
@@ -1198,6 +1242,10 @@
         {% if is_owner and 'annotations' in viewer_features %}<button id="annotateBtn" class="viewer-tool-btn" type="button" aria-label="Annotate">
           <svg class="sm:hidden viewer-icon-annotate" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 1.5l3 3L5 14H2v-3z"/></svg>
           <span class="hidden sm:inline">Annotate</span>
+        </button>{% endif %}
+        {% if viewer_layers|length > 1 %}<button id="layersBtn" class="viewer-tool-btn" type="button" aria-label="Layers" aria-expanded="false" aria-controls="layersPanel" title="Show or hide the parts of this model">
+          <svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.5l6.5 3.5L8 8.5 1.5 5z"/><path d="M1.5 8L8 11.5 14.5 8"/><path d="M1.5 11L8 14.5 14.5 11"/></svg>
+          <span class="hidden sm:inline">Layers</span>
         </button>{% endif %}
         <button id="measureBtn" class="viewer-tool-btn" type="button" aria-label="Measure a distance" aria-pressed="false" title="Measure the distance between two points">
           <svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 11.5l10-10 3 3-10 10z"/><path d="M4.5 8.5l1.5 1.5M6.5 6.5l1 1M8.5 4.5l1.5 1.5"/></svg>
@@ -1408,6 +1456,7 @@
 
       <h3 class="font-semibold text-lg mb-4">{{ paper.title }}</h3>
       <div class="space-y-3 text-sm text-white/70">
+        {% if is_medical_model %}<p class="rounded-lg border border-white/15 px-3 py-2 text-white/80" data-medical-note>Generated from a medical scan. For education and presentation only — not for diagnosis.</p>{% endif %}
         {% if paper.authors %}<p><span class="text-white/40">Authors:</span> {{ paper.authors }}</p>{% endif %}
         {% if paper.year %}<p><span class="text-white/40">Year:</span> {{ paper.year }}</p>{% endif %}
         {% if paper.field %}<p><span class="text-white/40">Field:</span> {{ paper.field }}</p>{% endif %}
@@ -1522,6 +1571,19 @@
         <button type="button" id="tourClose" aria-label="End tour">&times;</button>
       </div>
     </div>
+    {% endif %}
+    {% if viewer_layers|length > 1 %}
+    <section id="layersPanel" class="layers-panel{% if is_embed %} is-embed{% endif %}" aria-label="Model layers" hidden>
+      <div class="layers-head">
+        <h2>Layers <span class="font-normal">({{ viewer_layers|length }})</span></h2>
+        <div class="layers-head-actions">
+          <button type="button" data-layers-all>Show all</button>
+          <button type="button" data-layers-close aria-label="Close layers">×</button>
+        </div>
+      </div>
+      <ul class="layers-list" data-layers-list></ul>
+      {% if is_medical_model %}<p class="layers-note">For education and presentation only — not for diagnosis.{% if viewer_layers|selectattr('volume_ml')|list %} Volumes are estimated from the segmentation.{% endif %}</p>{% endif %}
+    </section>
     {% endif %}
   </main>
 
@@ -1884,6 +1946,113 @@
         // A cached model can finish loading before this script runs.
         if (viewer.loaded) openTour(); else viewer.addEventListener('load', openTour, { once: true });
       }
+    }
+
+    // --- Layers: each part / structure has its own named material(s), so it
+    // is shown, hidden or faded through model-viewer's material API. Hidden =
+    // alpha-masked out (no depth write); faded = blended. AR shows the model
+    // as published (Scene Viewer / Quick Look have no layer controls). ---
+    const layersBtn = document.getElementById('layersBtn');
+    const layersPanel = document.getElementById('layersPanel');
+    if (layersBtn && layersPanel && viewer) {
+      const layerData = {{ viewer_layers|tojson }};
+      const list = layersPanel.querySelector('[data-layers-list]');
+      const state = layerData.map(() => ({ visible: true, opacity: 1 }));
+      let mats = null; // per layer: [{ material, mode, cutoff, factor }]
+      const toSrgbHex = (rgba) => '#' + rgba.slice(0, 3).map((c) => {
+        const v = c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+        return Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, '0');
+      }).join('');
+      const formatVolume = (ml) => ml >= 1000 ? `${(ml / 1000).toFixed(2)} L` : ml >= 100 ? `${Math.round(ml)} mL` : `${ml.toFixed(1)} mL`;
+      const resolveMaterials = () => {
+        if (mats || !viewer.model) return mats;
+        const byName = new Map();
+        viewer.model.materials.forEach((m) => { if (!byName.has(m.name)) byName.set(m.name, []); byName.get(m.name).push(m); });
+        mats = layerData.map((layer) => (layer.materials || [layer.name]).flatMap((name) => byName.get(name) || []).map((material) => ({
+          material,
+          mode: material.getAlphaMode(),
+          cutoff: material.getAlphaCutoff(),
+          factor: [...material.pbrMetallicRoughness.baseColorFactor],
+        })));
+        return mats;
+      };
+      const apply = (i) => {
+        const entries = resolveMaterials()?.[i] || [];
+        const { visible, opacity } = state[i];
+        entries.forEach(({ material, mode, cutoff, factor }) => {
+          const pbr = material.pbrMetallicRoughness;
+          if (!visible || opacity <= 0.01) {
+            material.setAlphaMode('MASK');
+            material.setAlphaCutoff(0.5);
+            pbr.setBaseColorFactor([factor[0], factor[1], factor[2], 0]);
+          } else if (opacity < 0.99) {
+            material.setAlphaMode('BLEND');
+            pbr.setBaseColorFactor([factor[0], factor[1], factor[2], factor[3] * opacity]);
+          } else {
+            material.setAlphaMode(mode);
+            material.setAlphaCutoff(cutoff);
+            pbr.setBaseColorFactor(factor);
+          }
+        });
+        const row = list.children[i];
+        if (row) {
+          row.classList.toggle('is-hidden', !visible);
+          row.querySelector('.layer-eye').setAttribute('aria-pressed', String(visible));
+          row.querySelector('.layer-eye').setAttribute('aria-label', `${visible ? 'Hide' : 'Show'} ${layerData[i].name}`);
+        }
+      };
+      const applyAll = () => state.forEach((_, i) => apply(i));
+      layerData.forEach((layer, i) => {
+        const row = document.createElement('li');
+        row.className = 'layer-row';
+        row.innerHTML = '<button type="button" class="layer-eye" aria-pressed="true"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg></button>'
+          + '<button type="button" class="layer-name" title="Show only this layer (click again to show all)"><span class="layer-swatch"></span><span></span></button>'
+          + '<input type="range" class="layer-opacity" min="0" max="100" value="100">';
+        const nameLabel = row.querySelector('.layer-name span:last-child');
+        nameLabel.textContent = layer.name;
+        if (layer.volume_ml != null) {
+          const vol = document.createElement('span');
+          vol.className = 'layer-volume';
+          vol.textContent = formatVolume(layer.volume_ml);
+          nameLabel.appendChild(vol);
+        }
+        row.querySelector('.layer-swatch').style.background = layer.color || '#cccccc';
+        row.querySelector('.layer-opacity').setAttribute('aria-label', `Opacity of ${layer.name}`);
+        row.querySelector('.layer-eye').addEventListener('click', () => { state[i].visible = !state[i].visible; apply(i); });
+        row.querySelector('.layer-name').addEventListener('click', () => {
+          const solo = state.every((s, j) => s.visible === (j === i));
+          state.forEach((s, j) => { s.visible = solo || j === i; });
+          applyAll();
+        });
+        row.querySelector('.layer-opacity').addEventListener('input', (event) => {
+          state[i].opacity = Number(event.target.value) / 100;
+          if (state[i].opacity > 0.01) state[i].visible = true;
+          apply(i);
+        });
+        list.appendChild(row);
+      });
+      const refreshSwatches = () => {
+        (resolveMaterials() || []).forEach((entries, i) => {
+          const live = entries[0]?.material.pbrMetallicRoughness.baseColorFactor;
+          const swatch = list.children[i]?.querySelector('.layer-swatch');
+          if (live && swatch && !entries[0].material.pbrMetallicRoughness.baseColorTexture?.texture) swatch.style.background = toSrgbHex(live);
+        });
+      };
+      const setOpen = (open) => {
+        layersPanel.hidden = !open;
+        layersBtn.setAttribute('aria-expanded', String(open));
+        layersBtn.classList.toggle('is-active', open);
+      };
+      layersBtn.addEventListener('click', () => setOpen(layersPanel.hidden));
+      layersPanel.querySelector('[data-layers-close]').addEventListener('click', () => setOpen(false));
+      layersPanel.querySelector('[data-layers-all]').addEventListener('click', () => {
+        state.forEach((s) => { s.visible = true; s.opacity = 1; });
+        list.querySelectorAll('.layer-opacity').forEach((input) => { input.value = 100; });
+        applyAll();
+      });
+      const onLoad = () => { mats = null; resolveMaterials(); refreshSwatches(); applyAll(); };
+      if (viewer.loaded) onLoad();
+      viewer.addEventListener('load', onLoad);
     }
 
     // --- Measure: distance between two surface points. The GLB is in metres
