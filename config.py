@@ -1,6 +1,7 @@
 """
 Application configuration loaded from environment variables.
 """
+import logging
 import os
 from datetime import timedelta
 from pathlib import Path
@@ -289,4 +290,10 @@ class Config:
             app.config["MEDICAL_STAGING_FOLDER"],
             app.config["STORAGE_ROOT"],
         ):
-            os.makedirs(folder, exist_ok=True)
+            # A full volume must not stop the app from booting (it would
+            # crash-loop and take the whole site down); uploads report the
+            # problem instead, and folders are created again on first use.
+            try:
+                os.makedirs(folder, exist_ok=True)
+            except OSError as exc:
+                logging.getLogger(__name__).error("Could not create storage folder %s: %s", folder, exc)
