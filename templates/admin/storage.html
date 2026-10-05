@@ -20,6 +20,11 @@
       </div>
     </div>
     {% endif %}
+    <form method="POST" action="{{ url_for('admin_layer_metrics_backfill') }}" class="admin-filter-bar">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="admin-btn admin-btn-secondary compact">Compute layer measurements for existing models</button>
+      <span class="admin-editor-note">Queues a worker job for each layered model that has none yet.</span>
+    </form>
     <div class="admin-insight-grid">
       {% if storage_disk %}
       <div class="admin-insight-card">
