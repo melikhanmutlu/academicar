@@ -1154,6 +1154,55 @@
     .viewer-control-panel[data-collapsed="true"] #panelChevron {
       transform: rotate(180deg);
     }
+    /* Section plane panel + publication figure export (paid plans). */
+    #sectionBtn[hidden] { display: none; }
+    #sectionBtn.is-active {
+      background: #ff682c !important;
+      border-color: #ff682c !important;
+      color: #fff !important;
+    }
+    .section-body { padding: 0 14px 12px; }
+    .section-axes { display: flex; gap: 6px; flex-wrap: wrap; }
+    .section-axes button {
+      flex: 1 1 0; min-width: 64px; padding: 6px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+      color: #fff; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.14); cursor: pointer;
+    }
+    .section-axes button:hover { background: rgba(255, 255, 255, 0.18); }
+    .section-axes button[aria-pressed="true"] { background: #ff682c; border-color: #ff682c; }
+    .section-pos { display: block; margin-top: 12px; font-size: 12px; color: rgba(255, 255, 255, 0.6); }
+    .section-pos input { display: block; width: 100%; margin-top: 6px; accent-color: #ff682c; }
+    .section-pos input:disabled { opacity: 0.4; }
+    .section-readout { display: block; margin-top: 4px; font-size: 12.5px; font-weight: 600; color: #fff; }
+    .layers-head-actions button:disabled { opacity: 0.4; cursor: default; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .section-axes button { color: #202020; background: #f5f5f5; border-color: #e8e8e8; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .section-axes button[aria-pressed="true"] { color: #fff; background: #ff682c; border-color: #ff682c; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .section-pos { color: #6b6b6b; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .section-readout { color: #202020; }
+    #figureModal:not(.hidden) { display: flex; align-items: center; justify-content: center; }
+    .fig-layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 1rem; }
+    .fig-options { min-width: 0; font-size: 0.78rem; color: rgba(255, 255, 255, 0.8); }
+    .fig-options .fig-label { display: block; margin-top: 0.85rem; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255, 255, 255, 0.55); }
+    .fig-options .fig-label:first-child { margin-top: 0; }
+    .fig-options .viewer-shot-bg-opts { display: flex; flex-wrap: wrap; margin-top: 0.4rem; }
+    .fig-title-input {
+      display: block; width: 100%; margin-top: 0.4rem; padding: 0.4rem 0.6rem; border-radius: 0.5rem; font-size: 0.82rem; color: #fff;
+      background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.16);
+    }
+    .fig-title-input:disabled { opacity: 0.45; }
+    .fig-options [hidden] { display: none !important; }
+    .fig-preview {
+      min-width: 0; min-height: 220px; display: grid; place-items: center; overflow: hidden; border-radius: 0.5rem;
+      background: repeating-conic-gradient(rgba(255, 255, 255, 0.06) 0% 25%, transparent 0% 50%) 0 0 / 16px 16px;
+    }
+    .fig-preview img { max-width: 100%; max-height: 52vh; object-fit: contain; }
+    .fig-preview p { padding: 1rem; text-align: center; font-size: 0.8rem; color: rgba(255, 255, 255, 0.5); }
+    .fig-status { min-height: 1.1em; font-size: 0.8rem; color: rgba(255, 255, 255, 0.6); }
+    .fig-status.is-error { color: #ff9b7a; }
+    @media (max-width: 720px) {
+      .fig-layout { grid-template-columns: 1fr; }
+      .fig-preview { min-height: 140px; }
+      .fig-preview img { max-height: 30vh; }
+    }
   </style>
   {# Compiled Tailwind, last in <head> like the old Play CDN styles. #}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css', v=asset_version) }}">
@@ -1280,6 +1329,7 @@
       <div class="pointer-events-auto flex items-center gap-2">
         {% if show_scenes %}<button id="scenesBtn" class="viewer-tool-btn !py-1.5 !px-3 !text-xs" type="button" aria-label="Scenes" aria-expanded="false" aria-controls="scenesPanel">Scenes</button>{% endif %}
         {% if viewer_layers|length > 1 %}<button id="layersBtn" class="viewer-tool-btn !py-1.5 !px-3 !text-xs" type="button" aria-label="Layers" aria-expanded="false" aria-controls="layersPanel">Layers</button>{% endif %}
+        {% if 'section_plane' in viewer_features %}<button id="sectionBtn" class="viewer-tool-btn !py-1.5 !px-3 !text-xs" type="button" aria-label="Section plane" aria-expanded="false" aria-controls="sectionPanel" hidden>Section</button>{% endif %}
         {% if 'ar' in viewer_features %}<button id="arBtn" data-ar-btn class="viewer-tool-btn primary !py-1.5 !px-4 !text-xs" type="button">
           <span class="hidden sm:inline">View in AR</span>
           <span class="sm:hidden">AR</span>
@@ -1332,6 +1382,10 @@
           <svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 11.5l10-10 3 3-10 10z"/><path d="M4.5 8.5l1.5 1.5M6.5 6.5l1 1M8.5 4.5l1.5 1.5"/></svg>
           <span class="hidden sm:inline">Measure</span>
         </button>
+        {% if 'section_plane' in viewer_features %}<button id="sectionBtn" class="viewer-tool-btn" type="button" aria-label="Section plane" aria-expanded="false" aria-controls="sectionPanel" title="Cut the model with a plane to see inside" hidden>
+          <svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.5l5.5 3v7L8 14.5l-5.5-3v-7z"/><path d="M2.5 8.5L8 11.5l5.5-3"/></svg>
+          <span class="hidden sm:inline">Section</span>
+        </button>{% endif %}
         {% if 'ar' in viewer_features %}<button id="arBtn" data-ar-btn class="viewer-tool-btn primary" type="button" aria-label="View in AR">
           <svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1L14 4.5v7L8 15L2 11.5v-7z"/><path d="M8 1v6.5M8 7.5L14 4.5M8 7.5L2 4.5"/></svg>
           <span class="hidden sm:inline">View in AR</span>
@@ -1424,6 +1478,7 @@
               <span>Screenshots</span>
               <div class="flex items-center gap-2">
                 {% if 'combined_view' in viewer_features %}<button type="button" data-combine-shots disabled>Combine</button>{% endif %}
+                {% if 'figure_export' in viewer_features %}<button type="button" data-export-figure disabled>Export figure</button>{% endif %}
                 <button type="button" data-download-zip disabled>Download ZIP</button>
               </div>
             </div>
@@ -1642,6 +1697,65 @@
         </div>
       </div>
     </div>
+    {% if 'section_plane' in viewer_features %}
+    <section id="sectionPanel" class="layers-panel section-panel{% if is_embed %} is-embed{% endif %}" aria-label="Section plane" hidden>
+      <div class="layers-head">
+        <h2>Section</h2>
+        <div class="layers-head-actions">
+          <button type="button" data-section-flip disabled>Flip</button>
+          <button type="button" data-section-off disabled>Off</button>
+          <button type="button" data-section-close aria-label="Close section">×</button>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="section-axes" role="group" aria-label="Section axis" data-section-axes></div>
+        <label class="section-pos">Position
+          <input type="range" min="0" max="1000" step="1" value="500" data-section-pos disabled aria-label="Section position">
+          <span class="section-readout" data-section-readout>Choose an axis to cut the model.</span>
+        </label>
+      </div>
+      <p class="layers-note">{% if is_medical_model %}Planes follow the scan's patient orientation. For education and presentation only — not for diagnosis.{% else %}Cuts the model along a plane in its own axes; interior faces stay visible.{% endif %}</p>
+    </section>
+    {% endif %}
+    {% if 'figure_export' in viewer_features %}
+    <div id="figureModal" class="hidden fixed inset-0 z-50 bg-black/70 p-4 backdrop-blur-md" data-figure-modal role="dialog" aria-modal="true" aria-labelledby="figureModalTitle">
+      <div class="viewer-collage-modal-card mx-auto w-full max-w-5xl rounded-xl border border-white/10 bg-[#111111] p-4 text-white shadow-2xl">
+        <div class="mb-3 flex items-center justify-between gap-4">
+          <div>
+            <p class="text-xs uppercase tracking-[0.18em] text-white/45">Publication figure</p>
+            <h2 id="figureModalTitle" class="mt-1 text-xl font-bold">Export figure</h2>
+          </div>
+          <button type="button" data-figure-close class="rounded border border-white/10 px-3 py-2 text-sm text-white/70 hover:bg-white/10">Close</button>
+        </div>
+        <div class="fig-layout">
+          <div class="fig-options">
+            <span class="fig-label">Width</span>
+            <div class="viewer-shot-bg-opts" role="group" aria-label="Figure width" data-fig-widths>
+              <button type="button" data-fig-width="2000" aria-pressed="false">2000 px</button>
+              <button type="button" data-fig-width="3000" aria-pressed="true">3000 px</button>
+              <button type="button" data-fig-width="4000" aria-pressed="false">4000 px</button>
+            </div>
+            <span class="fig-label">Background</span>
+            <div class="viewer-shot-bg-opts" role="group" aria-label="Figure background" data-fig-bgs>
+              <button type="button" data-fig-bg="white" aria-pressed="true">White</button>
+              <button type="button" data-fig-bg="transparent" aria-pressed="false">Transparent</button>
+            </div>
+            <span class="fig-label">Include</span>
+            <label class="viewer-shot-qr-toggle"><input type="checkbox" data-fig-title-on checked><span>Title</span></label>
+            <input type="text" class="fig-title-input" maxlength="120" data-fig-title aria-label="Figure title">
+            <label class="viewer-shot-qr-toggle" data-fig-legend-row hidden><input type="checkbox" data-fig-legend checked><span>Layer legend</span></label>
+            <label class="viewer-shot-qr-toggle" data-fig-scale-row hidden><input type="checkbox" data-fig-scale checked><span>Scale bar</span></label>
+            <label class="viewer-shot-qr-toggle"><input type="checkbox" data-fig-qr><span>QR code</span></label>
+          </div>
+          <div class="fig-preview" data-fig-preview><p>The figure is rendered at full size when you download it.</p></div>
+        </div>
+        <div class="mt-4 flex items-center justify-between gap-3 flex-wrap">
+          <p class="fig-status" data-fig-status role="status" aria-live="polite"></p>
+          <button type="button" data-fig-download class="viewer-tool-btn primary">Download PNG</button>
+        </div>
+      </div>
+    </div>
+    {% endif %}
     {% if has_tour or scenes_edit %}
     <div class="tour-bar" id="tourBar" role="region" aria-label="Guided tour" aria-live="polite" hidden>
       <div>
@@ -4225,6 +4339,573 @@
           await showScene(initialScene);
         })();
       }
+    }
+
+    // --- Section plane (paid plans). One clipping plane through model-viewer's
+    // three.js materials: renderer.localClippingEnabled + material.clippingPlanes
+    // (a duck-typed { normal, constant } in WORLD space, because THREE.Plane is
+    // not exported). The plane is defined in the model's own space (the first
+    // model root, the frame positionAndNormalFromPoint reports in) as an axis
+    // plus an offset in metres from the centre of the model's bounding box, and
+    // re-derived from the root's matrixWorld every frame so the orientation
+    // sliders keep it attached to the model. The default keeps the lower side of
+    // the axis; Flip keeps the upper one. DoubleSide shows the cut interior
+    // while active and each material's original side is restored afterwards.
+    // Hit tests (Measure, labels, tap-to-recenter) all run three's raycaster on
+    // each mesh, so every mesh's raycast drops intersections on the clipped side
+    // while the plane is on; a ray then lands on the next surface behind it.
+    // Medical axis names. The converter maps patient axes to glTF (Y-up) as
+    // LPS (x=L, y=P, z=S) -> (X=L, Y=S, Z=A) and RAS (x=R, y=A, z=S) -> (X=-R, Y=S, Z=A)
+    // (converters/medical/meshing.py), so glTF Y is superior-inferior (Axial
+    // slices), Z is anterior-posterior (Coronal) and X is left-right (Sagittal).
+    // The element has no public queueRender(); ask its scene for a new frame.
+    const requestViewerRender = () => {
+      try {
+        const scene = viewerInternals.getScene();
+        if (scene && typeof scene.queueRender === 'function') scene.queueRender();
+        else if (typeof viewer.queueRender === 'function') viewer.queueRender();
+      } catch (e) { /* the next camera or resize frame redraws anyway */ }
+    };
+    const sectionBtn = document.getElementById('sectionBtn');
+    const sectionPanel = document.getElementById('sectionPanel');
+    if (sectionBtn && sectionPanel && viewer) {
+      const isMedicalScan = {{ 'true' if is_medical_model else 'false' }};
+      const SECTION_AXES = isMedicalScan
+        ? [['y', 'Axial'], ['z', 'Coronal'], ['x', 'Sagittal']]
+        : [['x', 'X'], ['y', 'Y'], ['z', 'Z']];
+      const AXIS_INDEX = { x: 0, y: 1, z: 2 };
+      const axesEl = sectionPanel.querySelector('[data-section-axes]');
+      const posInput = sectionPanel.querySelector('[data-section-pos]');
+      const readoutEl = sectionPanel.querySelector('[data-section-readout]');
+      const flipBtn = sectionPanel.querySelector('[data-section-flip]');
+      const offBtn = sectionPanel.querySelector('[data-section-off]');
+      const plane = { normal: null, constant: 0 };
+      const sectionSides = new Map(); // material -> its original `side`
+      const patchedMeshes = new Set();
+      let section = null; // { axis: 'x'|'y'|'z', offset: metres from the model-space bbox centre, flip }
+      let pendingSection; // a saved section that arrived before the model was ready
+      let sectionCtx = null; // { three, root, meshes, Vec3, scratchP, scratchN, min, max, centre }
+
+      const prepareSection = () => {
+        try {
+          const scene = viewerInternals.getScene();
+          const three = viewerInternals.getRenderer()?.threeRenderer;
+          const root = scene && ((scene.models && scene.models[0]) || scene.target);
+          if (!scene || !three || !root || !('localClippingEnabled' in three)) return null;
+          const meshes = [];
+          let Vec3 = null;
+          let Mat4 = null;
+          root.traverse((object) => {
+            if (!object.isMesh || !object.material || !object.geometry) return;
+            meshes.push(object);
+            Vec3 = Vec3 || object.position.constructor;
+            Mat4 = Mat4 || object.matrixWorld.constructor;
+          });
+          if (!meshes.length || !Vec3 || !Mat4) return null;
+          root.updateMatrixWorld(true);
+          const toRoot = new Mat4().copy(root.matrixWorld).invert();
+          const corner = new Vec3();
+          const min = [Infinity, Infinity, Infinity];
+          const max = [-Infinity, -Infinity, -Infinity];
+          meshes.forEach((mesh) => {
+            const geometry = mesh.geometry;
+            if (!geometry.boundingBox) geometry.computeBoundingBox();
+            const box = geometry.boundingBox;
+            if (!box || box.isEmpty()) return;
+            const matrix = new Mat4().multiplyMatrices(toRoot, mesh.matrixWorld);
+            for (let k = 0; k < 8; k += 1) {
+              corner.set(k & 1 ? box.max.x : box.min.x, k & 2 ? box.max.y : box.min.y, k & 4 ? box.max.z : box.min.z).applyMatrix4(matrix);
+              [corner.x, corner.y, corner.z].forEach((value, i) => {
+                if (value < min[i]) min[i] = value;
+                if (value > max[i]) max[i] = value;
+              });
+            }
+          });
+          if (!min.every(Number.isFinite) || !max.every(Number.isFinite)) return null;
+          plane.normal = plane.normal || new Vec3(0, 1, 0);
+          return {
+            three, root, meshes, Vec3, min, max,
+            centre: min.map((value, i) => (value + max[i]) / 2),
+            scratchP: new Vec3(), scratchN: new Vec3(),
+          };
+        } catch (e) { return null; }
+      };
+      const isClipped = (point) => plane.normal.x * point.x + plane.normal.y * point.y + plane.normal.z * point.z + plane.constant < 0;
+      const eachMaterial = (fn) => sectionCtx.meshes.forEach((mesh) => {
+        (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).forEach((material) => { if (material) fn(material); });
+      });
+      const updatePlane = () => {
+        if (!section || !sectionCtx) return;
+        const { root, centre, scratchP, scratchN } = sectionCtx;
+        const i = AXIS_INDEX[section.axis];
+        root.updateMatrixWorld();
+        scratchP.set(centre[0], centre[1], centre[2]);
+        scratchP.setComponent(i, centre[i] + section.offset);
+        scratchP.applyMatrix4(root.matrixWorld);
+        scratchN.set(i === 0 ? 1 : 0, i === 1 ? 1 : 0, i === 2 ? 1 : 0).transformDirection(root.matrixWorld);
+        if (!section.flip) scratchN.negate();
+        plane.normal.copy(scratchN);
+        plane.constant = -scratchN.dot(scratchP);
+      };
+      const engageSection = () => {
+        sectionCtx.three.localClippingEnabled = true;
+        eachMaterial((material) => {
+          if (!sectionSides.has(material)) sectionSides.set(material, material.side);
+          material.clippingPlanes = [plane];
+          material.side = 2; // DoubleSide: the cut shows the inside faces
+          material.needsUpdate = true;
+        });
+        sectionCtx.meshes.forEach((mesh) => {
+          if (patchedMeshes.has(mesh)) return;
+          const original = mesh.raycast;
+          mesh.raycast = function sectionRaycast(raycaster, intersects) {
+            const before = intersects.length;
+            original.call(this, raycaster, intersects);
+            for (let k = intersects.length - 1; k >= before; k -= 1) {
+              if (isClipped(intersects[k].point)) intersects.splice(k, 1);
+            }
+          };
+          patchedMeshes.add(mesh);
+        });
+      };
+      const releaseSection = () => {
+        if (sectionCtx) {
+          eachMaterial((material) => {
+            material.clippingPlanes = null;
+            if (sectionSides.has(material)) material.side = sectionSides.get(material);
+            material.needsUpdate = true;
+          });
+          sectionCtx.meshes.forEach((mesh) => { if (patchedMeshes.has(mesh)) delete mesh.raycast; });
+          sectionCtx.three.localClippingEnabled = false;
+        }
+        sectionSides.clear();
+        patchedMeshes.clear();
+      };
+      const axisRange = (axis) => {
+        const i = AXIS_INDEX[axis];
+        return [sectionCtx.min[i] - sectionCtx.centre[i], sectionCtx.max[i] - sectionCtx.centre[i]];
+      };
+      const formatOffset = (metres) => {
+        const mm = metres * 1000;
+        const text = Math.abs(mm) < 1000 ? `${Math.abs(mm).toFixed(1)} mm` : `${Math.abs(metres).toFixed(2)} m`;
+        return `${mm < -0.05 ? '−' : mm > 0.05 ? '+' : ''}${text}`;
+      };
+      const syncSectionUi = () => {
+        const on = !!section;
+        sectionBtn.classList.toggle('is-active', on);
+        flipBtn.disabled = !on;
+        offBtn.disabled = !on;
+        posInput.disabled = !on;
+        axesEl.querySelectorAll('button').forEach((button) => button.setAttribute('aria-pressed', String(on && button.dataset.axis === section.axis)));
+        if (!on) { readoutEl.textContent = 'Choose an axis to cut the model.'; return; }
+        const [lo, hi] = axisRange(section.axis);
+        posInput.value = String(hi > lo ? Math.round(((section.offset - lo) / (hi - lo)) * 1000) : 500);
+        const label = SECTION_AXES.find(([axis]) => axis === section.axis)[1];
+        readoutEl.textContent = `${label} · ${formatOffset(section.offset)} from the centre`;
+      };
+      const setSection = (next) => {
+        if (!sectionCtx) { pendingSection = next; return; }
+        if (next) {
+          const [lo, hi] = axisRange(next.axis);
+          section = { axis: next.axis, offset: Math.min(hi, Math.max(lo, next.offset)), flip: next.flip === true };
+          updatePlane();
+          engageSection();
+        } else {
+          section = null;
+          releaseSection();
+        }
+        syncSectionUi();
+        requestViewerRender();
+      };
+
+      SECTION_AXES.forEach(([axis, label]) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.dataset.axis = axis;
+        button.textContent = label;
+        button.setAttribute('aria-pressed', 'false');
+        button.addEventListener('click', () => {
+          if (section && section.axis === axis) return;
+          setSection({ axis, offset: 0, flip: section ? section.flip : false });
+        });
+        axesEl.appendChild(button);
+      });
+      posInput.addEventListener('input', () => {
+        if (!section) return;
+        const [lo, hi] = axisRange(section.axis);
+        setSection({ ...section, offset: lo + ((hi - lo) * Number(posInput.value)) / 1000 });
+      });
+      flipBtn.addEventListener('click', () => { if (section) setSection({ ...section, flip: !section.flip }); });
+      offBtn.addEventListener('click', () => setSection(null));
+      sectionPanel.querySelector('[data-section-close]').addEventListener('click', () => setSectionOpen(false));
+
+      // One corner panel at a time (Scenes / Layers sit in the same place).
+      const otherPanelToggles = ['scenesBtn', 'layersBtn'].map((id) => document.getElementById(id)).filter(Boolean);
+      const setSectionOpen = (open) => {
+        if (open) otherPanelToggles.forEach((toggle) => { if (toggle.getAttribute('aria-expanded') === 'true') toggle.click(); });
+        sectionPanel.hidden = !open;
+        sectionBtn.setAttribute('aria-expanded', String(open));
+      };
+      sectionBtn.addEventListener('click', () => setSectionOpen(sectionPanel.hidden));
+      otherPanelToggles.forEach((toggle) => toggle.addEventListener('click', () => { if (!sectionPanel.hidden) setSectionOpen(false); }));
+
+      viewer.addEventListener('before-render', () => { if (section && sectionCtx) updatePlane(); });
+      const onSectionModelLoad = () => {
+        // A reload brings new meshes and materials: drop what the old ones held.
+        sectionSides.clear();
+        patchedMeshes.clear();
+        sectionCtx = prepareSection();
+        sectionBtn.hidden = !sectionCtx; // internals differ -> the feature hides
+        if (!sectionCtx) { section = null; syncSectionUi(); return; }
+        const next = pendingSection !== undefined ? pendingSection : section;
+        pendingSection = undefined;
+        section = null;
+        setSection(next);
+      };
+      if (viewer.loaded) onSectionModelLoad();
+      viewer.addEventListener('load', onSectionModelLoad);
+      // Saved views: undefined (a state without a section) switches it off.
+      window.viewerView.register('section', {
+        get: () => (section ? { axis: section.axis, offset: Math.round(section.offset * 10000) / 10000, flip: section.flip } : undefined),
+        apply: (saved) => {
+          const valid = saved && typeof saved === 'object' && Object.prototype.hasOwnProperty.call(AXIS_INDEX, saved.axis);
+          const offset = Number(valid && saved.offset);
+          setSection(valid ? { axis: saved.axis, offset: Number.isFinite(offset) ? offset : 0, flip: saved.flip === true } : null);
+        },
+      });
+    }
+
+    // --- Publication figure export (paid plans). Renders the model at the
+    // chosen pixel width by temporarily raising model-viewer's render
+    // resolution (devicePixelRatio override + minimumRenderScale, as video
+    // recording does for the scale), then composes it on a canvas with an
+    // optional title, layer legend, scale bar and QR card. All client-side. ---
+    const figureBtn = document.querySelector('[data-export-figure]');
+    const figureModal = document.getElementById('figureModal');
+    if (figureBtn && figureModal && viewer) {
+      const figLayers = {{ viewer_layers|tojson }};
+      const fq = (selector) => figureModal.querySelector(selector);
+      const figEls = {
+        titleOn: fq('[data-fig-title-on]'), title: fq('[data-fig-title]'),
+        legendRow: fq('[data-fig-legend-row]'), legend: fq('[data-fig-legend]'),
+        scaleRow: fq('[data-fig-scale-row]'), scale: fq('[data-fig-scale]'),
+        qr: fq('[data-fig-qr]'), preview: fq('[data-fig-preview]'), status: fq('[data-fig-status]'),
+        download: fq('[data-fig-download]'),
+      };
+      let figWidth = 3000;
+      let figBg = 'white';
+      let figPreviewUrl = null;
+      let figBusy = false;
+      const FIG_MAX_PIXELS = 24e6; // render budget; very tall (phone) viewers render smaller and are upscaled
+      const FIG_INK = '#202020';
+      const FIG_MUTED = '#6b6b6b';
+      const FIG_FONT = 'Inter, system-ui, sans-serif';
+      figEls.title.value = modelBaseName;
+      const setFigWidthButtons = (width) => {
+        figWidth = width;
+        figureModal.querySelectorAll('[data-fig-width]').forEach((button) => button.setAttribute('aria-pressed', String(Number(button.dataset.figWidth) === width)));
+      };
+      if (viewer.clientHeight > viewer.clientWidth) setFigWidthButtons(2000); // tall (phone) viewer: keep the PNG a manageable size
+      const setFigStatus = (text, error = false) => {
+        figEls.status.textContent = text || '';
+        figEls.status.classList.toggle('is-error', !!error);
+      };
+      figureModal.querySelectorAll('[data-fig-width]').forEach((button) => button.addEventListener('click', () => setFigWidthButtons(Number(button.dataset.figWidth))));
+      figureModal.querySelectorAll('[data-fig-bg]').forEach((button) => button.addEventListener('click', () => {
+        figBg = button.dataset.figBg;
+        figureModal.querySelectorAll('[data-fig-bg]').forEach((other) => other.setAttribute('aria-pressed', String(other === button)));
+      }));
+      figEls.titleOn.addEventListener('change', () => { figEls.title.disabled = !figEls.titleOn.checked; });
+
+      const srgbHex = (rgba) => '#' + rgba.slice(0, 3).map((c) => {
+        const v = c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+        return Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, '0');
+      }).join('');
+      // Visible layers only (per the saved-view state), with their live colours.
+      const figLegendEntries = () => {
+        if (figLayers.length < 2) return [];
+        const saved = (window.viewerView.getState().layers) || {};
+        const materials = new Map();
+        ((viewer.model && viewer.model.materials) || []).forEach((material) => { if (!materials.has(material.name)) materials.set(material.name, material); });
+        return figLayers
+          .filter((layer) => { const s = saved[layer.name]; return !s || (s.visible !== false && !(s.opacity <= 0.01)); })
+          .map((layer) => {
+            const material = (layer.materials || [layer.name]).map((name) => materials.get(name)).find(Boolean);
+            const pbr = material && material.pbrMetallicRoughness;
+            const live = pbr && !(pbr.baseColorTexture && pbr.baseColorTexture.texture) ? srgbHex(pbr.baseColorFactor) : null;
+            return { name: layer.name, color: live || layer.color || '#cccccc' };
+          });
+      };
+
+      // CSS pixels per millimetre at the camera target, measured with two
+      // temporary hotspots: the target and a point 10 mm to its right (the
+      // camera's right vector, which is perpendicular to the view direction).
+      const figScalePxPerMm = async () => {
+        const created = [];
+        try {
+          const scene = viewerInternals.getScene();
+          const camera = scene && typeof scene.getCamera === 'function' ? scene.getCamera() : null;
+          const target = scene && scene.target;
+          if (!camera || !target || typeof viewer.queryHotspot !== 'function' || typeof viewer.updateHotspot !== 'function' || !viewer.getCameraTarget) return null;
+          camera.updateMatrixWorld();
+          target.updateMatrixWorld();
+          const Vec3 = target.position.constructor;
+          const Mat4 = target.matrixWorld.constructor;
+          const right = new Vec3().setFromMatrixColumn(camera.matrixWorld, 0);
+          right.transformDirection(new Mat4().copy(target.matrixWorld).invert()); // world -> hotspot (target) space
+          const t = viewer.getCameraTarget();
+          const spots = [
+            ['hotspot-fig-a', { x: t.x, y: t.y, z: t.z }],
+            ['hotspot-fig-b', { x: t.x + right.x * 0.01, y: t.y + right.y * 0.01, z: t.z + right.z * 0.01 }],
+          ];
+          const asPos = (p) => `${p.x}m ${p.y}m ${p.z}m`;
+          spots.forEach(([name, p]) => {
+            const el = document.createElement('div');
+            el.slot = name;
+            el.setAttribute('data-position', asPos(p));
+            el.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;pointer-events:none';
+            viewer.appendChild(el);
+            created.push(el);
+          });
+          let a = null;
+          let b = null;
+          for (let attempt = 0; attempt < 12 && !(a && b); attempt += 1) {
+            await waitFrame();
+            spots.forEach(([name, p]) => viewer.updateHotspot({ name, position: asPos(p) }));
+            requestViewerRender();
+            await waitFrame();
+            a = viewer.queryHotspot('hotspot-fig-a');
+            b = viewer.queryHotspot('hotspot-fig-b');
+          }
+          if (!a || !b) return null;
+          const pxPerMm = Math.hypot(b.canvasPosition.x - a.canvasPosition.x, b.canvasPosition.y - a.canvasPosition.y) / 10;
+          return Number.isFinite(pxPerMm) && pxPerMm > 0 ? pxPerMm : null;
+        } catch (e) { return null; } finally {
+          created.forEach((el) => el.remove());
+        }
+      };
+      // 1 / 2 / 5 x 10^n mm whose length is closest to 20% of the figure width.
+      const figNiceBar = (pxPerMm, width) => {
+        let best = null;
+        for (let e = -3; e <= 7; e += 1) {
+          [1, 2, 5].forEach((m) => {
+            const mm = m * Math.pow(10, e);
+            const score = Math.abs(Math.log((mm * pxPerMm) / (0.2 * width)));
+            if (!best || score < best.score) best = { mm, px: mm * pxPerMm, score };
+          });
+        }
+        const text = best.mm >= 1000 ? `${parseFloat((best.mm / 1000).toPrecision(3))} m` : `${parseFloat(best.mm.toPrecision(3))} mm`;
+        return { ...best, text };
+      };
+
+      // Render the model at `width` px by raising the renderer's pixel ratio for a moment.
+      const renderFigureImage = async (width) => {
+        const cssW = viewer.clientWidth;
+        const cssH = viewer.clientHeight;
+        let renderW = width;
+        if (renderW * (renderW * cssH / cssW) > FIG_MAX_PIXELS) renderW = Math.floor(Math.sqrt(FIG_MAX_PIXELS * cssW / cssH));
+        const dpr = renderW / cssW;
+        const ModelViewer = customElements.get('model-viewer');
+        const previousRenderScale = (ModelViewer && typeof ModelViewer.minimumRenderScale === 'number') ? ModelViewer.minimumRenderScale : 0.5;
+        const dprDescriptor = Object.getOwnPropertyDescriptor(window, 'devicePixelRatio');
+        const wasAuto = viewer.hasAttribute('auto-rotate');
+        if (wasAuto) setAutoRotateState(false);
+        if (ModelViewer) ModelViewer.minimumRenderScale = 1;
+        try {
+          Object.defineProperty(window, 'devicePixelRatio', { configurable: true, get: () => dpr });
+          const canvas = viewerInternals.getRenderer()?.canvas3D;
+          for (let i = 0; i < 60; i += 1) {
+            requestViewerRender();
+            await waitFrame();
+            if (!canvas || canvas.width >= Math.ceil(cssW * dpr) - 1) break;
+          }
+          return await captureShot(null);
+        } finally {
+          if (dprDescriptor) Object.defineProperty(window, 'devicePixelRatio', dprDescriptor);
+          else delete window.devicePixelRatio;
+          if (ModelViewer) ModelViewer.minimumRenderScale = previousRenderScale;
+          requestViewerRender();
+          if (wasAuto) setAutoRotateState(true);
+        }
+      };
+
+      const figTruncate = (ctx, text, maxWidth) => {
+        if (ctx.measureText(text).width <= maxWidth) return text;
+        let out = text;
+        while (out.length > 3 && ctx.measureText(out + '…').width > maxWidth) out = out.slice(0, -1);
+        return out + '…';
+      };
+      const figQrImage = () => {
+        const sceneId = window.viewerScenes && window.viewerScenes.activeId ? window.viewerScenes.activeId() : null;
+        if (sceneId == null || {{ 'true' if demo_mode is defined and demo_mode else 'false' }}) return getQrImage();
+        // The active scene's own link, so the figure opens that scene.
+        return loadImage(`/qr-image/${modelId}?scene=${sceneId}`).catch(() => getQrImage());
+      };
+      const composeFigure = async (shotUrl, options) => {
+        const [shot, qr] = await Promise.all([loadImage(shotUrl), options.qr ? figQrImage() : Promise.resolve(null)]);
+        const W = options.width;
+        const H = Math.round(W * (shot.naturalHeight || 1) / (shot.naturalWidth || 1));
+        const canvas = document.createElement('canvas');
+        canvas.width = W;
+        canvas.height = H;
+        const ctx = canvas.getContext('2d');
+        if (options.bg === 'white') { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H); }
+        ctx.drawImage(shot, 0, 0, W, H);
+        const margin = Math.round(W * 0.03);
+        ctx.textBaseline = 'top';
+        ctx.textAlign = 'left';
+        if (options.title) {
+          ctx.fillStyle = FIG_INK;
+          ctx.font = `600 ${Math.round(W * 0.03)}px ${FIG_FONT}`;
+          ctx.fillText(figTruncate(ctx, options.title, W * 0.72), margin, margin);
+        }
+        let qrLeft = W - margin;
+        if (options.qr) {
+          const q = Math.max(140, Math.round(W * 0.1));
+          const pad = Math.round(q * 0.12);
+          const capH = Math.round(q * 0.22);
+          const cardW = q + pad * 2;
+          const cardH = q + pad * 2 + capH;
+          const cardX = W - margin - cardW;
+          const cardY = H - margin - cardH;
+          ctx.save();
+          ctx.shadowColor = 'rgba(0,0,0,0.18)';
+          ctx.shadowBlur = Math.round(q * 0.14);
+          ctx.shadowOffsetY = Math.round(q * 0.05);
+          ctx.fillStyle = '#ffffff';
+          roundRectPath(ctx, cardX, cardY, cardW, cardH, Math.round(q * 0.12));
+          ctx.fill();
+          ctx.restore();
+          ctx.strokeStyle = 'rgba(32,32,32,0.10)';
+          ctx.lineWidth = 1;
+          roundRectPath(ctx, cardX, cardY, cardW, cardH, Math.round(q * 0.12));
+          ctx.stroke();
+          if (qr) ctx.drawImage(qr, cardX + pad, cardY + pad, q, q);
+          ctx.fillStyle = '#4d4d4d';
+          ctx.font = `700 ${Math.round(q * 0.12)}px ${FIG_FONT}`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('SCAN FOR 3D / AR', cardX + cardW / 2, cardY + pad + q + capH * 0.5);
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'top';
+          qrLeft = cardX - margin;
+        }
+        if (options.legend && options.legend.length) {
+          const MAX_ROWS = 10;
+          const MAX_ENTRIES = 30;
+          const entries = options.legend.slice(0, MAX_ENTRIES);
+          const font = Math.max(14, Math.round(W * 0.0165));
+          const rowH = Math.round(font * 1.7);
+          const swatch = Math.round(font * 0.95);
+          ctx.font = `500 ${font}px ${FIG_FONT}`;
+          const rows = Math.min(MAX_ROWS, entries.length + (options.legend.length > MAX_ENTRIES ? 1 : 0));
+          const columns = [];
+          for (let k = 0; k < entries.length; k += MAX_ROWS) columns.push(entries.slice(k, k + MAX_ROWS));
+          const textMax = W * 0.2;
+          let x = margin;
+          const top = H - margin - rows * rowH;
+          columns.forEach((column) => {
+            const names = column.map((entry) => figTruncate(ctx, entry.name, textMax));
+            column.forEach((entry, row) => {
+              const y = top + row * rowH;
+              ctx.fillStyle = entry.color;
+              ctx.fillRect(x, y + (rowH - swatch) / 2 - font * 0.1, swatch, swatch);
+              ctx.strokeStyle = 'rgba(32,32,32,0.35)';
+              ctx.lineWidth = Math.max(1, Math.round(font * 0.06));
+              ctx.strokeRect(x, y + (rowH - swatch) / 2 - font * 0.1, swatch, swatch);
+              ctx.fillStyle = FIG_INK;
+              ctx.fillText(names[row], x + swatch + font * 0.6, y + (rowH - font) / 2 - font * 0.1);
+            });
+            x += swatch + font * 0.6 + Math.max(...names.map((name) => ctx.measureText(name).width)) + font * 1.6;
+          });
+          if (options.legend.length > MAX_ENTRIES) {
+            ctx.fillStyle = FIG_MUTED;
+            ctx.fillText(`+${options.legend.length - MAX_ENTRIES} more`, margin, top + (rows - 1) * rowH + (rowH - font) / 2 - font * 0.1);
+          }
+        }
+        if (options.scale) {
+          const { px, text } = options.scale;
+          const thick = Math.max(3, Math.round(W * 0.0035));
+          const font = Math.max(14, Math.round(W * 0.017));
+          const note = Math.max(11, Math.round(W * 0.0105));
+          const right = qrLeft;
+          const left = right - px;
+          const baseY = H - margin - note * 1.6 - thick * 2;
+          ctx.fillStyle = FIG_INK;
+          ctx.fillRect(left, baseY, px, thick);
+          ctx.fillRect(left, baseY - thick * 1.5, thick, thick * 4);
+          ctx.fillRect(right - thick, baseY - thick * 1.5, thick, thick * 4);
+          ctx.font = `600 ${font}px ${FIG_FONT}`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(text, left + px / 2, baseY - thick * 2);
+          ctx.fillStyle = FIG_MUTED;
+          ctx.font = `500 ${note}px ${FIG_FONT}`;
+          ctx.textBaseline = 'top';
+          ctx.fillText('Scale at the model centre', left + px / 2, baseY + thick * 2);
+        }
+        return canvas;
+      };
+
+      let figScaleAvailable = false;
+      const openFigureModal = async () => {
+        figureModal.classList.remove('hidden');
+        setFigStatus('');
+        const legend = figLegendEntries();
+        figEls.legendRow.hidden = !legend.length;
+        figEls.scaleRow.hidden = true;
+        figScaleAvailable = !!(await figScalePxPerMm());
+        figEls.scaleRow.hidden = !figScaleAvailable;
+        figEls.download.focus({ preventScroll: true });
+      };
+      const closeFigureModal = () => { figureModal.classList.add('hidden'); figureBtn.focus({ preventScroll: true }); };
+      const downloadFigure = async () => {
+        if (figBusy || !viewer.loaded) return;
+        figBusy = true;
+        figEls.download.disabled = true;
+        figEls.download.textContent = 'Rendering...';
+        setFigStatus('Rendering the figure…');
+        try {
+          const width = figWidth;
+          const pxPerMm = figEls.scale.checked && figScaleAvailable ? await figScalePxPerMm() : null;
+          const shotUrl = await renderFigureImage(width);
+          if (!shotUrl) throw new Error('capture');
+          const scale = pxPerMm ? figNiceBar(pxPerMm * (width / viewer.clientWidth), width) : null;
+          const canvas = await composeFigure(shotUrl, {
+            width, bg: figBg, qr: figEls.qr.checked,
+            title: figEls.titleOn.checked ? figEls.title.value.trim() : '',
+            legend: !figEls.legendRow.hidden && figEls.legend.checked ? figLegendEntries() : [],
+            scale,
+          });
+          const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+          if (!blob) throw new Error('encode');
+          if (figPreviewUrl) URL.revokeObjectURL(figPreviewUrl);
+          figPreviewUrl = URL.createObjectURL(blob);
+          figEls.preview.innerHTML = '';
+          const img = document.createElement('img');
+          img.alt = 'Figure preview';
+          img.src = figPreviewUrl;
+          figEls.preview.appendChild(img);
+          const link = document.createElement('a');
+          link.href = figPreviewUrl;
+          link.download = `${safeName(modelBaseName)}-figure.png`;
+          link.click();
+          setFigStatus(`Downloaded ${canvas.width} × ${canvas.height} px${scale ? ` · scale bar ${scale.text}` : ''}.`);
+        } catch (error) {
+          setFigStatus('The figure could not be created at this size on this device. Try a smaller width.', true);
+        } finally {
+          figBusy = false;
+          figEls.download.disabled = false;
+          figEls.download.textContent = 'Download PNG';
+        }
+      };
+      figureBtn.addEventListener('click', openFigureModal);
+      figureModal.querySelector('[data-figure-close]').addEventListener('click', closeFigureModal);
+      figureModal.addEventListener('click', (event) => { if (event.target === figureModal) closeFigureModal(); });
+      document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !figureModal.classList.contains('hidden') && !figBusy) closeFigureModal(); });
+      figEls.download.addEventListener('click', downloadFigure);
+      const enableFigureButton = () => { figureBtn.disabled = false; };
+      if (viewer.loaded) enableFigureButton(); else viewer.addEventListener('load', enableFigureButton, { once: true });
     }
 
     // Discourage casual download attempts. None of these stop a determined
