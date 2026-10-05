@@ -1796,12 +1796,61 @@
       });
     }
 
+    // --- Shared viewer plumbing. model-viewer keeps its three.js scene and
+    // renderer private; reach them through the Symbols it exports and return
+    // null when the internals differ, so a feature built on them can hide. ---
+    const viewerInternals = {
+      getScene() {
+        try {
+          const key = viewer && Object.getOwnPropertySymbols(viewer).find((s) => s.description === 'scene');
+          const scene = key && viewer[key];
+          return scene && typeof scene.traverse === 'function' ? scene : null;
+        } catch (e) { return null; }
+      },
+      getRenderer() {
+        try {
+          let prototype = viewer;
+          let key = null;
+          while (prototype && !key) {
+            key = Object.getOwnPropertySymbols(prototype).find((symbol) => symbol.description === 'renderer') || null;
+            prototype = Object.getPrototypeOf(prototype);
+          }
+          return key ? viewer[key] || null : null;
+        } catch (e) { return null; }
+      },
+    };
+
+    // --- Saved view state (scenes, figures, comparison). Each viewer section
+    // registers a part { get(), apply(value) }; apply receives undefined when
+    // a saved state has no entry for it and then falls back to its default.
+    // Parts apply in registration order (labels, layers, camera, background). ---
+    const viewerViewParts = new Map();
+    window.viewerView = {
+      register(name, part) { viewerViewParts.set(name, part); },
+      getState() {
+        const state = { v: 1 };
+        viewerViewParts.forEach((part, name) => {
+          try {
+            const value = part.get();
+            if (value !== undefined) state[name] = value;
+          } catch (e) { /* a broken part must not lose the rest of the view */ }
+        });
+        return state;
+      },
+      async applyState(state) {
+        if (!state || typeof state !== 'object') return;
+        for (const [name, part] of viewerViewParts) {
+          try { await part.apply(state[name]); } catch (e) { /* keep applying the other parts */ }
+        }
+      },
+    };
+
     // --- Annotation visibility toggle ---
     const annotationsBtn = document.getElementById('annotationsBtn');
     if (annotationsBtn) {
       let annotationsVisible = true;
-      annotationsBtn.addEventListener('click', () => {
-        annotationsVisible = !annotationsVisible;
+      const setAnnotationsVisible = (visible) => {
+        annotationsVisible = visible;
         document.querySelectorAll('.annotation-hotspot').forEach(el => {
           if (annotationsVisible) el.removeAttribute('data-hidden');
           else el.setAttribute('data-hidden', '');
@@ -1809,6 +1858,11 @@
         const labelSpan = annotationsBtn.querySelector('span');
         if (labelSpan) labelSpan.textContent = annotationsVisible ? 'Labels' : 'Labels off';
         annotationsBtn.setAttribute('aria-pressed', annotationsVisible ? 'true' : 'false');
+      };
+      annotationsBtn.addEventListener('click', () => setAnnotationsVisible(!annotationsVisible));
+      window.viewerView.register('labels', {
+        get: () => annotationsVisible,
+        apply: (visible) => setAnnotationsVisible(visible !== false),
       });
     }
 
@@ -1994,9 +2048,8 @@
       const HIDDEN_THREE_LAYER = 31;
       const syncMeshLayers = () => {
         try {
-          const sceneKey = Object.getOwnPropertySymbols(viewer).find((s) => s.description === 'scene');
-          const scene = sceneKey && viewer[sceneKey];
-          if (!scene || typeof scene.traverse !== 'function') return;
+          const scene = viewerInternals.getScene();
+          if (!scene) return;
           const known = new Set();
           const hidden = new Set();
           layerData.forEach((layer, i) => {
@@ -2112,6 +2165,24 @@
       const onLoad = () => { mats = null; resolveMaterials(); refreshSwatches(); applyAll(); };
       if (viewer.loaded) onLoad();
       viewer.addEventListener('load', onLoad);
+      // Keyed by layer name so a saved view survives a model replacement that
+      // keeps the part names; layers it does not mention are shown.
+      window.viewerView.register('layers', {
+        get: () => Object.fromEntries(layerData.map((layer, i) => [
+          layer.name, { visible: state[i].visible, opacity: Math.round(state[i].opacity * 100) / 100 },
+        ])),
+        apply: (saved) => {
+          layerData.forEach((layer, i) => {
+            const entry = saved && typeof saved === 'object' ? saved[layer.name] : null;
+            const opacity = Number(entry?.opacity);
+            state[i].visible = entry ? entry.visible !== false : true;
+            state[i].opacity = Number.isFinite(opacity) ? Math.min(1, Math.max(0, opacity)) : 1;
+            const input = list.children[i]?.querySelector('.layer-opacity');
+            if (input) input.value = Math.round(state[i].opacity * 100);
+          });
+          if (viewer.loaded) applyAll(); // otherwise onLoad applies the new state
+        },
+      });
     }
 
     // --- Measure: distance between two surface points. The GLB is in metres
@@ -2645,14 +2716,7 @@
       // AR has never been opened, which removes the model after a rotation.
       // Its renderer is intentionally private, so locate the exported Symbol
       // by description and keep the original callback for real AR sessions.
-      let prototype = viewer;
-      let rendererKey = null;
-      while (prototype && !rendererKey) {
-        rendererKey = Object.getOwnPropertySymbols(prototype)
-          .find((symbol) => symbol.description === 'renderer') || null;
-        prototype = Object.getPrototypeOf(prototype);
-      }
-      const arRenderer = rendererKey ? viewer[rendererKey]?.arRenderer : null;
+      const arRenderer = viewerInternals.getRenderer()?.arRenderer || null;
       if (!arRenderer || arRenderer.__academicArSceneGuarded) return;
       const originalUpdate = arRenderer.onUpdateScene;
       arRenderer.onUpdateScene = (...args) => {
@@ -2697,6 +2761,10 @@
       await waitFrame();
       if (modelAnimationPlaying && typeof viewer.play === 'function') viewer.play();
     };
+    window.viewerView.register('camera', {
+      get: cameraState,
+      apply: (saved) => (saved && saved.orbit ? restoreCamera(saved) : undefined),
+    });
     const captureShot = async (view) => {
       if (!viewer.classList.contains('is-loaded') || typeof viewer.toDataURL !== 'function') return;
       const shouldResumeAnimation = modelAnimationAvailable && modelAnimationPlaying;
@@ -3472,6 +3540,10 @@
     }
     // Sync the buttons with the theme already applied by the head script.
     applyViewerBg(document.documentElement.getAttribute('data-viewer-bg') || 'dark');
+    window.viewerView.register('background', {
+      get: () => document.documentElement.getAttribute('data-viewer-bg') || 'dark',
+      apply: (mode) => { if (mode) applyViewerBg(mode); },
+    });
 
     const setVideoStatus = (message, error = false) => {
       if (!videoStatusEl) return;

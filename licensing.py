@@ -44,7 +44,19 @@ PLAN_FEATURES: tuple[tuple[str, str], ...] = (
     ("medical_colors", "Medical colour presets"),
     ("presentation_library", "PDF / PowerPoint library"),
     ("detailed_insights", "Detailed model insights"),
+    ("scenes", "Saved scenes and presentation mode"),
+    ("scene_ar", "AR for saved scenes"),
+    ("section_plane", "Section plane"),
+    ("layer_metrics", "Structure measurements and distances"),
+    ("figure_export", "Publication figure export"),
+    ("comparison", "Before / after comparison"),
 )
+
+# Paid-only viewer capabilities (v39). Free keeps every older feature but none
+# of these; migration b6c7d8e9f0a1 applies the same split to existing rows.
+PAID_ONLY_FEATURES: frozenset[str] = frozenset({
+    "scenes", "scene_ar", "section_plane", "layer_metrics", "figure_export", "comparison",
+})
 
 PLAN_RANK: dict[str, int] = {
     "free": 0,
@@ -71,7 +83,7 @@ _DEFAULT_LICENSE_PLANS: dict[str, LicensePlan] = {
             "Watermarked viewer",
         ),
         max_models_per_project=1,
-        features=frozenset(key for key, _ in PLAN_FEATURES),
+        features=frozenset(key for key, _ in PLAN_FEATURES) - PAID_ONLY_FEATURES,
     ),
     "academic": LicensePlan(
         key="academic",
@@ -92,7 +104,7 @@ _DEFAULT_LICENSE_PLANS: dict[str, LicensePlan] = {
             "ar", "annotations", "screenshots", "combined_view",
             "video_recording", "medical_colors", "presentation_library",
             "detailed_insights",
-        }),
+        }) | PAID_ONLY_FEATURES,
     ),
     "extended_archive": LicensePlan(
         key="extended_archive",
@@ -113,7 +125,7 @@ _DEFAULT_LICENSE_PLANS: dict[str, LicensePlan] = {
             "ar", "annotations", "screenshots", "combined_view",
             "video_recording", "medical_colors", "presentation_library",
             "detailed_insights",
-        }),
+        }) | PAID_ONLY_FEATURES,
     ),
     "institutional": LicensePlan(
         key="institutional",
