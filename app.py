@@ -2244,6 +2244,56 @@ def project_visibility(project: Paper | None) -> str:
     )
 
 
+
+
+def paper_visible_to_request(paper: Paper) -> bool:
+    """A project is visible if shared publicly/unlisted, owned by the user,
+    or the viewer is an admin (the admin panel links to users' private
+    models; answering those with "Page not found" hid live models)."""
+    if paper_is_deleted(paper):
+        return False
+    if project_visibility(paper) in {"public", "unlisted"}:
+        return True
+    if not current_user.is_authenticated:
+        return False
+    return current_user.id == paper.user_id or bool(current_user.is_admin) or can_edit_project(paper)
+
+
+def private_project_response(paper: Paper):
+    """Visitors following a link or QR of a private project get an
+    explanation instead of a bare "Page not found" (deleted projects stay
+    404). Nothing about the project itself is shown."""
+    if paper_is_deleted(paper):
+        abort(404)
+    return (
+        render_template(
+            "model_access_unavailable.html", model=None, paper=None,
+            status="private", is_owner=False,
+        ),
+        403,
+    )
+
+
+QR_ASSETS = {
+    # asset name -> (mimetype, builder(url, title) -> bytes|str)
+    "qr.svg": ("image/svg+xml", lambda url, title: qr_assets.qr_svg(url)),
+    "qr-print.png": ("image/png", lambda url, title: qr_assets.qr_png(url)),
+    "label.svg": ("image/svg+xml", qr_assets.qr_label_svg),
+    "label.png": ("image/png", qr_assets.qr_label_png),
+}
+
+
+def qr_asset_response(asset, url, title, stem):
+    """Print-quality QR download (vector SVG, high-res PNG, poster label)."""
+    if asset not in QR_ASSETS:
+        abort(404)
+    mimetype, build = QR_ASSETS[asset]
+    body = build(url, title)
+    response = Response(body.encode() if isinstance(body, str) else body, mimetype=mimetype)
+    response.headers["Content-Disposition"] = f'attachment; filename="{stem}-{asset}"'
+    response.headers["Cache-Control"] = "private, no-cache"
+    return response
+
 def project_model_capacity(project: Paper | None, *, intended_plan: str | None = None) -> dict:
     """Return the strongest plan's topic-level model capacity and usage."""
     selected_key = strongest_project_plan_key(project, intended_plan=intended_plan)
@@ -5563,23 +5613,7 @@ def register_routes(app: Flask) -> None:
         share = build_share_snippets(model, model_resolver_url(model))
         return render_template("qr_page.html", model=model, paper=model.paper, share=share)
 
-    QR_ASSETS = {
-        # asset name -> (mimetype, builder(url, title) -> bytes|str)
-        "qr.svg": ("image/svg+xml", lambda url, title: qr_assets.qr_svg(url)),
-        "qr-print.png": ("image/png", lambda url, title: qr_assets.qr_png(url)),
-        "label.svg": ("image/svg+xml", qr_assets.qr_label_svg),
-        "label.png": ("image/png", qr_assets.qr_label_png),
-    }
-
-    def _qr_asset_response(asset, url, title, stem):
-        if asset not in QR_ASSETS:
-            abort(404)
-        mimetype, build = QR_ASSETS[asset]
-        body = build(url, title)
-        response = Response(body.encode() if isinstance(body, str) else body, mimetype=mimetype)
-        response.headers["Content-Disposition"] = f'attachment; filename="{stem}-{asset}"'
-        response.headers["Cache-Control"] = "private, no-cache"
-        return response
+    _qr_asset_response = qr_asset_response
 
     @app.route("/qr-print/<model_id>/<asset>")
     @login_required
@@ -5620,31 +5654,8 @@ def register_routes(app: Flask) -> None:
         ensure_local(os.path.join(app.config["PDF_FOLDER"], pdf_name), f"pdfs/{pdf_name}")
         return send_from_directory(app.config["PDF_FOLDER"], pdf_name)
 
-    def _paper_visible_to_request(paper: Paper) -> bool:
-        """A project is visible if shared publicly/unlisted, owned by the user,
-        or the viewer is an admin (the admin panel links to users' private
-        models; answering those with "Page not found" hid live models)."""
-        if paper_is_deleted(paper):
-            return False
-        if project_visibility(paper) in {"public", "unlisted"}:
-            return True
-        if not current_user.is_authenticated:
-            return False
-        return current_user.id == paper.user_id or bool(current_user.is_admin) or can_edit_project(paper)
-
-    def _private_project_response(paper: Paper):
-        """Visitors following a link or QR of a private project get an
-        explanation instead of a bare "Page not found" (deleted projects stay
-        404). Nothing about the project itself is shown."""
-        if paper_is_deleted(paper):
-            abort(404)
-        return (
-            render_template(
-                "model_access_unavailable.html", model=None, paper=None,
-                status="private", is_owner=False,
-            ),
-            403,
-        )
+    _paper_visible_to_request = paper_visible_to_request
+    _private_project_response = private_project_response
 
     def _is_admin_preview(owner_user_id) -> bool:
         """An admin looking at someone else's model; kept out of the owner's
