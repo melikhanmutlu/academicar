@@ -25,7 +25,7 @@ ENGAGEMENT_EVENTS = ("viewer_ar_started", "share_link_copied", "viewer_fullscree
 # starts and link copies counted as engagement.
 ENGAGEMENT_TRACKED_SINCE = date(2026, 10, 5)
 DIRECT_SOURCE_LABEL = "Direct / QR"
-INTERNAL_SOURCE_LABEL = "AcademicAR (internal)"
+INTERNAL_SOURCE_LABEL = "AcademicAR pages"
 _geoip_reader = None
 
 
