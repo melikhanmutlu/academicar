@@ -21,8 +21,11 @@ ALLOWED_BROWSER_EVENTS = {
 }
 # A visitor "engaged" with a model when they did more than load the page.
 ENGAGEMENT_EVENTS = ("viewer_ar_started", "share_link_copied", "viewer_fullscreen_opened", "viewer_model_rotated")
+# Rotation and fullscreen were first recorded on this date; before it only AR
+# starts and link copies counted as engagement.
+ENGAGEMENT_TRACKED_SINCE = date(2026, 10, 5)
 DIRECT_SOURCE_LABEL = "Direct / QR"
-INTERNAL_SOURCE_LABEL = "AcademicAR (internal)"
+INTERNAL_SOURCE_LABEL = "AcademicAR pages"
 _geoip_reader = None
 
 
@@ -324,7 +327,7 @@ def _source_label(domain: str | None, internal: set[str]) -> str:
 
 def _with_share(rows: list[tuple[str, int]], total: int, limit: int) -> list[dict]:
     rows = sorted(rows, key=lambda row: (-row[1], row[0]))[:limit]
-    return [{"label": label, "count": count, "pct": _rate(count, total) or 0} for label, count in rows]
+    return [{"label": label, "count": count, "pct": _rate(count, total) or 0.0} for label, count in rows]
 
 
 def _breakdowns(views_query, total_views: int, limit: int = 5) -> dict:
@@ -358,7 +361,7 @@ def _funnel(totals: dict) -> list[dict]:
         ("Started AR", totals["ar_visitors"]),
     ]
     top = steps[0][1]
-    return [{"label": label, "count": count, "pct": _rate(count, top) or 0} for label, count in steps]
+    return [{"label": label, "count": count, "pct": _rate(count, top) or 0.0} for label, count in steps]
 
 
 def _period_summary(base_query, days: int) -> dict:
@@ -372,22 +375,60 @@ def _period_summary(base_query, days: int) -> dict:
     totals = _totals(query)
     previous = _totals(previous_query)
     granularity, trend = _trend(query, first_day, days)
+    _, previous_trend = _trend(previous_query, first_day - timedelta(days=days), days)
+    for point, before in zip(trend, previous_trend):
+        point["previous_views"] = before["views"]
+    for point in trend[len(previous_trend):]:
+        point["previous_views"] = 0
     views_query = query.filter(AnalyticsEvent.event_name == "model_viewed")
     peak = max(trend, key=lambda point: point["views"]) if trend else None
+    changes = {
+        key: _change(totals[key], previous[key])
+        for key in ("views", "unique_visitors", "qr_scans", "ar_starts", "engaged_visitors", "shares", "review_visits")
+    }
+    # The previous window predates full engagement tracking: not like for like.
+    if previous_start.date() < ENGAGEMENT_TRACKED_SINCE:
+        changes["engaged_visitors"] = None
     return {
         "days": days,
         **totals,
-        "changes": {
-            key: _change(totals[key], previous[key])
-            for key in ("views", "unique_visitors", "qr_scans", "ar_starts", "engaged_visitors", "shares", "review_visits")
-        },
+        "changes": changes,
+        "engagement_since": ENGAGEMENT_TRACKED_SINCE,
+        "engagement_partial": first_day < ENGAGEMENT_TRACKED_SINCE,
         "trend": trend,
         "trend_granularity": granularity,
         "trend_peak": peak if peak and peak["views"] else None,
+        "trend_max": max(
+            [max(point["views"], point["previous_views"], point["qr_scans"]) for point in trend] or [0]
+        ),
         **_breakdowns(views_query, totals["views"]),
         "funnel": _funnel(totals),
         "_query": query,
     }
+
+
+def _headline(summary: dict, top_model=None) -> list[str]:
+    """Two or three plain sentences that read the period at a glance."""
+    days = summary["days"]
+    period = "12 months" if days == 365 else f"{days} days"
+    views, change = summary["views"], summary["changes"]["views"]
+    lines = []
+    if not views:
+        return [f"No model views in the last {period} yet."]
+    noun = "view" if views == 1 else "views"
+    if change["pct"] is None:
+        lines.append(f"{views} model {noun} in the last {period}, none in the {period} before.")
+    elif change["direction"] == "flat":
+        lines.append(f"{views} model {noun}, the same as the previous {period}.")
+    else:
+        word = "up" if change["direction"] == "up" else "down"
+        lines.append(f"{views} model {noun}, {word} {abs(change['pct'])}% on the previous {period}.")
+    if top_model is not None:
+        lines.append(f"Most viewed: {top_model['name']} ({top_model['views']} {'view' if top_model['views'] == 1 else 'views'}).")
+    if summary["sources"]:
+        source = summary["sources"][0]
+        lines.append(f"Top source: {source['label']} ({source['pct']:g}% of views).")
+    return lines
 
 
 def analytics_snapshot(owner_user_id: int | None = None, days: int = 30, project_id: int | None = None) -> dict:
@@ -430,8 +471,14 @@ def analytics_snapshot(owner_user_id: int | None = None, days: int = 30, project
             owned_query = owned_query.filter(Model3D.paper_id == project_id)
         model_metrics = _model_metrics(query, owned_query.order_by(Model3D.created_at.desc()).all())
 
+    leader = next((item for item in model_metrics if item["views"]), None)
+    top_model = (
+        {"name": leader["model"].display_name or leader["model"].original_filename or "3D model", "views": leader["views"]}
+        if leader else None
+    )
     return {
         **summary,
+        "headline": _headline(summary, top_model),
         "project_id": project_id,
         "projects": projects,
         "project_views": count("project_viewed"),
@@ -542,4 +589,6 @@ def model_snapshot(model, days: int = 30) -> dict:
     summary.pop("_query")
     summary["detailed"] = plan_supports_feature(model.license_type, "detailed_insights")
     summary["qr_share"] = _rate(summary["qr_scans"], summary["views"])
+    # Source names are audience detail: only for plans that include it.
+    summary["headline"] = _headline(summary if summary["detailed"] else {**summary, "sources": []})
     return summary

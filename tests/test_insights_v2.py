@@ -176,3 +176,57 @@ def test_model_detail_page_owner_only(client, app):
     login(client, email="other@example.com")
     assert client.get(f"/insights/model/{model_id}").status_code == 404
     assert client.get("/insights/model/not-a-uuid").status_code == 404
+
+
+def test_previous_period_trend_and_headline(client, app):
+    register(client)
+    owner_id, _, model_id = _setup(app)
+    with app.app_context():
+        for i in range(3):
+            _event(owner_id, model_id, visitor=f"now{i}")
+        _event(owner_id, model_id, visitor="old", when=_now() - timedelta(days=7))
+        db.session.commit()
+        snapshot = analytics_snapshot(owner_id, days=7)
+    assert sum(point["previous_views"] for point in snapshot["trend"]) == 1
+    assert snapshot["trend_max"] == 3
+    assert snapshot["headline"][0] == "3 model views, up 200% on the previous 7 days."
+    assert snapshot["headline"][1] == "Most viewed: Femur (3 views)."
+    assert snapshot["headline"][2] == "Top source: Direct / QR (100% of views)."
+
+
+def test_headline_without_views(client, app):
+    register(client)
+    owner_id, _, _ = _setup(app)
+    with app.app_context():
+        snapshot = analytics_snapshot(owner_id, days=30)
+    assert snapshot["headline"] == ["No model views in the last 30 days yet."]
+
+
+def test_engagement_comparison_hidden_before_full_tracking(client, app):
+    import analytics
+
+    register(client)
+    owner_id, _, _ = _setup(app)
+    with app.app_context():
+        early = analytics_snapshot(owner_id, days=7)
+        assert early["changes"]["engaged_visitors"] is None and early["engagement_partial"] is True
+        original = analytics.ENGAGEMENT_TRACKED_SINCE
+        analytics.ENGAGEMENT_TRACKED_SINCE = (_now() - timedelta(days=400)).date()
+        try:
+            later = analytics_snapshot(owner_id, days=7)
+        finally:
+            analytics.ENGAGEMENT_TRACKED_SINCE = original
+    assert later["changes"]["engaged_visitors"] is not None and later["engagement_partial"] is False
+
+
+def test_model_headline_hides_sources_without_detailed_plan(client, app, monkeypatch):
+    monkeypatch.setattr("analytics.plan_supports_feature", lambda plan, feature: False)
+    register(client)
+    owner_id, _, model_id = _setup(app)
+    with app.app_context():
+        model = db.session.get(Model3D, model_id)
+        _event(owner_id, model_id, visitor="a", referrer_domain="google.com")
+        db.session.commit()
+        snapshot = model_snapshot(model, days=30)
+    assert snapshot["detailed"] is False
+    assert not any("source" in line.lower() for line in snapshot["headline"])
