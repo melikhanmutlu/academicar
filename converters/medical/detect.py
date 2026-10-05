@@ -11,6 +11,39 @@ _ZIP_UNRECOGNISED = (
 )
 
 
+def _looks_like_dicom_zip(path: str, members) -> bool:
+    """True when a sampled member has the DICM marker, or parses as DICOM without a preamble.
+
+    Reads a few KB of up to 5 members straight from the archive (nothing is extracted).
+    """
+    import zipfile
+
+    step = max(1, len(members) // 5)
+    sample = members[::step][:5]  # spread out: viewers/readmes often come first
+    try:
+        with zipfile.ZipFile(path) as zf:
+            heads = []
+            for info in sample:
+                with zf.open(info) as fh:
+                    heads.append(fh.read(4096))
+    except Exception:
+        return False
+    if any(head[128:132] == b"DICM" for head in heads):
+        return True
+    import io
+
+    import pydicom
+
+    for head in heads:
+        try:
+            ds = pydicom.dcmread(io.BytesIO(head), stop_before_pixels=True, force=True)
+            if "SOPClassUID" in ds or "Modality" in ds:
+                return True
+        except Exception:
+            continue
+    return False
+
+
 def _magic_ok(path: str, name: str) -> bool:
     try:
         with open(path, "rb") as fh:
@@ -59,6 +92,8 @@ def detect_medical_format(path: str, original_name: str):
         if any(is_segmentation_name(m.filename) for m in members):
             return "segmentation", None
         if len(members) >= 3:
+            if not _looks_like_dicom_zip(path, members):
+                return None, _ZIP_UNRECOGNISED
             return "dicom", None
         return None, _ZIP_UNRECOGNISED
     return None, None

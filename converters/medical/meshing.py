@@ -109,12 +109,18 @@ def _mesh_mask(mask: np.ndarray, affine: np.ndarray):
     hi = [min(n, b.stop + margin) for b, n in zip(boxes[0], mask.shape)]
     crop = mask[tuple(slice(a, b) for a, b in zip(lo, hi))]
     padded = np.pad(crop.astype(np.float32), 1)  # 1 voxel of air so surfaces close
-    smooth = ndimage.gaussian_filter(padded, sigma=1.0)
-    if smooth.max() < 0.5:
-        return None  # a structure thinner than the smoothing kernel
-    try:
-        verts, faces, _normals, _values = measure.marching_cubes(smooth, level=0.5)
-    except (ValueError, RuntimeError):
+    # Thin structures (vessels, nerves 1-2 voxels wide) never reach 0.5 under the full
+    # smoothing, so retry with weaker smoothing and finally on the raw binary mask.
+    for sigma in (1.0, 0.5, None):
+        field = padded if sigma is None else ndimage.gaussian_filter(padded, sigma=sigma)
+        if field.max() < 0.5:
+            continue
+        try:
+            verts, faces, _normals, _values = measure.marching_cubes(field, level=0.5)
+        except (ValueError, RuntimeError):
+            continue
+        break
+    else:
         return None
     # Index space -> patient mm through the full affine (direction cosines +
     # origin), so oblique acquisitions land where they were scanned.
@@ -138,7 +144,7 @@ def _unique_names(names):
 
 
 def _mesh_layers(source: Source, strides: tuple, layers: list):
-    """Mesh the given layers at ``strides``. Returns ([(layer, mesh, ml)], faces)."""
+    """Mesh the given layers at ``strides``. Returns ([(layer, mesh, ml)], faces, notes)."""
     import trimesh
 
     affine = source.grid.affine.copy()
@@ -148,15 +154,20 @@ def _mesh_layers(source: Source, strides: tuple, layers: list):
     sl = tuple(slice(None, None, s) for s in strides)
 
     built = []
+    notes = []
     total_faces = 0
     for layer in layers:
-        mask = np.asarray(layer.load())[sl]
+        full = np.asarray(layer.load())
+        mask = full[sl]
         voxels = int(mask.sum())
         if voxels == 0:
+            if full.any():  # present at full resolution but stepped over by the stride
+                notes.append(f"{layer.name} is too thin to display at this resolution.")
             continue
         result = _mesh_mask(mask, affine)
         del mask
         if result is None:
+            notes.append(f"{layer.name} is too thin to display at this resolution.")
             continue
         world, faces = result
         verts = (world @ rot.T) / 1000.0  # patient mm -> glTF axes, metres
@@ -165,7 +176,7 @@ def _mesh_layers(source: Source, strides: tuple, layers: list):
             mesh.invert()  # keep normals pointing outward
         total_faces += len(mesh.faces)
         built.append((layer, mesh, voxels * voxel_mm3 / 1000.0))
-    return built, total_faces
+    return built, total_faces, notes
 
 
 def fmt_mm(voxel_mm) -> str:
@@ -199,7 +210,7 @@ def build_glb(source: Source, output_path: str):
         notes.append(f"Only the {MAX_LAYERS} largest structures are shown; the rest were left out.")
 
     cap = max_faces()
-    built, faces = _mesh_layers(source, strides, layers)
+    built, faces, mesh_notes = _mesh_layers(source, strides, layers)
     attempts = 0
     while faces > cap and attempts < _MAX_REDUCTIONS:
         attempts += 1
@@ -210,13 +221,14 @@ def build_glb(source: Source, output_path: str):
         resample_note = (
             f"Downsampled to {fmt_mm(spacing * np.array(strides))} voxels to keep the 3D model a manageable size."
         )
-        built, faces = _mesh_layers(source, strides, layers)
+        built, faces, mesh_notes = _mesh_layers(source, strides, layers)
     if faces > cap:
         raise MedicalError("This scan produces a 3D model that is too complex. Try a smaller series or crop it.")
     if not built:
         raise MedicalError(source.empty_error)
     if resample_note:
         notes.append(resample_note)
+    notes.extend(mesh_notes)
 
     names = _unique_names([b[0].name for b in built])
     colors = [

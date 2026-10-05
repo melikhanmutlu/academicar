@@ -104,6 +104,18 @@ def zip_folder(folder, zip_path, extra=None):
     return str(zip_path)
 
 
+def zip_folders(folders, zip_path, extra=None):
+    """ZIP several folders side by side (e.g. two series, or a series plus a DICOM-SEG)."""
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for folder in folders:
+            base = os.path.basename(str(folder))
+            for name in sorted(os.listdir(folder)):
+                zf.write(os.path.join(folder, name), f"{base}/{name}")
+        for name, data in (extra or {}).items():
+            zf.writestr(name, data)
+    return str(zip_path)
+
+
 def cielab_scaled(l_star, a_star, b_star):
     """L*a*b* -> DICOM 16-bit scaled RecommendedDisplayCIELabValue."""
     return [

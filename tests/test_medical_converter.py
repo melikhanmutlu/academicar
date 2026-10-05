@@ -24,6 +24,7 @@ from tests.medical_fixtures import (
     write_ct_series,
     write_dicom_seg,
     zip_folder,
+    zip_folders,
 )
 
 
@@ -637,3 +638,404 @@ def test_unknown_kind_and_preset_and_missing_file(tmp_path):
     missing = MedicalConverter("segmentation")
     assert missing.convert(str(tmp_path / "missing.nii"), str(tmp_path / "o.glb")) is False
     assert missing.errors
+
+
+# ------------------------------------------------------ ZIP of masks (images, label maps, tables)
+
+def zip_nifti(tmp_path, members, extra=None, name="masks.zip"):
+    """members: {archive name: array or (array, affine)}; extra: {archive name: text/bytes}."""
+    zip_path = tmp_path / name
+    with zipfile.ZipFile(zip_path, "w") as zf:
+        for member, data in members.items():
+            array, affine = data if isinstance(data, tuple) else (data, None)
+            zf.write(save_nifti(tmp_path / f"_{os.path.basename(member)}", array, affine), member)
+        for member, content in (extra or {}).items():
+            zf.writestr(member, content)
+    return zip_path
+
+
+def ct_image(shape=(24, 24, 24)):
+    return np.random.default_rng(0).integers(-1000, 1500, shape).astype(np.int16)
+
+
+def test_zip_skips_ct_image_next_to_masks(tmp_path):
+    liver = sphere((32, 32, 32), (10, 16, 16), 6).astype(np.uint8)
+    kidney = sphere((32, 32, 32), (22, 16, 16), 5).astype(np.uint8)
+    # the CT sits on a different grid: it must not trigger the grid-mismatch error
+    zip_path = zip_nifti(
+        tmp_path,
+        {"ct.nii.gz": ct_image(), "segmentations/liver.nii.gz": liver, "segmentations/kidney.nii.gz": kidney},
+    )
+    result, out = convert_in_process("segmentation", zip_path, tmp_path)
+    assert result["ok"], result["error"]
+    assert [l["name"] for l in result["layers"]] == ["Kidney", "Liver"]
+    assert result["notes"] == ["Skipped ct.nii.gz: it looks like an image, not a mask."]
+    assert sorted(m.name for m in pygltflib.GLTF2().load(out).materials) == ["Kidney", "Liver"]
+
+
+@pytest.mark.parametrize(
+    "image",
+    [
+        np.random.default_rng(1).normal(100, 30, (16, 16, 16)).astype(np.float32),  # non-integer floats
+        np.random.default_rng(2).integers(0, 4000, (16, 16, 16)).astype(np.uint16),  # offset CT, many values
+        np.random.default_rng(3).integers(-900, 0, (16, 16, 16)).astype(np.int16),  # negative HU
+    ],
+    ids=["float", "many-values", "negative"],
+)
+def test_zip_image_detection_and_only_images_error(tmp_path, image):
+    mask = sphere((16, 16, 16), (8, 8, 8), 4).astype(np.uint8)
+    ok, _ = convert_in_process(
+        "segmentation", zip_nifti(tmp_path, {"scan.nii.gz": image, "liver.nii.gz": mask}), tmp_path / "a"
+    )
+    assert ok["ok"], ok["error"]
+    assert [l["name"] for l in ok["layers"]] == ["Liver"]
+    assert ok["notes"] == ["Skipped scan.nii.gz: it looks like an image, not a mask."]
+
+    only, _ = convert_in_process(
+        "segmentation", zip_nifti(tmp_path, {"a.nii.gz": image, "b.nii.gz": image}, name="img.zip"), tmp_path / "b"
+    )
+    assert not only["ok"] and only["error"] == "This ZIP contains no mask files (only images)."
+    single, _ = convert_in_process(
+        "segmentation", zip_nifti(tmp_path, {"a.nii.gz": image}, name="one.zip"), tmp_path / "c"
+    )
+    assert not single["ok"] and single["error"] == "This ZIP contains no mask files (only images)."
+
+
+def test_zip_mask_grid_mismatch_still_rejected_among_masks(tmp_path):
+    zip_path = zip_nifti(
+        tmp_path,
+        {"ct.nii.gz": ct_image(), "a.nii.gz": np.ones((8, 8, 8), np.uint8), "b.nii.gz": np.ones((9, 8, 8), np.uint8)},
+    )
+    result, _ = convert_in_process("segmentation", zip_path, tmp_path)
+    assert not result["ok"] and "same size and orientation" in result["error"]
+
+
+def test_zip_multilabel_map_expands_to_one_layer_per_label(tmp_path):
+    multi = label_volume((1, (12, 16, 16), 6), (2, (24, 16, 16), 5), shape=(32, 32, 32))
+    liver = sphere((32, 32, 32), (16, 6, 16), 3).astype(np.uint8)
+    result, _ = convert_in_process(
+        "segmentation", zip_nifti(tmp_path, {"liver.nii.gz": liver, "multi_seg.nii.gz": multi}), tmp_path
+    )
+    assert result["ok"], result["error"]
+    assert [l["name"] for l in result["layers"]] == ["Liver", "Multi seg 1", "Multi seg 2"]
+    volumes = {l["name"]: l["volume_ml"] for l in result["layers"]}
+    assert volumes["Multi seg 1"] == pytest.approx(4 / 3 * math.pi * 6**3 / 1000, rel=0.2)
+    assert volumes["Multi seg 2"] == pytest.approx(4 / 3 * math.pi * 5**3 / 1000, rel=0.25)
+
+
+def test_zip_with_one_segmentation_behaves_like_direct_upload(tmp_path):
+    multi = label_volume((1, (12, 16, 16), 6), (2, (24, 16, 16), 5), shape=(32, 32, 32))
+    zipped, _ = convert_in_process("segmentation", zip_nifti(tmp_path, {"multi.nii.gz": multi}), tmp_path / "a")
+    direct, _ = convert_in_process("segmentation", save_nifti(tmp_path / "multi.nii.gz", multi), tmp_path / "b")
+    assert [l["name"] for l in zipped["layers"]] == [l["name"] for l in direct["layers"]] == ["Label 1", "Label 2"]
+
+    import nrrd
+
+    header = {"space": "right-anterior-superior", "space directions": np.eye(3), "space origin": np.zeros(3),
+              "kinds": ["domain"] * 3, "Segment0_Name": "Left lung", "Segment0_LabelValue": "1", "Segment0_Layer": "0"}
+    seg = str(tmp_path / "case.seg.nrrd")
+    nrrd.write(seg, label_volume((1, (16, 16, 16), 6), shape=(32, 32, 32)), header)
+    zip_path = tmp_path / "seg.zip"
+    with zipfile.ZipFile(zip_path, "w") as zf:
+        zf.write(seg, "case.seg.nrrd")
+    nrrd_result, _ = convert_in_process("segmentation", zip_path, tmp_path / "c")
+    assert [l["name"] for l in nrrd_result["layers"]] == ["Left lung"]
+
+
+ITK_SNAP = """################################################
+# ITK-SnAP Label Description File
+################################################
+    0     0    0    0        0  0  0    "Clear Label"
+    1   255    0    0        1  1  1    "Liver"
+"""
+SLICER_CTBL = "# Color table file\n# 3 values\n1 Liver 255 0 0 255\n3 Spleen 0 255 0 255\n"
+JSON_NAMES = json.dumps({"1": "Liver"})
+JSON_COLORS = json.dumps({"1": {"name": "Liver", "color": "#ff0000"}})
+
+
+@pytest.mark.parametrize(
+    "filename,content,color",
+    [
+        ("labels.txt", ITK_SNAP, "#FF0000"),
+        ("labels.ctbl", SLICER_CTBL, "#FF0000"),
+        ("colors.txt", SLICER_CTBL, "#FF0000"),  # Slicer table under a .txt name: detected by content
+        ("names.json", JSON_NAMES, None),
+        ("names.json", JSON_COLORS, "#FF0000"),
+    ],
+)
+def test_zip_label_table_names_and_colours(tmp_path, filename, content, color):
+    multi = label_volume((1, (12, 16, 16), 6), (2, (24, 16, 16), 5), shape=(32, 32, 32))
+    other = sphere((32, 32, 32), (16, 6, 16), 3).astype(np.uint8)
+    # one-file ZIP and multi-file ZIP both apply the table; unknown labels keep their default name
+    single, _ = convert_in_process(
+        "segmentation", zip_nifti(tmp_path, {"m.nii.gz": multi}, {filename: content}, name="one.zip"), tmp_path / "a"
+    )
+    assert single["ok"], single["error"]
+    assert [l["name"] for l in single["layers"]] == ["Liver", "Label 2"]
+    if color:
+        assert single["layers"][0]["color"] == color
+    many, _ = convert_in_process(
+        "segmentation",
+        zip_nifti(tmp_path, {"m.nii.gz": multi, "other.nii.gz": other}, {filename: content}, name="two.zip"),
+        tmp_path / "b",
+    )
+    assert [l["name"] for l in many["layers"]] == ["Liver", "M 2", "Other"]
+
+
+def test_zip_garbage_label_table_is_ignored(tmp_path):
+    multi = label_volume((1, (12, 16, 16), 6), (2, (24, 16, 16), 5), shape=(32, 32, 32))
+    extra = {"readme.txt": "Segmentation exported on a Tuesday.\n1 2 3", "broken.json": "{not json", "list.json": "[1, 2]",
+             "bad.ctbl": b"\xff\xfe\x00 garbage"}
+    result, _ = convert_in_process(
+        "segmentation", zip_nifti(tmp_path, {"multi.nii.gz": multi}, extra), tmp_path
+    )
+    assert result["ok"], result["error"]
+    assert [l["name"] for l in result["layers"]] == ["Label 1", "Label 2"]
+
+
+def test_nifti_header_extension_label_names(tmp_path):
+    multi = label_volume((1, (12, 16, 16), 6), (2, (24, 16, 16), 5), shape=(32, 32, 32))
+
+    def with_extension(path, content):
+        img = nib.Nifti1Image(multi, np.eye(4))
+        img.header.extensions.append(nib.nifti1.Nifti1Extension(6, content))
+        nib.save(img, str(path))
+        return str(path)
+
+    named = with_extension(tmp_path / "named.nii.gz", json.dumps({"1": "liver", "2": "spleen"}).encode())
+    result, _ = convert_in_process("segmentation", named, tmp_path / "a")
+    assert [l["name"] for l in result["layers"]] == ["liver", "spleen"]
+    zip_path = tmp_path / "ext.zip"
+    with zipfile.ZipFile(zip_path, "w") as zf:
+        zf.write(named, "named.nii.gz")
+        zf.write(save_nifti(tmp_path / "_o.nii.gz", sphere((32, 32, 32), (16, 6, 16), 3).astype(np.uint8)), "o.nii.gz")
+    in_zip, _ = convert_in_process("segmentation", zip_path, tmp_path / "b")
+    assert [l["name"] for l in in_zip["layers"]] == ["liver", "spleen", "O"]
+    # not a label table: ignored
+    for junk in (b"not json", json.dumps({"patient": "x"}).encode(), json.dumps({"1": 5}).encode(), b""):
+        path = with_extension(tmp_path / "junk.nii.gz", junk)
+        result, _ = convert_in_process("segmentation", path, tmp_path / "c")
+        assert [l["name"] for l in result["layers"]] == ["Label 1", "Label 2"]
+
+
+
+# ------------------------------------------------------ DICOM zips: SEG objects, series, presets
+
+SMALL_ML = 4 / 3 * math.pi * 7**3 / 1000
+
+
+def test_dicom_seg_inside_ct_zip_replaces_threshold(tmp_path):
+    folder = write_ct_series(tmp_path / "ct")
+    shape = (64, 64, 40)
+    liver = sphere(shape, (20, 20, 20), 8, (1, 1, 2))
+    seg_dir = tmp_path / "seg"
+    seg_dir.mkdir()
+    write_dicom_seg(seg_dir / "seg.dcm", [liver], ["Liver"], [None], shape)
+    zip_path = zip_folders([folder, seg_dir], tmp_path / "both.zip")
+    result, _ = convert_in_process("dicom", zip_path, tmp_path, "bone")
+    assert result["ok"], result["error"]
+    assert [l["name"] for l in result["layers"]] == ["Liver"]
+    assert result["notes"] == ["Used the DICOM segmentation found in the ZIP instead of a threshold."]
+
+
+def test_several_dicom_segs_use_the_one_with_most_frames(tmp_path):
+    folder = write_ct_series(tmp_path / "ct")
+    shape = (64, 64, 40)
+    seg_dir = tmp_path / "seg"
+    seg_dir.mkdir()
+    write_dicom_seg(seg_dir / "small.dcm", [sphere(shape, (20, 20, 20), 3, (1, 1, 2))], ["Small"], [None], shape)
+    write_dicom_seg(seg_dir / "big.dcm", [sphere(shape, (30, 30, 30), 10, (1, 1, 2))], ["Big"], [None], shape)
+    result, _ = convert_in_process("dicom", zip_folders([folder, seg_dir], tmp_path / "x.zip"), tmp_path, "bone")
+    assert result["ok"], result["error"]
+    assert [l["name"] for l in result["layers"]] == ["Big"]
+    assert "Used the DICOM segmentation found in the ZIP instead of a threshold." in result["notes"]
+    assert any("2 DICOM segmentations" in n and "most frames" in n for n in result["notes"])
+
+
+def test_unreadable_dicom_seg_falls_back_to_threshold(tmp_path):
+    folder = write_ct_series(tmp_path / "ct")
+    seg_dir = tmp_path / "seg"
+    seg_dir.mkdir()
+    shape = (64, 64, 40)
+    seg = write_dicom_seg(seg_dir / "seg.dcm", [sphere(shape, (20, 20, 20), 5, (1, 1, 2))], ["Liver"], [None], shape)
+    import pydicom
+
+    ds = pydicom.dcmread(seg)
+    del ds.PerFrameFunctionalGroupsSequence
+    ds.save_as(seg)
+    result, _ = convert_in_process("dicom", zip_folders([folder, seg_dir], tmp_path / "x.zip"), tmp_path, "bone")
+    assert result["ok"], result["error"]
+    assert [l["name"] for l in result["layers"]] == ["Bone"]
+    assert any("segmentation" in n and "could not be used" in n for n in result["notes"])
+
+
+def test_several_image_series_note_counts_only(tmp_path):
+    big = write_ct_series(tmp_path / "big", n_slices=40)
+    small = write_ct_series(tmp_path / "small", n_slices=20)
+    result, _ = convert_in_process("dicom", zip_folders([big, small], tmp_path / "two.zip"), tmp_path, "bone")
+    assert result["ok"], result["error"]
+    assert result["notes"] == ["This ZIP has 2 image series; used the one with 40 slices."]
+    single, _ = convert_in_process("dicom", make_ct_zip(tmp_path, name="one"), tmp_path / "b", "bone")
+    assert single["notes"] == []
+
+
+def test_skin_preset_keeps_only_the_body(tmp_path):
+    # a large body plus a separate dense "table" blob that is no part of it
+    spheres = [(32.0, 32.0, 40.0, 15.0), (52.0, 52.0, 16.0, 8.0)]
+    zip_path = make_ct_zip(tmp_path, spheres=spheres)
+    bone, _ = convert_in_process("dicom", zip_path, tmp_path / "a", "bone")
+    skin, _ = convert_in_process("dicom", zip_path, tmp_path / "b", "skin")
+    assert bone["ok"] and skin["ok"], skin["error"]
+    assert bone["layers"][0]["volume_ml"] == pytest.approx(SPHERE_ML + 4 / 3 * math.pi * 8**3 / 1000, rel=0.1)
+    assert skin["layers"][0]["volume_ml"] == pytest.approx(SPHERE_ML, rel=0.1)
+    assert "table" not in MEDICAL_PRESETS["skin"]["description"]
+
+
+def test_multiple_presets_make_one_layer_each_without_overlap(tmp_path):
+    # a bright "bone" sphere and a separate contrast-level sphere (200 HU) on one volume
+    import pydicom
+
+    folder = write_ct_series(tmp_path / "ct", spheres=[(20.0, 32.0, 40.0, 10.0)])
+    for name in sorted(os.listdir(folder)):  # paint the second sphere at 200 HU into every slice
+        ds = pydicom.dcmread(os.path.join(folder, name))
+        k = int(name[6:9])
+        arr = np.frombuffer(ds.PixelData, dtype="<u2").reshape(64, 64).copy()
+        rr, cc = np.meshgrid(np.arange(64), np.arange(64), indexing="ij")
+        inside = (cc - 48) ** 2 + (rr - 32) ** 2 + (2 * k - 40) ** 2 <= 7**2
+        arr[inside] = 200 + 1024
+        ds.PixelData = arr.tobytes()
+        ds.save_as(os.path.join(folder, name))
+    zip_path = zip_folder(folder, tmp_path / "two.zip")
+    result, out = convert_in_process("dicom", zip_path, tmp_path / "a", "bone,contrast")
+    assert result["ok"], result["error"]
+    volumes = {l["name"]: l for l in result["layers"]}
+    assert list(volumes) == ["Bone", "Contrast vessels"]
+    assert volumes["Bone"]["color"] == "#E8D5B7" and volumes["Contrast vessels"]["color"] == "#CC2222"
+    assert volumes["Bone"]["volume_ml"] == pytest.approx(4 / 3 * math.pi * 10**3 / 1000, rel=0.15)
+    assert volumes["Contrast vessels"]["volume_ml"] == pytest.approx(SMALL_ML, rel=0.15)  # bone is left out
+    assert sorted(layer_meshes(out)) == ["Bone", "Contrast vessels"]
+    alone, _ = convert_in_process("dicom", zip_path, tmp_path / "b", "contrast")
+    assert alone["layers"][0]["volume_ml"] > SMALL_ML * 2  # without bone the contrast layer includes it
+
+    both, _ = convert_in_process("dicom", zip_path, tmp_path / "c", "bone,skin,bone")
+    assert [l["name"] for l in both["layers"]] == ["Bone", "Skin"]  # duplicates removed
+    assert "do not overlap" in MEDICAL_PRESETS["contrast"]["description"]
+
+
+def test_new_paths_never_leak_patient_identifiers(tmp_path, caplog):
+    import pydicom
+
+    caplog.set_level(logging.DEBUG)
+    shape = (64, 64, 40)
+    ct = write_ct_series(tmp_path / "ct", n_slices=40)
+    other = write_ct_series(tmp_path / "other", n_slices=20)
+    good, bad = tmp_path / "good", tmp_path / "bad"
+    for folder in (good, bad):
+        folder.mkdir()
+        write_dicom_seg(folder / "seg.dcm", [sphere(shape, (20, 20, 20), 8, (1, 1, 2))], ["Liver"], [None], shape)
+    ds = pydicom.dcmread(str(bad / "seg.dcm"))
+    del ds.PerFrameFunctionalGroupsSequence  # unusable SEG: falls back to a threshold with a note
+    ds.save_as(str(bad / "seg.dcm"))
+    runs = [  # several series + several presets, SEG used, SEG unusable
+        (zip_folders([ct, other], tmp_path / "a.zip"), "bone,skin,contrast"),
+        (zip_folders([ct, good], tmp_path / "b.zip"), "bone"),
+        (zip_folders([ct, bad], tmp_path / "c.zip"), "bone"),
+    ]
+    texts = []
+    for i, (zip_path, preset) in enumerate(runs):
+        converter = MedicalConverter("dicom", preset)
+        assert converter.convert(zip_path, str(tmp_path / f"m{i}.glb")) is True
+        texts += [json.dumps(converter.layers), json.dumps(converter.notes), json.dumps(converter.errors)]
+        with open(tmp_path / f"m{i}.glb", "rb") as fh:
+            texts.append(fh.read().decode("latin-1"))
+    in_process, _ = convert_in_process("dicom", runs[2][0], tmp_path / "x", "bone")
+    texts += [json.dumps(in_process), caplog.text]
+    assert len(texts) == 14 and any("could not be used" in t for t in texts)
+    for text in texts:
+        for secret in (PATIENT_NAME, "Patient", PATIENT_ID, "19700101"):
+            assert secret not in text
+
+
+def test_multiple_presets_on_mr_fall_back_to_one_auto_layer(tmp_path):
+    zip_path = make_ct_zip(tmp_path, modality="MR", background=0, fg=800)
+    result, _ = convert_in_process("dicom", zip_path, tmp_path, "bone,skin")
+    assert result["ok"], result["error"]
+    assert [l["name"] for l in result["layers"]] == ["Auto threshold"]
+    assert len([n for n in result["notes"] if "not CT" in n]) == 1
+
+
+def test_unknown_preset_in_list_rejected(tmp_path):
+    result, _ = convert_in_process("dicom", make_ct_zip(tmp_path), tmp_path, "bone,nope")
+    assert not result["ok"] and result["error"] == "Unknown preset."
+    converter = MedicalConverter("dicom", "bone,nope")
+    assert converter.convert(str(tmp_path / "ct.zip"), str(tmp_path / "o.glb")) is False
+    assert converter.errors == ["Unknown preset."]
+
+
+def test_multiple_presets_via_child_process(tmp_path):
+    converter = MedicalConverter("dicom", "bone,skin")
+    assert converter.convert(make_ct_zip(tmp_path), str(tmp_path / "model.glb")) is True
+    assert [l["name"] for l in converter.layers] == ["Bone", "Skin"]
+
+
+# ------------------------------------------------------ thin structures
+
+def test_thin_structure_survives_weaker_smoothing(tmp_path):
+    vol = label_volume((1, (20, 32, 32), 10), shape=(64, 64, 64))
+    vol[30:50, 40, 40] = 2  # a one-voxel-wide rod, thinner than the default smoothing kernel
+    result, out = convert_in_process("segmentation", save_nifti(tmp_path / "thin.nii.gz", vol), tmp_path)
+    assert result["ok"], result["error"]
+    assert [l["name"] for l in result["layers"]] == ["Label 1", "Label 2"]
+    assert len(layer_meshes(out)["Label 2"].faces) > 0
+    assert not result["notes"]
+
+
+def test_structure_lost_to_downsampling_is_reported(tmp_path, monkeypatch):
+    vol = label_volume((1, (32, 32, 32), 14), shape=(64, 64, 64))
+    vol[5, 5, 5] = 2  # an odd index: a stride of 2 steps over it
+    monkeypatch.setenv("MEDICAL_MAX_VOXELS", "40000")
+    result, _ = convert_in_process("segmentation", save_nifti(tmp_path / "t.nii.gz", vol), tmp_path)
+    assert result["ok"], result["error"]
+    assert [l["name"] for l in result["layers"]] == ["Label 1"]
+    assert "Label 2 is too thin to display at this resolution." in result["notes"]
+
+
+def test_structure_that_cannot_be_meshed_is_reported(tmp_path, monkeypatch):
+    from skimage import measure
+
+    real = measure.marching_cubes
+
+    def picky(volume, level=None, **kwargs):
+        if volume.max() <= 1.0 and volume.sum() < 5:  # reject the tiny structure at every smoothing level
+            raise ValueError("no surface")
+        return real(volume, level=level, **kwargs)
+
+    monkeypatch.setattr(measure, "marching_cubes", picky)
+    vol = label_volume((1, (32, 32, 32), 10), shape=(64, 64, 64))
+    vol[10, 10, 10] = 2
+    result, _ = convert_in_process("segmentation", save_nifti(tmp_path / "t.nii.gz", vol), tmp_path)
+    assert result["ok"], result["error"]
+    assert "Label 2 is too thin to display at this resolution." in result["notes"]
+
+
+# ------------------------------------------------------ upload-time ZIP sanity check
+
+def test_detect_rejects_zip_of_non_dicom_files(tmp_path):
+    jpegs = tmp_path / "photos.zip"
+    with zipfile.ZipFile(jpegs, "w") as zf:
+        for i in range(4):
+            zf.writestr(f"p{i}.jpg", b"\xff\xd8\xff\xe0" + os.urandom(2000))
+    kind, error = detect_medical_format(str(jpegs), "photos.zip")
+    assert kind is None and error.startswith("This ZIP does not look like a DICOM series or a segmentation")
+
+
+def test_detect_accepts_dicom_zip_without_preamble_or_with_junk_first(tmp_path):
+    folder = write_ct_series(tmp_path / "ct", n_slices=6)
+    bare = tmp_path / "bare"
+    bare.mkdir()
+    for name in sorted(os.listdir(folder)):  # drop the 128-byte preamble and the DICM marker
+        with open(os.path.join(folder, name), "rb") as src, open(bare / name, "wb") as dst:
+            dst.write(src.read()[132:])
+    assert detect_medical_format(zip_folder(bare, tmp_path / "bare.zip"), "bare.zip") == ("dicom", None)
+    with_junk = zip_folder(folder, tmp_path / "junk.zip", extra={"README.txt": "hi", "autorun.inf": "x", "a.exe": "MZ"})
+    assert detect_medical_format(with_junk, "junk.zip") == ("dicom", None)

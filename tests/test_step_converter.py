@@ -13,6 +13,8 @@ FIXTURES = Path(__file__).parent / "fixtures" / "step"
 COLORED = FIXTURES / "assembly_colored.step"
 SAME_COLOR = FIXTURES / "assembly_same_color.step"
 BOX = FIXTURES / "box_plain.stp"
+# Part names written with ISO 10303-21 escapes (\X2\00F6\X0\ ...) plus a bolt placed 4 times.
+UNICODE = FIXTURES / "assembly_unicode.step"
 
 
 def _convert(source, tmp_path, **kwargs):
@@ -216,3 +218,37 @@ def test_layers_end_to_end(tmp_path, source, kwargs):
         assert [l["color"] for l in layers][0] == "#ff0000"
     else:
         assert {l["color"] for l in layers} == {"#b87333"}
+
+
+def test_non_ascii_part_names_are_decoded(tmp_path):
+    # OpenCascade decodes the \X2\...\X0\ escapes itself; no manual decoding is needed.
+    assert b"\\X2\\" in UNICODE.read_bytes()
+
+    converter, output, ok = _convert(UNICODE, tmp_path)
+
+    assert ok, converter.errors
+    gltf = GLTF2.load(str(output))
+    names = {n.name for n in gltf.nodes if n.mesh is not None}
+    assert names == {"G\u00f6vde", "\u015eaft", "Kapak \u00fc", "\u00dcnite-\u00c7", "C\u0131vata"}
+    assert not any("\\X" in (n.name or "") for n in gltf.nodes)
+
+
+def test_repeated_step_parts_are_one_layer_with_unicode_names(tmp_path):
+    _, output, ok = _convert(UNICODE, tmp_path)
+    assert ok
+
+    layers = normalize_layers(str(output))
+
+    assert [l["name"] for l in layers] == ["G\u00f6vde", "\u015eaft", "Kapak \u00fc", "\u00dcnite-\u00c7", "C\u0131vata"]
+    assert [l.get("count") for l in layers] == [None, None, None, None, 4]
+    assert [l["materials"] for l in layers] == [[l["name"]] for l in layers]
+    # four bolt instances, one material, and it belongs to the bolt layer only
+    gltf = GLTF2.load(str(output))
+    bolt_materials = {
+        gltf.materials[p.material].name
+        for n in gltf.nodes
+        if n.mesh is not None and n.name == "C\u0131vata"
+        for p in gltf.meshes[n.mesh].primitives
+    }
+    assert bolt_materials == {"C\u0131vata"}
+    assert len({m.name for m in gltf.materials}) == len(gltf.materials) == 5

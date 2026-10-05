@@ -464,12 +464,14 @@
     .layer-name span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .layer-swatch { flex: none; width: 12px; height: 12px; border-radius: 3px; border: 1px solid rgba(255, 255, 255, 0.35); }
     .layer-volume { display: block; font-size: 11px; color: rgba(255, 255, 255, 0.55); }
+    .layer-count { flex: none; margin-left: 6px; font-size: 11px; color: rgba(255, 255, 255, 0.55); }
     .layer-opacity { width: 72px; accent-color: #ff682c; }
     .layers-note { padding: 8px 14px 12px; font-size: 11.5px; line-height: 1.45; color: rgba(255, 255, 255, 0.6); border-top: 1px solid rgba(255, 255, 255, 0.1); }
     .tour-mode .layers-panel { display: none !important; }
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layers-panel { background: rgba(255, 255, 255, 0.96); color: #202020; border-color: #e8e8e8; }
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layers-head h2,
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layer-volume,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layer-count,
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layers-note { color: #6b6b6b; }
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layers-head-actions button,
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layer-eye { color: #202020; background: #f5f5f5; border-color: #e8e8e8; }
@@ -1374,7 +1376,11 @@
             <p class="viewer-video-status" data-video-status role="status" aria-live="polite">Record a WebM/MP4 clip of the interactive canvas.</p>
           </div>{% endif %}
 
-          {% if 'medical_colors' in viewer_features %}<div class="viewer-color-tools" data-color-tools>
+          {# A whole-model colour would flatten the per-layer colours: layered models set colours per layer. #}
+          {% if 'medical_colors' in viewer_features and viewer_layers|length >= 2 %}<div class="viewer-color-tools">
+            <div class="viewer-tool-heading"><span>Color</span></div>
+            <p class="viewer-color-hint">Colours are set per layer.</p>
+          </div>{% elif 'medical_colors' in viewer_features %}<div class="viewer-color-tools" data-color-tools>
             <div class="viewer-tool-heading">
               <span>Color</span>
               <div class="flex items-center gap-2">
@@ -1950,15 +1956,18 @@
 
     // --- Layers: each part / structure has its own named material(s), so it
     // is shown, hidden or faded through model-viewer's material API. Hidden =
-    // alpha-masked out (no depth write); faded = blended. AR shows the model
-    // as published (Scene Viewer / Quick Look have no layer controls). ---
+    // alpha-masked out (no depth write) and, where model-viewer's three.js
+    // scene is reachable, its meshes also leave the render/raycast layer so
+    // Measure, labels and tap-to-recenter ignore them; faded = blended. AR
+    // shows the model as published (Scene Viewer / Quick Look have no layer
+    // controls). ---
     const layersBtn = document.getElementById('layersBtn');
     const layersPanel = document.getElementById('layersPanel');
     if (layersBtn && layersPanel && viewer) {
       const layerData = {{ viewer_layers|tojson }};
       const list = layersPanel.querySelector('[data-layers-list]');
       const state = layerData.map(() => ({ visible: true, opacity: 1 }));
-      let mats = null; // per layer: [{ material, mode, cutoff, factor }]
+      let mats = null; // per layer: [{ material, mode, cutoff, factor, applied }]
       const toSrgbHex = (rgba) => '#' + rgba.slice(0, 3).map((c) => {
         const v = c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
         return Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, '0');
@@ -1973,14 +1982,56 @@
           mode: material.getAlphaMode(),
           cutoff: material.getAlphaCutoff(),
           factor: [...material.pbrMetallicRoughness.baseColorFactor],
+          applied: false, // true while hidden/faded: the captured values are then the ones to restore
         })));
         return mats;
       };
-      const apply = (i) => {
+      // Hidden layers also leave three.js layer 0 (the only layer the camera
+      // renders and the raycaster tests), so positionAndNormalFromPoint (Measure,
+      // labels) and tap-to-recenter cannot hit an invisible surface. Reaches
+      // model-viewer's scene through its "scene" instance symbol; any failure
+      // leaves the material-alpha hiding above as the only mechanism.
+      const HIDDEN_THREE_LAYER = 31;
+      const syncMeshLayers = () => {
+        try {
+          const sceneKey = Object.getOwnPropertySymbols(viewer).find((s) => s.description === 'scene');
+          const scene = sceneKey && viewer[sceneKey];
+          if (!scene || typeof scene.traverse !== 'function') return;
+          const known = new Set();
+          const hidden = new Set();
+          layerData.forEach((layer, i) => {
+            (layer.materials || [layer.name]).forEach((name) => {
+              known.add(name);
+              if (!state[i].visible || state[i].opacity <= 0.01) hidden.add(name);
+            });
+          });
+          scene.traverse((object) => {
+            if (!object.isMesh || !object.material) return;
+            const names = (Array.isArray(object.material) ? object.material : [object.material]).map((m) => m && m.name);
+            if (!names.some((name) => known.has(name))) return;
+            const isHidden = names.every((name) => hidden.has(name));
+            if (isHidden) object.layers.set(HIDDEN_THREE_LAYER);
+            else if (object.layers.isEnabled(HIDDEN_THREE_LAYER)) object.layers.set(0);
+          });
+          if (typeof viewer.queueRender === 'function') viewer.queueRender();
+        } catch (e) { /* internals differ: material alpha still hides the layer */ }
+      };
+      const apply = (i, syncLayers = true) => {
         const entries = resolveMaterials()?.[i] || [];
         const { visible, opacity } = state[i];
-        entries.forEach(({ material, mode, cutoff, factor }) => {
+        entries.forEach((entry) => {
+          const { material } = entry;
           const pbr = material.pbrMetallicRoughness;
+          const modified = !visible || opacity < 0.99;
+          if (modified && !entry.applied) {
+            // Re-capture what the material looks like now: the colour may have
+            // been changed through the viewer since the model loaded.
+            entry.mode = material.getAlphaMode();
+            entry.cutoff = material.getAlphaCutoff();
+            entry.factor = [...pbr.baseColorFactor];
+          }
+          entry.applied = modified;
+          const { mode, cutoff, factor } = entry;
           if (!visible || opacity <= 0.01) {
             material.setAlphaMode('MASK');
             material.setAlphaCutoff(0.5);
@@ -1994,6 +2045,7 @@
             pbr.setBaseColorFactor(factor);
           }
         });
+        if (syncLayers) syncMeshLayers();
         const row = list.children[i];
         if (row) {
           row.classList.toggle('is-hidden', !visible);
@@ -2001,7 +2053,7 @@
           row.querySelector('.layer-eye').setAttribute('aria-label', `${visible ? 'Hide' : 'Show'} ${layerData[i].name}`);
         }
       };
-      const applyAll = () => state.forEach((_, i) => apply(i));
+      const applyAll = () => { state.forEach((_, i) => apply(i, false)); syncMeshLayers(); };
       layerData.forEach((layer, i) => {
         const row = document.createElement('li');
         row.className = 'layer-row';
@@ -2010,6 +2062,12 @@
           + '<input type="range" class="layer-opacity" min="0" max="100" value="100">';
         const nameLabel = row.querySelector('.layer-name span:last-child');
         nameLabel.textContent = layer.name;
+        if (layer.count > 1) {
+          const count = document.createElement('span');
+          count.className = 'layer-count';
+          count.textContent = `×${layer.count}`;
+          nameLabel.appendChild(count);
+        }
         if (layer.volume_ml != null) {
           const vol = document.createElement('span');
           vol.className = 'layer-volume';
@@ -2039,6 +2097,7 @@
         });
       };
       const setOpen = (open) => {
+        if (open) refreshSwatches();
         layersPanel.hidden = !open;
         layersBtn.setAttribute('aria-expanded', String(open));
         layersBtn.classList.toggle('is-active', open);

@@ -93,6 +93,13 @@
             <p class="model-edit-preview-hint">Live preview — drag to rotate. Unsaved until you update.</p>
           </div>
           <div class="model-edit-material-controls">
+            {% if model_has_layers(model) %}
+            {# A whole-model colour would flatten the per-layer colours; the hidden field only keeps the form valid (color_changed stays 0). #}
+            <div class="model-edit-field-grid">
+              <input type="hidden" name="color" value="{{ model.appearance_color or '#cccccc' }}">
+              <p>Colours are set per layer. Use the Layers card below.</p>
+            </div>
+            {% else %}
             <div class="model-edit-field-grid">
               <div class="color-hex-row">
                 <input type="color" id="appearanceColor" name="color" value="{{ model.appearance_color or '#cccccc' }}" class="color-swatch-input" aria-label="Pick model color">
@@ -116,6 +123,7 @@
               </div>
               <p>Use the swatch, type a hex code, or pick a preset — they stay in sync.</p>
             </div>
+            {% endif %}
             <div class="model-edit-field-grid">
               <label class="field-label model-edit-slider-label" for="appearanceRoughness">Roughness <span id="roughness-val">{{ '%.2f'|format(model.appearance_roughness if model.appearance_roughness is not none else 0.35) }}</span></label>
               <input type="range" id="appearanceRoughness" name="roughness" min="0" max="1" step="0.05" value="{{ model.appearance_roughness if model.appearance_roughness is not none else 0.35 }}" class="w-full" oninput="document.getElementById('roughness-val').textContent=this.value">
@@ -147,6 +155,48 @@
           <h2>Material &amp; appearance</h2>
           <p>Available once the model finishes processing{{ ' — this conversion failed, upload a replacement below.' if model_status == 'failed' else '.' }}</p>
         </div>
+      </div>
+      {% endif %}
+
+      {% if model_status == 'ready' and model_has_layers(model) %}
+      <form method="POST" action="{{ url_for('layer_editor.update_layers', model_id=model.id) }}" class="surface model-edit-card" id="layersSection">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="model-edit-card-head">
+          <h2>Layers</h2>
+          <p>Rename and recolour the parts listed in the viewer's Layers panel. The viewer link and QR stay the same.</p>
+        </div>
+        <div class="model-edit-field-grid">
+          {% for layer in model_layers(model) %}
+          <div class="color-hex-row">
+            {% if layer.color %}
+            <input type="color" name="layer_color_{{ loop.index0 }}" value="{{ layer.color }}" class="color-swatch-input" aria-label="Color of {{ layer.name }}">
+            {% else %}
+            <span class="color-swatch-input" title="Textured layers keep their texture" aria-hidden="true"></span>
+            {% endif %}
+            <input type="text" name="layer_name_{{ loop.index0 }}" value="{{ layer.name }}" class="field-input min-w-0" maxlength="80" required aria-label="Name of layer {{ loop.index }}">
+            {% if layer.count and layer.count > 1 %}<span class="text-xs text-[#64748b]">&times;{{ layer.count }}</span>{% endif %}
+          </div>
+          {% endfor %}
+          <p>Names can be up to 80 characters and must be unique.</p>
+        </div>
+        <div class="model-edit-actions">
+          <button type="submit" class="detail-action detail-action-primary">Save Layers</button>
+        </div>
+      </form>
+      {% endif %}
+
+      {% set processing_notes = model_processing_notes(model) %}
+      {% if processing_notes %}
+      <div class="surface model-edit-card" id="processingNotes">
+        <div class="model-edit-card-head">
+          <h2>Processing notes</h2>
+          <p>What the converter did with this file.</p>
+        </div>
+        <ul class="space-y-2">
+          {% for note in processing_notes %}
+          <li class="text-sm text-[#64748b]">{{ note }}</li>
+          {% endfor %}
+        </ul>
       </div>
       {% endif %}
 

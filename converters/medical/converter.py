@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 
 from ..base_converter import BaseConverter
-from .common import MEDICAL_PRESETS, convert_timeout
+from .common import MedicalError, convert_timeout, parse_presets
 
 logger = logging.getLogger(__name__)
 
@@ -50,9 +50,12 @@ class MedicalConverter(BaseConverter):
         if self.kind not in ("dicom", "segmentation"):
             self.handle_error("Unsupported medical upload type.")
             return False
-        if self.kind == "dicom" and self.preset and self.preset not in MEDICAL_PRESETS:
-            self.handle_error("Unknown preset.")
-            return False
+        if self.kind == "dicom":
+            try:
+                parse_presets(self.preset)  # comma-separated list, e.g. "bone,skin"
+            except MedicalError as exc:
+                self.handle_error(str(exc))
+                return False
         if not os.path.isfile(input_path):
             self.handle_error("File not found.")
             return False

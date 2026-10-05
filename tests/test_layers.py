@@ -219,3 +219,200 @@ def test_read_layers_on_unnormalized_single_mesh_is_empty(tmp_path):
     glb = _make_glb(tmp_path / "a.glb", [("Only", "g", _mat("m"), 0)])
     assert read_layers(str(glb)) == []
     assert read_layers(str(tmp_path / "missing.glb")) == []
+
+
+# --- repeated parts: one layer per part, not per instance --------------------
+
+from converters.layers import MAX_LAYERS, _base_name  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "raw, base",
+    [
+        ("Bolt (2)", "Bolt"),
+        ("Bolt(12)", "Bolt"),
+        ("Bolt:1", "Bolt"),
+        ("Bolt #2", "Bolt"),
+        ("Bolt.001", "Bolt"),
+        ("Bolt_1", "Bolt"),
+        ("Bolt-3", "Bolt"),
+        ("M6 Bolt-10", "M6 Bolt"),
+        # not instance markers: a bare number after a space, versions, digits-only names
+        ("Bolt 2", "Bolt 2"),
+        ("Label 1", "Label 1"),
+        ("Housing", "Housing"),
+        ("1", "1"),
+        ("(2)", "(2)"),
+        ("-1", "-1"),
+        ("_1", "_1"),
+        ("42.001", "42.001"),
+        ("Bolt2", "Bolt2"),
+        ("Gövde_2", "Gövde"),
+    ],
+)
+def test_instance_suffixes_are_stripped_conservatively(raw, base):
+    assert _base_name(raw) == base
+
+
+def _node_materials(path):
+    gltf = GLTF2.load(str(path))
+    return {
+        n.name: {gltf.materials[p.material].name for p in gltf.meshes[n.mesh].primitives}
+        for n in gltf.nodes
+        if n.mesh is not None
+    }
+
+
+def test_repeated_parts_share_one_layer_and_one_material(tmp_path):
+    parts = [("Housing", "gh", _mat("h", (0.9, 0.1, 0.1, 1.0)), 0)]
+    parts += [("Bolt" if i == 0 else f"Bolt ({i + 1})", f"g{i}", _mat("steel", (0.5, 0.5, 0.6, 1.0)), 2 + i * 2) for i in range(20)]
+    glb = _make_glb(tmp_path / "a.glb", parts)
+
+    layers = normalize_layers(str(glb))
+
+    assert [l["name"] for l in layers] == ["Housing", "Bolt"]
+    assert layers[0].get("count") is None
+    assert layers[1]["count"] == 20
+    assert layers[1]["materials"] == ["Bolt"]
+    gltf = GLTF2.load(str(glb))
+    by_node = _node_materials(glb)
+    assert {m for n, ms in by_node.items() if n.startswith("Bolt") for m in ms} == {"Bolt"}
+    assert by_node["Housing"] == {"Housing"}
+    # no leftover materials from the folded-in instances, and names stay unique
+    names = [m.name for m in gltf.materials]
+    assert sorted(names) == ["Bolt", "Housing"]
+
+
+def test_repeats_with_different_original_colours_still_one_material(tmp_path):
+    parts = [
+        ("Plate", "gp", _mat("p"), 0),
+        ("Screw:1", "g1", _mat("red", (1.0, 0.0, 0.0, 1.0)), 2),
+        ("Screw:2", "g2", _mat("blue", (0.0, 0.0, 1.0, 1.0)), 4),
+    ]
+    glb = _make_glb(tmp_path / "a.glb", parts)
+
+    layers = normalize_layers(str(glb))
+
+    assert [(l["name"], l.get("count")) for l in layers] == [("Plate", None), ("Screw", 2)]
+    assert _material_names(glb) == ["Plate", "Screw"]
+    assert layers[1]["color"] == "#ff0000"  # the first instance's colour
+
+
+def test_instances_sharing_one_mesh_keep_sharing_it(tmp_path):
+    glb = _make_glb(
+        tmp_path / "a.glb",
+        [("Plate", "gp", _mat("p"), 0), ("Nut", "g1", _mat("m"), 2), ("Nut (2)", "g2", None, 4)],
+    )
+    gltf = GLTF2.load(str(glb))
+    nuts = [n for n in gltf.nodes if (n.name or "").startswith("Nut")]
+    nuts[1].mesh = nuts[0].mesh
+    gltf.save(str(glb))
+
+    layers = normalize_layers(str(glb))
+
+    after = GLTF2.load(str(glb))
+    assert [(l["name"], l.get("count")) for l in layers] == [("Plate", None), ("Nut", 2)]
+    assert len({n.mesh for n in after.nodes if (n.name or "").startswith("Nut")}) == 1
+    assert sorted(m.name for m in after.materials) == ["Nut", "Plate"]
+
+
+def test_mesh_shared_across_different_layers_is_cloned(tmp_path):
+    glb = _make_glb(tmp_path / "a.glb", [("Cap", "g0", _mat("m"), 0), ("Lid", "g1", _mat("n"), 2)])
+    gltf = GLTF2.load(str(glb))
+    first, second = [n for n in gltf.nodes if n.mesh is not None]
+    second.mesh = first.mesh
+    gltf.save(str(glb))
+
+    layers = normalize_layers(str(glb))
+
+    assert [l["name"] for l in layers] == ["Cap", "Lid"]
+    assert _node_materials(glb) == {"Cap": {"Cap"}, "Lid": {"Lid"}}
+
+
+def test_instance_count_beyond_max_layers_is_still_a_layer_panel(tmp_path):
+    parts = [("Housing", "gh", _mat("h"), 0)]
+    parts += [(f"Bolt:{i}", f"g{i}", _mat("steel"), 2 + i) for i in range(MAX_LAYERS + 36)]
+    glb = _make_glb(tmp_path / "a.glb", parts)
+
+    layers = normalize_layers(str(glb))
+
+    assert [(l["name"], l.get("count")) for l in layers] == [("Housing", None), ("Bolt", MAX_LAYERS + 36)]
+
+
+def test_distinct_parts_with_numeric_names_keep_their_own_layers(tmp_path):
+    glb = _make_glb(tmp_path / "a.glb", [(f"Label {i}", f"g{i}", _mat("m"), i * 2) for i in range(1, 5)])
+
+    layers = normalize_layers(str(glb))
+
+    assert [l["name"] for l in layers] == ["Label 1", "Label 2", "Label 3", "Label 4"]
+    assert all("count" not in l for l in layers)
+
+
+def test_single_part_repeated_keeps_per_instance_layers_when_few(tmp_path):
+    glb = _make_glb(tmp_path / "a.glb", [(f"Rib-{i}", f"g{i}", _mat("m"), i * 2) for i in range(3)])
+
+    layers = normalize_layers(str(glb))
+
+    assert [l["name"] for l in layers] == ["Rib-0", "Rib-1", "Rib-2"]
+
+
+def _nested_glb(path, subassemblies, per_sub, wrap=True):
+    """Scene -> [STEP root] -> Sub A -> parts; parts have unique names."""
+    scene = trimesh.Scene()
+    root = "STEP root"
+    if wrap:
+        scene.graph.update(frame_to=root, frame_from=scene.graph.base_frame)
+    for s in range(subassemblies):
+        sub = f"Sub {chr(65 + s)}"
+        scene.graph.update(frame_to=sub, frame_from=root if wrap else scene.graph.base_frame)
+        for p in range(per_sub):
+            mesh = trimesh.creation.box(extents=(1, 1, 1))
+            mesh.apply_translation((s * 5 + p * 0.1, 0, 0))
+            mesh.visual = trimesh.visual.TextureVisuals(material=_mat("m"))
+            scene.add_geometry(mesh, node_name=f"{sub} part {p}", geom_name=f"{sub}-{p}", parent_node_name=sub)
+    scene.export(str(path))
+    return path
+
+
+def test_too_many_part_names_fall_back_to_sub_assemblies(tmp_path):
+    glb = _nested_glb(tmp_path / "a.glb", subassemblies=3, per_sub=30)  # 90 distinct parts
+
+    layers = normalize_layers(str(glb))
+
+    assert [l["name"] for l in layers] == ["Sub A", "Sub B", "Sub C"]
+    assert all("count" not in l for l in layers)
+    # each sub-assembly's parts share one material named after the layer
+    assert sorted(_material_names(glb)) == ["Sub A", "Sub B", "Sub C"]
+    assert read_layers(str(glb)) == layers
+
+
+def test_still_too_many_after_sub_assemblies_returns_empty_untouched(tmp_path):
+    glb = _nested_glb(tmp_path / "a.glb", subassemblies=MAX_LAYERS + 2, per_sub=2)
+    before = glb.read_bytes()
+
+    assert normalize_layers(str(glb)) == []
+    assert glb.read_bytes() == before
+    assert read_layers(str(glb)) == []
+
+
+def test_read_layers_reports_grouped_layers_after_normalize(tmp_path):
+    parts = [("Housing", "gh", _mat("h"), 0)] + [(f"Bolt ({i})", f"g{i}", _mat("s"), 2 + i * 2) for i in range(1, 6)]
+    glb = _make_glb(tmp_path / "a.glb", parts)
+    layers = normalize_layers(str(glb))
+    after = glb.read_bytes()
+
+    assert layers[1]["count"] == 5
+    assert read_layers(str(glb)) == layers
+    assert glb.read_bytes() == after
+
+
+def test_verified_layer_info_keeps_instance_count(tmp_path):
+    from app import verified_layer_info
+
+    parts = [("Housing", "gh", _mat("h"), 0)] + [(f"Bolt:{i}", f"g{i}", _mat("s"), 2 + i) for i in range(1, 4)]
+    glb = _make_glb(tmp_path / "a.glb", parts)
+    layers = normalize_layers(str(glb))
+
+    info = verified_layer_info(str(glb), layers)
+
+    assert [l.get("count") for l in info["layers"]] == [None, 3]
