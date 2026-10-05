@@ -41,7 +41,9 @@ verification commands and read the output — evidence before claims:
 
 - Web requests must enqueue `ConversionJob` rows only; production conversion work belongs to `worker.py`, not the Flask web process.
 - Upload rate limiting uses `Flask-Limiter`. In Railway/production, point `RATELIMIT_STORAGE_URI` at `REDIS_URL`; local dev and tests can use `memory://`.
-- The model upload surface now accepts GLB, STL, OBJ, and FBX. OBJ/FBX conversion is handled by external converter wrappers.
+- The model upload surface accepts GLB, STL, OBJ, FBX, STEP/STP, and medical inputs. OBJ/FBX conversion is handled by external converter wrappers; STEP/STP by `converters/step_converter.py` (cascadio/OpenCascade, run in a child process); medical inputs by `converters/medical/` (child process): a DICOM series as ZIP thresholded with a preset (`source_format` "dicom") or a segmentation — NIfTI, NRRD/.seg.nrrd, DICOM-SEG, ZIP of masks (`source_format` "segmentation").
+- Medical uploads need `medical_confirm` on top of the compliance checkbox, are capped by `MEDICAL_UPLOAD_MAX_BYTES` (not the plan's model limit), are never archived or mirrored, and the raw scan is deleted after conversion (success or failure). Never log patient identifiers.
+- Viewer layers: the worker calls `converters.layers.normalize_layers()` (one named material per part/structure, 2–64 layers) and stores `Model3D.layer_info`; layered GLBs are optimized with Draco only (`optimize_glb(keep_layers=True)`), because `gltf-transform optimize` merges same-coloured parts.
 - GLB output is optimized via `gltf-transform` (Draco geometry compression + webp textures) in `finalize_converted_glb()`. The optimizer is best-effort: if `gltf-transform` is unavailable the original GLB passes through unchanged.
 - `fbx2gltf` is pinned to 0.9.7-p1 (the project is effectively unmaintained upstream). Do not upgrade without testing.
 - Backups (database dump + stored files zip) are built by the worker (`run_scheduled_backups`): a daily archive plus admin "Create backup now" requests, keeping the newest `BACKUP_RETENTION_COUNT`. The web request only records the request.
@@ -115,7 +117,7 @@ flask db downgrade base
 - **Institutional (B2B) module** (`institutions.py`, `institution_panel.py`): Institution contracts with quotas (model count + storage), invite-link membership (optional edu email-domain restriction, one institution per user), quota-funded "institutional" licensing on member uploads with expiry bound to `contract_ends_at`, an institution-admin panel at `/institution`, a public showcase at `/i/<slug>`, "Supported by" viewer attribution, offline contract payments (`Payment.institution_id`), and worker-driven monthly usage reports + 30-day renewal reminders.
 - **Stable QR resolver** (`/m/<public_id>`): QRLink model maps public_id to model_id. QR codes survive replacements, upgrades, and color changes.
 - **Model versioning**: ModelVersion table tracks replacement history per model. Replace-model flow preserves model ID, QR public ID, and resolver URL.
-- **Converter pipeline**: GLB direct upload + STL/OBJ/FBX to GLB conversion via STLConverter (trimesh) and ExternalConverter (Node CLI wrappers). USDZ companion generated for iOS AR.
+- **Converter pipeline**: GLB direct upload + STL/OBJ/FBX to GLB conversion via STLConverter (trimesh) and ExternalConverter (Node CLI wrappers), STEP/STP via STEPConverter, CT/MR and segmentations via MedicalConverter. USDZ companion generated for iOS AR. Multi-part models get a Layers panel in the viewer.
 - **Background worker** (`worker.py`): polls ConversionJob rows. Production web processes only enqueue work.
 - **Railway deployment**: web + worker in single container via `railway.json`, PostgreSQL, Redis for rate limits, persistent volume for files.
 

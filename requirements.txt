@@ -17,6 +17,13 @@ pyrender==0.1.45
 pygltflib==1.16.2
 scipy==1.13.1
 numpy==1.26.4
+# STEP/STP (CAD) -> GLB via OpenCascade, and medical inputs (DICOM series,
+# NIfTI / NRRD / DICOM-SEG segmentations) -> GLB in converters/medical.
+cascadio==0.1.1
+pydicom==3.0.2
+scikit-image==0.25.2
+nibabel==5.4.2
+pynrrd==1.1.3
 qrcode==7.4.2
 Pillow==11.1.0
 python-slugify==8.0.1

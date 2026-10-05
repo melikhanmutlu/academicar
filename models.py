@@ -234,7 +234,7 @@ class Model3D(db.Model):
     version = db.Column(db.Integer, nullable=False, default=1)
     replacement_status = db.Column(db.String(30), nullable=True)
     replacement_error = db.Column(db.Text, nullable=True)
-    source_format = db.Column(db.String(10), nullable=False, default="stl")
+    source_format = db.Column(db.String(20), nullable=False, default="stl")
     # Declared source unit for unitless formats (mm/cm/m), or "embedded" for
     # FBX/GLB. Stored so the edit page can re-interpret the unit (rescale by ratio).
     source_unit = db.Column(db.String(12), nullable=True)
@@ -254,6 +254,10 @@ class Model3D(db.Model):
     # next successful mirror. NULL means "no known failure" — the async
     # (web-request) mirror path does not set this column (see services/r2_mirror.py).
     r2_mirror_failed_at = db.Column(db.DateTime, nullable=True)
+    # Viewer layers set by the worker: {"layers": [{"name", "materials",
+    # "color", "volume_ml"?}], "notes": [...]} — one named material per part
+    # (STEP assembly part, segmented structure, multi-part mesh). NULL = none.
+    layer_info = db.Column(db.JSON, nullable=True)
     created_at = db.Column(db.DateTime, default=utc_now)
 
     # Uploader. ORM-only relationship (user_id column already exists) — used to
@@ -361,7 +365,7 @@ class ModelVersion(db.Model):
     version_number = db.Column(db.Integer, nullable=False)
     source_path = db.Column(db.String(500), nullable=True)
     glb_path = db.Column(db.String(500), nullable=True)
-    source_format = db.Column(db.String(10), nullable=True)
+    source_format = db.Column(db.String(20), nullable=True)
     file_size = db.Column(db.Integer, nullable=True)
     material_color = db.Column(db.String(20), nullable=True)
     storage_provider = db.Column(db.String(40), nullable=False, default="railway_volume")

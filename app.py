@@ -46,6 +46,7 @@ from converters.glb_quality import (
 from converters.glb_optimize import normalize_specular_glossiness, optimize_glb
 from converters.glb_scale import clamp_oversized_glb
 from converters.poster import generate_poster
+from converters.layers import normalize_layers, read_layers
 from converters.stl_converter import convert_glb_to_usdz, enrich_glb_for_ar
 from licensing import (
     PLAN_FEATURES,
@@ -400,6 +401,18 @@ PROJECT_WORKFLOW_STAGES = ("in_progress", "ready_for_review", "published", "arch
 PROJECT_VISIBILITIES = ("private", "unlisted", "public")
 
 SUPPORTED_MODEL_EXTENSIONS = {"stl", "glb", "obj", "fbx"}
+# CAD (STEP) and medical inputs. STEP is normalised to source_format "step";
+# medical uploads become "dicom" (a CT/MR series in a ZIP, thresholded with a
+# preset) or "segmentation" (NIfTI / NRRD / DICOM-SEG / ZIP of masks), decided
+# from the file itself by converters.medical.detect_medical_format.
+STEP_MODEL_EXTENSIONS = {"step", "stp"}
+MEDICAL_MODEL_EXTENSIONS = {"zip", "nii", "nii.gz", "nrrd", "dcm"}
+MEDICAL_SOURCE_FORMATS = {"dicom", "segmentation"}
+# Formats whose units are carried by the file itself (no unit picker).
+EMBEDDED_UNIT_FORMATS = {"glb", "fbx", "step", "dicom", "segmentation"}
+# Raw medical uploads can be far larger than meshes; they are capped
+# separately and only the resulting GLB counts toward the plan's storage.
+MEDICAL_UPLOAD_MAX_BYTES = int(os.environ.get("MEDICAL_UPLOAD_MAX_BYTES", 500 * 1024 * 1024))
 SUPPORTED_DOCUMENT_EXTENSIONS = {"pdf", "ppt", "pptx"}
 COMPANION_FILE_EXTENSIONS = {".mtl", ".png", ".jpg", ".jpeg", ".webp"}
 # Blog post inline images (admin upload). SVG is excluded on purpose (it can
@@ -433,8 +446,37 @@ NAMED_COLORS = {
 }
 
 
+def model_upload_extension(filename: str) -> str:
+    """Lower-case extension of an uploaded model file; ".nii.gz" stays whole."""
+    name = (filename or "").lower()
+    if name.endswith(".nii.gz"):
+        return "nii.gz"
+    return name.rsplit(".", 1)[1] if "." in name else ""
+
+
 def allowed_model(filename: str) -> bool:
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in SUPPORTED_MODEL_EXTENSIONS
+    ext = model_upload_extension(filename)
+    return ext in SUPPORTED_MODEL_EXTENSIONS or ext in STEP_MODEL_EXTENSIONS or ext in MEDICAL_MODEL_EXTENSIONS
+
+
+def resolve_source_format(path: str, original_name: str) -> tuple[str | None, str | None]:
+    """(source_format, error) for a saved upload. Medical files are inspected
+    (headers / ZIP listing only, no pixel data) to tell a scan from a
+    segmentation."""
+    ext = model_upload_extension(original_name)
+    if ext in SUPPORTED_MODEL_EXTENSIONS:
+        return ext, None
+    if ext in STEP_MODEL_EXTENSIONS:
+        return "step", None
+    if ext in MEDICAL_MODEL_EXTENSIONS:
+        from converters.medical import detect_medical_format
+
+        kind, error = detect_medical_format(path, original_name)
+        if error:
+            return None, error
+        if kind in MEDICAL_SOURCE_FORMATS:
+            return kind, None
+    return None, "Unsupported file type."
 
 
 def allowed_pdf(filename: str) -> bool:
@@ -1139,6 +1181,8 @@ def ensure_sqlite_schema(app: Flask) -> None:
             connection.execute(text("ALTER TABLE models ADD COLUMN dimensions_cm VARCHAR(50)"))
         if model_columns and "uploaded_by_user_id" not in model_columns:
             connection.execute(text("ALTER TABLE models ADD COLUMN uploaded_by_user_id INTEGER"))
+        if model_columns and "layer_info" not in model_columns:
+            connection.execute(text("ALTER TABLE models ADD COLUMN layer_info JSON"))
         payment_columns = {row[1] for row in connection.execute(text("PRAGMA table_info(payments)")).fetchall()}
         if payment_columns and "model_id" not in payment_columns:
             connection.execute(text("ALTER TABLE payments ADD COLUMN model_id VARCHAR(36)"))
@@ -1287,6 +1331,56 @@ def validate_stl_file(file_path: str) -> list[str]:
     if not is_ascii_stl and not is_binary_stl:
         return ["STL header could not be recognized or the file is corrupted."]
     return []
+
+
+ALLOWED_MODEL_FILES_MESSAGE = (
+    "Accepted files: GLB, STL, OBJ, FBX, STEP/STP, or a medical scan "
+    "(DICOM series as ZIP, NIfTI, NRRD, DICOM-SEG)."
+)
+
+
+def validate_step_file(file_path: str) -> list[str]:
+    """Cheap STEP check for the upload request: the ISO-10303-21 header."""
+    try:
+        with open(file_path, "rb") as handle:
+            head = handle.read(2048)
+    except OSError:
+        return ["File could not be read."]
+    head = head.lstrip(b"\xef\xbb\xbf").lstrip()
+    if not head.startswith(b"ISO-10303-21"):
+        return ["missing the ISO-10303-21 header (export the model as STEP AP203/AP214/AP242)"]
+    return []
+
+
+def medical_upload_error(medical_confirm: str | None) -> str | None:
+    """Medical scans need their own confirmation on top of the general one."""
+    if medical_confirm != "yes":
+        return (
+            "For medical scans, confirm that patient-identifying information has been removed "
+            "and that the result is for education and presentation, not diagnosis."
+        )
+    return None
+
+
+def inspect_medical_upload(path: str, original_name: str, file_size: int, preset: str | None) -> tuple[str | None, str | None, str | None]:
+    """(source_format, preset, error) for a saved medical upload."""
+    if MEDICAL_UPLOAD_MAX_BYTES and file_size > MEDICAL_UPLOAD_MAX_BYTES:
+        limit_mb = MEDICAL_UPLOAD_MAX_BYTES // (1024 * 1024)
+        return None, None, (
+            f"This scan is {file_size // (1024 * 1024)} MB; the limit is {limit_mb} MB. "
+            "Upload a thicker-slice series or crop it to the region you need."
+        )
+    source_format, error = resolve_source_format(path, original_name)
+    if error:
+        return None, None, error
+    if source_format != "dicom":
+        return source_format, None, None
+    from converters.medical import MEDICAL_PRESETS
+
+    preset = (preset or "bone").strip().lower()
+    if preset not in MEDICAL_PRESETS:
+        return None, None, "Choose what to extract from the scan (bone, skin, contrast or automatic)."
+    return source_format, preset, None
 
 
 def validate_glb_file(file_path: str) -> list[str]:
@@ -2475,10 +2569,21 @@ FAQ_ITEMS = (
     },
     {
         "q": "Which 3D file formats can I upload?",
-        "a": "You can upload GLB, STL, OBJ, and FBX files. We automatically "
-             "convert and optimize them to web-friendly GLB (Draco-compressed "
-             "geometry and compressed textures) and generate an iOS-ready USDZ "
-             "for AR.",
+        "a": "You can upload GLB, STL, OBJ, FBX and STEP/STP (CAD) files. We "
+             "automatically convert and optimize them to web-friendly GLB "
+             "(Draco-compressed geometry) and generate an iOS-ready USDZ for AR. "
+             "The parts of a STEP assembly stay separate, so viewers can show or "
+             "hide them in the Layers panel.",
+    },
+    {
+        "q": "Can I upload CT or MR scans?",
+        "a": "Yes. Upload a DICOM series as a ZIP and pick what to extract (bone, "
+             "skin, contrast-filled vessels, or an automatic threshold), or upload "
+             "a segmentation you made in 3D Slicer, ITK-SNAP or TotalSegmentator "
+             "(NIfTI, NRRD, DICOM-SEG, or a ZIP of masks): each structure becomes "
+             "its own layer with its volume. Remove patient-identifying information "
+             "first; the raw scan is deleted after processing. The result is for "
+             "education and presentation, not diagnosis.",
     },
     {
         "q": "Do my readers need to install an app to view the model?",
@@ -2675,7 +2780,7 @@ def mark_model_failed(
         db.session.rollback()
 
 
-def _get_converter_for_format(source_format: str):
+def _get_converter_for_format(source_format: str, medical_preset: str | None = None):
     """Return a fresh converter instance for the given source format, or None."""
     fmt = (source_format or "").lower()
     if fmt == "stl":
@@ -2684,7 +2789,47 @@ def _get_converter_for_format(source_format: str):
         return OBJConverter()
     if fmt == "fbx":
         return FBXConverter()
+    if fmt == "step":
+        from converters.step_converter import STEPConverter
+
+        return STEPConverter()
+    if fmt in MEDICAL_SOURCE_FORMATS:
+        from converters.medical import MedicalConverter
+
+        return MedicalConverter(fmt, preset=medical_preset)
     return None
+
+
+def merge_converter_layer_details(layers: list[dict], converter) -> list[dict]:
+    """Add what the converter knows about each layer (e.g. a segmented
+    structure's volume and colour) to the layers found in the GLB."""
+    details = {item.get("name"): item for item in (getattr(converter, "layers", None) or [])}
+    for layer in layers:
+        extra = details.get(layer.get("name")) or {}
+        if extra.get("volume_ml") is not None:
+            layer["volume_ml"] = round(float(extra["volume_ml"]), 1)
+        if extra.get("color") and not layer.get("color"):
+            layer["color"] = extra["color"]
+    return layers
+
+
+def verified_layer_info(glb_path: str, layers: list[dict], notes: list[str] | None = None) -> dict | None:
+    """Layer info stored on the model, or None. Re-read after optimization:
+    the panel toggles materials by name, so every layer's materials must
+    still be there."""
+    notes = [note for note in (notes or []) if note]
+    if not layers:
+        return {"layers": [], "notes": notes} if notes else None
+    try:
+        present = {name for item in read_layers(glb_path) for name in item.get("materials", [])}
+    except Exception:
+        logger.exception("Could not re-read layers from %s", glb_path)
+        present = set()
+    if any(name not in present for layer in layers for name in layer.get("materials", [])):
+        logger.warning("Layer materials did not survive optimization for %s; hiding the layer panel", glb_path)
+        return {"layers": [], "notes": notes} if notes else None
+    keep = ("name", "materials", "color", "volume_ml")
+    return {"layers": [{key: layer[key] for key in keep if layer.get(key) is not None} for layer in layers], "notes": notes}
 
 
 def _run_converter(converter, source_path: str, glb_path: str, *, color: str | None, source_unit: str) -> bool:
@@ -2695,8 +2840,11 @@ def _run_converter(converter, source_path: str, glb_path: str, *, color: str | N
         return converter.convert(source_path, glb_path, color=color)
 
 
-def finalize_converted_glb(glb_path: str, *, source_dir: str) -> None:
-    """Pack texture references, ensure baseline PBR materials, optimize, and validate GLB output."""
+def finalize_converted_glb(glb_path: str, *, source_dir: str, keep_layers: bool = False) -> None:
+    """Pack texture references, ensure baseline PBR materials, optimize, and validate GLB output.
+
+    keep_layers: the model has viewer layers (one named material per part), so
+    the optimizer must not merge parts or materials."""
     embed_external_textures(glb_path, search_dirs=[source_dir, os.path.dirname(glb_path)])
     # Normalize any KHR_materials_pbrSpecularGlossiness materials (FBX-derived or
     # legacy GLB uploads) to core metallic-roughness so model-viewer renders
@@ -2727,7 +2875,7 @@ def finalize_converted_glb(glb_path: str, *, source_dir: str) -> None:
     # optimize_glb because Draco-compressed geometry can't be measured. Legitimate
     # large models (under AR_MAX_PLAUSIBLE_EXTENT_M) are left untouched.
     clamp_oversized_glb(glb_path)
-    optimize_glb(glb_path)
+    optimize_glb(glb_path, keep_layers=keep_layers)
     validate_glb_quality(glb_path)
 
 
@@ -2746,6 +2894,7 @@ def process_model_upload_job(
     is_replacement: bool = False,
     job_id: int | None = None,
     version_id: int | None = None,
+    medical_preset: str | None = None,
 ) -> None:
     """Convert/copy the uploaded model and update Model3D / ConversionJob /
     ModelVersion rows. Runs synchronously in tests, or in the isolated worker
@@ -2848,7 +2997,7 @@ def process_model_upload_job(
                     cleanup_dir(upload_dir)
                     return
             else:
-                converter = _get_converter_for_format(source_format)
+                converter = _get_converter_for_format(source_format, medical_preset)
                 if converter is None:
                     mark_model_failed(
                         model_id,
@@ -2881,8 +3030,18 @@ def process_model_upload_job(
             # "Not measured". Captured here and cached on the model row below.
             measured_dimensions_cm = compute_glb_dimensions_cm(target_glb)
 
+            # Viewer layers: one named material per part / structure, so the
+            # viewer can show and hide them. Best-effort; a model without
+            # layers simply has no layer panel.
+            layers = []
             try:
-                finalize_converted_glb(target_glb, source_dir=os.path.dirname(source_path))
+                layers = normalize_layers(target_glb)
+            except Exception:
+                logger.exception("normalize_layers failed for model %s; continuing without layers", model_id)
+            layers = merge_converter_layer_details(layers, converter)
+
+            try:
+                finalize_converted_glb(target_glb, source_dir=os.path.dirname(source_path), keep_layers=bool(layers))
             except GLBQualityError as e:
                 cleanup_file(target_glb)
                 mark_model_failed(
@@ -2929,6 +3088,7 @@ def process_model_upload_job(
                 model.poster_path = poster_png
             model.processing_status = "ready"
             model.processing_error = None
+            model.layer_info = verified_layer_info(glb_path, layers, getattr(converter, "notes", None))
             if color:
                 model.appearance_color = color
             if is_replacement:
@@ -2946,6 +3106,12 @@ def process_model_upload_job(
                 version.file_size = model.file_size
                 version.material_color = color
                 version.error = None
+            if source_format in MEDICAL_SOURCE_FORMATS:
+                # The raw scan may carry patient data: keep only the GLB.
+                model.original_source_path = None
+                model.current_source_path = None
+                if version is not None:
+                    version.source_path = None
 
             db.session.add(
                 AuditLog(
@@ -2956,6 +3122,8 @@ def process_model_upload_job(
                 )
             )
             db.session.commit()
+            if source_format in MEDICAL_SOURCE_FORMATS:
+                cleanup_dir(upload_dir)
             track_event(
                 "model_conversion_completed",
                 owner_user_id=model.user_id,
@@ -3137,6 +3305,10 @@ def reclaim_stuck_conversion_jobs(app: Flask) -> int:
                 is_replacement=is_replacement,
                 job=job,
             )
+            # A raw medical scan must not outlive its failed job.
+            payload = job.payload or {}
+            if payload.get("source_format") in MEDICAL_SOURCE_FORMATS and payload.get("upload_dir"):
+                cleanup_dir(payload["upload_dir"])
         else:
             app.logger.warning(
                 "Reaping stuck conversion job %s (model=%s, attempts=%s): re-queuing for another attempt.",
@@ -3219,6 +3391,8 @@ def _create_model_for_paper(
     color: str | None,
     source_unit: str | None,
     compliance_confirm: str | None,
+    medical_preset: str | None = None,
+    medical_confirm: str | None = None,
 ) -> tuple[bool, str]:
     """Shared model upload pipeline used by paper_new (first-model) and the
     /papers/<slug>/upload-model endpoint.
@@ -3230,7 +3404,7 @@ def _create_model_for_paper(
     from flask import current_app
 
     if not allowed_model(file.filename):
-        return False, "Only .stl, .glb, .obj, or .fbx files are accepted."
+        return False, ALLOWED_MODEL_FILES_MESSAGE
     if compliance_confirm != "yes":
         return False, (
             "You must confirm that the model is anonymized and that you have "
@@ -3251,11 +3425,19 @@ def _create_model_for_paper(
 
     unique_id = str(uuid.uuid4())
     original_name = secure_filename(file.filename)
-    source_format = original_name.rsplit(".", 1)[1].lower()
+    upload_ext = model_upload_extension(original_name)
+    is_medical_upload = upload_ext in MEDICAL_MODEL_EXTENSIONS
+    # Provisional until the saved file is inspected (medical uploads).
+    source_format = "step" if upload_ext in STEP_MODEL_EXTENSIONS else upload_ext
+    if is_medical_upload:
+        error = medical_upload_error(medical_confirm)
+        if error:
+            return False, error
 
     # Source unit. STL/OBJ are unitless, so the user must explicitly declare
-    # mm/cm/m (no magnitude guessing). FBX/GLB already carry real units, so they
-    # are kept as authored ("embedded"). Validated before any files are written.
+    # mm/cm/m (no magnitude guessing). FBX/GLB/STEP and medical scans already
+    # carry real units, so they are kept as authored ("embedded"). Validated
+    # before any files are written.
     if source_format in {"stl", "obj"}:
         if raw_source_unit not in {"mm", "cm", "m"}:
             return False, "Please choose the source unit (mm, cm, or m) for STL/OBJ files."
@@ -3288,6 +3470,16 @@ def _create_model_for_paper(
 
     file_size = os.path.getsize(source_path)
 
+    if is_medical_upload:
+        source_format, preset, error = inspect_medical_upload(source_path, original_name, file_size, medical_preset)
+        if error:
+            cleanup_dir(upload_dir)
+            cleanup_dir(converted_dir)
+            return False, error
+        medical_preset = preset
+    else:
+        medical_preset = None
+
     # Institutional grant: a member's upload is covered by their institution's
     # contract while it is active, current, and within quota. Decided here
     # (file_size is known) so the per-file limit check below already enforces
@@ -3312,7 +3504,9 @@ def _create_model_for_paper(
             "per project. Upgrade the existing model to add more, or start a new project."
         )
 
-    size_error = model_file_limit_error(file_size, license_normalized)
+    # A raw scan is not what gets stored (only the resulting GLB), so it is
+    # capped by MEDICAL_UPLOAD_MAX_BYTES above instead of the plan's model limit.
+    size_error = None if is_medical_upload else model_file_limit_error(file_size, license_normalized)
     if size_error:
         cleanup_dir(upload_dir)
         cleanup_dir(converted_dir)
@@ -3323,6 +3517,8 @@ def _create_model_for_paper(
         preflight_errors = validate_glb_file(source_path)
     elif source_format == "stl":
         preflight_errors = validate_stl_file(source_path)
+    elif source_format == "step":
+        preflight_errors = validate_step_file(source_path)
     else:
         preflight_errors = []
     if preflight_errors:
@@ -3331,11 +3527,15 @@ def _create_model_for_paper(
         return False, f"Invalid {source_format.upper()} file: " + "; ".join(preflight_errors)
 
     # Archive the originals into a versioned directory so conversions can be
-    # rerun and replacements can be audited later.
+    # rerun and replacements can be audited later. Raw medical scans are never
+    # archived: they may carry patient data and are deleted once converted.
     archive_root = os.path.join(current_app.config["UPLOAD_FOLDER"], unique_id, "v1")
-    os.makedirs(archive_root, exist_ok=True)
-    archived_source = os.path.join(archive_root, original_name)
-    shutil.copy2(source_path, archived_source)
+    if is_medical_upload:
+        archived_source = source_path
+    else:
+        os.makedirs(archive_root, exist_ok=True)
+        archived_source = os.path.join(archive_root, original_name)
+        shutil.copy2(source_path, archived_source)
     if source_format == "obj":
         for entry in os.listdir(upload_dir):
             full = os.path.join(upload_dir, entry)
@@ -3414,6 +3614,8 @@ def _create_model_for_paper(
         "source_unit": source_unit_norm,
         "version_id": version_row.id,
     }
+    if medical_preset:
+        job_kwargs["medical_preset"] = medical_preset
     enqueue_conversion_job(current_app, model=model, job_kwargs=job_kwargs, job_type="model_upload")
     audit_details = {}
     if funding_institution is not None:
@@ -8565,6 +8767,8 @@ def register_routes(app: Flask) -> None:
                     color=request.form.get("color") if request.form.get("color_enabled") == "yes" else None,
                     source_unit=request.form.get("source_unit"),
                     compliance_confirm=request.form.get("compliance_confirm"),
+                    medical_preset=request.form.get("medical_preset"),
+                    medical_confirm=request.form.get("medical_confirm"),
                 )
                 if ok:
                     flash(message, "success")
@@ -8964,6 +9168,8 @@ def register_routes(app: Flask) -> None:
             color=request.form.get("color") if request.form.get("color_enabled") == "yes" else None,
             source_unit=request.form.get("source_unit"),
             compliance_confirm=request.form.get("compliance_confirm"),
+            medical_preset=request.form.get("medical_preset"),
+            medical_confirm=request.form.get("medical_confirm"),
         )
         flash(message, "success" if ok else "danger")
         return redirect(url_for("project_detail", slug=slug))
@@ -8990,8 +9196,14 @@ def register_routes(app: Flask) -> None:
             flash("No replacement file selected.", "danger")
             return redirect(url_for("project_detail", slug=model.paper.slug))
         if not allowed_model(file.filename):
-            flash("Replacement must be a .stl, .glb, .obj, or .fbx file.", "danger")
+            flash(ALLOWED_MODEL_FILES_MESSAGE, "danger")
             return redirect(url_for("project_detail", slug=model.paper.slug))
+        is_medical_upload = model_upload_extension(file.filename) in MEDICAL_MODEL_EXTENSIONS
+        if is_medical_upload:
+            error = medical_upload_error(request.form.get("medical_confirm"))
+            if error:
+                flash(error, "danger")
+                return redirect(url_for("model_edit", model_id=model.id))
         if request.form.get("compliance_confirm") != "yes":
             flash(
                 "You must reconfirm anonymization, rights, and ethics responsibility before replacing the model.",
@@ -9000,7 +9212,8 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("project_detail", slug=model.paper.slug))
 
         original_name = secure_filename(file.filename)
-        source_format = original_name.rsplit(".", 1)[1].lower()
+        upload_ext = model_upload_extension(original_name)
+        source_format = "step" if upload_ext in STEP_MODEL_EXTENSIONS else upload_ext
         next_version = (model.version or 1) + 1
 
         # Stage upload in a temporary scratch dir so the previous source files
@@ -9029,7 +9242,17 @@ def register_routes(app: Flask) -> None:
                 flash(str(e), "danger")
                 return redirect(url_for("project_detail", slug=model.paper.slug))
 
-        size_error = model_file_limit_error(os.path.getsize(source_path), model.license_type)
+        medical_preset = None
+        if is_medical_upload:
+            source_format, medical_preset, error = inspect_medical_upload(
+                source_path, original_name, os.path.getsize(source_path), request.form.get("medical_preset")
+            )
+            size_error = error
+        else:
+            step_errors = validate_step_file(source_path) if source_format == "step" else []
+            size_error = ("Invalid STEP file: " + "; ".join(step_errors)) if step_errors else (
+                model_file_limit_error(os.path.getsize(source_path), model.license_type)
+            )
         if size_error:
             cleanup_dir(upload_dir)
             flash(size_error, "danger")
@@ -9051,8 +9274,12 @@ def register_routes(app: Flask) -> None:
                 return redirect(url_for("model_edit", model_id=model.id))
 
         # Archive the new source under uploads/<model_id>/v<n>/ so we have a
-        # tamper-evident trail of every replacement attempt.
-        archived_source = archive_source_file(model, source_path, next_version, app)
+        # tamper-evident trail of every replacement attempt. Raw medical scans
+        # are not archived (or mirrored offsite): they are deleted once converted.
+        if is_medical_upload:
+            archived_source = source_path
+        else:
+            archived_source = archive_source_file(model, source_path, next_version, app)
 
         version_row = ModelVersion(
             model_id=model.id,
@@ -9075,6 +9302,8 @@ def register_routes(app: Flask) -> None:
         model.original_source_path = archived_source
         model.current_source_path = archived_source
         model.source_format = source_format
+        if source_format in EMBEDDED_UNIT_FORMATS:
+            model.source_unit = "embedded"
         model.version = next_version
         model.replaced_at = datetime.now(UTC)
         model.replacement_status = "replacement_processing"
@@ -9096,6 +9325,8 @@ def register_routes(app: Flask) -> None:
             "is_replacement": True,
             "version_id": version_row.id,
         }
+        if medical_preset:
+            job_kwargs["medical_preset"] = medical_preset
         enqueue_conversion_job(app, model=model, job_kwargs=job_kwargs, job_type="model_replace")
 
         # Reload after job (synchronous in TESTING) to surface its outcome.

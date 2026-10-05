@@ -1,6 +1,18 @@
 # STEP / STP ve DICOM entegrasyon planı
 
-Branch: `v38`. Durum: plan, kod yok. Başlamadan önce en alttaki "Karar bekleyen sorular" yanıtlanmalı.
+Branch: `v38`. Durum: **uygulandı** (aşağıdaki "Uygulama durumu"). Plan metni karar kaydı olarak duruyor.
+
+## Uygulama durumu
+
+Alınan kararlar: STEP parçaları tek modelde ayrı katman; ham DICOM/segmentasyon işlemden sonra silinir; tüm planlara açık; ham tarama sınırı `MEDICAL_UPLOAD_MAX_BYTES` (500 MB), plan model sınırı yalnızca çıkan GLB için geçerli.
+
+- **STEP/STP:** `converters/step_converter.py` (+ `step_cli.py`, alt süreç). Tolerans 0,05 mm / 0,2 rad (`STEP_TOL_LINEAR`, `STEP_TOL_ANGULAR`), üçgen tavanı `STEP_MAX_TRIANGLES` (3M). Z-up → Y-up kök düğümle. STEP renkleri korunur; renksizse kullanıcı rengi.
+- **Katmanlar:** `converters/layers.py` (`normalize_layers`, 2–64 katman, parça başına adlı malzeme). Katmanlı modeller yalnızca Draco ile sıkıştırılır (`optimize_glb(keep_layers=True)`): `gltf-transform optimize` aynı renkli parçaları birleştiriyordu. Bilgi `Model3D.layer_info` (migrasyon `b5c6d7e8f9a0`). Viewer'da "Layers" paneli: göster/gizle, tek katman, saydamlık, hacim (mL).
+- **DICOM:** `converters/medical/` (alt süreç). Hazır ayarlar: kemik ≥250 HU, deri ≥−300 HU, kontrast ≥150 HU (kemik dahil), otomatik (Otsu; MR'da HU ayarları otomatiğe düşer). Sınırlar: `MEDICAL_CONVERT_TIMEOUT` 900 sn, `MEDICAL_MAX_VOXELS` 40M, `MEDICAL_MAX_FACES` 1,5M, `MEDICAL_MAX_UNZIPPED_BYTES` 2 GiB, `MEDICAL_MAX_FILES` 5000.
+- **Segmentasyon:** NIfTI, NRRD / Slicer .seg.nrrd (ad + renk), DICOM-SEG (ad + renk), ZIP içinde maske dosyaları (TotalSegmentator; dosya adı = yapı adı). Her etiket bir katman, hacmi mL.
+- **Gizlilik:** ek `medical_confirm` onayı; ham veri arşivlenmez, R2'ye aynalanmaz, dönüşüm sonrası (başarılı/başarısız, takılan iş dahil) silinir; hasta bilgisi log/GLB'ye yazılmaz (testle doğrulandı). Viewer'da "tanı amaçlı değildir" notu.
+
+Bilinen sınırlar: sıkıştırılmış (JPEG/JPEG2000) ve çok kareli (enhanced) DICOM, gantry tilt, 4D NIfTI desteklenmez (anlaşılır hata). Gizlenen katmanlar ölçüm/etiket tıklamasında hâlâ "yakalanabilir" (model-viewer raycast görünürlüğü dikkate almıyor). Katman kontrolleri yalnızca web viewer'da; AR modeli olduğu gibi gösterir.
 
 ## 0. Ortak ilkeler (CLAUDE.md'den)
 

@@ -122,7 +122,10 @@ class Config:
     R2_BUCKET_NAME = os.environ.get("R2_BUCKET_NAME", "academicar-backup")
 
     # Upload limits.
-    MAX_CONTENT_LENGTH = int(os.environ.get("MAX_CONTENT_LENGTH", 260 * 1024 * 1024))
+    # Room for a raw medical scan (MEDICAL_UPLOAD_MAX_BYTES, 500 MB by default);
+    # meshes stay capped at MAX_MODEL_FILE_BYTES (260 MB) in converters and by
+    # each plan's per-model limit.
+    MAX_CONTENT_LENGTH = int(os.environ.get("MAX_CONTENT_LENGTH", 520 * 1024 * 1024))
     ALLOWED_STL_EXTENSIONS = {"stl"}
     ALLOWED_PDF_EXTENSIONS = {"pdf"}
     UPLOAD_RATE_LIMIT_COUNT = int(os.environ.get("UPLOAD_RATE_LIMIT_COUNT", 5))

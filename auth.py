@@ -220,7 +220,7 @@ def send_verification_email(user, *, welcome: bool = False) -> bool:
             f"{verify_url}\n\n"
             "Then publish your first interactive 3D/AR model in a few minutes:\n\n"
             "  1. Create a project.\n"
-            "  2. Upload a GLB, STL, OBJ or FBX model.\n"
+            "  2. Upload a GLB, STL, OBJ, FBX or STEP model, or a CT/MR scan.\n"
             "  3. Share the generated link and QR code on your paper, "
             "poster or slides.\n\n"
             f"Start here: {public_url('dashboard')}\n\n"

@@ -1,0 +1,43 @@
+{# Extra fields for medical uploads (DICOM series as ZIP, NIfTI, NRRD, DICOM-SEG).
+   Hidden until such a file is picked in the surrounding form's file input
+   (data-dropzone-input or [name=file] / [name=model_file]). #}
+<div class="rounded-xl border border-[#e2e8f0] bg-white p-4 text-sm text-[#475569]" data-medical-options hidden>
+  <p class="font-semibold text-[#111827]">Medical scan</p>
+  <div class="mt-3" data-medical-preset-row>
+    <label class="field-label" for="medical_preset_{{ medical_options_id|default('upload') }}">What to extract <span class="text-[#ff682c]">*</span></label>
+    <select name="medical_preset" id="medical_preset_{{ medical_options_id|default('upload') }}" class="field-input">
+      <option value="bone">Bone (CT)</option>
+      <option value="skin">Skin / body surface (CT)</option>
+      <option value="contrast">Contrast-filled vessels, with bone (CT)</option>
+      <option value="auto">Automatic threshold (MR or other scans)</option>
+    </select>
+    <p class="text-xs text-[#5c6473] mt-1">Used for a DICOM series (ZIP). A segmentation (NIfTI, NRRD, DICOM-SEG, or a ZIP of masks) keeps its own structures, one layer each.</p>
+  </div>
+  <label class="flex items-start gap-3 mt-3">
+    <input type="checkbox" name="medical_confirm" value="yes" class="mt-1" data-medical-confirm>
+    <span>I removed patient-identifying information from this scan and understand the 3D result is for education and presentation, not diagnosis. The raw scan is deleted after processing.</span>
+  </label>
+</div>
+<script>
+  (() => {
+    const box = document.currentScript.previousElementSibling;
+    const form = box.closest('form');
+    const input = form && form.querySelector('[data-dropzone-input], input[type="file"][name="file"], input[type="file"][name="model_file"]');
+    if (!input) return;
+    const confirm = box.querySelector('[data-medical-confirm]');
+    const presetRow = box.querySelector('[data-medical-preset-row]');
+    const sync = () => {
+      const name = (input.files && input.files[0] ? input.files[0].name : '').toLowerCase();
+      const ext = name.endsWith('.nii.gz') ? 'nii.gz' : (name.includes('.') ? name.split('.').pop() : '');
+      const medical = ['zip', 'nii', 'nii.gz', 'nrrd', 'dcm'].includes(ext);
+      box.hidden = !medical;
+      confirm.required = medical;
+      presetRow.hidden = ext !== 'zip';
+      // STEP and medical files carry real-world units.
+      const unit = form.querySelector('[name="source_unit"]');
+      if (unit && (medical || ['step', 'stp'].includes(ext))) unit.value = 'embedded';
+    };
+    input.addEventListener('change', sync);
+    sync();
+  })();
+</script>
