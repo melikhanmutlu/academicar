@@ -1,98 +1,127 @@
 {% extends "base.html" %}
+{% from "partials/_insights_macros.html" import kpi, chart, funnel, breakdown, periods, secondary_line %}
 {% block title %}Insights - AcademicAR{% endblock %}
 {% block content %}
+{% set a = analytics %}
 <main class="app-shell py-8 insights-page">
   <header class="dashboard-header">
     <div>
       <h1>Insights</h1>
-      <p>How visitors engage with your projects and 3D models in the last {{ analytics.days }} days.</p>
+      <p>How visitors engage with your projects and 3D models in the last {{ a.days }} days.</p>
     </div>
     <div class="insights-actions">
-      <nav class="insights-periods" aria-label="Period">
-        {% for d, label in [(7, '7 days'), (30, '30 days'), (90, '90 days'), (365, '12 months')] %}
-          <a href="{{ url_for('insights', days=d) }}" {% if analytics.days == d %}aria-current="page" class="is-active"{% endif %}>{{ label }}</a>
-        {% endfor %}
-      </nav>
-      <a href="{{ url_for('insights_export', days=analytics.days) }}" class="btn-secondary btn-compact">Download CSV</a>
-      <button type="button" class="btn-secondary btn-compact" onclick="window.print()">Print / PDF</button>
+      {{ periods('insights', a.days, {'project': a.project_id}) }}
+      {% if a.projects %}
+      <form method="get" action="{{ url_for('insights') }}" class="insights-filter">
+        <input type="hidden" name="days" value="{{ a.days }}">
+        <label class="insights-sr" for="insights-project">Project</label>
+        <select id="insights-project" name="project" onchange="this.form.submit()">
+          <option value="">All projects</option>
+          {% for p in a.projects %}<option value="{{ p.id }}" {% if a.project_id == p.id %}selected{% endif %}>{{ p.title }}</option>{% endfor %}
+        </select>
+        <noscript><button type="submit" class="btn-secondary btn-compact">Apply</button></noscript>
+      </form>
+      {% endif %}
+      <details class="insights-export">
+        <summary class="btn-secondary btn-compact">Export</summary>
+        <div class="insights-export-menu">
+          <a href="{{ url_for('insights_export', days=a.days, project=a.project_id) }}">Download CSV</a>
+          <button type="button" onclick="window.print()">Print / PDF</button>
+        </div>
+      </details>
     </div>
   </header>
-  <p class="insights-print-note">AcademicAR impact report &middot; {{ current_user.username }} &middot; last {{ analytics.days }} days &middot; generated {{ generated_on }}</p>
+  <p class="insights-print-note">AcademicAR impact report &middot; {{ current_user.username }} &middot; last {{ a.days }} days &middot; generated {{ generated_on }}</p>
 
-  <section class="insights-metrics">
-    <div><span>Model views</span><strong>{{ analytics.views }}</strong></div>
-    <div><span>Unique visitors</span><strong>{{ analytics.unique_visitors }}</strong></div>
-    <div><span>QR scans</span><strong>{{ analytics.qr_scans }}</strong></div>
-    <div><span>AR starts</span><strong>{{ analytics.ar_starts }}</strong></div>
-    <div><span>Review visits</span><strong>{{ analytics.review_visits }}</strong></div>
-    <div><span>Link copies</span><strong>{{ analytics.shares }}</strong></div>
+  <section class="ins-kpis">
+    {{ kpi('Model views', a.views, none, a.changes.views, a.views, a.days) }}
+    {{ kpi('Unique visitors', a.unique_visitors, none, a.changes.unique_visitors, a.unique_visitors, a.days) }}
+    {{ kpi('QR scans', a.qr_scans, none, a.changes.qr_scans, a.qr_scans, a.days) }}
+    {{ kpi('Engagement', (a.engagement_rate ~ '%') if a.engagement_rate is not none else '—', a.engaged_visitors ~ ' engaged visitors', a.changes.engaged_visitors, a.engaged_visitors, a.days) }}
   </section>
+  {{ secondary_line(a) }}
 
-  <section class="insights-section surface model-insights-section">
-    <div class="insights-section-head"><div><p class="project-section-kicker">Model-level performance</p><h2>Every model, side by side</h2></div><span>{{ analytics.model_metrics|length }} models</span></div>
-    {% if analytics.model_metrics %}
-      <div class="model-insights-table-wrap">
-        <table class="model-insights-table">
-          <thead><tr><th>Model</th><th>Views</th><th>Unique</th><th>QR</th><th>AR</th><th>Shares</th><th>Engagement</th><th>Leading segment</th><th>Last viewed</th></tr></thead>
-          <tbody>
-          {% for item in analytics.model_metrics %}
-            <tr>
-              <td><a href="{{ url_for('view_model', model_id=item.model.id) }}"><strong>{{ item.model.display_name or item.model.original_filename or '3D model' }}</strong><small>{{ item.model.paper.title }} · {{ get_license_plan(item.model.license_type).label }}</small></a></td>
-              <td>{{ item.views }}</td><td>{{ item.unique_visitors }}</td><td>{{ item.qr_scans }}</td><td>{{ item.ar_starts }}</td><td>{{ item.shares }}</td>
-              <td><strong>{{ item.engagement_rate }}%</strong><small>Unique visitors with AR or share activity</small></td>
-              {% if item.detailed %}
-                <td><span>{{ item.top_country.label if item.top_country else '—' }}</span><small>{{ item.top_device.label if item.top_device else 'No device data' }}{% if item.top_source %} · {{ item.top_source.label }}{% endif %}</small></td>
-              {% else %}
-                <td><span class="insight-locked">Not in this plan</span>{% if model_upgrade_options(item.model) %}<small><a href="{{ url_for('model_upgrade_page', model_id=item.model.id) }}">Upgrade this model</a> to see visitor countries, devices and sources.</small>{% else %}<small>Detailed visitor insights are not included in this model's plan.</small>{% endif %}</td>
-              {% endif %}
-              <td>{{ item.last_viewed_at.strftime('%d %b %Y, %H:%M') if item.last_viewed_at else 'Never' }}</td>
+  {{ chart(a) }}
+  {{ funnel(a) }}
+
+  <section class="ins-card">
+    <div class="ins-card-head"><h2>Models</h2><span>{{ a.model_metrics|length }} models</span></div>
+    {% if a.model_metrics %}
+      <table class="ins-table" id="ins-models">
+        <thead>
+          <tr>
+            <th scope="col" data-type="text" aria-sort="none"><button type="button">Model</button></th>
+            <th scope="col" data-type="num" aria-sort="descending"><button type="button">Views</button></th>
+            <th scope="col" data-type="num" aria-sort="none"><button type="button">Unique</button></th>
+            <th scope="col" data-type="num" aria-sort="none"><button type="button">QR</button></th>
+            <th scope="col" data-type="num" aria-sort="none"><button type="button">AR</button></th>
+            <th scope="col" data-type="num" aria-sort="none"><button type="button" title="Unique visitors who started AR or copied the link">Engagement <span aria-hidden="true">&#9432;</span></button></th>
+            <th scope="col" data-type="text" aria-sort="none"><button type="button">Last viewed</button></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in a.model_metrics %}
+            {% set name = item.model.display_name or item.model.original_filename or '3D model' %}
+            <tr{% if not item.views %} class="is-idle"{% endif %}>
+              <td data-label="Model" data-v="{{ name|lower }}">
+                <a class="ins-model-name" href="{{ url_for('insights_model', model_id=item.model.id, days=a.days) }}">{{ name }}</a>
+                <small>{{ item.model.paper.title }} &middot; {{ get_license_plan(item.model.license_type).label }}</small>
+                {% if not item.detailed %}
+                  <small class="ins-lock"><span title="Audience details are not part of this model's plan">Not in this plan</span>{% if model_upgrade_options(item.model) %} &middot; <a href="{{ url_for('model_upgrade_page', model_id=item.model.id) }}">Upgrade for audience details</a>{% endif %}</small>
+                {% endif %}
+              </td>
+              <td data-label="Views" data-v="{{ item.views }}">{{ item.views }}</td>
+              <td data-label="Unique" data-v="{{ item.unique_visitors }}">{{ item.unique_visitors }}</td>
+              <td data-label="QR" data-v="{{ item.qr_scans }}">{{ item.qr_scans }}</td>
+              <td data-label="AR" data-v="{{ item.ar_starts }}">{{ item.ar_starts }}</td>
+              <td data-label="Engagement" data-v="{{ item.engagement_rate if item.engagement_rate is not none else -1 }}">{{ (item.engagement_rate ~ '%') if item.engagement_rate is not none else '—' }}</td>
+              <td data-label="Last viewed" data-v="{{ item.last_viewed_at.isoformat() if item.last_viewed_at else '' }}">
+                {% if item.last_viewed_at %}<time class="ins-rel" datetime="{{ item.last_viewed_at.isoformat() }}Z">{{ item.last_viewed_at.strftime('%d %b %Y') }}</time>{% else %}Never{% endif %}
+              </td>
             </tr>
           {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    {% else %}<p class="insights-empty">Upload a model to begin collecting model-level statistics.</p>{% endif %}
+        </tbody>
+      </table>
+    {% else %}<p class="ins-empty">Upload a model to begin collecting model-level statistics.</p>{% endif %}
   </section>
 
-  <section class="insights-section surface">
-    <div class="insights-section-head"><h2>Viewer activity</h2><span>Last {{ analytics.days }} days</span></div>
-    <div class="insights-trend{% if analytics.trend|length > 30 %} insights-trend--dense{% endif %}" aria-label="Daily model views">
-      {% set max_views = analytics.trend|map(attribute='views')|max if analytics.trend else 0 %}
-      {% for point in analytics.trend %}
-        <div class="insights-bar-wrap" title="{{ point.label }}: {{ point.views }} views">
-          <i style="height: {{ ((point.views / max_views) * 100) if max_views else 0 }}%"></i>
-          {# About six date labels whatever the period (7 days ... 12 months). #}
-          {% if loop.index0 % ([1, (analytics.trend|length) // 6]|max) == 0 %}<small>{{ point.label }}</small>{% endif %}
-        </div>
-      {% endfor %}
-    </div>
-  </section>
-
-  <section class="insights-section surface">
-    <div class="insights-section-head"><h2>Top models</h2><span>By views</span></div>
-    {% if analytics.top_models %}
-      <div class="insights-list">
-        {% for item in analytics.top_models %}
-          <div>
-            <span>{{ item.model.display_name or item.model.original_filename if item.model else 'Removed model' }}</span>
-            <strong>{{ item.count }} views</strong>
-          </div>
-        {% endfor %}
-      </div>
+  <section class="ins-audience">
+    {{ breakdown('Devices', a.devices, 'No device data yet. Share a model link or QR code to see how people view it.') }}
+    {{ breakdown('Traffic sources', a.sources, 'No traffic yet. Share a model link or QR code to see where visitors come from.') }}
+    {% if a.has_country_data %}
+      {{ breakdown('Countries', a.countries, '') }}
     {% else %}
-      <p class="insights-empty">Viewer activity will appear here after your models are visited.</p>
+      <section class="ins-card"><div class="ins-card-head"><h2>Countries</h2></div><p class="ins-empty">Country data isn't available yet.</p></section>
     {% endif %}
   </section>
-
-  <section class="insights-breakdowns">
-    {% for title, rows in [('Devices', analytics.devices), ('Countries', analytics.countries), ('Traffic sources', analytics.sources)] %}
-      <div class="insights-section surface">
-        <div class="insights-section-head"><h2>{{ title }}</h2></div>
-        {% if rows %}
-          <div class="insights-list">{% for row in rows %}<div><span>{{ row.label }}</span><strong>{{ row.count }}</strong></div>{% endfor %}</div>
-        {% else %}<p class="insights-empty">No data yet.</p>{% endif %}
-      </div>
-    {% endfor %}
-  </section>
 </main>
+<script>
+(function () {
+  document.querySelectorAll('time.ins-rel').forEach(function (t) {
+    var d = new Date(t.getAttribute('datetime')); if (isNaN(d)) return;
+    var days = Math.floor((Date.now() - d.getTime()) / 864e5);
+    if (days <= 0) t.textContent = 'Today';
+    else if (days === 1) t.textContent = 'Yesterday';
+    else if (days < 31) t.textContent = days + ' days ago';
+    t.title = d.toLocaleString();
+  });
+  var table = document.getElementById('ins-models'); if (!table) return;
+  var ths = table.tHead.rows[0].cells;
+  Array.prototype.forEach.call(ths, function (th, col) {
+    th.querySelector('button').addEventListener('click', function () {
+      var dir = th.getAttribute('aria-sort') === 'descending' ? 'ascending' : 'descending';
+      Array.prototype.forEach.call(ths, function (o) { o.setAttribute('aria-sort', 'none'); });
+      th.setAttribute('aria-sort', dir);
+      var num = th.dataset.type === 'num', k = dir === 'ascending' ? 1 : -1;
+      var rows = Array.prototype.slice.call(table.tBodies[0].rows);
+      rows.sort(function (r1, r2) {
+        var x = r1.cells[col].dataset.v, y = r2.cells[col].dataset.v;
+        if (num) return (parseFloat(x) - parseFloat(y)) * k;
+        return (x < y ? -1 : x > y ? 1 : 0) * k;
+      });
+      rows.forEach(function (r) { table.tBodies[0].appendChild(r); });
+    });
+  });
+})();
+</script>
 {% endblock %}

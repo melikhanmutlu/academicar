@@ -118,7 +118,7 @@ def test_engagement_counts_rotation_and_is_none_without_viewers(client, app):
 def test_rotation_browser_event_is_accepted(client, app):
     register(client)
     _, _, model_id = _setup(app)
-    client.get("/auth/logout")
+    client.post("/auth/logout")
     response = client.post("/analytics/event", json={"event": "viewer_model_rotated", "model_id": model_id})
     assert response.status_code == 202
     with app.app_context():
@@ -171,7 +171,7 @@ def test_model_detail_page_owner_only(client, app):
         snapshot = model_snapshot(model, days=30)
     assert snapshot["views"] == 1 and snapshot["qr_share"] == 100.0
     assert client.get(f"/insights/model/{model_id}").status_code == 200
-    client.get("/auth/logout")
+    client.post("/auth/logout")
     register(client, email="other@example.com")
     login(client, email="other@example.com")
     assert client.get(f"/insights/model/{model_id}").status_code == 404
