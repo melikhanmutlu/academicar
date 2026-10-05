@@ -18,7 +18,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import selectinload
 
 from licensing import apply_model_license_defaults, is_access_expired
-from models import AuditLog, Institution, InstitutionMember, Model3D, Paper, User, db
+from models import AuditLog, Institution, InstitutionMember, Model3D, ModelScene, Paper, User, db
 
 logger = logging.getLogger(__name__)
 
@@ -56,13 +56,32 @@ def institution_admin_emails(institution_id) -> list[str]:
     return [email for (email,) in rows if email]
 
 
+def institution_scene_ar_bytes(institution_ids) -> dict:
+    """{institution_id: bytes} of the scene AR variants (GLB + USDZ) of the
+    funded models; these files count toward the contract's storage quota."""
+    rows = (
+        db.session.query(Model3D.institution_id, func.coalesce(func.sum(ModelScene.ar_file_size), 0))
+        .join(ModelScene, ModelScene.model_id == Model3D.id)
+        .join(Paper, Model3D.paper_id == Paper.id)
+        .filter(
+            Model3D.institution_id.in_(list(institution_ids)),
+            Model3D.license_type == "institutional",
+            or_(Paper.status.is_(None), Paper.status != "deleted"),
+        )
+        .group_by(Model3D.institution_id)
+        .all()
+    )
+    return {institution_id: int(total or 0) for institution_id, total in rows}
+
+
 def institution_usage(institution_id) -> tuple[int, int]:
     """(model_count, bytes_used) of the institution's funded models.
 
     Single aggregate query. Counts models still on the institutional plan
     (an admin re-licensing a model individually frees its quota) and joins
     Paper to exclude soft-deleted publications — the same visibility
-    predicate the admin dashboard uses.
+    predicate the admin dashboard uses. Bytes include the models' scene AR
+    variants (``institution_scene_ar_bytes``).
     """
     count, total = (
         db.session.query(
@@ -77,7 +96,8 @@ def institution_usage(institution_id) -> tuple[int, int]:
         )
         .one()
     )
-    return int(count or 0), int(total or 0)
+    scene_bytes = institution_scene_ar_bytes([institution_id]).get(institution_id, 0)
+    return int(count or 0), int(total or 0) + scene_bytes
 
 
 def _funded_models_query(institution_id):
