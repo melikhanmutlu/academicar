@@ -507,3 +507,34 @@ def test_scene_files_wait_until_the_variant_is_ready_and_come_back_from_r2(app, 
         db.session.get(ModelScene, 1).ar_status = "queued"
         db.session.commit()
     assert client.get(f"/files/{model_id}/scenes/1.glb").status_code == 404
+
+
+def _layer_form(app, model_id, rename=None, recolour=None):
+    with app.app_context():
+        layers = db.session.get(Model3D, model_id).layer_info["layers"]
+    data = {}
+    for i, layer in enumerate(layers):
+        data[f"layer_name_{i}"] = (rename or {}).get(layer["name"], layer["name"])
+        if layer.get("color"):
+            data[f"layer_color_{i}"] = (recolour or {}).get(layer["name"], layer["color"])
+    return data
+
+
+def test_renaming_layers_keeps_saved_scenes_in_step(app, client, queued):
+    model_id = _make_model(app)
+    scene_id = _add_scene(app, model_id)
+    login(client, email="owner@example.com", password=PASSWORD)
+    client.post(f"/models/{model_id}/layers", data=_layer_form(app, model_id, rename={"A": "B", "B": "A"}))
+    with app.app_context():
+        layers = db.session.get(ModelScene, scene_id).state["layers"]
+    assert layers == {"B": {"visible": False, "opacity": 1}, "A": {"visible": True, "opacity": 0.4}}  # swap is safe
+
+
+def test_recolouring_layers_rebuilds_scene_variants(app, client, queued):
+    model_id = _make_model(app)
+    scene_id = _add_scene(app, model_id)
+    login(client, email="owner@example.com", password=PASSWORD)
+    client.post(f"/models/{model_id}/layers", data=_layer_form(app, model_id, recolour={"C": "#ff0000"}))
+    assert {"scene_id": scene_id} in queued
+    with app.app_context():
+        assert db.session.get(ModelScene, scene_id).ar_status == "queued"

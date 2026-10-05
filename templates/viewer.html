@@ -2404,13 +2404,18 @@
         }
         row.querySelector('.layer-swatch').style.background = layer.color || '#cccccc';
         row.querySelector('.layer-opacity').setAttribute('aria-label', `Opacity of ${layer.name}`);
-        row.querySelector('.layer-eye').addEventListener('click', () => { state[i].visible = !state[i].visible; apply(i); });
+        // A hand edit leaves the saved scene: AR then opens the full model, not
+        // that scene's variant, which would no longer match what is on screen.
+        const leaveScene = () => { if (window.viewerScenes && window.viewerScenes.activeId() != null) window.viewerScenes.markActive(null); };
+        row.querySelector('.layer-eye').addEventListener('click', () => { leaveScene(); state[i].visible = !state[i].visible; apply(i); });
         row.querySelector('.layer-name').addEventListener('click', () => {
+          leaveScene();
           const solo = state.every((s, j) => s.visible === (j === i));
           state.forEach((s, j) => { s.visible = solo || j === i; });
           applyAll();
         });
         row.querySelector('.layer-opacity').addEventListener('input', (event) => {
+          leaveScene();
           state[i].opacity = Number(event.target.value) / 100;
           if (state[i].opacity > 0.01) state[i].visible = true;
           apply(i);
@@ -2536,6 +2541,7 @@
       layersBtn.addEventListener('click', () => setOpen(layersPanel.hidden));
       layersPanel.querySelector('[data-layers-close]').addEventListener('click', () => setOpen(false));
       layersPanel.querySelector('[data-layers-all]').addEventListener('click', () => {
+        if (window.viewerScenes && window.viewerScenes.activeId() != null) window.viewerScenes.markActive(null);
         state.forEach((s) => { s.visible = true; s.opacity = 1; });
         list.querySelectorAll('.layer-opacity').forEach((input) => { input.value = 100; });
         applyAll();

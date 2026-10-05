@@ -147,7 +147,7 @@ def _write_layer_colors(glb_path: str, colors: dict[str, str]) -> None:
 @login_required
 @require_model_editor
 def update_layers(model_id):
-    from app import _refresh_model_poster, enqueue_conversion_job, log_audit
+    from app import _refresh_model_poster, enqueue_conversion_job, log_audit, requeue_scene_ar
     from services.r2_mirror import ensure_local, mirror_file
 
     model = db.session.get(Model3D, model_id)
@@ -212,11 +212,15 @@ def update_layers(model_id):
         updated.append(item)
     info = dict(model.layer_info)
     info["layers"] = updated
-    if info.get("metrics"):  # measurements are keyed by layer name
-        renames = {l["name"]: names[i] for i, l in enumerate(layers) if l.get("name") != names[i]}
-        if renames:
-            info["metrics"] = rename_metrics_layers(info["metrics"], renames)
+    renames = {l["name"]: names[i] for i, l in enumerate(layers) if l.get("name") != names[i]}
+    if info.get("metrics") and renames:  # measurements are keyed by layer name
+        info["metrics"] = rename_metrics_layers(info["metrics"], renames)
     model.layer_info = info  # new dict: JSON columns do not track in-place changes
+    if renames:  # saved scenes are keyed by layer name too
+        for scene in model.scenes:
+            saved = (scene.state or {}).get("layers")
+            if isinstance(saved, dict):
+                scene.state = dict(scene.state, layers={renames.get(k, k): v for k, v in saved.items()})
     try:
         if new_colors:
             model.file_size = os.path.getsize(glb_path)  # part of model_asset_token
@@ -245,6 +249,8 @@ def update_layers(model_id):
         except SQLAlchemyError:
             db.session.rollback()
             logger.exception("Could not enqueue USDZ regen after layer recolour for %s", model.id)
+        # Scene AR variants are cut from the GLB, so they need the new colours too.
+        requeue_scene_ar(current_app._get_current_object(), model)
 
     log_audit(
         "model_layers_updated",
