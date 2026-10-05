@@ -2116,6 +2116,12 @@
           try {
             if (!document.fullscreenElement && !document.webkitFullscreenElement) {
               await requestFs.call(fsTarget);
+              fetch('/analytics/event', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ event: 'viewer_fullscreen_opened', model_id: {{ model.id|tojson }} }),
+                keepalive: true,
+              }).catch(() => {});
             } else {
               await (document.exitFullscreen || document.webkitExitFullscreen).call(document);
             }
@@ -2248,6 +2254,20 @@
       }
       if (event.detail && event.detail.status === 'failed') showQrFallback();
     });
+
+    // Count one "rotated" engagement per page load, only for real visitor
+    // interaction (auto-rotate and programmatic camera moves are ignored).
+    const onFirstUserRotation = (event) => {
+      if (!event.detail || event.detail.source !== 'user-interaction') return;
+      viewer.removeEventListener('camera-change', onFirstUserRotation);
+      fetch('/analytics/event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event: 'viewer_model_rotated', model_id: {{ model.id|tojson }} }),
+        keepalive: true,
+      }).catch(() => {});
+    };
+    viewer.addEventListener('camera-change', onFirstUserRotation);
 
     viewer.addEventListener('load', async () => {
       viewer.classList.add('is-loaded');
