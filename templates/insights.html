@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "partials/_insights_macros.html" import kpi, chart, funnel, breakdown, periods, secondary_line %}
+{% from "partials/_insights_macros.html" import kpi, chart, funnel, breakdown, periods, secondary_line, headline, pct, partial_note, chart_script %}
 {% block title %}Insights - AcademicAR{% endblock %}
 {% block content %}
 {% set a = analytics %}
@@ -23,7 +23,7 @@
       </form>
       {% endif %}
       <details class="insights-export">
-        <summary class="btn-secondary btn-compact">Export</summary>
+        <summary class="ins-menu-btn" aria-haspopup="true">Export <span aria-hidden="true">&#9662;</span></summary>
         <div class="insights-export-menu">
           <a href="{{ url_for('insights_export', days=a.days, project=a.project_id) }}">Download CSV</a>
           <button type="button" onclick="window.print()">Print / PDF</button>
@@ -31,23 +31,50 @@
       </details>
     </div>
   </header>
+  {{ headline(a) }}
   <p class="insights-print-note">AcademicAR impact report &middot; {{ current_user.username }} &middot; last {{ a.days }} days &middot; generated {{ generated_on }}</p>
 
   <section class="ins-kpis">
     {{ kpi('Model views', a.views, none, a.changes.views, a.views, a.days) }}
     {{ kpi('Unique visitors', a.unique_visitors, none, a.changes.unique_visitors, a.unique_visitors, a.days) }}
-    {{ kpi('QR scans', a.qr_scans, none, a.changes.qr_scans, a.qr_scans, a.days) }}
-    {{ kpi('Engagement', (a.engagement_rate ~ '%') if a.engagement_rate is not none else '—', a.engaged_visitors ~ ' engaged visitors', a.changes.engaged_visitors, a.engaged_visitors, a.days) }}
+    {{ kpi('QR scans', a.qr_scans, none, a.changes.qr_scans, a.qr_scans, a.days, hint=('Add the QR code to your poster or slides' if not a.qr_scans else none)) }}
+    {{ kpi('Engagement', pct(a.engagement_rate), (a.engaged_visitors ~ ' engaged visitors') if a.unique_visitors else none, a.changes.engaged_visitors, a.engaged_visitors, a.days, note=partial_note(a)) }}
   </section>
   {{ secondary_line(a) }}
 
   {{ chart(a) }}
-  {{ funnel(a) }}
+  {% if a.views %}{{ funnel(a) }}{% endif %}
 
   <section class="ins-card">
-    <div class="ins-card-head"><h2>Models</h2><span>{{ a.model_metrics|length }} models</span></div>
+    <div class="ins-card-head"><h2>Models</h2><span>{{ a.model_metrics|length }} {{ 'model' if a.model_metrics|length == 1 else 'models' }}</span></div>
     {% if a.model_metrics %}
+      {% set viewed = a.model_metrics|selectattr('views')|list %}
+      {% set idle = a.model_metrics|rejectattr('views')|list %}
+      {% if not viewed %}{% set viewed = idle %}{% set idle = [] %}{% endif %}
+      {% macro cols() %}<colgroup><col class="c-name"><col><col><col><col><col class="c-eng"><col class="c-last"></colgroup>{% endmacro %}
+      {% macro model_row(item) %}
+            {% set name = item.model.display_name or item.model.original_filename or '3D model' %}
+            {% set plan = get_license_plan(item.model.license_type).label %}
+            <tr{% if not item.views %} class="is-idle"{% endif %}>
+              <td data-label="Model" data-v="{{ name|lower }}">
+                <a class="ins-model-name" href="{{ url_for('insights_model', model_id=item.model.id, days=a.days) }}"><span class="ins-model-text">{{ name }}</span><span class="ins-chev" aria-hidden="true">&rsaquo;</span></a>
+                <small class="ins-sub"><span class="ins-plan">{{ plan }}</span><span class="ins-proj" title="{{ item.model.paper.title }}">{{ item.model.paper.title }}</span></small>
+                {% if not item.detailed %}
+                  <small class="ins-lock"><span title="Audience details are not part of this model's plan">Not in this plan</span>{% if model_upgrade_options(item.model) %} &middot; <a href="{{ url_for('model_upgrade_page', model_id=item.model.id) }}">Upgrade for audience details</a>{% endif %}</small>
+                {% endif %}
+              </td>
+              <td data-label="Views" data-v="{{ item.views }}">{{ item.views }}</td>
+              <td data-label="Unique" data-v="{{ item.unique_visitors }}">{{ item.unique_visitors }}</td>
+              <td data-label="QR" data-v="{{ item.qr_scans }}">{{ item.qr_scans }}</td>
+              <td data-label="AR" data-v="{{ item.ar_starts }}">{{ item.ar_starts }}</td>
+              <td data-label="Engagement" data-v="{{ item.engagement_rate if item.engagement_rate is not none else -1 }}">{{ pct(item.engagement_rate) }}</td>
+              <td data-label="Last viewed" data-v="{{ item.last_viewed_at.isoformat() if item.last_viewed_at else '' }}">
+                {% if item.last_viewed_at %}<time class="ins-rel" datetime="{{ item.last_viewed_at.isoformat() }}Z">{{ item.last_viewed_at.strftime('%d %b %Y') }}</time>{% else %}Never{% endif %}
+              </td>
+            </tr>
+      {% endmacro %}
       <table class="ins-table" id="ins-models">
+        {{ cols() }}
         <thead>
           <tr>
             <th scope="col" data-type="text" aria-sort="none"><button type="button">Model</button></th>
@@ -59,44 +86,35 @@
             <th scope="col" data-type="text" aria-sort="none"><button type="button">Last viewed</button></th>
           </tr>
         </thead>
-        <tbody>
-          {% for item in a.model_metrics %}
-            {% set name = item.model.display_name or item.model.original_filename or '3D model' %}
-            <tr{% if not item.views %} class="is-idle"{% endif %}>
-              <td data-label="Model" data-v="{{ name|lower }}">
-                <a class="ins-model-name" href="{{ url_for('insights_model', model_id=item.model.id, days=a.days) }}">{{ name }}</a>
-                <small>{{ item.model.paper.title }} &middot; {{ get_license_plan(item.model.license_type).label }}</small>
-                {% if not item.detailed %}
-                  <small class="ins-lock"><span title="Audience details are not part of this model's plan">Not in this plan</span>{% if model_upgrade_options(item.model) %} &middot; <a href="{{ url_for('model_upgrade_page', model_id=item.model.id) }}">Upgrade for audience details</a>{% endif %}</small>
-                {% endif %}
-              </td>
-              <td data-label="Views" data-v="{{ item.views }}">{{ item.views }}</td>
-              <td data-label="Unique" data-v="{{ item.unique_visitors }}">{{ item.unique_visitors }}</td>
-              <td data-label="QR" data-v="{{ item.qr_scans }}">{{ item.qr_scans }}</td>
-              <td data-label="AR" data-v="{{ item.ar_starts }}">{{ item.ar_starts }}</td>
-              <td data-label="Engagement" data-v="{{ item.engagement_rate if item.engagement_rate is not none else -1 }}">{{ (item.engagement_rate ~ '%') if item.engagement_rate is not none else '—' }}</td>
-              <td data-label="Last viewed" data-v="{{ item.last_viewed_at.isoformat() if item.last_viewed_at else '' }}">
-                {% if item.last_viewed_at %}<time class="ins-rel" datetime="{{ item.last_viewed_at.isoformat() }}Z">{{ item.last_viewed_at.strftime('%d %b %Y') }}</time>{% else %}Never{% endif %}
-              </td>
-            </tr>
-          {% endfor %}
-        </tbody>
+        <tbody>{% for item in viewed %}{{ model_row(item) }}{% endfor %}</tbody>
       </table>
+      {% if idle %}
+      <details class="ins-idle">
+        <summary>{{ idle|length }} {{ 'model' if idle|length == 1 else 'models' }} not viewed in this period</summary>
+        <table class="ins-table">
+          {{ cols() }}
+          <tbody>{% for item in idle %}{{ model_row(item) }}{% endfor %}</tbody>
+        </table>
+      </details>
+      {% endif %}
     {% else %}<p class="ins-empty">Upload a model to begin collecting model-level statistics.</p>{% endif %}
   </section>
 
-  <section class="ins-audience">
+  {% if a.views %}
+  <section class="ins-audience{% if not a.has_country_data %} is-two{% endif %}">
     {{ breakdown('Devices', a.devices, 'No device data yet. Share a model link or QR code to see how people view it.') }}
     {{ breakdown('Traffic sources', a.sources, 'No traffic yet. Share a model link or QR code to see where visitors come from.') }}
     {% if a.has_country_data %}
       {{ breakdown('Countries', a.countries, '') }}
-    {% else %}
-      <section class="ins-card"><div class="ins-card-head"><h2>Countries</h2></div><p class="ins-empty">Country data isn't available yet.</p></section>
     {% endif %}
   </section>
+  {% endif %}
 </main>
+{{ chart_script() }}
 <script>
 (function () {
+  var ex = document.querySelector('.insights-export');
+  if (ex) document.addEventListener('click', function (e) { if (!ex.contains(e.target)) ex.removeAttribute('open'); });
   document.querySelectorAll('time.ins-rel').forEach(function (t) {
     var d = new Date(t.getAttribute('datetime')); if (isNaN(d)) return;
     var days = Math.floor((Date.now() - d.getTime()) / 864e5);

@@ -1,41 +1,70 @@
 {# Shared building blocks for insights.html and insights_model.html. #}
 
+{% macro pct(value) -%}
+  {%- if value is none -%}&mdash;
+  {%- elif value == value|int -%}{{ value|int }}%
+  {%- else -%}{{ '%.1f'|format(value) }}%{%- endif -%}
+{%- endmacro %}
+
+{% macro partial_note(a) -%}
+  {%- if a.engagement_partial and a.engagement_since -%}
+    <span class="ins-note">Rotation and fullscreen are counted since {{ a.engagement_since.strftime('%-d %b %Y') }}.</span>
+  {%- endif -%}
+{%- endmacro %}
+
 {% macro change_line(change, current, days) -%}
   {%- if change and change.pct is not none -%}
     {%- if change.direction == 'up' -%}<span class="ins-change is-up">&#9650; {{ change.pct }}% vs previous {{ days }} days</span>
     {%- elif change.direction == 'down' -%}<span class="ins-change is-down">&#9660; {{ change.pct|abs }}% vs previous {{ days }} days</span>
-    {%- else -%}<span class="ins-change">No change vs previous {{ days }} days</span>{%- endif -%}
-  {%- elif current -%}<span class="ins-change">New this period</span>
-  {%- else -%}<span class="ins-change">&mdash;</span>{%- endif -%}
+    {%- elif current -%}<span class="ins-change">No change vs previous {{ days }} days</span>{%- endif -%}
+  {%- elif change and current -%}<span class="ins-change">New this period</span>
+  {%- endif -%}
 {%- endmacro %}
 
-{% macro kpi(label, value, sub, change, current, days) %}
+{% macro kpi(label, value, sub, change, current, days, hint=none, hint_url=none, note=none) %}
   <div class="ins-kpi">
     <span class="ins-kpi-label">{{ label }}</span>
     <strong>{{ value }}</strong>
     {% if sub %}<span class="ins-kpi-sub">{{ sub }}</span>{% endif %}
     {{ change_line(change, current, days) }}
+    {% if hint %}<span class="ins-kpi-hint">{% if hint_url %}<a href="{{ hint_url }}">{{ hint }}</a>{% else %}{{ hint }}{% endif %}</span>{% endif %}
+    {% if note %}{{ note }}{% endif %}
   </div>
 {% endmacro %}
 
-{% macro chart(analytics) %}
+{% macro chart(analytics, qr_url=none) %}
   {% set trend = analytics.trend %}
   {% set n = trend|length %}
   {% set max_views = (trend|map(attribute='views')|max) if n else 0 %}
+  {% set tmax = analytics.trend_max or 1 %}
   {% set peak = analytics.trend_peak %}
   {% set gran = {'day': 'Daily', 'week': 'Weekly', 'month': 'Monthly'}.get(analytics.trend_granularity, 'Daily') %}
-  <section class="ins-card ins-chart-card">
-    <div class="ins-card-head"><h2>{{ gran }} views</h2><span>Last {{ analytics.days }} days</span></div>
+  <section class="ins-card ins-chart-card" id="ins-chart-card" data-max="{{ tmax }}">
+    <div class="ins-card-head">
+      <h2>{{ gran }} <span class="ins-series-name" id="ins-series-name">views</span></h2>
+      {% if max_views %}
+      <div class="ins-chart-tools">
+        <div class="ins-toggle" role="group" aria-label="Series">
+          <button type="button" class="is-active" data-series="views" aria-pressed="true">Views</button>
+          <button type="button" data-series="qr" aria-pressed="false">QR scans</button>
+        </div>
+        <span class="ins-legend"><span class="ins-key is-now"></span>This period <span class="ins-key is-prev" id="ins-key-prev"></span><span id="ins-key-prev-t">Previous period</span></span>
+      </div>
+      {% else %}<span>Last {{ analytics.days }} days</span>{% endif %}
+    </div>
     {% if max_views %}
       <div class="ins-chart">
-        <div class="ins-y" aria-hidden="true"><span>{{ max_views }}</span><span>0</span></div>
-        <div class="ins-plot{% if n > 30 %} is-dense{% endif %}" role="list" aria-label="{{ gran }} model views">
+        <div class="ins-y" aria-hidden="true"><span>{{ tmax }}</span><span>0</span></div>
+        <div class="ins-plot{% if n > 30 %} is-dense{% endif %}" id="ins-plot" role="list" aria-label="{{ gran }} model views">
           {% for point in trend %}
             {% set pos = 'is-left' if loop.index0 < n * 0.2 else ('is-right' if loop.index0 > n * 0.8 else '') %}
             <div class="ins-col {{ pos }}{% if peak and point.start == peak.start %} is-peak{% endif %}" role="listitem" tabindex="0"
-                 aria-label="{{ point.label }}: {{ point.views }} views, {{ point.qr_scans }} QR scans">
-              <i style="height: {{ (point.views / max_views * 100)|round(1) }}%"></i>
-              <span class="ins-tip" aria-hidden="true">{{ point.label }}: {{ point.views }} views &middot; {{ point.qr_scans }} QR</span>
+                 data-label="{{ point.label }}" data-views="{{ point.views }}" data-prev="{{ point.previous_views or 0 }}" data-qr="{{ point.qr_scans }}"
+                 {% if peak and point.start == peak.start %}data-peak="1"{% endif %}
+                 aria-label="{{ point.label }}: {{ point.views }} views, {{ point.qr_scans }} QR scans, previous period {{ point.previous_views or 0 }} views">
+              {% if point.previous_views %}<b class="ins-ghost" style="bottom: {{ (point.previous_views / tmax * 100)|round(1) }}%"></b>{% endif %}
+              <i style="height: {{ (point.views / tmax * 100)|round(1) }}%"></i>
+              <span class="ins-tip" aria-hidden="true">{{ point.label }}: {{ point.views }} views &middot; {{ point.qr_scans }} QR &middot; previous {{ point.previous_views or 0 }}</span>
             </div>
           {% endfor %}
         </div>
@@ -48,24 +77,31 @@
         </div>
       </div>
     {% else %}
-      <p class="ins-empty">No views in this period yet. Share the viewer link or put the QR code on a poster or slide to start collecting activity.</p>
+      <p class="ins-empty">No views in the last {{ analytics.days }} days yet. Share the viewer link{% if qr_url %} or <a class="ins-link" href="{{ qr_url }}">print the QR code</a>{% else %} or put the QR code{% endif %} on a poster or slide to start collecting activity.</p>
     {% endif %}
   </section>
 {% endmacro %}
 
 {% macro funnel(analytics) %}
+  {% set steps = analytics.funnel %}
   <section class="ins-card">
-    <div class="ins-card-head"><h2>Engagement funnel</h2><span>Share of visitors</span></div>
+    {% set collapsed = steps[1].count == 0 and steps[2].count == 0 %}
+    <div class="ins-card-head"><h2>Engagement funnel</h2>{% if not collapsed %}<span>Share of visitors</span>{% endif %}</div>
+    {% if collapsed %}
+      <p class="ins-strip"><strong>{{ steps[0].count }}</strong> {{ 'visitor' if steps[0].count == 1 else 'visitors' }} &middot; no interactions recorded yet</p>
+    {% else %}
     <div class="ins-funnel">
-      {% for step in analytics.funnel %}
+      {% for step in steps %}
         <div class="ins-step">
           <span class="ins-step-label">{{ step.label }}</span>
           <strong>{{ step.count }}</strong>
           <span class="ins-bar"><i style="width: {{ step.pct or 0 }}%"></i></span>
-          <span class="ins-step-pct">{{ step.pct if step.pct is not none else 0 }}%</span>
+          <span class="ins-step-pct">{{ pct(step.pct) }}</span>
         </div>
       {% endfor %}
     </div>
+      {{ partial_note(analytics) }}
+    {% endif %}
   </section>
 {% endmacro %}
 
@@ -76,7 +112,7 @@
       <ul class="ins-rows">
         {% for row in rows %}
           <li>
-            <div><span>{{ row.label }}</span><strong>{{ row.count }}</strong></div>
+            <div><span>{{ row.label }}</span><strong>{{ row.count }} <small>{{ pct(row.pct) }}</small></strong></div>
             <span class="ins-bar"><i style="width: {{ row.pct or 0 }}%"></i></span>
           </li>
         {% endfor %}
@@ -93,11 +129,42 @@
   </nav>
 {% endmacro %}
 
+{% macro headline(a) %}
+  {% if a.headline %}<p class="ins-headline">{{ a.headline|join(' ') }}</p>{% endif %}
+{% endmacro %}
+
 {% macro secondary_line(a) %}
+  {% set items = [(a.ar_starts, 'AR starts'), (a.shares, 'link copies'), (a.review_visits, 'review visits'), (a.fullscreen_opens, 'fullscreen opens')] %}
+  {% if items|selectattr(0)|list %}
   <p class="ins-secondary">
-    <span><strong>{{ a.ar_starts }}</strong> AR starts</span>
-    <span><strong>{{ a.shares }}</strong> link copies</span>
-    <span><strong>{{ a.review_visits }}</strong> review visits</span>
-    <span><strong>{{ a.fullscreen_opens }}</strong> fullscreen opens</span>
+    {% for count, label in items if count %}<span><strong>{{ count }}</strong> {{ label }}</span>{% endfor %}
   </p>
+  {% endif %}
+{% endmacro %}
+
+{# Chart series toggle: Views | QR scans. #}
+{% macro chart_script() %}
+<script>
+(function () {
+  var card = document.getElementById('ins-chart-card'), plot = document.getElementById('ins-plot');
+  if (!card || !plot) return;
+  var max = parseFloat(card.dataset.max) || 1, cols = plot.querySelectorAll('.ins-col');
+  var name = document.getElementById('ins-series-name'), btns = card.querySelectorAll('[data-series]');
+  var prevKey = document.getElementById('ins-key-prev'), prevT = document.getElementById('ins-key-prev-t');
+  btns.forEach(function (b) {
+    b.addEventListener('click', function () {
+      var qr = b.dataset.series === 'qr';
+      btns.forEach(function (o) { var on = o === b; o.classList.toggle('is-active', on); o.setAttribute('aria-pressed', on); });
+      name.textContent = qr ? 'QR scans' : 'views';
+      plot.classList.toggle('is-qr', qr);
+      prevKey.hidden = prevT.hidden = qr;
+      cols.forEach(function (c) {
+        c.querySelector('i').style.height = (parseFloat(qr ? c.dataset.qr : c.dataset.views) / max * 100).toFixed(1) + '%';
+        c.classList.toggle('is-peak', !qr && c.dataset.peak === '1');
+        c.querySelector('.ins-tip').textContent = c.dataset.label + ': ' + (qr ? c.dataset.qr + ' QR scans' : c.dataset.views + ' views · ' + c.dataset.qr + ' QR · previous ' + c.dataset.prev);
+      });
+    });
+  });
+})();
+</script>
 {% endmacro %}

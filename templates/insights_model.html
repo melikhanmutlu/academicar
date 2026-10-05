@@ -1,41 +1,42 @@
 {% extends "base.html" %}
-{% from "partials/_insights_macros.html" import kpi, chart, funnel, breakdown, periods, secondary_line %}
+{% from "partials/_insights_macros.html" import kpi, chart, funnel, breakdown, periods, secondary_line, headline, pct, partial_note, chart_script %}
 {% block title %}Model insights - AcademicAR{% endblock %}
 {% block content %}
 {% set a = analytics %}
+{% set qr_url = url_for('qr_print', model_id=model.id) %}
 {% set name = model.display_name or model.original_filename or '3D model' %}
 <main class="app-shell py-8 insights-page">
   <a class="ins-back" href="{{ url_for('insights', days=a.days) }}">&larr; All insights</a>
   <header class="dashboard-header">
     <div>
       <h1>{{ name }}</h1>
-      <p>{{ model.paper.title }} &middot; {{ get_license_plan(model.license_type).label }} &middot; <a class="ins-link" href="{{ url_for('view_model', model_id=model.id) }}">Open viewer</a></p>
+      <p class="ins-subtitle-line" title="{{ model.paper.title }}">{{ model.paper.title }}</p>
+      <p class="ins-meta">{{ get_license_plan(model.license_type).label }} &middot; <a class="ins-link" href="{{ url_for('view_model', model_id=model.id) }}">Open viewer</a></p>
     </div>
     <div class="insights-actions">{{ periods('insights_model', a.days, {'model_id': model.id}) }}</div>
   </header>
+  {{ headline(a) }}
   <p class="insights-print-note">AcademicAR model report &middot; {{ name }} &middot; last {{ a.days }} days &middot; generated {{ generated_on }}</p>
 
   <section class="ins-kpis">
     {{ kpi('Views', a.views, none, a.changes.views, a.views, a.days) }}
     {{ kpi('Unique visitors', a.unique_visitors, none, a.changes.unique_visitors, a.unique_visitors, a.days) }}
-    {{ kpi('QR scans', a.qr_scans, (a.qr_share ~ '% of views from QR') if a.qr_share is not none else none, a.changes.qr_scans, a.qr_scans, a.days) }}
-    {{ kpi('Engagement', (a.engagement_rate ~ '%') if a.engagement_rate is not none else '—', a.engaged_visitors ~ ' engaged visitors', a.changes.engaged_visitors, a.engaged_visitors, a.days) }}
+    {{ kpi('QR scans', a.qr_scans, (pct(a.qr_share) ~ ' of views from QR') if a.qr_scans and a.qr_share is not none else none, a.changes.qr_scans, a.qr_scans, a.days, hint=('Add the QR code to your poster or slides' if not a.qr_scans else none), hint_url=(qr_url if not a.qr_scans else none)) }}
+    {{ kpi('Engagement', pct(a.engagement_rate), (a.engaged_visitors ~ ' engaged visitors') if a.unique_visitors else none, a.changes.engaged_visitors, a.engaged_visitors, a.days, note=partial_note(a)) }}
   </section>
   {{ secondary_line(a) }}
 
-  {{ chart(a) }}
-  {{ funnel(a) }}
+  {{ chart(a, qr_url) }}
+  {% if a.views %}{{ funnel(a) }}{% endif %}
 
   {% if a.detailed %}
-    <section class="ins-audience">
+    {% if a.views %}<section class="ins-audience{% if not a.has_country_data %} is-two{% endif %}">
       {{ breakdown('Devices', a.devices, 'No device data yet. Share the link or QR code to see how people view this model.') }}
       {{ breakdown('Traffic sources', a.sources, 'No traffic yet. Share the link or QR code to see where visitors come from.') }}
       {% if a.has_country_data %}
         {{ breakdown('Countries', a.countries, '') }}
-      {% else %}
-        <section class="ins-card"><div class="ins-card-head"><h2>Countries</h2></div><p class="ins-empty">Country data isn't available yet.</p></section>
       {% endif %}
-    </section>
+    </section>{% endif %}
   {% else %}
     <section class="ins-card ins-locked">
       <div class="ins-card-head"><h2>Audience details</h2><span>Not in this plan</span></div>
@@ -44,4 +45,5 @@
     </section>
   {% endif %}
 </main>
+{{ chart_script() }}
 {% endblock %}
