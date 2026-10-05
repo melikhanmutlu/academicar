@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "partials/_insights_macros.html" import kpi, chart, funnel, breakdown, periods, secondary_line, headline, pct, partial_note, chart_script %}
+{% from "partials/_insights_macros.html" import kpi, chart, breakdown, period, engagement_sub, periods, secondary_line, headline, pct, partial_note, chart_script %}
 {% block title %}Insights - AcademicAR{% endblock %}
 {% block content %}
 {% set a = analytics %}
@@ -7,7 +7,7 @@
   <header class="dashboard-header">
     <div>
       <h1>Insights</h1>
-      <p>How visitors engage with your projects and 3D models in the last {{ a.days }} days.</p>
+      <p>How visitors engage with your projects and 3D models in the last {{ period(a.days) }}.</p>
     </div>
     <div class="insights-actions">
       {{ periods('insights', a.days, {'project': a.project_id}) }}
@@ -32,18 +32,17 @@
     </div>
   </header>
   {{ headline(a) }}
-  <p class="insights-print-note">AcademicAR impact report &middot; {{ current_user.username }} &middot; last {{ a.days }} days &middot; generated {{ generated_on }}</p>
+  <p class="insights-print-note">AcademicAR impact report &middot; {{ current_user.username }} &middot; last {{ period(a.days) }} &middot; generated {{ generated_on }}</p>
 
   <section class="ins-kpis">
     {{ kpi('Model views', a.views, none, a.changes.views, a.views, a.days) }}
     {{ kpi('Unique visitors', a.unique_visitors, none, a.changes.unique_visitors, a.unique_visitors, a.days) }}
     {{ kpi('QR scans', a.qr_scans, none, a.changes.qr_scans, a.qr_scans, a.days, hint=('Add the QR code to your poster or slides' if not a.qr_scans else none)) }}
-    {{ kpi('Engagement', pct(a.engagement_rate), (a.engaged_visitors ~ ' engaged visitors') if a.unique_visitors else none, a.changes.engaged_visitors, a.engaged_visitors, a.days, note=partial_note(a)) }}
+    {{ kpi('Engagement', pct(a.engagement_rate), engagement_sub(a), a.changes.engaged_visitors, a.engaged_visitors, a.days, note=partial_note(a)) }}
   </section>
   {{ secondary_line(a) }}
 
   {{ chart(a) }}
-  {% if a.views %}{{ funnel(a) }}{% endif %}
 
   <section class="ins-card">
     <div class="ins-card-head"><h2>Models</h2><span>{{ a.model_metrics|length }} {{ 'model' if a.model_metrics|length == 1 else 'models' }}</span></div>
@@ -105,7 +104,7 @@
     {{ breakdown('Devices', a.devices, 'No device data yet. Share a model link or QR code to see how people view it.') }}
     {{ breakdown('Traffic sources', a.sources, 'No traffic yet. Share a model link or QR code to see where visitors come from.') }}
     {% if a.has_country_data %}
-      {{ breakdown('Countries', a.countries, '') }}
+      {{ breakdown('Countries', a.countries, '', regions=true) }}
     {% endif %}
   </section>
   {% endif %}

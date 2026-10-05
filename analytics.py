@@ -354,18 +354,8 @@ def _breakdowns(views_query, total_views: int, limit: int = 5) -> dict:
     }
 
 
-def _funnel(totals: dict) -> list[dict]:
-    steps = [
-        ("Viewed a model", totals["unique_visitors"]),
-        ("Interacted (rotate, fullscreen, AR or share)", totals["engaged_visitors"]),
-        ("Started AR", totals["ar_visitors"]),
-    ]
-    top = steps[0][1]
-    return [{"label": label, "count": count, "pct": _rate(count, top) or 0.0} for label, count in steps]
-
-
 def _period_summary(base_query, days: int) -> dict:
-    """Totals, change vs the previous period, trend, audience and funnel for one
+    """Totals, change vs the previous period, trend and audience for one
     pre-filtered event query (a whole account, a project or a single model)."""
     first_day, start, previous_start = _windows(days)
     query = base_query.filter(AnalyticsEvent.occurred_at >= start)
@@ -402,7 +392,6 @@ def _period_summary(base_query, days: int) -> dict:
             [max(point["views"], point["previous_views"], point["qr_scans"]) for point in trend] or [0]
         ),
         **_breakdowns(views_query, totals["views"]),
-        "funnel": _funnel(totals),
         "_query": query,
     }
 

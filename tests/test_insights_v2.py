@@ -112,7 +112,7 @@ def test_engagement_counts_rotation_and_is_none_without_viewers(client, app):
         snapshot = analytics_snapshot(owner_id, days=30)
     assert snapshot["engagement_rate"] == 50.0
     assert snapshot["model_metrics"][0]["engagement_rate"] == 50.0
-    assert [step["count"] for step in snapshot["funnel"]] == [2, 1, 0]
+    assert (snapshot["unique_visitors"], snapshot["engaged_visitors"], snapshot["ar_visitors"]) == (2, 1, 0)
 
 
 def test_rotation_browser_event_is_accepted(client, app):
