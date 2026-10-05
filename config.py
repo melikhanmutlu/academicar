@@ -95,6 +95,10 @@ class Config:
         REDIS_URL if REDIS_URL else "memory://",
     )
 
+    # Optional MaxMind GeoLite2-Country database for the Insights "Countries"
+    # card when the site is not behind Cloudflare (which sends CF-IPCountry).
+    GEOIP_DB_PATH = os.environ.get("GEOIP_DB_PATH")
+
     # Runtime folders. Railway filesystem is ephemeral; use external object
     # storage before relying on these paths for long-lived production files.
     STORAGE_PROVIDER = os.environ.get("STORAGE_PROVIDER", "railway_volume")

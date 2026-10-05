@@ -348,8 +348,9 @@ def test_model_level_insights_include_engagement_and_segments(client, app):
         assert metric["engagement_rate"] == 100.0
         assert metric["top_country"]["label"] == "TR"
     page = client.get("/insights")
-    assert b"Model-level performance" in page.data
-    assert b"Leading segment" in page.data
+    assert b"Models" in page.data
+    assert b"Engagement" in page.data
+    assert b"/insights/model/" in page.data
 
 
 def test_institution_showcase_groups_articles_by_department(client, app):

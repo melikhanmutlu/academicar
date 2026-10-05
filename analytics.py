@@ -3,18 +3,27 @@ from __future__ import annotations
 
 import hashlib
 import secrets
-from datetime import UTC, datetime, timedelta
+from bisect import bisect_right
+from datetime import UTC, date, datetime, timedelta
 from urllib.parse import urlparse
 
 from flask import current_app, g, has_request_context, request
 from flask_login import current_user
-from sqlalchemy import func
+from sqlalchemy import func, or_, select
+from sqlalchemy.orm import aliased
 
 from licensing import plan_supports_feature
 from models import AnalyticsEvent, Model3D, Paper, db
 
 ANALYTICS_COOKIE = "aar_vid"
-ALLOWED_BROWSER_EVENTS = {"viewer_ar_started", "viewer_fullscreen_opened", "share_link_copied"}
+ALLOWED_BROWSER_EVENTS = {
+    "viewer_ar_started", "viewer_fullscreen_opened", "viewer_model_rotated", "share_link_copied",
+}
+# A visitor "engaged" with a model when they did more than load the page.
+ENGAGEMENT_EVENTS = ("viewer_ar_started", "share_link_copied", "viewer_fullscreen_opened", "viewer_model_rotated")
+DIRECT_SOURCE_LABEL = "Direct / QR"
+INTERNAL_SOURCE_LABEL = "AcademicAR (internal)"
+_geoip_reader = None
 
 
 def _hash(value: str) -> str:
@@ -80,7 +89,7 @@ def track_event(
     try:
         request_context = has_request_context()
         referrer = urlparse(request.referrer or "").hostname if request_context else None
-        country = (request.headers.get("CF-IPCountry") or "").upper() if request_context else ""
+        country = _request_country() if request_context else ""
         event = AnalyticsEvent(
             event_name=event_name[:64],
             owner_user_id=owner_user_id,
@@ -102,6 +111,29 @@ def track_event(
     except Exception:
         current_app.logger.exception("Could not record analytics event %s", event_name)
         db.session.rollback()
+
+
+def _request_country() -> str:
+    """Two-letter country from Cloudflare's header, else an optional GeoLite2 lookup.
+
+    ``GEOIP_DB_PATH`` points at a MaxMind GeoLite2-Country ``.mmdb`` file; the IP
+    is only used for this lookup and is never stored.
+    """
+    country = (request.headers.get("CF-IPCountry") or "").upper()
+    if country:
+        return country
+    path = current_app.config.get("GEOIP_DB_PATH")
+    if not path or not request.remote_addr:
+        return ""
+    global _geoip_reader
+    try:
+        if _geoip_reader is None:
+            import geoip2.database
+
+            _geoip_reader = geoip2.database.Reader(path)
+        return (_geoip_reader.country(request.remote_addr).country.iso_code or "").upper()
+    except Exception:
+        return ""
 
 
 def apply_analytics_cookie(response):
@@ -169,20 +201,214 @@ def funnel_snapshot(days: int = 30) -> dict:
     return {"days": days, "stages": stages}
 
 
-def analytics_snapshot(owner_user_id: int | None = None, days: int = 30) -> dict:  # noqa: C901
-    """Return a compact, role-safe dashboard payload from first-party events."""
-    now = datetime.now(UTC)
-    start = now - timedelta(days=days)
-    query = AnalyticsEvent.query.filter(AnalyticsEvent.occurred_at >= start)
+def _own_activity_excluded(query, owner_user_id: int):
+    """Drop the owner's own activity, including logged-out visits from a browser
+    the owner has used while signed in (same first-party visitor cookie)."""
+    own = aliased(AnalyticsEvent)
+    own_visitors = (
+        select(own.visitor_hash)
+        .where(own.actor_user_id == owner_user_id, own.visitor_hash.isnot(None))
+        .distinct()
+    )
+    return query.filter(
+        or_(AnalyticsEvent.actor_user_id.is_(None), AnalyticsEvent.actor_user_id != owner_user_id),
+        or_(AnalyticsEvent.visitor_hash.is_(None), AnalyticsEvent.visitor_hash.notin_(own_visitors)),
+    )
+
+
+def _windows(days: int, now: datetime | None = None):
+    """Current window = the last ``days`` calendar days (UTC, today included);
+    the previous window is the same length immediately before it."""
+    now = now or datetime.now(UTC)
+    first_day = now.date() - timedelta(days=days - 1)
+    start = datetime(first_day.year, first_day.month, first_day.day, tzinfo=UTC)
+    return first_day, start, start - timedelta(days=days)
+
+
+def _totals(query) -> dict:
+    by_event = {
+        name: (int(total or 0), int(unique or 0))
+        for name, total, unique in query.with_entities(
+            AnalyticsEvent.event_name,
+            func.count(AnalyticsEvent.id),
+            func.count(func.distinct(AnalyticsEvent.visitor_hash)),
+        ).group_by(AnalyticsEvent.event_name)
+    }
+    engaged = int(
+        query.filter(AnalyticsEvent.event_name.in_(ENGAGEMENT_EVENTS))
+        .with_entities(func.count(func.distinct(AnalyticsEvent.visitor_hash)))
+        .scalar()
+        or 0
+    )
+    unique_visitors = by_event.get("model_viewed", (0, 0))[1]
+    return {
+        "views": by_event.get("model_viewed", (0, 0))[0],
+        "unique_visitors": unique_visitors,
+        "qr_scans": by_event.get("qr_scanned", (0, 0))[0],
+        "ar_starts": by_event.get("viewer_ar_started", (0, 0))[0],
+        "ar_visitors": by_event.get("viewer_ar_started", (0, 0))[1],
+        "shares": by_event.get("share_link_copied", (0, 0))[0],
+        "fullscreen_opens": by_event.get("viewer_fullscreen_opened", (0, 0))[0],
+        "rotations": by_event.get("viewer_model_rotated", (0, 0))[0],
+        "review_visits": by_event.get("review_link_opened", (0, 0))[0],
+        "engaged_visitors": engaged,
+        "engagement_rate": _rate(engaged, unique_visitors),
+    }
+
+
+def _rate(part: int, whole: int) -> float | None:
+    """Percentage, or None when there is nothing to divide by (shown as "—")."""
+    return round(min(part / whole * 100, 100), 1) if whole else None
+
+
+def _change(current: int, previous: int) -> dict:
+    """Period-over-period change; ``pct`` is None when the previous period was 0."""
+    pct = round((current - previous) / previous * 100) if previous else None
+    direction = "up" if current > previous else "down" if current < previous else "flat"
+    return {"previous": previous, "pct": pct, "direction": direction}
+
+
+def _trend(query, first_day: date, days: int) -> tuple[str, list[dict]]:
+    """Views, QR scans and AR starts bucketed by day (≤30 days), week (90) or
+    month (12 months), from a single grouped query."""
+    granularity = "day" if days <= 31 else "week" if days <= 120 else "month"
+    today = first_day + timedelta(days=days - 1)
+    if granularity == "day":
+        starts = [first_day + timedelta(days=i) for i in range(days)]
+    elif granularity == "week":
+        starts = [first_day + timedelta(days=i) for i in range(0, days, 7)]
+    else:
+        starts, cursor = [], first_day.replace(day=1)
+        while cursor <= today:
+            starts.append(cursor)
+            cursor = (cursor + timedelta(days=32)).replace(day=1)
+    fmt = {"day": "%b %d", "week": "%b %d", "month": "%b %Y"}[granularity]
+    points = [
+        {"label": start.strftime(fmt), "start": start.isoformat(), "views": 0, "qr_scans": 0, "ar_starts": 0}
+        for start in starts
+    ]
+    field = {"model_viewed": "views", "qr_scanned": "qr_scans", "viewer_ar_started": "ar_starts"}
+    rows = (
+        query.filter(AnalyticsEvent.event_name.in_(tuple(field)))
+        .with_entities(func.date(AnalyticsEvent.occurred_at), AnalyticsEvent.event_name, func.count(AnalyticsEvent.id))
+        .group_by(func.date(AnalyticsEvent.occurred_at), AnalyticsEvent.event_name)
+        .all()
+    )
+    for day_value, event_name, total in rows:
+        day = date.fromisoformat(str(day_value)[:10])
+        index = bisect_right(starts, day) - 1
+        if 0 <= index < len(points):
+            points[index][field[event_name]] += int(total or 0)
+    return granularity, points
+
+
+def _internal_hosts() -> set[str]:
+    hosts = {"localhost", "127.0.0.1"}
+    site_host = urlparse(current_app.config.get("SITE_URL") or "").hostname
+    if site_host:
+        bare = site_host.removeprefix("www.")
+        hosts |= {bare, f"www.{bare}"}
+    if has_request_context() and request.host:
+        hosts.add(request.host.split(":")[0])
+    return hosts
+
+
+def _source_label(domain: str | None, internal: set[str]) -> str:
+    if not domain:
+        return DIRECT_SOURCE_LABEL
+    domain = domain.lower()
+    if domain in internal or domain.endswith(".up.railway.app"):
+        return INTERNAL_SOURCE_LABEL
+    return domain.removeprefix("www.")
+
+
+def _with_share(rows: list[tuple[str, int]], total: int, limit: int) -> list[dict]:
+    rows = sorted(rows, key=lambda row: (-row[1], row[0]))[:limit]
+    return [{"label": label, "count": count, "pct": _rate(count, total) or 0} for label, count in rows]
+
+
+def _breakdowns(views_query, total_views: int, limit: int = 5) -> dict:
+    """Viewer audience only: counting every event mixed sign-ups and uploads
+    into "devices" / "countries"."""
+    def grouped(column):
+        return [
+            (label, int(count))
+            for label, count in views_query.with_entities(column, func.count(AnalyticsEvent.id)).group_by(column)
+        ]
+
+    internal = _internal_hosts()
+    sources: dict[str, int] = {}
+    for domain, count in grouped(AnalyticsEvent.referrer_domain):
+        label = _source_label(domain, internal)
+        sources[label] = sources.get(label, 0) + count
+    countries = [(label, count) for label, count in grouped(AnalyticsEvent.country_code) if label]
+    devices = [(label, count) for label, count in grouped(AnalyticsEvent.device_type) if label]
+    return {
+        "countries": _with_share(countries, total_views, limit),
+        "has_country_data": bool(countries),
+        "devices": _with_share(devices, total_views, limit),
+        "sources": _with_share(list(sources.items()), total_views, limit + 1),
+    }
+
+
+def _funnel(totals: dict) -> list[dict]:
+    steps = [
+        ("Viewed a model", totals["unique_visitors"]),
+        ("Interacted (rotate, fullscreen, AR or share)", totals["engaged_visitors"]),
+        ("Started AR", totals["ar_visitors"]),
+    ]
+    top = steps[0][1]
+    return [{"label": label, "count": count, "pct": _rate(count, top) or 0} for label, count in steps]
+
+
+def _period_summary(base_query, days: int) -> dict:
+    """Totals, change vs the previous period, trend, audience and funnel for one
+    pre-filtered event query (a whole account, a project or a single model)."""
+    first_day, start, previous_start = _windows(days)
+    query = base_query.filter(AnalyticsEvent.occurred_at >= start)
+    previous_query = base_query.filter(
+        AnalyticsEvent.occurred_at >= previous_start, AnalyticsEvent.occurred_at < start
+    )
+    totals = _totals(query)
+    previous = _totals(previous_query)
+    granularity, trend = _trend(query, first_day, days)
+    views_query = query.filter(AnalyticsEvent.event_name == "model_viewed")
+    peak = max(trend, key=lambda point: point["views"]) if trend else None
+    return {
+        "days": days,
+        **totals,
+        "changes": {
+            key: _change(totals[key], previous[key])
+            for key in ("views", "unique_visitors", "qr_scans", "ar_starts", "engaged_visitors", "shares", "review_visits")
+        },
+        "trend": trend,
+        "trend_granularity": granularity,
+        "trend_peak": peak if peak and peak["views"] else None,
+        **_breakdowns(views_query, totals["views"]),
+        "funnel": _funnel(totals),
+        "_query": query,
+    }
+
+
+def analytics_snapshot(owner_user_id: int | None = None, days: int = 30, project_id: int | None = None) -> dict:
+    """Return a compact, role-safe dashboard payload from first-party events.
+
+    With ``owner_user_id`` the owner's own activity is excluded, so the numbers
+    describe readers only.
+    """
+    base = AnalyticsEvent.query
     if owner_user_id is not None:
-        query = query.filter(AnalyticsEvent.owner_user_id == owner_user_id)
+        base = _own_activity_excluded(base.filter(AnalyticsEvent.owner_user_id == owner_user_id), owner_user_id)
+    if project_id is not None:
+        base = base.filter(AnalyticsEvent.project_id == project_id)
+    summary = _period_summary(base, days)
+    query = summary.pop("_query")
 
     def count(name: str) -> int:
         return query.filter(AnalyticsEvent.event_name == name).count()
 
-    views_query = query.filter(AnalyticsEvent.event_name == "model_viewed")
     top_rows = (
-        views_query.filter(AnalyticsEvent.model_id.isnot(None))
+        query.filter(AnalyticsEvent.event_name == "model_viewed", AnalyticsEvent.model_id.isnot(None))
         .with_entities(AnalyticsEvent.model_id, func.count(AnalyticsEvent.id))
         .group_by(AnalyticsEvent.model_id)
         .order_by(func.count(AnalyticsEvent.id).desc())
@@ -191,125 +417,23 @@ def analytics_snapshot(owner_user_id: int | None = None, days: int = 30) -> dict
     )
     model_ids = [model_id for model_id, _ in top_rows]
     models = {model.id: model for model in Model3D.query.filter(Model3D.id.in_(model_ids)).all()} if model_ids else {}
-    trend = []
-    for offset in range(days - 1, -1, -1):
-        day_start = (now - timedelta(days=offset)).replace(hour=0, minute=0, second=0, microsecond=0)
-        day_end = day_start + timedelta(days=1)
-        day_query = query.filter(AnalyticsEvent.occurred_at >= day_start, AnalyticsEvent.occurred_at < day_end)
-        trend.append({"label": day_start.strftime("%b %d"), "views": day_query.filter(AnalyticsEvent.event_name == "model_viewed").count()})
 
-    def breakdown(column):
-        # Viewer audience only: counting every event mixed sign-ups and
-        # uploads into "devices" / "countries".
-        return [
-            {"label": label, "count": count_value}
-            for label, count_value in (
-                views_query.with_entities(column, func.count(AnalyticsEvent.id))
-                .filter(column.isnot(None))
-                .group_by(column)
-                .order_by(func.count(AnalyticsEvent.id).desc())
-                .limit(5)
-                .all()
-            )
-        ]
-
+    projects = []
     model_metrics = []
     if owner_user_id is not None:
-        owned_models = (
-            Model3D.query.join(Paper)
-            .filter(Model3D.user_id == owner_user_id, Paper.deleted_at.is_(None))
-            .order_by(Model3D.created_at.desc())
-            .all()
-        )
-        owned_ids = [model.id for model in owned_models]
-        aggregate = {}
-        if owned_ids:
-            rows = (
-                query.with_entities(
-                    AnalyticsEvent.model_id,
-                    AnalyticsEvent.event_name,
-                    func.count(AnalyticsEvent.id),
-                    func.count(func.distinct(AnalyticsEvent.visitor_hash)),
-                    func.max(AnalyticsEvent.occurred_at),
-                )
-                .filter(AnalyticsEvent.model_id.in_(owned_ids))
-                .group_by(AnalyticsEvent.model_id, AnalyticsEvent.event_name)
-                .all()
-            )
-            for model_id, event_name, total, unique_count, last_at in rows:
-                aggregate.setdefault(model_id, {})[event_name] = {
-                    "count": int(total or 0), "unique": int(unique_count or 0), "last_at": last_at,
-                }
-
-        dimension_maps = {}
-        for dimension_name, column in (
-            ("country", AnalyticsEvent.country_code),
-            ("device", AnalyticsEvent.device_type),
-            ("source", AnalyticsEvent.referrer_domain),
-        ):
-            per_model = {}
-            if owned_ids:
-                dimension_rows = (
-                    query.with_entities(AnalyticsEvent.model_id, column, func.count(AnalyticsEvent.id))
-                    .filter(AnalyticsEvent.model_id.in_(owned_ids), column.isnot(None))
-                    .group_by(AnalyticsEvent.model_id, column)
-                    .order_by(func.count(AnalyticsEvent.id).desc())
-                    .all()
-                )
-                for model_id, label, count_value in dimension_rows:
-                    per_model.setdefault(model_id, {"label": label, "count": int(count_value)})
-            dimension_maps[dimension_name] = per_model
-
-        engaged_visitors: dict[str, set[str]] = {}
-        if owned_ids:
-            engagement_rows = (
-                query.with_entities(AnalyticsEvent.model_id, AnalyticsEvent.visitor_hash)
-                .filter(
-                    AnalyticsEvent.model_id.in_(owned_ids),
-                    AnalyticsEvent.event_name.in_(("viewer_ar_started", "share_link_copied")),
-                    AnalyticsEvent.visitor_hash.isnot(None),
-                )
-                .distinct()
-                .all()
-            )
-            for model_id, visitor in engagement_rows:
-                engaged_visitors.setdefault(model_id, set()).add(visitor)
-
-        for model in owned_models:
-            events = aggregate.get(model.id, {})
-            views = events.get("model_viewed", {}).get("count", 0)
-            unique_viewers = events.get("model_viewed", {}).get("unique", 0)
-            ar_starts = events.get("viewer_ar_started", {}).get("count", 0)
-            shares = events.get("share_link_copied", {}).get("count", 0)
-            engaged_unique = len(engaged_visitors.get(model.id, set()))
-            model_metrics.append({
-                "model": model,
-                "detailed": plan_supports_feature(model.license_type, "detailed_insights"),
-                "views": views,
-                "unique_visitors": unique_viewers,
-                "qr_scans": events.get("qr_scanned", {}).get("count", 0),
-                "ar_starts": ar_starts,
-                "shares": shares,
-                "fullscreen_opens": events.get("viewer_fullscreen_opened", {}).get("count", 0),
-                "engaged_visitors": engaged_unique,
-                "engagement_rate": round(min((engaged_unique / unique_viewers) * 100, 100), 1) if unique_viewers else 0,
-                "last_viewed_at": events.get("model_viewed", {}).get("last_at"),
-                "top_country": dimension_maps["country"].get(model.id),
-                "top_device": dimension_maps["device"].get(model.id),
-                "top_source": dimension_maps["source"].get(model.id),
-            })
+        owned_query = Model3D.query.join(Paper).filter(Model3D.user_id == owner_user_id, Paper.deleted_at.is_(None))
+        projects = [
+            {"id": paper_id, "title": title}
+            for paper_id, title in owned_query.with_entities(Paper.id, Paper.title).distinct().order_by(Paper.title)
+        ]
+        if project_id is not None:
+            owned_query = owned_query.filter(Model3D.paper_id == project_id)
+        model_metrics = _model_metrics(query, owned_query.order_by(Model3D.created_at.desc()).all())
 
     return {
-        "days": days,
-        "views": views_query.count(),
-        "unique_visitors": int(
-            views_query.with_entities(func.count(func.distinct(AnalyticsEvent.visitor_hash))).scalar()
-            or 0
-        ),
-        "qr_scans": count("qr_scanned"),
-        "review_visits": count("review_link_opened"),
-        "shares": count("share_link_copied"),
-        "ar_starts": count("viewer_ar_started"),
+        **summary,
+        "project_id": project_id,
+        "projects": projects,
         "project_views": count("project_viewed"),
         "projects_created": count("project_created"),
         "models_uploaded": count("model_uploaded"),
@@ -317,9 +441,105 @@ def analytics_snapshot(owner_user_id: int | None = None, days: int = 30) -> dict
         "conversion_failed": count("model_conversion_failed"),
         "active_creators": query.filter(AnalyticsEvent.event_name.in_(("project_created", "model_uploaded"))).with_entities(AnalyticsEvent.actor_user_id).distinct().count(),
         "top_models": [{"model": models.get(model_id), "count": count_value} for model_id, count_value in top_rows],
-        "trend": trend,
-        "countries": breakdown(AnalyticsEvent.country_code),
-        "devices": breakdown(AnalyticsEvent.device_type),
-        "sources": breakdown(AnalyticsEvent.referrer_domain),
         "model_metrics": model_metrics,
     }
+
+
+def _model_metrics(query, owned_models: list) -> list[dict]:
+    """Per-model rows, most viewed first; never-viewed models last."""
+    owned_ids = [model.id for model in owned_models]
+    if not owned_ids:
+        return []
+    aggregate: dict = {}
+    for model_id, event_name, total, unique_count, last_at in (
+        query.with_entities(
+            AnalyticsEvent.model_id,
+            AnalyticsEvent.event_name,
+            func.count(AnalyticsEvent.id),
+            func.count(func.distinct(AnalyticsEvent.visitor_hash)),
+            func.max(AnalyticsEvent.occurred_at),
+        )
+        .filter(AnalyticsEvent.model_id.in_(owned_ids))
+        .group_by(AnalyticsEvent.model_id, AnalyticsEvent.event_name)
+    ):
+        aggregate.setdefault(model_id, {})[event_name] = {
+            "count": int(total or 0), "unique": int(unique_count or 0), "last_at": last_at,
+        }
+
+    internal = _internal_hosts()
+    dimension_maps = {}
+    for dimension_name, column in (
+        ("country", AnalyticsEvent.country_code),
+        ("device", AnalyticsEvent.device_type),
+        ("source", AnalyticsEvent.referrer_domain),
+    ):
+        per_model: dict = {}
+        rows = (
+            query.filter(AnalyticsEvent.event_name == "model_viewed", AnalyticsEvent.model_id.in_(owned_ids))
+            .with_entities(AnalyticsEvent.model_id, column, func.count(AnalyticsEvent.id))
+            .group_by(AnalyticsEvent.model_id, column)
+            .order_by(func.count(AnalyticsEvent.id).desc())
+        )
+        for model_id, label, count_value in rows:
+            if dimension_name == "source":
+                label = _source_label(label, internal)
+            elif label is None:
+                continue
+            per_model.setdefault(model_id, {"label": label, "count": int(count_value)})
+        dimension_maps[dimension_name] = per_model
+
+    engaged_visitors: dict[str, set[str]] = {}
+    for model_id, visitor in (
+        query.with_entities(AnalyticsEvent.model_id, AnalyticsEvent.visitor_hash)
+        .filter(
+            AnalyticsEvent.model_id.in_(owned_ids),
+            AnalyticsEvent.event_name.in_(ENGAGEMENT_EVENTS),
+            AnalyticsEvent.visitor_hash.isnot(None),
+        )
+        .distinct()
+    ):
+        engaged_visitors.setdefault(model_id, set()).add(visitor)
+
+    metrics = []
+    for model in owned_models:
+        events = aggregate.get(model.id, {})
+
+        def stat(name, key="count"):
+            return events.get(name, {}).get(key, 0)
+
+        unique_viewers = stat("model_viewed", "unique")
+        engaged_unique = len(engaged_visitors.get(model.id, set()))
+        metrics.append({
+            "model": model,
+            "detailed": plan_supports_feature(model.license_type, "detailed_insights"),
+            "views": stat("model_viewed"),
+            "unique_visitors": unique_viewers,
+            "qr_scans": stat("qr_scanned"),
+            "ar_starts": stat("viewer_ar_started"),
+            "shares": stat("share_link_copied"),
+            "fullscreen_opens": stat("viewer_fullscreen_opened"),
+            "rotations": stat("viewer_model_rotated"),
+            "engaged_visitors": engaged_unique,
+            "engagement_rate": _rate(engaged_unique, unique_viewers),
+            "last_viewed_at": events.get("model_viewed", {}).get("last_at"),
+            "top_country": dimension_maps["country"].get(model.id),
+            "top_device": dimension_maps["device"].get(model.id),
+            "top_source": dimension_maps["source"].get(model.id),
+        })
+    viewed = sorted(
+        (item for item in metrics if item["views"]),
+        key=lambda item: (-item["views"], -item["unique_visitors"]),
+    )
+    return viewed + [item for item in metrics if not item["views"]]
+
+
+def model_snapshot(model, days: int = 30) -> dict:
+    """Single-model insights for the owner's per-model detail page."""
+    base = _own_activity_excluded(
+        AnalyticsEvent.query.filter(AnalyticsEvent.model_id == model.id), model.user_id
+    )
+    summary = _period_summary(base, days)
+    summary.pop("_query")
+    summary["detailed"] = plan_supports_feature(model.license_type, "detailed_insights")
+    summary["qr_share"] = _rate(summary["qr_scans"], summary["views"])
+    return summary
