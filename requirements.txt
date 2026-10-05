@@ -21,6 +21,9 @@ numpy==1.26.4
 # NIfTI / NRRD / DICOM-SEG segmentations) -> GLB in converters/medical.
 cascadio==0.1.1
 pydicom==3.0.2
+# Decoder plugin so pydicom reads compressed DICOM (JPEG Lossless, JPEG-LS,
+# JPEG 2000, RLE) - most PACS exports. BSD licensed.
+python-gdcm==3.2.6
 scikit-image==0.25.2
 nibabel==5.4.2
 pynrrd==1.1.3
