@@ -340,6 +340,72 @@ class ModelAnnotation(db.Model):
         }
 
 
+class ModelScene(db.Model):
+    """A saved view of a model (layers, camera, labels, section) with its own link.
+
+    ``state`` is a versioned JSON object ({"v": 1, ...}) filtered by
+    scenes.clean_scene_state before it is stored. ``ar_*`` hold the optional
+    per-scene AR variant (only the scene's visible layers) built by the worker.
+    """
+    __tablename__ = "model_scenes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    model_id = db.Column(db.String(36), db.ForeignKey("models.id", ondelete="CASCADE"), nullable=False, index=True)
+    public_id = db.Column(db.String(40), unique=True, nullable=False, index=True)
+    title = db.Column(db.String(120), nullable=False)
+    description = db.Column(db.String(500), nullable=True)
+    order_index = db.Column(db.Integer, nullable=False, default=0)
+    state = db.Column(db.JSON, nullable=False)
+    ar_status = db.Column(db.String(20), nullable=False, default="none")  # none/queued/ready/failed
+    ar_glb_path = db.Column(db.String(500), nullable=True)
+    ar_usdz_path = db.Column(db.String(500), nullable=True)
+    ar_file_size = db.Column(db.Integer, nullable=True)
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = db.Column(db.DateTime, default=utc_now)
+    updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
+
+    model = db.relationship(
+        "Model3D",
+        backref=db.backref("scenes", lazy=True, cascade="all, delete-orphan", order_by="ModelScene.order_index"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<ModelScene {self.public_id} -> {self.model_id}>"
+
+
+class ModelComparison(db.Model):
+    """Two models side by side (before/after) behind one public link.
+
+    Both models come from projects the owner can edit; each half still obeys
+    its own model's access rules when the link is opened.
+    """
+    __tablename__ = "model_comparisons"
+
+    id = db.Column(db.Integer, primary_key=True)
+    public_id = db.Column(db.String(40), unique=True, nullable=False, index=True)
+    owner_user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    title = db.Column(db.String(120), nullable=False)
+    left_model_id = db.Column(db.String(36), db.ForeignKey("models.id", ondelete="CASCADE"), nullable=False, index=True)
+    right_model_id = db.Column(db.String(36), db.ForeignKey("models.id", ondelete="CASCADE"), nullable=False, index=True)
+    left_label = db.Column(db.String(60), nullable=True)
+    right_label = db.Column(db.String(60), nullable=True)
+    sync_camera = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=utc_now)
+
+    owner = db.relationship("User", foreign_keys=[owner_user_id])
+    left_model = db.relationship(
+        "Model3D", foreign_keys=[left_model_id],
+        backref=db.backref("comparisons_as_left", lazy=True, cascade="all, delete-orphan"),
+    )
+    right_model = db.relationship(
+        "Model3D", foreign_keys=[right_model_id],
+        backref=db.backref("comparisons_as_right", lazy=True, cascade="all, delete-orphan"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<ModelComparison {self.public_id}>"
+
+
 class QRLink(db.Model):
     __tablename__ = "qr_links"
 
