@@ -293,8 +293,8 @@ def layer_metrics_csv(model_id):
     for pair in metrics["pairs"]:
         writer.writerow(["pair", _csv_cell(pair["a"]), _csv_cell(pair["b"]), "", "", "", "", "", pair["min_distance_mm"]])
     return Response(
-        out.getvalue(),
-        mimetype="text/csv",
+        "\ufeff" + out.getvalue(),  # BOM: Excel otherwise misreads non-ASCII layer names
+        mimetype="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="layer-measurements-{model.id[:8]}.csv"', "Cache-Control": "no-store"},
     )
 

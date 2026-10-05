@@ -136,7 +136,9 @@ def test_csv_has_layer_and_pair_rows_and_neutralises_formulas(client, app, owner
     resp = client.get(f"/models/{owner}/layer-metrics.csv")
     assert resp.status_code == 200
     assert resp.mimetype == "text/csv" and "attachment" in resp.headers["Content-Disposition"]
-    rows = list(csv.reader(io.StringIO(resp.get_data(as_text=True))))
+    body = resp.get_data(as_text=True)
+    assert body.startswith("\ufeff")  # Excel needs the BOM for non-ASCII names
+    rows = list(csv.reader(io.StringIO(body[1:])))
     assert rows[0][:3] == ["kind", "layer", "layer_b"]
     kinds = [r[0] for r in rows[1:]]
     assert kinds == ["layer"] * 3 + ["pair"] * 2
