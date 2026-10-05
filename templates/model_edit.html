@@ -272,6 +272,50 @@
         {% endif %}
       </div>
 
+      {% if model_status == 'ready' %}
+      {% set model_compares = model_comparisons(model) %}
+      <div class="surface model-edit-card" id="compareSection">
+        <style>
+          .compare-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 10px 0; border-top: 1px solid #e8e8e8; }
+          .compare-row-title { min-width: 0; flex: 1 1 200px; overflow-wrap: anywhere; font-size: 14px; }
+          .compare-row-title span { display: block; font-size: 12px; color: #6b6b6b; }
+          .compare-row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+          .compare-row-actions form { margin: 0; }
+        </style>
+        <div class="model-edit-card-head">
+          <h2>Compare</h2>
+          <p>Show this model next to another one, such as before and after, behind a single public link.</p>
+        </div>
+        {% if model_compares %}
+        <div>
+          {% for cmp in model_compares %}
+          <div class="compare-row">
+            <div class="compare-row-title">{{ cmp.title }}<span>{{ cmp.left_label or 'Before' }} &middot; {{ cmp.right_label or 'After' }}</span></div>
+            <div class="compare-row-actions">
+              <a href="{{ url_for('comparisons.view', public_id=cmp.public_id) }}" target="_blank" rel="noopener noreferrer" class="detail-action">Open</a>
+              <button type="button" class="detail-action" data-copy-link="{{ comparison_url(cmp) }}">Copy link</button>
+              {% if can_manage_comparison(cmp) %}
+              <a href="{{ url_for('comparisons.qr_asset', cid=cmp.id, asset='label.png') }}" class="detail-action">QR label</a>
+              <form method="POST" action="{{ url_for('comparisons.delete_comparison', cid=cmp.id) }}" onsubmit="return confirm('Delete this comparison? Its link and QR label stop working.');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="detail-action detail-action-danger">Delete</button>
+              </form>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <div class="model-edit-actions">
+          {% if 'comparison' in get_license_plan(model.license_type).features %}
+          <a href="{{ url_for('comparisons.new_comparison', left=model.id) }}" class="detail-action detail-action-primary">Compare with another model&hellip;</a>
+          {% else %}
+          <p class="text-sm text-[#64748b]">Before / after comparison is available on paid plans.</p>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
       <div class="surface model-edit-card" id="annotationSection">
         <div class="model-edit-card-head">
           <h2>Educational labels</h2>

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}New comparison - AcademicAR{% endblock %}
+
+{% block content %}
+<div class="app-shell model-edit-shell py-10 pb-10">
+  <a href="{{ url_for('model_edit', model_id=left.id) }}" class="detail-back-button">&larr; Model</a>
+
+  <div class="model-edit-header">
+    <div>
+      <h1>Compare two models</h1>
+      <p>Show two models side by side behind one public link, for example before and after a procedure.</p>
+    </div>
+  </div>
+
+  <div class="model-edit-layout">
+    <main class="model-edit-main">
+      {% if candidates %}
+      <form method="POST" action="{{ url_for('comparisons.create_comparison') }}" class="surface model-edit-card">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="left_model_id" value="{{ left.id }}">
+        <div class="model-edit-card-head">
+          <h2>Comparison</h2>
+          <p>The left side is <strong>{{ model_label(left) }}</strong>. Pick the model to show beside it.</p>
+        </div>
+        <div class="model-edit-field-grid">
+          <label class="field-label" for="cmpRight">Compare with</label>
+          <select id="cmpRight" name="right_model_id" class="field-input" required>
+            {% for candidate in candidates %}
+            <option value="{{ candidate.id }}">{{ model_label(candidate) }} &mdash; {{ candidate.paper.title }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="model-edit-field-grid">
+          <label class="field-label" for="cmpTitle">Title</label>
+          <input id="cmpTitle" type="text" name="title" class="field-input" maxlength="{{ title_max }}" placeholder="Example: Femur, before and after">
+        </div>
+        <div class="model-edit-field-grid">
+          <label class="field-label" for="cmpLeftLabel">Left label</label>
+          <input id="cmpLeftLabel" type="text" name="left_label" class="field-input" maxlength="{{ label_max }}" value="Before">
+        </div>
+        <div class="model-edit-field-grid">
+          <label class="field-label" for="cmpRightLabel">Right label</label>
+          <input id="cmpRightLabel" type="text" name="right_label" class="field-input" maxlength="{{ label_max }}" value="After">
+        </div>
+        <label class="model-edit-confirm">
+          <input type="checkbox" name="sync_camera" value="on" checked class="mt-1">
+          <span>Move both cameras together. Viewers can still turn this off on the page.</span>
+        </label>
+        <div class="model-edit-actions">
+          <button type="submit" class="detail-action detail-action-primary">Create comparison</button>
+        </div>
+      </form>
+      {% else %}
+      <div class="surface model-edit-card">
+        <div class="model-edit-card-head">
+          <h2>No other model to compare</h2>
+          <p>Upload another model to one of your projects (or a project you edit) and wait for it to finish processing, then come back.</p>
+        </div>
+        <div class="model-edit-actions">
+          <a href="{{ url_for('model_edit', model_id=left.id) }}" class="detail-action">Back to model</a>
+        </div>
+      </div>
+      {% endif %}
+    </main>
+  </div>
+</div>
+{% endblock %}
