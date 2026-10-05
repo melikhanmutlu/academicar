@@ -22,12 +22,16 @@ def is_out_of_space_error(exc: BaseException) -> bool:
     return isinstance(exc, OSError) and exc.errno in (errno.ENOSPC, errno.EDQUOT)
 
 
-def upload_space_shortfall(folder: str, request_bytes: int | None, *, medical: bool, min_free: int) -> dict | None:
+def upload_space_shortfall(
+    folder: str, request_bytes: int | None, *, medical: bool, min_free: int, already_written: int = 0
+) -> dict | None:
     """None when the volume holding ``folder`` can take an upload of
     ``request_bytes``; otherwise the numbers for the log line. Needs
     ``request_bytes`` x factor + ``min_free`` free, with factor 4 for medical
     scans (raw file + extraction) and 2 otherwise (source + archived copy).
-    ``request_bytes`` None (no Content-Length) enforces only the reserve."""
+    ``request_bytes`` None (no Content-Length) enforces only the reserve.
+    ``already_written``: bytes of this upload already on the volume (a chunked
+    upload being appended or finalised), which no longer need free space."""
     probe = folder
     while probe and not os.path.exists(probe):
         parent = os.path.dirname(probe)
@@ -39,7 +43,7 @@ def upload_space_shortfall(folder: str, request_bytes: int | None, *, medical: b
     except OSError:
         return None  # cannot tell; the ENOSPC handler is the backstop
     factor = 4 if medical else 2
-    required = int(request_bytes or 0) * factor + int(min_free)
+    required = max(0, int(request_bytes or 0) * factor - int(already_written)) + int(min_free)
     if free >= required:
         return None
     return {"free": free, "required": required, "request_bytes": int(request_bytes or 0), "factor": factor, "min_free": int(min_free)}

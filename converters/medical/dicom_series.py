@@ -10,6 +10,7 @@ import math
 
 import numpy as np
 
+from . import progress
 from .common import MEDICAL_PRESETS, MedicalError, max_voxels, parse_presets
 from .meshing import Grid, LayerSource, Source, choose_strides, fmt_mm
 from .segmentation import _load_dicom_seg
@@ -125,7 +126,12 @@ def _use_segmentation(segs):
 def load_series(paths, preset: str) -> Source:
     """``preset`` is one preset key or a comma-separated list ("bone,skin"); each becomes a layer."""
     presets = parse_presets(preset)
-    headers = [h for h in (_header(p) for p in paths) if h]
+    headers = []
+    for index, path in enumerate(paths):
+        progress.report(8 + 7 * index / max(1, len(paths)), f"Checking slices {index} / {len(paths)}")
+        header = _header(path)
+        if header:
+            headers.append(header)
     notes = []
     # A DICOM-SEG exported next to the CT (3D Slicer, OHIF) is what the user wants to see.
     segs = [h for h in headers if h["modality"] == "SEG"]
@@ -206,8 +212,11 @@ def load_series(paths, preset: str) -> Source:
     )
     shape = (math.ceil(cols / si), math.ceil(rows / sj), len(chosen))
     volume = np.empty(shape, dtype=np.int16 if as_int else np.float32)
+    verb = "Decoding compressed slices" if any(h["compressed"] for h in chosen) else "Reading DICOM slices"
     for k, h in enumerate(chosen):
+        progress.report(15 + 40 * k / len(chosen), f"{verb} {k} / {len(chosen)}")
         volume[:, :, k] = _read_slice(h["path"], as_int)[::sj, ::si].T
+    progress.report(55, "Applying the threshold", force=True)
 
     infos, preset_notes = _resolve_presets(presets, modality)
     notes.extend(preset_notes)
@@ -269,7 +278,12 @@ def _threshold_layers(volume: np.ndarray, keys) -> list:
         return cache[key]
 
     return [
-        LayerSource(name=MEDICAL_PRESETS[k]["label"], color=MEDICAL_PRESETS[k]["color"], load=lambda k=k: mask_for(k))
+        LayerSource(
+            name=MEDICAL_PRESETS[k]["label"],
+            color=MEDICAL_PRESETS[k]["color"],
+            load=lambda k=k: mask_for(k),
+            public_name=True,
+        )
         for k in keys
     ]
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
@@ -11,6 +12,7 @@ import tempfile
 from pathlib import Path
 
 from ..base_converter import BaseConverter
+from . import progress
 from .common import MedicalError, convert_timeout, parse_presets
 
 logger = logging.getLogger(__name__)
@@ -63,14 +65,19 @@ class MedicalConverter(BaseConverter):
         os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
         with tempfile.TemporaryDirectory(dir=os.path.dirname(os.path.abspath(output_path)), prefix=".medical_result_") as tmp:
             result_path = os.path.join(tmp, "result.json")
+            progress_path = os.path.join(tmp, "progress.json")
             command = [
                 sys.executable, "-m", "converters.medical.cli", self.kind, input_path, output_path,
                 "--preset", self.preset or "", "--result", result_path, "--workdir", tmp,
+                "--progress", progress_path,
             ]
             try:
-                proc = subprocess.run(
-                    command, cwd=str(_REPO_ROOT), capture_output=True, text=True, timeout=convert_timeout()
-                )
+                # The child reports real counts (slices read, structures meshed) into
+                # progress_path; the poller hands them to progress_callback while it runs.
+                with self._follow_progress(progress_path):
+                    proc = subprocess.run(
+                        command, cwd=str(_REPO_ROOT), capture_output=True, text=True, timeout=convert_timeout()
+                    )
             except subprocess.TimeoutExpired:
                 self._fail(_TIMEOUT_MESSAGE, output_path)
                 return False
@@ -103,6 +110,11 @@ class MedicalConverter(BaseConverter):
         self.log_operation(f"Medical conversion produced {len(self.layers)} layer(s)")
         self.cleanup()
         return True
+
+    def _follow_progress(self, progress_path: str):
+        if self.progress_callback is None:
+            return contextlib.nullcontext()
+        return progress.Poller(progress_path, self.progress_callback)
 
     def _fail(self, message: str, output_path: str) -> None:
         self.handle_error(message)

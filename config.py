@@ -115,6 +115,10 @@ class Config:
     # Deliberately outside UPLOAD_FOLDER: backups zip (and mirror offsite) the
     # whole upload folder and must never contain a patient scan.
     MEDICAL_STAGING_FOLDER = runtime_folder("MEDICAL_STAGING_FOLDER", "medical_staging", _runtime_base)
+    # Chunked uploads (uploads.py) are assembled here until the form that owns
+    # them is submitted. Also outside UPLOAD_FOLDER, so backups never include a
+    # half-finished upload; medical inputs use MEDICAL_STAGING_FOLDER instead.
+    UPLOAD_STAGING_FOLDER = runtime_folder("UPLOAD_STAGING_FOLDER", "upload_staging", _runtime_base)
 
     # S3-compatible mirror (best-effort backup). Silently disabled if unset.
     # Works with Cloudflare R2 (set R2_ACCOUNT_ID) or any S3 provider such as
@@ -304,6 +308,7 @@ class Config:
             app.config["BLOG_IMAGE_FOLDER"],
             app.config["INSTITUTION_LOGO_FOLDER"],
             app.config["MEDICAL_STAGING_FOLDER"],
+            app.config["UPLOAD_STAGING_FOLDER"],
             app.config["STORAGE_ROOT"],
         ):
             # A full volume must not stop the app from booting (it would

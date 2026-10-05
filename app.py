@@ -84,6 +84,7 @@ from scenes import (
     scenes_bp,
     scenes_for_viewer,
 )
+from uploads import resolve_staged_upload, uploads_bp
 from collaborators import (
     add_collaborator,
     can_edit_project,
@@ -189,6 +190,10 @@ def create_app(test_config: dict | None = None) -> Flask:
             app.config["MEDICAL_STAGING_FOLDER"] = os.path.join(
                 os.path.dirname(os.path.abspath(test_config["UPLOAD_FOLDER"])), "medical_staging"
             )
+        if "UPLOAD_FOLDER" in test_config and "UPLOAD_STAGING_FOLDER" not in test_config:
+            app.config["UPLOAD_STAGING_FOLDER"] = os.path.join(
+                os.path.dirname(os.path.abspath(test_config["UPLOAD_FOLDER"])), "upload_staging"
+            )
     app_env = str(app.config.get("APP_ENV", "development")).lower()
     if app.config.get("TESTING"):
         app.config["RATELIMIT_STORAGE_URI"] = "memory://"
@@ -245,6 +250,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.register_blueprint(layer_editor_bp)
     app.register_blueprint(comparisons_bp)
     app.register_blueprint(scenes_bp)
+    app.register_blueprint(uploads_bp)
 
     @app.context_processor
     def inject_globals():
@@ -1414,7 +1420,8 @@ def sweep_orphaned_temp_artifacts(app: Flask, max_age_seconds: int | None = None
     older than TEMP_ARTIFACT_MAX_AGE_SECONDS: ``.medical*`` work dirs,
     ``*.step-tmp.glb`` and ``*.optimized.glb`` under CONVERTED_FOLDER,
     ``_replace_*`` staging dirs under UPLOAD_FOLDER, and everything in
-    MEDICAL_STAGING_FOLDER (raw scans). Nothing a pending/processing job owns is
+    MEDICAL_STAGING_FOLDER (raw scans), and everything in UPLOAD_STAGING_FOLDER
+    (chunked uploads nobody finished). Nothing a pending/processing job owns is
     touched. Logs counts and bytes only (staging holds patient scans)."""
     if max_age_seconds is None:
         max_age_seconds = int(app.config.get("TEMP_ARTIFACT_MAX_AGE_SECONDS") or 0)
@@ -1430,7 +1437,11 @@ def sweep_orphaned_temp_artifacts(app: Flask, max_age_seconds: int | None = None
                 dirs.remove(name)
                 candidates.add(os.path.join(root, name))
             candidates.update(os.path.join(root, f) for f in files if f.endswith((".step-tmp.glb", ".optimized.glb")))
-    for folder, only_replace_dirs in ((app.config["UPLOAD_FOLDER"], True), (app.config["MEDICAL_STAGING_FOLDER"], False)):
+    for folder, only_replace_dirs in (
+        (app.config["UPLOAD_FOLDER"], True),
+        (app.config["MEDICAL_STAGING_FOLDER"], False),
+        (app.config["UPLOAD_STAGING_FOLDER"], False),
+    ):
         if not os.path.isdir(folder):
             continue
         for name in os.listdir(folder):
@@ -1541,6 +1552,10 @@ def ensure_sqlite_schema(app: Flask) -> None:
             connection.execute(text("ALTER TABLE users ADD COLUMN deactivated_at DATETIME"))
         if model_columns and "r2_mirror_failed_at" not in model_columns:
             connection.execute(text("ALTER TABLE models ADD COLUMN r2_mirror_failed_at DATETIME"))
+        if model_columns and "processing_progress" not in model_columns:
+            connection.execute(text("ALTER TABLE models ADD COLUMN processing_progress INTEGER"))
+        if model_columns and "processing_stage" not in model_columns:
+            connection.execute(text("ALTER TABLE models ADD COLUMN processing_stage VARCHAR(120)"))
 
 
 def _alembic_head_revision(app: Flask) -> str | None:
@@ -3199,6 +3214,76 @@ def mark_model_failed(
         db.session.rollback()
 
 
+PROGRESS_WRITE_INTERVAL_SECONDS = 0.5
+QUEUED_STAGE = "Waiting for the converter"
+_progress_state = {"model_id": None, "stage_key": None, "at": 0.0}
+
+
+def report_processing_progress(model_id: str, percent: float, stage: str | None = None) -> None:
+    """Record live conversion progress (0-100 + a short stage label) on the model.
+
+    Uses its own short connection (one UPDATE, committed at once), so the job's
+    ORM session and any rows it holds are left alone. Writes are throttled to one
+    per PROGRESS_WRITE_INTERVAL_SECONDS, except when the stage label changes
+    (digits ignored, so "slices 12 / 240" and "slices 13 / 240" are one stage).
+    Best-effort: a failed write never fails the conversion. The label must never
+    contain filenames or patient data.
+    """
+    percent = max(0, min(100, int(round(percent))))
+    stage = (stage or "").strip()[:120] or None
+    stage_key = re.sub(r"\d+", "#", stage or "")
+    now = time.monotonic()
+    state = _progress_state
+    if state["model_id"] == model_id and state["stage_key"] == stage_key and now - state["at"] < PROGRESS_WRITE_INTERVAL_SECONDS:
+        return
+    state.update(model_id=model_id, stage_key=stage_key, at=now)
+    table = Model3D.__table__
+    try:
+        with db.engine.begin() as connection:
+            connection.execute(
+                table.update().where(table.c.id == model_id).values(processing_progress=percent, processing_stage=stage)
+            )
+    except SQLAlchemyError:
+        logger.warning("Could not record conversion progress for model %s", model_id, exc_info=True)
+
+
+def conversion_queue_position(model_id: str) -> int | None:
+    """1 = next in line, for the model's waiting conversion job; None when it
+    is not waiting (already running, or nothing queued). Counts every pending
+    job created before it: the worker runs jobs one at a time, oldest first."""
+    job = (
+        ConversionJob.query.filter(
+            ConversionJob.model_id == model_id,
+            ConversionJob.status == "pending",
+            ConversionJob.job_type.in_(("model_upload", "model_replace")),
+        )
+        .order_by(ConversionJob.id.desc())
+        .first()
+    )
+    if job is None:
+        return None
+    ahead = ConversionJob.query.filter(
+        ConversionJob.status == "pending",
+        or_(
+            ConversionJob.created_at < job.created_at,
+            (ConversionJob.created_at == job.created_at) & (ConversionJob.id < job.id),
+        ),
+    ).count()
+    return ahead + 1
+
+
+def _converter_progress_reporter(model_id: str, low: float, high: float):
+    """Callback for converters: maps their own 0-100 into the [low, high] slice of the whole job."""
+    app = current_app._get_current_object()
+
+    def report(percent: float, stage: str | None = None) -> None:
+        percent = max(0.0, min(100.0, float(percent)))
+        with app.app_context():  # medical progress arrives from a poller thread
+            report_processing_progress(model_id, low + (high - low) * percent / 100.0, stage)
+
+    return report
+
+
 def _get_converter_for_format(source_format: str, medical_preset: str | None = None):
     """Return a fresh converter instance for the given source format, or None."""
     fmt = (source_format or "").lower()
@@ -3358,6 +3443,7 @@ def process_model_upload_job(
             model.replacement_status = "replacement_processing"
             model.replacement_error = None
         db.session.commit()
+        report_processing_progress(model_id, 2, "Checking the file" if source_format == "glb" else "Converting")
 
         # For replacements we write to a sibling "<basename>.new.glb" path
         # (keeping the .glb extension so trimesh and friends pick the right
@@ -3408,6 +3494,7 @@ def process_model_upload_job(
                     cleanup_dir(upload_dir)
                     return
                 converter = STLConverter()
+                report_processing_progress(model_id, 5, "Converting")
                 success = _run_converter(
                     converter, source_path, target_glb, color=color, source_unit=source_unit
                 )
@@ -3435,6 +3522,9 @@ def process_model_upload_job(
                     )
                     cleanup_dir(upload_dir)
                     return
+                # Converters with real sub-progress (medical, STEP) report into the 5-65% slice.
+                converter.progress_callback = _converter_progress_reporter(model_id, 5, 65)
+                report_processing_progress(model_id, 5, "Converting")
                 success = _run_converter(
                     converter, source_path, target_glb, color=color, source_unit=source_unit
                 )
@@ -3455,6 +3545,7 @@ def process_model_upload_job(
             # finalize_converted_glb() applies Draco compression. trimesh cannot
             # read Draco-compressed geometry, so measuring afterwards yields
             # "Not measured". Captured here and cached on the model row below.
+            report_processing_progress(model_id, 66, "Building layers")
             measured_dimensions_cm = compute_glb_dimensions_cm(target_glb)
 
             # Viewer layers: one named material per part / structure, so the
@@ -3469,10 +3560,13 @@ def process_model_upload_job(
 
             # Measurements need the uncompressed geometry, so they are taken
             # before finalize_converted_glb() applies Draco. Best-effort.
+            if len(layers) >= 2:
+                report_processing_progress(model_id, 72, "Measuring layers")
             layer_metrics = compute_layer_metrics(target_glb, layers) if len(layers) >= 2 else None
             if len(layers) >= 2 and layer_metrics is None:
                 logger.warning("Layer measurements unavailable for model %s", model_id)
 
+            report_processing_progress(model_id, 78, "Compressing geometry")
             try:
                 finalize_converted_glb(target_glb, source_dir=os.path.dirname(source_path), keep_layers=bool(layers))
             except GLBQualityError as e:
@@ -3499,11 +3593,13 @@ def process_model_upload_job(
             if is_replacement and os.path.exists(usdz_path):
                 cleanup_file(usdz_path)
             if os.path.exists(glb_path) and not os.path.exists(usdz_path):
+                report_processing_progress(model_id, 88, "Preparing iPhone AR file")
                 try:
                     convert_glb_to_usdz(glb_path, usdz_path)
                 except Exception:  # USDZ companion is best-effort.
                     logger.exception("USDZ generation failed; continuing without iOS companion.")
 
+            report_processing_progress(model_id, 94, "Creating preview image")
             model = db.session.get(Model3D, model_id)
             if not model:
                 return
@@ -3519,8 +3615,11 @@ def process_model_upload_job(
             poster_png = os.path.join(os.path.dirname(glb_path), "poster.png")
             if generate_poster(glb_path, poster_png):
                 model.poster_path = poster_png
+            report_processing_progress(model_id, 97, "Finishing")
             model.processing_status = "ready"
             model.processing_error = None
+            model.processing_progress = 100
+            model.processing_stage = None
             previous_info = model.layer_info if isinstance(model.layer_info, dict) else {}
             model.layer_info = verified_layer_info(glb_path, layers, getattr(converter, "notes", None), layer_metrics)
             if model.layer_info and model.layer_info.get("metrics") and "metrics_public" in previous_info:
@@ -4091,15 +4190,17 @@ def run_next_conversion_job(app: Flask) -> bool:
     return True
 
 
-def _upload_space_is_short(folder: str, *, medical: bool, what: str) -> bool:
+def _upload_space_is_short(folder: str, *, medical: bool, what: str, staged_bytes: int = 0) -> bool:
     """True (after logging an ERROR with the numbers, which reaches Sentry)
     when the volume cannot take this request's upload plus the free-space
-    reserve. Checked before anything is written."""
+    reserve. Checked before anything is written. ``staged_bytes``: size of a
+    chunked upload already on the volume (the finishing request is tiny)."""
     shortfall = upload_space_shortfall(
         folder,
-        request.content_length,
+        staged_bytes or request.content_length,
         medical=medical,
         min_free=int(current_app.config.get("STORAGE_MIN_FREE_BYTES") or 0),
+        already_written=staged_bytes,
     )
     if shortfall is None:
         return False
@@ -4194,7 +4295,10 @@ def _create_model_for_paper(
         unique_id,
     )
     converted_dir = os.path.join(current_app.config["CONVERTED_FOLDER"], unique_id)
-    if _upload_space_is_short(os.path.dirname(upload_dir), medical=is_medical_upload, what="model upload"):
+    if _upload_space_is_short(
+        os.path.dirname(upload_dir), medical=is_medical_upload, what="model upload",
+        staged_bytes=getattr(file, "staged_bytes", 0),
+    ):
         return False, STORAGE_FULL_MESSAGE
     try:
         os.makedirs(upload_dir, exist_ok=True)
@@ -4329,6 +4433,8 @@ def _create_model_for_paper(
         appearance_color=color,
         version=1,
         processing_status="queued",
+        processing_progress=0,
+        processing_stage=QUEUED_STAGE,
         anonymization_confirmed=True,
         rights_confirmed=True,
         ethics_responsibility_confirmed=True,
@@ -4453,7 +4559,12 @@ def register_error_handlers(app: Flask) -> None:
                 # the values the browser kept in sessionStorage.
                 kept = [q for q in parsed.query.split("&") if q and not q.startswith("restore_draft=")]
                 back = f"{path}?{'&'.join(kept + ['restore_draft=1'])}"
-        flash("This page had been open too long, so the form was not sent. Please submit it again.", "warning")
+        if request.mimetype == "multipart/form-data" and error.description == "The CSRF token is missing.":
+            # A cut-off upload is parsed as an empty form (Werkzeug drops the
+            # unfinished body), which reads as a missing token, not an expired one.
+            flash("The upload was interrupted before it finished. Please try again.", "warning")
+        else:
+            flash("This page had been open too long, so the form was not sent. Please submit it again.", "warning")
         if back:
             return redirect(back, code=303)
         # No usable referrer: never fall back to request.path, which is often a
@@ -9483,12 +9594,15 @@ def register_routes(app: Flask) -> None:
         methods=["POST"],
         exempt_when=lambda: upload_rate_limit_disabled()
         or not (
-            request.files.get("model_file")
-            and request.files.get("model_file").filename
+            (request.files.get("model_file") and request.files.get("model_file").filename)
+            or request.form.get("upload_id")
         ),
     )
     def project_new():
         if request.method == "POST":
+            # A model uploaded in chunks (uploads.py) arrives as ``upload_id``; resolved up
+            # front so the staged file is removed whichever way this request ends.
+            staged_model, staged_error = resolve_staged_upload("new_project", None)
             paper_data, paper_errors = validate_project_form(request.form)
             _article_rows, article_errors = _article_form_rows(request.form, request.files)
             paper_errors.extend(article_errors)
@@ -9593,6 +9707,11 @@ def register_routes(app: Flask) -> None:
             # user can retry from the paper detail page.
             track_event("project_created", owner_user_id=current_user.id, project_id=paper.id)
             first_model_file = request.files.get("model_file") or request.files.get("model")
+            if not (first_model_file and first_model_file.filename) and (staged_model or staged_error):
+                first_model_file = staged_model
+            if staged_error:
+                flash(f"Project saved, but the model could not be added: {staged_error}", "danger")
+                return redirect(url_for("project_detail", slug=paper.slug, _anchor="add-model"))
             if first_model_file and first_model_file.filename:
                 ok, message = _create_model_for_paper(
                     paper,
@@ -9992,6 +10111,12 @@ def register_routes(app: Flask) -> None:
         paper = active_paper_query().filter_by(slug=slug).first_or_404()
         file = request.files.get("file") or request.files.get("model_file")
         if not file or not file.filename:
+            # Chunked upload (uploads.py): the file is already staged on the server.
+            file, staged_error = resolve_staged_upload("paper", slug)
+            if staged_error:
+                flash(staged_error, "danger")
+                return redirect(url_for("project_detail", slug=slug))
+        if not file or not file.filename:
             flash("No file selected.", "danger")
             return redirect(url_for("project_detail", slug=slug))
 
@@ -10029,6 +10154,12 @@ def register_routes(app: Flask) -> None:
             abort(404)
         file = request.files.get("file") or request.files.get("model_file")
         if not file or not file.filename:
+            # Chunked upload (uploads.py): the file is already staged on the server.
+            file, staged_error = resolve_staged_upload("model", model_id)
+            if staged_error:
+                flash(staged_error, "danger")
+                return redirect(url_for("model_edit", model_id=model.id))
+        if not file or not file.filename:
             flash("No replacement file selected.", "danger")
             return redirect(url_for("project_detail", slug=model.paper.slug))
         if not allowed_model(file.filename):
@@ -10062,7 +10193,10 @@ def register_routes(app: Flask) -> None:
             app.config["MEDICAL_STAGING_FOLDER"] if is_medical_upload else app.config["UPLOAD_FOLDER"],
             f"_replace_{uuid.uuid4().hex}",
         )
-        if _upload_space_is_short(os.path.dirname(upload_dir), medical=is_medical_upload, what="model replacement"):
+        if _upload_space_is_short(
+            os.path.dirname(upload_dir), medical=is_medical_upload, what="model replacement",
+            staged_bytes=getattr(file, "staged_bytes", 0),
+        ):
             flash(STORAGE_FULL_MESSAGE, "danger")
             return redirect(url_for("project_detail", slug=model.paper.slug))
         source_path = os.path.join(upload_dir, original_name)
@@ -10166,6 +10300,8 @@ def register_routes(app: Flask) -> None:
         model.replaced_at = datetime.now(UTC)
         model.replacement_status = "replacement_processing"
         model.replacement_error = None
+        model.processing_progress = 0
+        model.processing_stage = QUEUED_STAGE
         db.session.commit()
 
         glb_path = model.glb_path
@@ -10548,15 +10684,24 @@ def register_routes(app: Flask) -> None:
             abort(404)
         if not can_edit_project(model.paper):
             abort(403)
-        return jsonify(
-            {
-                "id": model.id,
-                "status": model.processing_status or "ready",
-                "error": model.processing_error,
-                "has_qr": bool(model.qr_code_path),
-                "viewer_url": url_for("view_model", model_id=model.id),
-            }
-        )
+        status = model.processing_status or "ready"
+        # A replacement keeps the old GLB live (status stays "ready") while its
+        # own conversion runs; report that conversion's progress too.
+        replacing = model.replacement_status == "replacement_processing"
+        busy = status in {"queued", "processing"} or replacing
+        payload = {
+            "id": model.id,
+            "status": status,
+            "error": model.processing_error,
+            "has_qr": bool(model.qr_code_path),
+            "viewer_url": url_for("view_model", model_id=model.id),
+            "replacing": replacing,
+            "progress": model.processing_progress if busy else None,
+            "stage": model.processing_stage if busy else None,
+        }
+        if busy:
+            payload["queue_position"] = conversion_queue_position(model.id)
+        return jsonify(payload)
 
     @app.route("/models/<model_id>/edit", methods=["GET", "POST"])
     @login_required

@@ -12,6 +12,8 @@ import os
 import stat
 import zipfile
 
+from . import progress
+
 # Hard cap on structures per GLB; each one costs a node, a material and a
 # toggle in the viewer.
 MAX_LAYERS = 64
@@ -180,7 +182,8 @@ def safe_extract(zip_path: str, dest_dir: str) -> list[str]:
     except (zipfile.BadZipFile, OSError):
         raise MedicalError(NOT_ZIP_MESSAGE)
     with zf:
-        for info in members:
+        for index, info in enumerate(members):
+            progress.report(1 + 7 * index / max(1, len(members)), f"Unpacking files {index} / {len(members)}")
             rel = info.filename.replace("\\", "/")
             target = os.path.realpath(os.path.join(root, rel))
             if not target.startswith(root + os.sep):
