@@ -1805,6 +1805,7 @@
         <h2>Section</h2>
         <div class="layers-head-actions">
           <button type="button" data-section-flip disabled>Flip</button>
+          <button type="button" data-section-face disabled title="Turn the camera to look straight at the cut">Face</button>
           <button type="button" data-section-off disabled>Off</button>
           <button type="button" data-section-close aria-label="Close section">×</button>
         </div>
@@ -4884,6 +4885,7 @@
       const posInput = sectionPanel.querySelector('[data-section-pos]');
       const readoutEl = sectionPanel.querySelector('[data-section-readout]');
       const flipBtn = sectionPanel.querySelector('[data-section-flip]');
+      const faceBtn = sectionPanel.querySelector('[data-section-face]');
       const offBtn = sectionPanel.querySelector('[data-section-off]');
       const plane = { normal: null, constant: 0 };
       const sectionSides = new Map(); // material -> its original `side`
@@ -5001,6 +5003,7 @@
         const on = !!section;
         sectionBtn.classList.toggle('is-active', on);
         flipBtn.disabled = !on;
+        faceBtn.disabled = !on;
         offBtn.disabled = !on;
         posInput.disabled = !on;
         axesEl.querySelectorAll('button').forEach((button) => button.setAttribute('aria-pressed', String(on && button.dataset.axis === section.axis)));
@@ -5020,6 +5023,11 @@
         } else {
           section = null;
           releaseSection();
+          // Face widens the polar limits to look straight down an axis; restore them.
+          if (viewer.hasAttribute('min-camera-orbit')) {
+            viewer.removeAttribute('min-camera-orbit');
+            viewer.removeAttribute('max-camera-orbit');
+          }
         }
         syncSectionUi();
         requestViewerRender();
@@ -5045,6 +5053,24 @@
         setSection({ ...section, offset: lo + ((hi - lo) * Number(posInput.value)) / 1000 });
       });
       flipBtn.addEventListener('click', () => { if (section) setSection({ ...section, flip: !section.flip }); });
+      // Face (from the claude/project-thread-738tj4 branch): orbit the camera onto
+      // the removed side of the plane, looking along its normal at the cut, like
+      // a slicer view. Straight down an axis the azimuth is undefined, so the
+      // current one is kept.
+      faceBtn.addEventListener('click', () => {
+        if (!section || !sectionCtx) return;
+        updatePlane();
+        const dx = -plane.normal.x;
+        const dy = -plane.normal.y;
+        const dz = -plane.normal.z;
+        const current = viewer.getCameraOrbit ? viewer.getCameraOrbit() : null;
+        const theta = Math.abs(dy) > 0.999 && current ? current.theta : Math.atan2(dx, dz);
+        const phi = Math.min(Math.PI - 0.001, Math.max(0.001, Math.acos(Math.max(-1, Math.min(1, dy)))));
+        setAutoRotateState(false);
+        viewer.setAttribute('min-camera-orbit', 'auto 0deg auto');
+        viewer.setAttribute('max-camera-orbit', 'auto 180deg auto');
+        viewer.cameraOrbit = `${theta}rad ${phi}rad auto`;
+      });
       offBtn.addEventListener('click', () => setSection(null));
       sectionPanel.querySelector('[data-section-close]').addEventListener('click', () => setSectionOpen(false));
       // Shortcut to Scenes > "Save this view": the scene keeps the cut, and its AR file is cut the same way.
