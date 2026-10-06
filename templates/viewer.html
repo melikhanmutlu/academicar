@@ -2094,6 +2094,36 @@
           panelBody.style.maxHeight = 'none';
         }
       });
+      // Phones: the control panel and the corner panels (Layers, Section,
+      // Scenes) share the bottom of the screen, so opening one folds the other.
+      const phone = () => window.matchMedia('(max-width: 640px)').matches;
+      const cornerToggles = ['layersBtn', 'sectionBtn', 'scenesBtn'].map((id) => document.getElementById(id)).filter(Boolean);
+      // (After the panel's own click handler, which is registered later, has run.)
+      cornerToggles.forEach((toggle) => toggle.addEventListener('click', () => setTimeout(() => {
+        if (phone() && toggle.getAttribute('aria-expanded') === 'true' && controlPanel.getAttribute('data-collapsed') === 'false') panelToggle.click();
+      }, 0)));
+      panelToggle.addEventListener('click', () => {
+        if (!phone() || controlPanel.getAttribute('data-collapsed') === 'true') return;
+        cornerToggles.forEach((toggle) => { if (toggle.getAttribute('aria-expanded') === 'true') toggle.click(); });
+      });
+    }
+
+    // The "Free preview" badge sits under the toolbar, which wraps to two rows
+    // on narrow screens; keep it clear of the buttons.
+    const freeBadge = document.querySelector('.viewer-free-watermark');
+    const viewerHeader = document.querySelector('header');
+    if (freeBadge && viewerHeader) {
+      const placeBadge = () => {
+        // Lowest edge of the visible toolbar buttons (not the header's padding box).
+        const bottom = Math.max(0, ...[...viewerHeader.querySelectorAll('button, a')]
+          .filter((el) => el.offsetParent)
+          .map((el) => el.getBoundingClientRect().bottom));
+        freeBadge.style.top = '';
+        const natural = freeBadge.getBoundingClientRect().top;
+        if (bottom + 8 > natural) freeBadge.style.top = `${Math.round(bottom + 8)}px`;
+      };
+      placeBadge();
+      window.addEventListener('resize', placeBadge);
     }
 
     // Overlays (publication info drawer, QR / AR hand-off modal) behave as
