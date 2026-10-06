@@ -424,6 +424,8 @@ code.*
         "persona": "Clinician-researchers & radiology teams",
         "read_minutes": 7,
         "body": """\
+![CT slices turning into a 3D skull shown in AR on a phone](/static/images/blog/covers/dicom-to-3d-model-guide.webp)
+
 Most medical 3D work starts in the same place: a stack of DICOM images from a CT or
 MRI scanner. Turning that stack into something a reader can rotate, cut open, and
 place on the desk in augmented reality used to take a segmentation workstation, a
@@ -512,6 +514,8 @@ an interactive figure.*
         "persona": "Medical imaging researchers & students",
         "read_minutes": 6,
         "body": """\
+![A skeleton above a CT density scale with a threshold marker](/static/images/blog/covers/hounsfield-units-ct-thresholding-3d.webp)
+
 When you turn a CT scan into a 3D model, one number decides almost everything about
 the result: the **threshold**. Set it too low and the bone model is buried in soft
 tissue; set it too high and thin structures disappear. Understanding Hounsfield
@@ -584,6 +588,8 @@ data.*
         "persona": "Medical imaging & AI researchers",
         "read_minutes": 6,
         "body": """\
+![Segmented abdominal organs floating above scan slices](/static/images/blog/covers/medical-image-segmentation-to-3d-viewer.webp)
+
 Segmentation is where much of the scientific value in medical imaging lives. Hours
 of manual contouring or a carefully validated AI model produce label maps that
 describe anatomy structure by structure — and then they end up as a single
@@ -657,6 +663,8 @@ For layered models, AcademicAR computes per-structure **dimensions** and the
         "persona": "Medical educators, engineers & architects",
         "read_minutes": 6,
         "body": """\
+![A head model cut by a plane next to its colour-coded 2D slice](/static/images/blog/covers/section-plane-slice-view-cross-sections.webp)
+
 A 3D model shows the outside of things. Most of the interesting questions are
 about the inside: how a tumour sits against a vessel, how thick a wall is, how a
 shaft passes through a housing. Cross-sections answer those questions, and they
@@ -729,6 +737,8 @@ measure empty space.
         "persona": "Researchers working with segmented or multi-part models",
         "read_minutes": 5,
         "body": """\
+![A kidney in a bounding box and the closest distance to a vessel](/static/images/blog/covers/measuring-anatomy-3d-layer-metrics.webp)
+
 "How big is it?" and "How close is it to that?" are among the first questions a
 reader asks about a 3D structure. In a static figure the answer is a number in the
 caption. In AcademicAR, layered models carry their own measurements, so readers
@@ -796,6 +806,8 @@ snapping measure in the [slice view](/blog/section-plane-slice-view-cross-sectio
         "persona": "Medical educators & clinician-researchers",
         "read_minutes": 6,
         "body": """\
+![Medical students around a 3D heart shown in AR on a tablet](/static/images/blog/covers/3d-models-surgical-education-case-reports.webp)
+
 Medicine is taught and published in two dimensions — slides, atlases, journal
 figures — yet the problems it deals with are spatial. Interactive 3D models built
 from real imaging close that gap for students, residents, and readers of the
@@ -862,6 +874,8 @@ segmentation.*
         "persona": "Engineering researchers & educators",
         "read_minutes": 6,
         "body": """\
+![An exploded gearbox assembly and the same model in AR on a phone](/static/images/blog/covers/step-cad-assemblies-ar-engineering.webp)
+
 Engineering research is full of 3D objects — prototypes, test rigs, mechanisms,
 fixtures, sensors — that end up as an isometric screenshot in a paper. Reviewers
 can't see the hidden parts, students can't see how the mechanism fits together,
@@ -941,6 +955,8 @@ model. See also [AR for engineering](/ar-for-engineering).*
         "persona": "Architecture researchers, instructors & students",
         "read_minutes": 6,
         "body": """\
+![A building model cut open by a section plane, placed in AR on a table](/static/images/blog/covers/architecture-3d-models-sections-ar.webp)
+
 Architecture has always been communicated through drawings that are cuts through a
 3D idea: plans, sections, elevations. Digital models made the 3D idea explicit, yet
 most still reach their audience as rendered images. Interactive 3D lets the reader
@@ -1016,6 +1032,8 @@ AR.*
         "persona": "Educators in medicine, engineering & architecture",
         "read_minutes": 5,
         "body": """\
+![Five saved views of a skull connected as a guided tour](/static/images/blog/covers/saved-scenes-guided-tours-3d-teaching.webp)
+
 A free-to-explore 3D model is wonderful for curious readers and overwhelming for
 students on their first encounter. Good teaching sequences attention: first this,
 then that, now look inside. **Scenes** bring that sequence to a 3D model.
@@ -1087,6 +1105,8 @@ floor, then a longitudinal section.
         "persona": "Researchers preparing papers & posters",
         "read_minutes": 6,
         "body": """\
+![Two femur models compared side by side on a figure with legend, scale bar and QR code](/static/images/blog/covers/publication-ready-3d-figures-comparisons.webp)
+
 An interactive model is the best way to explore 3D results, but papers still need
 printed figures, and many findings are comparisons: before and after, healthy and
 diseased, design A and design B. Here's how to get both from the same models.
