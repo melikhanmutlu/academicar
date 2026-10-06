@@ -80,7 +80,9 @@
     </form>
     </details>
 
-    <p class="admin-muted admin-mt">{{ blog_posts|length }} post{{ "" if blog_posts|length == 1 else "s" }}</p>
+    <div class="admin-section-head admin-mt">
+      <span>{{ blog_posts|length }} post{{ "" if blog_posts|length == 1 else "s" }}</span>
+    </div>
     {% if blog_posts %}
     <div class="table-wrap">
       <table class="data-table admin-table">

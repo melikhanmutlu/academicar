@@ -3,7 +3,7 @@
 {% block admin_subtitle %}Viewer activity and signup-to-payment funnel, last {{ analytics.days }} days.{% endblock %}
 {% block admin_actions %}<a href="{{ url_for('admin_analytics_export') }}" class="admin-btn admin-btn-secondary compact">Export CSV</a>{% endblock %}
 {% block admin_body %}
-  <section class="admin-metrics">
+  <section class="admin-metrics analytics-metrics">
     <div class="admin-metric"><span>Model views</span><strong>{{ analytics.views }}</strong></div>
     <div class="admin-metric"><span>Unique visitors</span><strong>{{ analytics.unique_visitors }}</strong></div>
     <div class="admin-metric"><span>QR scans</span><strong>{{ analytics.qr_scans }}</strong></div>
@@ -21,7 +21,7 @@
           </div>
           <div class="admin-funnel-count">{{ stage.count }}</div>
           <div class="admin-funnel-step" title="Share of the previous step">
-            {%- if stage.pct_of_prev is none -%}—
+            {%- if stage.pct_of_prev is none -%}-
             {%- elif not loop.first -%}{{ '%g' % stage.pct_of_prev }}%
             {%- endif -%}
           </div>

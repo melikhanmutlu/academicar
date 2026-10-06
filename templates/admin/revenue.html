@@ -70,7 +70,7 @@
         <thead>
           <tr>
             <th>Invoice</th>
-            <th>User</th>
+            <th class="revenue-hide-sm">User</th>
             <th class="admin-hide-sm">Amount</th>
             <th class="admin-hide-sm">Status</th>
             <th>Actions</th>
@@ -79,8 +79,12 @@
         <tbody>
           {% for payment in payments %}
             <tr>
-              <td>{{ payment.invoice_number or "-" }}<small>{{ payment.created_at.strftime("%Y-%m-%d") if payment.created_at else "" }} · {{ payment.provider }}</small></td>
               <td>
+                {{ payment.invoice_number or "-" }}<small class="admin-nowrap">{{ payment.created_at.strftime("%Y-%m-%d") if payment.created_at else "" }} · {{ payment.provider }}</small>
+                <small class="revenue-amount-sm">{{ payment.institution.name if payment.institution else (payment.user.email if payment.user else payment.user_id) }}</small>
+                <small class="revenue-amount-sm">{{ "%.2f"|format(payment.amount_kurus / 100) }} {{ payment.currency }} · {{ payment.status|title }}</small>
+              </td>
+              <td class="revenue-hide-sm">
                 {% if payment.institution %}
                   <a href="{{ url_for('admin_institution_detail', institution_id=payment.institution.id) }}">{{ payment.institution.name }}</a>
                   <small>Institution</small>
@@ -89,7 +93,6 @@
                 {% else %}
                   {{ payment.user_id }}
                 {% endif %}
-                <small class="revenue-amount-sm">{{ "%.2f"|format(payment.amount_kurus / 100) }} {{ payment.currency }} · {{ payment.status|title }}</small>
               </td>
               <td class="admin-hide-sm">
                 {{ "%.2f"|format(payment.amount_kurus / 100) }} {{ payment.currency }}

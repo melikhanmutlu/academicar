@@ -12,7 +12,7 @@
       <input name="audit_q" class="field-input" value="{{ filters.audit_q }}" placeholder="Search event, resource, or IP">
       <input name="audit_user" type="number" min="1" class="field-input logs-user-input" value="{{ filters.audit_user or '' }}" placeholder="User id">
       <select name="audit_event" class="field-select compact-select">
-        <option value="actions" {% if filters.audit_event == "actions" %}selected{% endif %}>Actions</option>
+        <option value="actions" {% if filters.audit_event == "actions" %}selected{% endif %}>Admin actions</option>
         <option value="all" {% if filters.audit_event == "all" %}selected{% endif %}>All events</option>
         {% for event_type in audit_event_types %}
           <option value="{{ event_type }}" {% if filters.audit_event == event_type %}selected{% endif %}>{{ event_type|replace("_", " ")|capitalize }}</option>

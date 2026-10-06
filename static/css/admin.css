@@ -37,7 +37,7 @@
   width: 268px;
   height: calc(100vh - var(--admin-header-height));
   overflow-y: auto;
-  padding: 24px 16px 24px 24px;
+  padding: 18px 16px 14px 24px;
   border-right: 1px solid var(--color-light-pearl);
   background: var(--color-canvas-white);
   z-index: 20;
@@ -62,8 +62,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 4px 12px 16px;
-  margin-bottom: 8px;
+  padding: 4px 12px 12px;
+  margin-bottom: 4px;
   border-bottom: 1px solid var(--color-light-pearl);
 }
 
@@ -91,7 +91,7 @@
 }
 
 .admin-sidenav-group {
-  padding: 16px 12px 6px;
+  padding: 8px 12px 3px;
   font-family: var(--font-inter);
   font-size: 10px;
   font-weight: 700;
@@ -105,7 +105,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 8px 12px;
+  min-height: 32px;
+  padding: 5px 12px;
   border-radius: 8px;
   font-family: var(--font-inter);
   font-size: 14px;
@@ -167,12 +168,20 @@
 }
 
 .admin-sidebar-foot {
-  margin-top: 16px;
-  padding: 14px 12px 4px;
+  margin-top: 8px;
+  padding: 10px 12px 2px;
   border-top: 1px solid var(--color-light-pearl);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+}
+
+/* Secondary links sit in one wrapping row so the foot stays short. */
+.admin-sidebar-foot-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 14px;
 }
 
 .admin-sidebar-foot a,
@@ -183,7 +192,7 @@
   text-decoration: none;
   background: none;
   border: none;
-  padding: 0;
+  padding: 6px 0;
   text-align: left;
   cursor: pointer;
 }
@@ -203,7 +212,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 6px;
+  margin-bottom: 2px;
 }
 
 .admin-sidebar-user img,
@@ -353,6 +362,7 @@
 
 .admin-editor > summary {
   cursor: pointer;
+  white-space: nowrap;
   padding: 8px 12px;
   font-family: var(--font-inter);
   font-size: 13px;
@@ -445,10 +455,10 @@
 }
 
 /* ---- Off-canvas sidebar on smaller screens -----------------------------
-   Below 1024px the sidebar becomes a full-viewport overlay drawer (ignores
-   the header offset, sits above everything including it) instead of the
-   permanent app-chrome column used at desktop widths. */
-@media (max-width: 1024px) {
+   At 1023px and narrower the sidebar becomes a full-viewport overlay drawer
+   (ignores the header offset, sits above everything including it) instead of
+   the permanent app-chrome column used at desktop widths (1024px keeps it). */
+@media (max-width: 1023px) {
   .admin-main {
     margin-left: 0;
     padding: 24px 20px 60px;
@@ -458,6 +468,11 @@
   }
   #adminMenuToggle {
     min-height: 40px;
+  }
+  /* A short page title must not sit beside the Menu toggle: the heading
+     always starts on its own row under it. */
+  .admin-topbar-titles {
+    flex-basis: 100%;
   }
   .admin-sidebar {
     top: 0;
@@ -492,6 +507,12 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Status chips inside a KPI tile or a section head keep the table chip look
+   instead of inheriting the uppercase, letter-spaced label style of
+   `.admin-metric span` / `.admin-section-head span`. */
+.admin-metric strong .status-chip,
+.admin-section-head .status-chip { text-transform: none; letter-spacing: 0; font-size: 0.72rem; font-weight: 800; }
 
 /* .admin-metric strong defaults to a large numeric KPI style (36px); this
    modifier is for cards whose value is text (an email, a title) instead of
@@ -618,6 +639,11 @@
 .admin-data-list span { min-width:0; overflow-wrap:anywhere; }
 .admin-data-list strong { color:var(--color-midnight-graphite); font-weight:600; white-space:nowrap; font-variant-numeric:tabular-nums; }
 .admin-empty { margin:0; color:var(--color-silver-ash); font-family:var(--font-inter); font-size:13px; }
+/* An insight card without a caption line keeps its value under the label
+   instead of dropping it to the card's bottom edge (QR, model health). */
+.admin-insight-card > strong:last-child { margin-top: 10px; margin-bottom: auto; }
+/* Secondary text (counts, slugs, dates) anywhere in the admin shell. */
+.admin-muted { margin: 0; color: var(--color-silver-ash); font-family: var(--font-inter); font-size: 12px; }
 
 /* Native file pickers styled like the secondary admin button. */
 .admin-main input[type="file"] { font-family:var(--font-inter); font-size:12px; color:var(--color-dark-shale); }
@@ -635,7 +661,7 @@ body:has(.admin-layout) .flash-stack {
   padding: 0 40px 0 32px;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1023px) {
   body:has(.admin-layout) .flash-stack {
     margin-left: 0;
     padding: 0 20px;
@@ -663,7 +689,7 @@ body:has(.admin-layout) .flash-stack {
 .admin-field-narrow { max-width: 520px; }
 /* Secondary table columns drop out on phones. */
 @media (max-width: 640px) {
-  .admin-hide-sm { display: none; }
+  .admin-hide-sm, .admin-table small.admin-hide-sm, .admin-metric small.admin-hide-sm { display: none; }
 }
 
 /* ================================================================
@@ -685,8 +711,9 @@ a.admin-metric:hover, a.admin-metric:focus-visible { border-color: var(--color-s
 .admin-users-table .admin-actions .admin-btn { width: auto; }
 .admin-users-table td, .admin-users-table th { padding-left: 8px; padding-right: 8px; }
 .admin-users-table td small, .admin-users-table td a { overflow-wrap: anywhere; }
-.admin-show-sm { display: none; }
-@media (max-width: 640px) { .admin-show-sm { display: block; } }
+@media (max-width: 640px) { .admin-users-table td:first-child { width: 46%; } }
+.admin-table small.admin-show-sm { display: none; }
+@media (max-width: 640px) { .admin-table small.admin-show-sm { display: block; } }
 /* == end page:users == */
 
 /* == page:content == */
@@ -706,6 +733,10 @@ a.admin-metric:hover, a.admin-metric:focus-visible { border-color: var(--color-s
 .admin-breakdown.is-flat { border: none; padding: 0; }
 .admin-metric small { overflow-wrap: anywhere; }
 .admin-breakdown .admin-actions form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+/* Poster & QR buttons group to the left instead of the breakdown row's space-between. */
+.admin-breakdown div.admin-wrap-row { justify-content: flex-start; }
+/* "Project deleted" stands in for the Viewer button: a neutral chip that wraps. */
+.models-offline { align-self: flex-start; white-space: normal; text-align: left; line-height: 1.3; }
 /* == end page:models == */
 
 /* == page:jobs == */
@@ -725,14 +756,19 @@ a.admin-metric:hover, a.admin-metric:focus-visible { border-color: var(--color-s
 @media (max-width: 640px) {
   .admin-table .admin-inline-form { flex-direction: column; align-items: stretch; gap: 6px; min-width: 0; }
   .admin-table .admin-inline-form .field-select { width: 100%; min-width: 0; }
+  #qr .admin-table td:last-child { min-width: 112px; }
 }
 /* == end page:access == */
 
 /* == page:revenue == */
-.revenue-amount-sm { display: none; }
+.admin-table small.revenue-amount-sm { display: none; }
 @media (max-width: 760px) {
-  .revenue-amount-sm { display: block; }
-  #payments .admin-actions { flex-direction: column; align-items: stretch; }
+  .admin-table small.revenue-amount-sm { display: block; }
+  #payments .revenue-hide-sm { display: none; }
+  #payments .admin-table td:last-child { min-width: 124px; }
+  #payments .admin-actions { flex-direction: column; align-items: stretch; min-width: 0; }
+  #payments .admin-actions .admin-inline-form { flex-direction: column; align-items: stretch; gap: 6px; min-width: 0; }
+  #payments .admin-actions .compact-select, #payments .admin-actions .admin-btn { width: 100%; min-width: 0; max-width: 100%; }
 }
 /* == end page:revenue == */
 
@@ -745,7 +781,10 @@ a.admin-metric:hover, a.admin-metric:focus-visible { border-color: var(--color-s
 /* == end page:pricing == */
 
 /* == page:security == */
-.admin-security-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+.admin-security-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1180px) { .admin-security-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* !important: style.css forces every .admin-insight-grid to one column on phones. */
+@media (max-width: 640px) { .admin-security-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
 a.admin-insight-card { color: inherit; text-decoration: none; }
 a.admin-insight-card:hover { border-color: var(--color-silver-ash); }
 /* == end page:security == */
@@ -808,10 +847,10 @@ a.admin-insight-card:hover { border-color: var(--color-silver-ash); }
 /* == page:blog == */
 .admin-blog-new > summary { display: inline-flex; list-style: none; cursor: pointer; }
 .admin-blog-new > summary::-webkit-details-marker { display: none; }
+.admin-blog-new[open] > summary { background: var(--color-canvas-white); color: var(--color-midnight-graphite); border-color: var(--color-light-pearl); }
 .admin-blog-new .admin-blog-form { max-width: none; }
 .admin-blog-new .admin-blog-field input[type="file"] { width: auto; max-width: 100%; border: 0; padding: 0; }
 .admin-blog-row .admin-blog-field { min-width: 140px; }
-.admin-muted { margin: 0; color: var(--color-silver-ash); font-size: 12px; }
 .admin-blog-row-actions { flex-wrap: wrap; }
 @media (max-width: 640px) {
   .admin-blog-row-actions .admin-btn { padding-left: 8px; padding-right: 8px; }
@@ -820,8 +859,6 @@ a.admin-insight-card:hover { border-color: var(--color-silver-ash); }
 
 /* == page:institutions == */
 .admin-currency { width: 70px; }
-.admin-show-sm { display: none; }
-@media (max-width: 640px) { .admin-show-sm { display: block; } }
 .admin-mb { margin-bottom: 12px; }
 .admin-nowrap { white-space: nowrap; }
 .admin-logo-label {
@@ -849,4 +886,7 @@ a.admin-insight-card:hover { border-color: var(--color-silver-ash); }
 .admin-audience { align-items: stretch; }
 .admin-audience .admin-section { margin: 0; }
 .admin-audience small { color: var(--color-silver-ash); font-weight: 400; }
+/* KPI cards here have no caption line, so they hug label + number instead of
+   spreading them across the shared card min-height. */
+.analytics-metrics .admin-metric { min-height: 0; justify-content: flex-start; gap: 12px; }
 /* == end page:analytics == */
