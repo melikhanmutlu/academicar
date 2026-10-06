@@ -10,12 +10,13 @@ def test_section_and_figure_controls_render_only_on_paid_plans(app, client):
     paid_id, _ = _make_model(app, plan="academic")
     html = _html(client, paid_id)
     assert 'id="sectionBtn"' in html and 'id="sectionPanel"' in html
+    assert "<canvas data-slice-canvas" in html  # flat (Slicer-like) view of the cut
     assert "data-export-figure disabled" in html and 'id="figureModal"' in html
     assert 'id="sectionBtn"' in _html(client, paid_id, "?embed=true")
 
     free_id, _ = _make_model(app, plan="free", email="free@example.com")
     free_html = _html(client, free_id)
-    for marker in ('id="sectionBtn"', 'id="sectionPanel"', "data-export-figure disabled", 'id="figureModal"'):
+    for marker in ('id="sectionBtn"', 'id="sectionPanel"', "<canvas data-slice-canvas", "data-export-figure disabled", 'id="figureModal"'):
         assert marker not in free_html, marker
     assert 'id="sectionBtn"' not in _html(client, free_id, "?embed=true")
 

@@ -1195,6 +1195,27 @@
     .section-pos input { display: block; width: 100%; margin-top: 6px; accent-color: #ff682c; }
     .section-pos input:disabled { opacity: 0.4; }
     .section-readout { display: block; margin-top: 4px; font-size: 12.5px; font-weight: 600; color: #fff; }
+    /* Flat view of the cut (Slicer-like), under the position slider. */
+    .section-panel { width: 360px; }
+    .section-panel .section-body { overflow-y: auto; }
+    .section-slice { position: relative; margin-top: 12px; }
+    .section-slice[hidden] { display: none; }
+    .section-slice canvas {
+      display: block; width: 100%; aspect-ratio: 1 / 1; max-height: 42vh; border-radius: 10px;
+      background: #0b0b0b; border: 1px solid rgba(255, 255, 255, 0.12); touch-action: none; cursor: grab;
+    }
+    .section-slice canvas:active { cursor: grabbing; }
+    .section-slice-empty { position: absolute; left: 0; right: 0; top: 45%; text-align: center; font-size: 12px; color: rgba(255, 255, 255, 0.6); pointer-events: none; }
+    .section-slice-empty[hidden] { display: none; }
+    .section-slice-hint { display: block; margin-top: 6px; font-size: 11.5px; color: rgba(255, 255, 255, 0.5); }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .section-slice canvas { background: #f5f5f5; border-color: #e8e8e8; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .section-slice-empty,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .section-slice-hint { color: #6b6b6b; }
+    @media (max-width: 640px) {
+      .section-panel { width: auto; }
+      .section-slice canvas { aspect-ratio: auto; height: 22vh; }
+      .section-slice-hint { display: none; }
+    }
     .layers-head-actions button:disabled { opacity: 0.4; cursor: default; }
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .section-axes button { color: #202020; background: #f5f5f5; border-color: #e8e8e8; }
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .section-axes button[aria-pressed="true"] { color: #fff; background: #ff682c; border-color: #ff682c; }
@@ -1741,6 +1762,11 @@
           <input type="range" min="0" max="1000" step="1" value="500" data-section-pos disabled aria-label="Section position">
           <span class="section-readout" data-section-readout>Choose an axis to cut the model.</span>
         </label>
+        <div class="section-slice" data-slice-wrap hidden>
+          <canvas data-slice-canvas role="img" aria-label="Flat view of the current cut"></canvas>
+          <span class="section-slice-empty" data-slice-empty hidden>Nothing visible at this position.</span>
+          <span class="section-slice-hint">Scroll or pinch to zoom, drag to pan, double-click to reset.</span>
+        </div>
       </div>
       <p class="layers-note">{% if is_medical_model %}Planes follow the scan's patient orientation. For education and presentation only — not for diagnosis.{% else %}Cuts the model along a plane in its own axes; interior faces stay visible.{% endif %}</p>
     </section>
@@ -4550,7 +4576,7 @@
       const patchedMeshes = new Set();
       let section = null; // { axis: 'x'|'y'|'z', offset: metres from the model-space bbox centre, flip }
       let pendingSection; // a saved section that arrived before the model was ready
-      let sectionCtx = null; // { three, root, meshes, Vec3, scratchP, scratchN, min, max, centre }
+      let sectionCtx = null; // { three, root, meshes, Vec3, Mat4, scratchP, scratchN, min, max, centre }
 
       const prepareSection = () => {
         try {
@@ -4590,7 +4616,7 @@
           if (!min.every(Number.isFinite) || !max.every(Number.isFinite)) return null;
           plane.normal = plane.normal || new Vec3(0, 1, 0);
           return {
-            three, root, meshes, Vec3, min, max,
+            three, root, meshes, Vec3, Mat4, min, max,
             centre: min.map((value, i) => (value + max[i]) / 2),
             scratchP: new Vec3(), scratchN: new Vec3(),
           };
@@ -4663,12 +4689,319 @@
         offBtn.disabled = !on;
         posInput.disabled = !on;
         axesEl.querySelectorAll('button').forEach((button) => button.setAttribute('aria-pressed', String(on && button.dataset.axis === section.axis)));
+        if (sliceWrap) sliceWrap.hidden = !on;
         if (!on) { readoutEl.textContent = 'Choose an axis to cut the model.'; return; }
         const [lo, hi] = axisRange(section.axis);
         posInput.value = String(hi > lo ? Math.round(((section.offset - lo) / (hi - lo)) * 1000) : 500);
         const label = SECTION_AXES.find(([axis]) => axis === section.axis)[1];
         readoutEl.textContent = `${label} · ${formatOffset(section.offset)} from the centre`;
       };
+      // 2D slice view (Slicer-like): the current cut drawn flat beside the 3D
+      // view. Only the surface mesh reaches the viewer (a scan itself is never
+      // kept), so it shows each visible layer's cross-section filled in its
+      // colour, like a label map. Uses the same model-space plane as the clip:
+      // every triangle straddling it gives one segment, segments are chained
+      // into loops on shared end points and filled even-odd. Triangles are
+      // bucketed per axis on first use, so a slider move only tests the ones
+      // near the plane. Wheel/pinch zooms, drag pans, double-click resets.
+      // Screen axes per cut axis as [model axis index, sign] for right and up,
+      // with edge letters [left, right, top, bottom]. Medical views follow the
+      // radiological convention (patient's right on the screen's left, sagittal
+      // facing left); other models are seen from +X, from above and from the front.
+      const SLICE_FRAME = isMedicalScan
+        ? {
+          y: { h: [0, 1], v: [2, 1], letters: ['R', 'L', 'A', 'P'] },
+          z: { h: [0, 1], v: [1, 1], letters: ['R', 'L', 'S', 'I'] },
+          x: { h: [2, -1], v: [1, 1], letters: ['A', 'P', 'S', 'I'] },
+        }
+        : {
+          x: { h: [2, -1], v: [1, 1], letters: null },
+          y: { h: [0, 1], v: [2, -1], letters: null },
+          z: { h: [0, 1], v: [1, 1], letters: null },
+        };
+      const SLICE_BINS = 64;
+      const sliceWrap = sectionPanel.querySelector('[data-slice-wrap]');
+      const sliceCanvas = sectionPanel.querySelector('[data-slice-canvas]');
+      const sliceEmpty = sectionPanel.querySelector('[data-slice-empty]');
+      let sliceGeo = new WeakMap(); // mesh -> { pos (model space), index, triCount, bins } | null
+      let sliceCache = null; // { key, meshes: [{ mesh, loops, open }] }
+      let sliceView = { zoom: 1, panX: 0, panY: 0, axis: null };
+      let sliceSignature = '';
+      let sliceFrame = 0;
+      const sliceVisible = () => !!(sliceCanvas && section && sectionCtx && !sectionPanel.hidden && !sliceWrap.hidden);
+      const linearToSrgb = (c) => Math.round(Math.min(1, Math.max(0, c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055)) * 255);
+      const meshColour = (mesh) => {
+        const material = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+        const colour = material && material.color;
+        return colour ? `rgb(${linearToSrgb(colour.r)}, ${linearToSrgb(colour.g)}, ${linearToSrgb(colour.b)})` : 'rgb(200, 200, 200)';
+      };
+      // Hidden layers leave three.js layer 0 (see Layers) or turn invisible.
+      const meshShown = (mesh) => mesh.visible && mesh.layers.isEnabled(0);
+      const sliceMeshData = (mesh) => {
+        if (sliceGeo.has(mesh)) return sliceGeo.get(mesh);
+        let data = null;
+        const position = mesh.geometry.attributes && mesh.geometry.attributes.position;
+        if (position && position.count >= 3 && !mesh.isSkinnedMesh) {
+          sectionCtx.root.updateMatrixWorld(true);
+          const e = new sectionCtx.Mat4().copy(sectionCtx.root.matrixWorld).invert().multiply(mesh.matrixWorld).elements;
+          const pos = new Float32Array(position.count * 3);
+          for (let k = 0; k < position.count; k += 1) {
+            const x = position.getX(k);
+            const y = position.getY(k);
+            const z = position.getZ(k);
+            pos[k * 3] = e[0] * x + e[4] * y + e[8] * z + e[12];
+            pos[k * 3 + 1] = e[1] * x + e[5] * y + e[9] * z + e[13];
+            pos[k * 3 + 2] = e[2] * x + e[6] * y + e[10] * z + e[14];
+          }
+          const index = mesh.geometry.index ? mesh.geometry.index.array : null;
+          data = { pos, index, triCount: Math.floor((index ? index.length : position.count) / 3), bins: {} };
+        }
+        sliceGeo.set(mesh, data);
+        return data;
+      };
+      const binOf = (value, i) => {
+        const lo = sectionCtx.min[i];
+        const span = sectionCtx.max[i] - lo || 1;
+        return Math.min(SLICE_BINS - 1, Math.max(0, Math.floor(((value - lo) / span) * SLICE_BINS)));
+      };
+      const sliceBins = (data, i) => {
+        if (data.bins[i]) return data.bins[i];
+        const { pos, index, triCount } = data;
+        const lists = Array.from({ length: SLICE_BINS }, () => []);
+        for (let t = 0; t < triCount; t += 1) {
+          const a = pos[(index ? index[t * 3] : t * 3) * 3 + i];
+          const b = pos[(index ? index[t * 3 + 1] : t * 3 + 1) * 3 + i];
+          const c = pos[(index ? index[t * 3 + 2] : t * 3 + 2) * 3 + i];
+          const last = binOf(Math.max(a, b, c), i);
+          for (let bin = binOf(Math.min(a, b, c), i); bin <= last; bin += 1) lists[bin].push(t);
+        }
+        data.bins[i] = lists.map((list) => Int32Array.from(list));
+        return data.bins[i];
+      };
+      // One mesh's cut as flat [h, v, h, v, ...] polylines in model units.
+      const sliceMesh = (data, i, c, hi, vi, quantum) => {
+        const { pos, index } = data;
+        const tris = sliceBins(data, i)[binOf(c, i)];
+        const points = []; // h, v per segment end
+        const keys = [];
+        const ids = [0, 0, 0];
+        const above = [false, false, false];
+        for (let n = 0; n < tris.length; n += 1) {
+          const t = tris[n];
+          let count = 0;
+          for (let k = 0; k < 3; k += 1) {
+            ids[k] = index ? index[t * 3 + k] : t * 3 + k;
+            above[k] = pos[ids[k] * 3 + i] >= c;
+            if (above[k]) count += 1;
+          }
+          if (count === 0 || count === 3) continue;
+          for (let k = 0; k < 3; k += 1) {
+            if (above[k] === above[(k + 1) % 3]) continue;
+            // Interpolate from the lower vertex id so neighbours sharing this
+            // edge produce the very same point.
+            let p = ids[k];
+            let q = ids[(k + 1) % 3];
+            if (p > q) { const swap = p; p = q; q = swap; }
+            const f = (c - pos[p * 3 + i]) / (pos[q * 3 + i] - pos[p * 3 + i]);
+            const h = pos[p * 3 + hi] + f * (pos[q * 3 + hi] - pos[p * 3 + hi]);
+            const v = pos[p * 3 + vi] + f * (pos[q * 3 + vi] - pos[p * 3 + vi]);
+            points.push(h, v);
+            keys.push(`${Math.round(h / quantum)},${Math.round(v / quantum)}`);
+          }
+        }
+        const ends = new Map(); // key -> end refs (segment * 2 + end)
+        keys.forEach((key, ref) => { if (!ends.has(key)) ends.set(key, []); ends.get(key).push(ref); });
+        const used = new Uint8Array(keys.length / 2);
+        const loops = [];
+        const open = [];
+        for (let s = 0; s < used.length; s += 1) {
+          if (used[s]) continue;
+          used[s] = 1;
+          const line = [points[s * 4], points[s * 4 + 1], points[s * 4 + 2], points[s * 4 + 3]];
+          const start = keys[s * 2];
+          let current = keys[s * 2 + 1];
+          while (current !== start) {
+            const next = (ends.get(current) || []).find((ref) => !used[ref >> 1]);
+            if (next === undefined) break;
+            used[next >> 1] = 1;
+            const other = next ^ 1;
+            line.push(points[other * 2], points[other * 2 + 1]);
+            current = keys[other];
+          }
+          (current === start ? loops : open).push(line);
+        }
+        return { loops, open };
+      };
+      const computeSlice = () => {
+        const i = AXIS_INDEX[section.axis];
+        const frame = SLICE_FRAME[section.axis];
+        const key = `${section.axis}:${section.offset}`;
+        if (sliceCache && sliceCache.key === key) return sliceCache;
+        const c = sectionCtx.centre[i] + section.offset;
+        const diagonal = Math.hypot(...sectionCtx.max.map((value, k) => value - sectionCtx.min[k])) || 1;
+        const meshes = [];
+        sectionCtx.meshes.forEach((mesh) => {
+          const data = sliceMeshData(mesh);
+          if (!data) return;
+          const cut = sliceMesh(data, i, c, frame.h[0], frame.v[0], diagonal * 1e-6);
+          if (cut.loops.length || cut.open.length) meshes.push({ mesh, ...cut });
+        });
+        sliceCache = { key, meshes };
+        return sliceCache;
+      };
+      const niceLength = (metres) => {
+        const mm = metres * 1000;
+        const power = Math.pow(10, Math.floor(Math.log10(mm)));
+        const step = [5, 2, 1].map((m) => m * power).find((value) => value <= mm) || power;
+        return step / 1000;
+      };
+      const drawSlice = () => {
+        sliceFrame = 0;
+        if (!sliceVisible()) return;
+        try {
+          const width = sliceCanvas.clientWidth;
+          const height = sliceCanvas.clientHeight;
+          if (!width || !height) return;
+          const dpr = Math.min(window.devicePixelRatio || 1, 3);
+          if (sliceCanvas.width !== Math.round(width * dpr)) sliceCanvas.width = Math.round(width * dpr);
+          if (sliceCanvas.height !== Math.round(height * dpr)) sliceCanvas.height = Math.round(height * dpr);
+          const ctx = sliceCanvas.getContext('2d');
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          ctx.clearRect(0, 0, width, height);
+          if (sliceView.axis !== section.axis) sliceView = { zoom: 1, panX: 0, panY: 0, axis: section.axis };
+          const frame = SLICE_FRAME[section.axis];
+          const [hi, hs] = frame.h;
+          const [vi, vs] = frame.v;
+          // Fit the model's whole extent in this plane, so the frame stays put while the slider moves.
+          const hRange = [sectionCtx.min[hi] * hs, sectionCtx.max[hi] * hs].sort((a, b) => a - b);
+          const vRange = [sectionCtx.min[vi] * vs, sectionCtx.max[vi] * vs].sort((a, b) => a - b);
+          const pad = 22;
+          const fit = Math.min((width - pad * 2) / (hRange[1] - hRange[0] || 1), (height - pad * 2) / (vRange[1] - vRange[0] || 1));
+          const scale = fit * sliceView.zoom;
+          const ch = (hRange[0] + hRange[1]) / 2;
+          const cv = (vRange[0] + vRange[1]) / 2;
+          const ox = width / 2 + sliceView.panX;
+          const oy = height / 2 + sliceView.panY;
+          const tracePath = (line, close) => {
+            ctx.moveTo(ox + (line[0] * hs - ch) * scale, oy - (line[1] * vs - cv) * scale);
+            for (let k = 2; k < line.length; k += 2) ctx.lineTo(ox + (line[k] * hs - ch) * scale, oy - (line[k + 1] * vs - cv) * scale);
+            if (close) ctx.closePath();
+          };
+          const { meshes } = computeSlice();
+          let drawn = 0;
+          ctx.lineJoin = 'round';
+          meshes.forEach(({ mesh, loops, open }) => {
+            if (!meshShown(mesh)) return;
+            drawn += 1;
+            const colour = meshColour(mesh);
+            ctx.beginPath();
+            loops.forEach((line) => tracePath(line, true));
+            ctx.globalAlpha = 0.7;
+            ctx.fillStyle = colour;
+            ctx.fill('evenodd');
+            open.forEach((line) => tracePath(line, false));
+            ctx.globalAlpha = 1;
+            ctx.strokeStyle = colour;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          });
+          sliceEmpty.hidden = drawn > 0;
+          const light = /^(light|white)$/.test(document.documentElement.dataset.viewerBg || '');
+          const ink = light ? '#202020' : '#ffffff';
+          const muted = light ? 'rgba(32, 32, 32, 0.55)' : 'rgba(255, 255, 255, 0.6)';
+          ctx.font = '600 11px Inter, system-ui, sans-serif';
+          if (frame.letters) {
+            ctx.fillStyle = muted;
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'left';
+            ctx.fillText(frame.letters[0], 6, height / 2);
+            ctx.textAlign = 'right';
+            ctx.fillText(frame.letters[1], width - 6, height / 2);
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText(frame.letters[2], width / 2, 6);
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(frame.letters[3], width / 2, height - 6);
+          }
+          // Scale bar, bottom left.
+          const bar = niceLength(70 / scale);
+          const barPx = bar * scale;
+          const mm = bar * 1000;
+          ctx.fillStyle = ink;
+          ctx.fillRect(12, height - 14, barPx, 2);
+          ctx.fillRect(12, height - 18, 1.5, 6);
+          ctx.fillRect(12 + barPx - 1.5, height - 18, 1.5, 6);
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'bottom';
+          const tidy = (value) => Number(value.toPrecision(3));
+          ctx.fillText(mm >= 1000 ? `${tidy(mm / 1000)} m` : mm >= 10 ? `${tidy(mm / 10)} cm` : `${tidy(mm)} mm`, 12, height - 20);
+        } catch (e) {
+          sliceWrap.hidden = true; // internals differ: keep the 3D section only
+        }
+      };
+      const scheduleSlice = () => {
+        if (!sliceFrame && sliceVisible()) sliceFrame = requestAnimationFrame(drawSlice);
+      };
+      // Layer visibility and colour changes go through the materials and the
+      // mesh layers; redraw when that changes rather than on every 3D frame.
+      const sliceStateSignature = () => (sliceCache ? sliceCache.meshes.map(({ mesh }) => (meshShown(mesh) ? meshColour(mesh) : '-')).join('|') : '')
+        + (document.documentElement.dataset.viewerBg || '');
+      if (sliceCanvas) {
+        if ('ResizeObserver' in window) new ResizeObserver(scheduleSlice).observe(sliceCanvas);
+        const pointers = new Map();
+        let gesture = null; // { x, y, distance } of the previous move
+        const gestureOf = () => {
+          const list = [...pointers.values()];
+          const x = list.reduce((sum, p) => sum + p.x, 0) / list.length;
+          const y = list.reduce((sum, p) => sum + p.y, 0) / list.length;
+          return { x, y, distance: list.length > 1 ? Math.hypot(list[0].x - list[1].x, list[0].y - list[1].y) : 0 };
+        };
+        // Zoom by `factor` about a canvas point, keeping the model point under it in place.
+        const zoomAt = (factor, x, y) => {
+          const zoom = Math.min(40, Math.max(0.5, sliceView.zoom * factor));
+          const applied = zoom / sliceView.zoom;
+          const cx = x - sliceCanvas.clientWidth / 2;
+          const cy = y - sliceCanvas.clientHeight / 2;
+          sliceView.panX = cx - (cx - sliceView.panX) * applied;
+          sliceView.panY = cy - (cy - sliceView.panY) * applied;
+          sliceView.zoom = zoom;
+        };
+        const local = (event) => {
+          const rect = sliceCanvas.getBoundingClientRect();
+          return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+        };
+        sliceCanvas.addEventListener('wheel', (event) => {
+          event.preventDefault();
+          const { x, y } = local(event);
+          zoomAt(Math.exp(-event.deltaY * (event.deltaMode === 1 ? 0.05 : 0.0015)), x, y);
+          scheduleSlice();
+        }, { passive: false });
+        sliceCanvas.addEventListener('pointerdown', (event) => {
+          sliceCanvas.setPointerCapture(event.pointerId);
+          pointers.set(event.pointerId, local(event));
+          gesture = gestureOf();
+        });
+        sliceCanvas.addEventListener('pointermove', (event) => {
+          if (!pointers.has(event.pointerId)) return;
+          pointers.set(event.pointerId, local(event));
+          const next = gestureOf();
+          sliceView.panX += next.x - gesture.x;
+          sliceView.panY += next.y - gesture.y;
+          if (next.distance && gesture.distance) zoomAt(next.distance / gesture.distance, next.x, next.y);
+          gesture = next;
+          scheduleSlice();
+        });
+        const release = (event) => {
+          pointers.delete(event.pointerId);
+          gesture = pointers.size ? gestureOf() : null;
+        };
+        sliceCanvas.addEventListener('pointerup', release);
+        sliceCanvas.addEventListener('pointercancel', release);
+        sliceCanvas.addEventListener('dblclick', () => {
+          sliceView = { zoom: 1, panX: 0, panY: 0, axis: sliceView.axis };
+          scheduleSlice();
+        });
+      }
       const setSection = (next) => {
         if (!sectionCtx) { pendingSection = next; return; }
         if (next) {
@@ -4682,6 +5015,7 @@
         }
         syncSectionUi();
         requestViewerRender();
+        scheduleSlice();
       };
 
       SECTION_AXES.forEach(([axis, label]) => {
@@ -4711,15 +5045,25 @@
         if (open) otherPanelToggles.forEach((toggle) => { if (toggle.getAttribute('aria-expanded') === 'true') toggle.click(); });
         sectionPanel.hidden = !open;
         sectionBtn.setAttribute('aria-expanded', String(open));
+        scheduleSlice();
       };
       sectionBtn.addEventListener('click', () => setSectionOpen(sectionPanel.hidden));
       otherPanelToggles.forEach((toggle) => toggle.addEventListener('click', () => { if (!sectionPanel.hidden) setSectionOpen(false); }));
 
-      viewer.addEventListener('before-render', () => { if (section && sectionCtx) updatePlane(); });
+      viewer.addEventListener('before-render', () => {
+        if (!section || !sectionCtx) return;
+        updatePlane();
+        if (sliceVisible()) {
+          const signature = sliceStateSignature();
+          if (signature !== sliceSignature) { sliceSignature = signature; scheduleSlice(); }
+        }
+      });
       const onSectionModelLoad = () => {
         // A reload brings new meshes and materials: drop what the old ones held.
         sectionSides.clear();
         patchedMeshes.clear();
+        sliceGeo = new WeakMap();
+        sliceCache = null;
         sectionCtx = prepareSection();
         sectionBtn.hidden = !sectionCtx; // internals differ -> the feature hides
         if (!sectionCtx) { section = null; syncSectionUi(); return; }
