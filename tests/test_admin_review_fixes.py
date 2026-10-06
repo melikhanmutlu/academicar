@@ -319,7 +319,7 @@ def test_user_audit_trail_includes_admin_actions_on_the_user(client):
         member_id = member.id
     client.post(f"/admin/users/{member_id}/deactivate")
     text = client.get(f"/admin/users/{member_id}").get_data(as_text=True)
-    assert "admin_user_deactivated" in text
+    assert "Admin user deactivated" in text
 
 
 def test_audit_log_csv_includes_details(client):

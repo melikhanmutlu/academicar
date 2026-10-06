@@ -680,6 +680,13 @@ a.admin-metric:hover, a.admin-metric:focus-visible { border-color: var(--color-s
 /* == end page:overview == */
 
 /* == page:users == */
+/* Row actions stay in one wrapping row on phones instead of a tall stack. */
+.admin-users-table .admin-actions { flex-direction: row; flex-wrap: wrap; align-items: center; }
+.admin-users-table .admin-actions .admin-btn { width: auto; }
+.admin-users-table td, .admin-users-table th { padding-left: 8px; padding-right: 8px; }
+.admin-users-table td small, .admin-users-table td a { overflow-wrap: anywhere; }
+.admin-show-sm { display: none; }
+@media (max-width: 640px) { .admin-show-sm { display: block; } }
 /* == end page:users == */
 
 /* == page:content == */
