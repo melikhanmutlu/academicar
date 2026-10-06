@@ -711,6 +711,7 @@ body:has(.admin-layout) .flash-stack {
 /* == end page:logs == */
 
 /* == page:backups == */
+#backups .admin-table td { overflow-wrap: anywhere; }
 /* == end page:backups == */
 
 /* == page:blog == */
