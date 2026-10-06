@@ -41,7 +41,7 @@
               <td class="admin-hide-sm">{{ annotation.model.paper.title if annotation.model and annotation.model.paper else "-" }}</td>
               <td>{{ annotation.created_at.strftime("%Y-%m-%d %H:%M") if annotation.created_at else "-" }}</td>
               <td>
-                <form method="POST" action="{{ url_for('admin_annotation_delete', annotation_id=annotation.id) }}" onsubmit="return confirm({{ ('Delete annotation “' ~ annotation.label ~ '” permanently?')|tojson }})">
+                <form method="POST" action="{{ url_for('admin_annotation_delete', annotation_id=annotation.id) }}" onsubmit='return confirm({{ ("Delete annotation “" ~ annotation.label ~ "” permanently?")|tojson }})'>
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <input type="hidden" name="next" value="{{ request.full_path }}">
                   <button type="submit" class="admin-btn admin-btn-danger compact">Delete</button>

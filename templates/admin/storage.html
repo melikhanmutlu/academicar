@@ -5,7 +5,7 @@
 {% block admin_body %}
   <section id="storage" class="admin-section">
     {% if storage_disk and storage_disk.low %}
-    <div class="admin-breakdown">
+    <div class="admin-breakdown admin-attention">
       <h3>Storage is nearly full</h3>
       <div>
         <span>Only {{ format_file_size(storage_disk.free) }} ({{ storage_disk.free_percent }}%) free. Uploads are refused below {{ format_file_size(storage_disk.min_free_bytes) }} plus twice the file size.</span>

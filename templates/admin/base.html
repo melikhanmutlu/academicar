@@ -67,7 +67,7 @@
     });
     // Resizing past the drawer breakpoint must not leave the scroll lock on.
     window.addEventListener('resize', function () {
-      if (window.innerWidth > 1024 && sidebar.classList.contains('is-open')) close();
+      if (window.innerWidth > 1023 && sidebar.classList.contains('is-open')) close();
     });
   })();
 </script>

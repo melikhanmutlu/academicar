@@ -90,7 +90,7 @@
           <tr>
             <th>Project</th>
             <th>Status</th>
-            <th>Models</th>
+            <th class="admin-hide-sm">Models</th>
             <th class="admin-hide-sm">Created</th>
             <th>Actions</th>
           </tr>
@@ -103,7 +103,7 @@
                 <small>{{ paper.slug }}</small>
               </td>
               <td><span class="status-chip {{ admin_chip_class(project_visibility(paper)) }}">{{ visibility_label(paper) }}</span></td>
-              <td>{{ paper.models|length }}</td>
+              <td class="admin-hide-sm">{{ paper.models|length }}</td>
               <td class="admin-hide-sm">{{ paper.created_at.strftime("%Y-%m-%d") if paper.created_at else "-" }}</td>
               <td>
                 <details class="admin-editor">
@@ -160,7 +160,7 @@
             <tr>
               <td>
                 {% if paper_is_deleted(model.paper) %}<span>{{ model.display_name or model.original_filename or model.id }}</span> <small>Project deleted</small>{% else %}<a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener noreferrer">{{ model.display_name or model.original_filename or model.id }}</a>{% endif %}
-                <small>{{ model_resolver_url(model) if model.public_id else "No public id" }}</small>
+                <small class="admin-hide-sm">{{ model_resolver_url(model) if model.public_id else "No public id" }}</small>
               </td>
               <td class="admin-hide-sm">{{ model.paper.title if model.paper else "-" }}</td>
               <td class="admin-hide-sm">{{ get_license_plan(model.license_type).label }}</td>
@@ -222,7 +222,7 @@
       <div class="admin-breakdown">
         <h3>Payments</h3>
         {% for payment in payments %}
-          <div><span>{{ payment.invoice_number or payment.provider }}</span><strong>{{ "%.2f"|format(payment.amount_kurus / 100) }} {{ payment.currency }} <span class="status-chip {{ admin_chip_class(payment.status) }}">{{ payment.status|replace("_", " ")|capitalize }}</span></strong></div>
+          <div><span>{{ payment.invoice_number or payment.provider }}</span><strong class="admin-wrap-row">{{ "%.2f"|format(payment.amount_kurus / 100) }} {{ payment.currency }} <span class="status-chip {{ admin_chip_class(payment.status) }}">{{ payment.status|replace("_", " ")|capitalize }}</span></strong></div>
         {% else %}
           <p class="admin-empty">No payments yet.</p>
         {% endfor %}
