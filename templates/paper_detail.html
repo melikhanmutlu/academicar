@@ -318,8 +318,12 @@
               {% if saved_media %}
               <div class="model-media" aria-label="Saved images and videos">
                 <p class="model-media-title">Media <span>{{ saved_media|length }}</span></p>
+                {% set media_videos = saved_media|selectattr('kind', 'equalto', 'video')|list %}
+                {% set media_images = saved_media|selectattr('kind', 'equalto', 'image')|list %}
+                {% for group, label in [(media_videos, 'Videos'), (media_images, 'Images')] if group %}
+                <p class="model-media-kind">{{ label }} <span>{{ group|length }}</span></p>
                 <div class="model-media-grid">
-                  {% for item in saved_media[:4] %}
+                  {% for item in group[:2] %}
                     {% set item_url = url_for('model_media.serve_media', model_id=m.id, media_id=item.id) %}
                     <a href="{{ item_url }}" target="_blank" rel="noopener" class="model-media-item" title="{{ item.label or item.kind|title }}">
                       {% if item.kind == 'video' %}<video src="{{ item_url }}#t=2" muted preload="metadata" playsinline></video><span class="model-media-badge">Video</span>
@@ -327,7 +331,8 @@
                     </a>
                   {% endfor %}
                 </div>
-                <a class="model-media-more" href="{{ url_for('view_model', model_id=m.id) }}">{% if saved_media|length > 4 %}+{{ saved_media|length - 4 }} more · {% endif %}Open in viewer</a>
+                {% endfor %}
+                <a class="model-media-more" href="{{ url_for('view_model', model_id=m.id) }}">All media in the viewer</a>
               </div>
               {% endif %}
             </div>

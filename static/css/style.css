@@ -5321,6 +5321,14 @@ input[type="file"]::-webkit-file-upload-button {
 }
 .model-media-title span { font-weight: 600; letter-spacing: 0; color: var(--color-midnight-graphite); }
 .model-media-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.model-media-kind {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-inter);
+  font-size: 10.5px;
+  font-weight: 650;
+  color: var(--color-silver-ash);
+}
 .model-media-item {
   position: relative;
   display: block;

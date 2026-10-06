@@ -190,6 +190,9 @@
     .viewer-media-count { font-weight: 500; letter-spacing: 0; }
     .viewer-media-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 0.6rem; }
     .viewer-media-grid:empty { display: none; }
+    .viewer-media-kind { margin-top: 0.6rem; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,0.5); }
+    .viewer-media-kind + .viewer-media-grid { margin-top: 0.35rem; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-media-kind { color: #6b6b6b; }
     .viewer-media-item { position: relative; aspect-ratio: 1 / 1; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.06); }
     .viewer-media-item img, .viewer-media-item video { display: block; width: 100%; height: 100%; object-fit: cover; }
     .viewer-media-item .viewer-media-badge { position: absolute; left: 4px; bottom: 4px; padding: 1px 5px; border-radius: 4px; font-size: 9px; font-weight: 700; color: #fff; background: rgba(0,0,0,0.6); }
@@ -1602,6 +1605,9 @@
 
           {% if is_owner and not is_embed and not (demo_mode is defined and demo_mode) %}<div class="viewer-media-tools" data-media-tools data-url="{{ url_for('model_media.upload_media', model_id=model.id) }}">
             <div class="viewer-tool-heading"><span>Saved media <span class="viewer-media-count" data-media-count></span></span></div>
+            <p class="viewer-media-kind" data-media-videos-title hidden>Videos</p>
+            <div class="viewer-media-grid" data-media-grid-videos></div>
+            <p class="viewer-media-kind" data-media-images-title hidden>Images</p>
             <div class="viewer-media-grid" data-media-grid></div>
             <p class="viewer-media-status" data-media-status role="status" aria-live="polite">Screenshots, figures and recordings you take are kept here. Only project editors see them.</p>
           </div>{% endif %}
@@ -1935,6 +1941,7 @@
       <div class="layers-head">
         <h2>Layers <span class="font-normal">({{ viewer_layers|length }})</span></h2>
         <div class="layers-head-actions">
+          <button type="button" data-layers-reset title="Back to the saved layers: visibility, colours and finishes">Reset changes</button>
           <button type="button" data-layers-all>Show all</button>
           <button type="button" data-layers-close aria-label="Close layers">×</button>
         </div>
@@ -2194,11 +2201,15 @@
       const mediaTools = document.querySelector('[data-media-tools]');
       if (!mediaTools) return;
       const grid = mediaTools.querySelector('[data-media-grid]');
+      const videoGrid = mediaTools.querySelector('[data-media-grid-videos]');
       const countEl = mediaTools.querySelector('[data-media-count]');
       const statusEl = mediaTools.querySelector('[data-media-status]');
       let items = {{ (model_media_list(model) if is_owner and not is_embed and not (demo_mode is defined and demo_mode) else [])|tojson }};
       const render = () => {
         grid.textContent = '';
+        videoGrid.textContent = '';
+        mediaTools.querySelector('[data-media-videos-title]').hidden = !items.some((item) => item.kind === 'video');
+        mediaTools.querySelector('[data-media-images-title]').hidden = !items.some((item) => item.kind === 'image');
         countEl.textContent = items.length ? `(${items.length})` : '';
         items.forEach((item) => {
           const cell = document.createElement('div');
@@ -2238,7 +2249,7 @@
           });
           actions.append(download, remove);
           cell.appendChild(actions);
-          grid.appendChild(cell);
+          (item.kind === 'video' ? videoGrid : grid).appendChild(cell);
         });
       };
       // Large PNGs (publication figures) are re-encoded as JPEG to fit the 8 MB limit.
@@ -2541,6 +2552,9 @@
           cutoff: material.getAlphaCutoff(),
           factor: [...material.pbrMetallicRoughness.baseColorFactor],
           applied: false, // true while hidden/faded: the captured values are then the ones to restore
+          // The saved finish, restored by cancelling a preset or "Reset changes".
+          metallic: material.pbrMetallicRoughness.metallicFactor,
+          roughness: material.pbrMetallicRoughness.roughnessFactor,
         })));
         return mats;
       };
@@ -2737,8 +2751,14 @@
             if (!response.ok || !result.ok) throw new Error(result.message || 'The layers could not be saved.');
             pendingColors.forEach((hex, i) => { layerData[i].color = hex; viewColors[i] = null; });
             pendingColors.clear();
-            pendingFinishes.forEach((finish, i) => Object.assign(layerData[i], finish));
+            pendingFinishes.forEach((finish, i) => {
+              Object.assign(layerData[i], finish);
+              (resolveMaterials()?.[i] || []).forEach((entry) => Object.assign(entry, finish));
+            });
             pendingFinishes.clear();
+            appliedFinish.clear();
+            finishUndo.clear();
+            syncFinishButtons();
             if (visibilityEdited) layerData.forEach((layer, i) => { layer.visible = state[i].visible; layer.opacity = state[i].opacity; });
             visibilityEdited = false;
             saveStatus.textContent = 'Layers saved. The AR file updates in a minute.';
@@ -2784,19 +2804,63 @@
         saveBox.hidden = false;
         saveBox.querySelector('[data-layers-save-status]').textContent = 'Saves colours, finishes and which layers show — the viewer and AR open this way.';
       };
+      const appliedFinish = new Map(); // layer index -> preset key on screen (not saved yet)
+      const finishUndo = new Map(); // layer index -> { color, opacity, visible } before the first preset
+      const restoreFinish = (i) => {
+        (resolveMaterials()?.[i] || []).forEach(({ material, metallic, roughness }) => {
+          material.pbrMetallicRoughness.setMetallicFactor(metallic);
+          material.pbrMetallicRoughness.setRoughnessFactor(roughness);
+        });
+        const undo = finishUndo.get(i);
+        if (undo) {
+          if (undo.color) setLayerColor(i, undo.color);
+          else if (layerData[i].color) { pendingColors.delete(i); paintLayer(i, layerData[i].color); }
+          state[i].opacity = undo.opacity;
+          state[i].visible = undo.visible;
+          const input = list.children[i]?.querySelector('.layer-opacity');
+          if (input) input.value = Math.round(undo.opacity * 100);
+          apply(i);
+        }
+        pendingFinishes.delete(i);
+        appliedFinish.delete(i);
+        finishUndo.delete(i);
+      };
       const finishBox = layersPanel.querySelector('[data-finish]');
+      const finishTargets = () => {
+        const target = finishBox?.querySelector('[data-finish-target]');
+        return !target || target.value === 'all' ? layerData.map((_, i) => i) : [Number(target.value)];
+      };
+      // A preset shows as pressed when every targeted layer wears it; pressing it
+      // again takes it off (back to the saved finish, colour and opacity).
+      const syncFinishButtons = () => {
+        if (!finishBox) return;
+        const indexes = finishTargets();
+        finishBox.querySelectorAll('[data-finish-preset]').forEach((b) => {
+          b.setAttribute('aria-pressed', String(indexes.every((i) => appliedFinish.get(i) === b.dataset.finishPreset)));
+        });
+      };
       if (finishBox) {
-        const target = finishBox.querySelector('[data-finish-target]');
+        finishBox.querySelector('[data-finish-target]').addEventListener('change', syncFinishButtons);
         finishBox.querySelectorAll('[data-finish-preset]').forEach((button) => {
           button.addEventListener('click', () => {
-            const finish = FINISHES[button.dataset.finishPreset];
-            const indexes = target.value === 'all' ? layerData.map((_, i) => i) : [Number(target.value)];
+            const key = button.dataset.finishPreset;
+            const finish = FINISHES[key];
+            const indexes = finishTargets();
+            if (indexes.every((i) => appliedFinish.get(i) === key)) {
+              indexes.forEach(restoreFinish);
+              syncFinishButtons();
+              if (!pendingColors.size && !pendingFinishes.size && !visibilityEdited && saveBox) saveBox.hidden = true;
+              return;
+            }
             indexes.forEach((i) => {
+              if (appliedFinish.has(i)) restoreFinish(i); // switching presets starts from the saved look
+              finishUndo.set(i, { color: pendingColors.get(i) || null, opacity: state[i].opacity, visible: state[i].visible });
               (resolveMaterials()?.[i] || []).forEach(({ material }) => {
                 material.pbrMetallicRoughness.setMetallicFactor(finish.metallic);
                 material.pbrMetallicRoughness.setRoughnessFactor(finish.roughness);
               });
               pendingFinishes.set(i, { metallic: finish.metallic, roughness: finish.roughness });
+              appliedFinish.set(i, key);
               if (finish.color && layerData[i].color) setLayerColor(i, finish.color);
               if (finish.opacity) {
                 state[i].opacity = finish.opacity;
@@ -2806,11 +2870,29 @@
                 apply(i);
               }
             });
-            finishBox.querySelectorAll('[data-finish-preset]').forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+            syncFinishButtons();
             markDirty(Boolean(finish.opacity));
           });
         });
       }
+      // "Reset changes": back to the saved layers (default view, colours, finishes).
+      layersPanel.querySelector('[data-layers-reset]').addEventListener('click', () => {
+        if (window.viewerScenes && window.viewerScenes.activeId() != null) window.viewerScenes.markActive(null);
+        layerData.forEach((layer, i) => {
+          finishUndo.delete(i);
+          restoreFinish(i);
+          if (layer.color) paintLayer(i, layer.color);
+          state[i].visible = layer.visible !== false;
+          state[i].opacity = typeof layer.opacity === 'number' ? layer.opacity : 1;
+          const input = list.children[i]?.querySelector('.layer-opacity');
+          if (input) input.value = Math.round(state[i].opacity * 100);
+        });
+        pendingColors.clear();
+        visibilityEdited = false;
+        applyAll();
+        syncFinishButtons();
+        if (saveBox) saveBox.hidden = true;
+      });
       const setOpen = (open) => {
         if (open) refreshSwatches();
         layersPanel.hidden = !open;
@@ -5845,12 +5927,14 @@
       const statusEl = mediaTools.querySelector('[data-media-status]');
       const layerInfo = {{ viewer_layers|tojson }};
       const layered = layerInfo.length >= 2;
+      // Every showcase video is exactly 8 seconds; each motion is paced to fill it.
+      const VIDEO_SECONDS = 8;
       const VIDEOS = [
-        { label: 'Video: 360° turntable', seconds: 8, kind: 'turntable' },
-        { label: 'Video: Showcase', seconds: 8, kind: 'showcase' },
+        { label: 'Video: 360° turntable', seconds: VIDEO_SECONDS, kind: 'turntable' },
+        { label: 'Video: Showcase', seconds: VIDEO_SECONDS, kind: 'showcase' },
         layered
-          ? { label: 'Video: Layer reveal', seconds: Math.min(12, 3 + layerInfo.length * 1.2), kind: 'reveal' }
-          : { label: 'Video: Elevation sweep', seconds: 8, kind: 'elevation' },
+          ? { label: 'Video: Layer reveal', seconds: VIDEO_SECONDS, kind: 'reveal' }
+          : { label: 'Video: Elevation sweep', seconds: VIDEO_SECONDS, kind: 'elevation' },
       ];
       const viewLabel = (view) => `View: ${view.label}`;
       const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
@@ -5938,10 +6022,11 @@
           if (video.kind === 'turntable') return setOrbit(el, -180 + 360 * t, 72, '105%');
           if (video.kind === 'showcase') return setOrbit(el, -40 + 110 * ease(t), 62 + 20 * ease(t), `${130 - 50 * ease(t)}%`);
           if (video.kind === 'elevation') return setOrbit(el, 30 + 40 * t, 25 + 85 * ease(t), '110%');
-          // Layer reveal: layers fade in one after another while the model turns.
-          const slot = 1 / (layers.length + 1);
-          layers.forEach((entries, i) => setLayerAlpha(entries, Math.min(defaultAlpha(layerInfo[i]), Math.max(0, (t - i * slot * 0.8) / slot))));
-          return setOrbit(el, -30 + 90 * t, 70, '110%');
+          // Layer reveal: the layers fade in one after another during the first
+          // 75% while the model turns; the last two seconds show them all.
+          const step = 0.75 / layers.length;
+          layers.forEach((entries, i) => setLayerAlpha(entries, Math.min(defaultAlpha(layerInfo[i]), Math.max(0, (t - i * step) / step))));
+          return setOrbit(el, -30 + 90 * ease(t), 70, '110%');
         };
         await pose(0);
         await nextFrame();
