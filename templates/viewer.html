@@ -4906,15 +4906,17 @@
         if (!guidesFrame) guidesFrame = requestAnimationFrame(drawGuides);
       };
 
-      // Root-space positions per mesh (computed once per load; meshes do not
-      // move inside the model root, the orientation sliders turn the root).
+      // Root-space positions per mesh, cached per placement inside the model
+      // root (the orientation sliders turn the root; a node animation moves
+      // the mesh and so invalidates its entry).
       const meshPositions = new WeakMap();
       const rootPositions = (mesh) => {
-        let data = meshPositions.get(mesh);
-        if (data) return data;
         const { root, Vec3, Mat4 } = sectionCtx;
         root.updateMatrixWorld(true);
         const matrix = new Mat4().copy(root.matrixWorld).invert().multiply(mesh.matrixWorld);
+        const placement = matrix.elements.map((value) => value.toFixed(6)).join(',');
+        let data = meshPositions.get(mesh);
+        if (data && data.placement === placement) return data;
         const attribute = mesh.geometry.attributes.position;
         const pos = new Float32Array(attribute.count * 3);
         const lo = [Infinity, Infinity, Infinity];
@@ -4927,7 +4929,7 @@
           if (v.y < lo[1]) lo[1] = v.y; if (v.y > hi[1]) hi[1] = v.y;
           if (v.z < lo[2]) lo[2] = v.z; if (v.z > hi[2]) hi[2] = v.z;
         }
-        data = { pos, index: mesh.geometry.index ? mesh.geometry.index.array : null, count: attribute.count, lo, hi };
+        data = { pos, index: mesh.geometry.index ? mesh.geometry.index.array : null, count: attribute.count, lo, hi, placement };
         meshPositions.set(mesh, data);
         return data;
       };
@@ -5257,7 +5259,8 @@
         if (guidesOn()) startGuides();
         else if (overlay) overlay.setAttribute('hidden', '');
         if (!sliceView) return;
-        const show = guidesOn();
+        // Skinned meshes are posed on the GPU, so their triangles cannot be traced here.
+        const show = guidesOn() && !sectionCtx.meshes.some((mesh) => mesh.isSkinnedMesh);
         sliceView.hidden = !show;
         if (!show) return;
         if (section.axis !== lastSliceAxis) {
