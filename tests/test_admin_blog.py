@@ -169,9 +169,11 @@ def test_create_requires_title_and_body(client, app):
     resp = client.post("/admin/blog/create", data={"title": "", "body": "", "is_published": "on"}, follow_redirects=True)
     assert resp.status_code == 200
     with app.app_context():
-        # The redirect lands on /admin/blog, which self-heals the 6 built-in
+        # The redirect lands on /admin/blog, which self-heals the built-in
         # posts into the DB (same precedent as the pricing page and
         # seed_license_plans) — but the invalid submission itself must not
         # have created anything.
-        assert BlogPost.query.count() == 6
+        from blog_content import POSTS
+
+        assert BlogPost.query.count() == len(POSTS)
         assert BlogPost.query.filter_by(title="").count() == 0
