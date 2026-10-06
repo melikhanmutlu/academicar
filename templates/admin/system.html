@@ -1,5 +1,6 @@
 {% extends "admin/base.html" %}
 {% block admin_title %}System health{% endblock %}
+{% block admin_subtitle %}Converter tools, queue and disk.{% endblock %}
 {% block admin_actions %}
   <form method="POST" action="{{ url_for('admin_ar_doctor_run') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

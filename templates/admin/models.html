@@ -25,7 +25,7 @@
       </div>
       <div class="admin-insight-card">
         <span>Avg conversion</span>
-        <strong>{{ '—' if stats.average_conversion_seconds is none else stats.average_conversion_seconds ~ 's' }}</strong>
+        <strong>{{ '-' if stats.average_conversion_seconds is none else stats.average_conversion_seconds ~ 's' }}</strong>
         <small>last 200 conversions</small>
       </div>
     </div>
@@ -115,7 +115,7 @@
               <td>
                 <div class="admin-actions">
                   {% if paper_is_deleted(model.paper) %}<span class="status-chip models-offline" title="The project was deleted, so its viewer is offline.">Project deleted</span>{% else %}<a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener noreferrer" class="admin-btn admin-btn-secondary compact">Viewer</a>{% endif %}
-                  <a href="{{ url_for('admin_model_detail', model_id=model.id) }}" class="admin-btn admin-btn-primary compact">Manage</a>
+                  <a href="{{ url_for('admin_model_detail', model_id=model.id) }}" class="admin-btn admin-btn-secondary compact">Manage</a>
                 </div>
               </td>
             </tr>

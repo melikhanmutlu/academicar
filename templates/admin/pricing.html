@@ -1,5 +1,6 @@
 {% extends "admin/base.html" %}
 {% block admin_title %}Pricing &amp; plans{% endblock %}
+{% block admin_subtitle %}License plans and coupons.{% endblock %}
 
 {% block admin_body %}
   <section class="admin-section">
@@ -12,7 +13,7 @@
     {% for plan in pricing_rows %}
       <details class="admin-plan-card" {% if loop.first %}open{% endif %}>
         <summary class="admin-plan-summary">
-          <span><strong>{{ plan.label }}</strong><small><code>{{ plan.key }}</code> · {{ '$%.2f'|format(plan.price_usd_cents / 100) }} · {{ plan.max_models_per_project or 'Unlimited' }} models/topic</small></span>
+          <span><strong>{{ plan.label }}</strong><small><code>{{ plan.key }}</code> · {{ '$%.2f'|format(plan.price_usd_cents / 100) }} · {{ plan.max_models_per_project or 'Unlimited' }} model{{ '' if plan.max_models_per_project == 1 else 's' }}/topic</small></span>
           <span class="admin-plan-summary-state">Edit <b aria-hidden="true">⌄</b></span>
         </summary>
         <form method="POST" action="{{ url_for('admin_pricing_update', plan_key=plan.key) }}">

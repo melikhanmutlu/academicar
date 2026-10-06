@@ -24,7 +24,7 @@
     </div>
     <div class="admin-metric">
       <span>License</span>
-      <strong>{{ get_license_plan(model.license_type).label }}</strong>
+      <strong class="is-text">{{ get_license_plan(model.license_type).label }}</strong>
       <small>{% if model.access_expires_at %}Expires {{ model.access_expires_at.strftime("%Y-%m-%d %H:%M") }} UTC{% else %}No expiry{% endif %}</small>
     </div>
     <div class="admin-metric">
@@ -35,7 +35,7 @@
     <div class="admin-metric">
       <span>Public ID</span>
       <strong class="is-text">{{ model.public_id or "None" }}</strong>
-      <small>{{ model_resolver_url(model) if model.public_id else "No QR link yet" }}</small>
+      <small class="admin-hide-sm">{{ model_resolver_url(model) if model.public_id else "No QR link yet" }}</small>
     </div>
   </section>
 
@@ -74,7 +74,7 @@
       </div>
       <div class="admin-breakdown">
         <h3>Poster &amp; QR</h3>
-        <div class="admin-actions">
+        <div class="admin-wrap-row">
           <form method="POST" action="{{ url_for('admin_model_poster_regenerate', model_id=model.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="next" value="model_detail">
@@ -162,7 +162,6 @@
   <section id="jobs" class="admin-section">
     <div class="admin-section-head">
       <h2>Conversion jobs</h2>
-      <span>Latest 10</span>
       <a href="{{ url_for('admin_dashboard', admin_page='jobs') }}" class="admin-btn admin-btn-secondary compact">All jobs</a>
     </div>
     <div class="table-wrap">

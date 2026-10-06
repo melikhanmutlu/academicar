@@ -2927,7 +2927,7 @@ def build_share_snippets(model: Model3D, resolver_url: str) -> dict:
 
 
 def ensure_model_qr_link(model: Model3D) -> QRLink:
-    """Ensure the model has a stable public_id and an active QRLink record.
+    """Ensure the model has a stable public_id and a QRLink record (new links are active).
 
     Idempotent: callable many times for the same model. The QRLink survives
     license upgrades, replacements, and color updates so QR codes never break.
@@ -2958,8 +2958,8 @@ def ensure_model_qr_link(model: Model3D) -> QRLink:
                 raise
     elif qr_link.public_id != model.public_id:
         qr_link.public_id = model.public_id
-    if qr_link.status != "active":
-        qr_link.status = "active"
+    # An existing link keeps its status: an admin-disabled QR must not come
+    # back because its image was regenerated or printed.
     return qr_link
 
 
@@ -3171,18 +3171,26 @@ def _apply_model_appearance_change(model, form):
             # factors are tuned, so dropping metallic to 0 removes a golden FBX
             # sheen without flattening the texture to a solid colour. Untextured
             # models still get the solid-colour enrichment (the color picker).
+            baked = True
             if not color_changed and not finish_changed:
                 pass
             elif not color_changed or has_base_color_textures(glb_path):
-                apply_pbr_factors(glb_path, roughness=roughness, metallic=metallic)
+                baked = apply_pbr_factors(glb_path, roughness=roughness, metallic=metallic)
             else:
-                enrich_glb_for_ar(glb_path, rgba, roughness=roughness, metallic=metallic)
+                baked = enrich_glb_for_ar(glb_path, rgba, roughness=roughness, metallic=metallic)
         except Exception as exc:
             logger.exception("Appearance enrichment failed; restoring backup")
             if os.path.exists(backup_path):
                 shutil.copy2(backup_path, glb_path)
             glb_exists = os.path.exists(glb_path)
             detail = f" (GLB {'found' if glb_exists else 'NOT found'} at {glb_path}; {type(exc).__name__}: {exc})"
+            return False, f"The model appearance could not be updated. The previous version is still active.{detail}", "warning", None
+        if not baked:
+            # The converters return False (no exception) when the GLB is missing
+            # or unreadable: nothing was baked, so do not record a colour/finish
+            # the viewer will never show.
+            glb_exists = os.path.exists(glb_path)
+            detail = f" (GLB {'found' if glb_exists else 'NOT found'} at {glb_path}; it could not be rewritten)"
             return False, f"The model appearance could not be updated. The previous version is still active.{detail}", "warning", None
 
         model.appearance_color = new_color
@@ -8157,6 +8165,9 @@ def register_routes(app: Flask) -> None:
     def admin_institution_detail(institution_id):
         require_admin()
         institution = _institution_or_404(institution_id)
+        # log_audit commits, which expires every loaded object: record the view
+        # before the queries so the template does not re-fetch each row lazily.
+        log_audit("admin_institution_detail_viewed", user_id=current_user.id, resource_id=str(institution.id))
         members = (
             InstitutionMember.query.options(selectinload(InstitutionMember.user))
             .filter_by(institution_id=institution.id)
@@ -8182,7 +8193,6 @@ def register_routes(app: Flask) -> None:
             .order_by(Model3D.created_at.desc())
             .paginate(page=page, per_page=ADMIN_PER_PAGE, error_out=False)
         )
-        log_audit("admin_institution_detail_viewed", user_id=current_user.id, resource_id=str(institution.id))
         return render_template(
             "admin/institution_detail.html",
             institution=institution,
@@ -9851,16 +9861,21 @@ def register_routes(app: Flask) -> None:
             flash("Invalid plan key.", "danger")
             return redirect(admin_return_url("revenue"))
         amount_raw = (request.form.get("amount") or "").strip()
-        try:
-            amount_major = float(amount_raw)
-        except ValueError:
+        amount_major = parse_finite_number(amount_raw)
+        if amount_major is None:
             flash("Amount must be a number.", "danger")
             return redirect(admin_return_url("revenue"))
         if amount_major <= 0:
             flash("Amount must be greater than zero.", "danger")
             return redirect(admin_return_url("revenue"))
+        if amount_major > MAX_INSTITUTION_AMOUNT:
+            flash(f"Amount cannot exceed {MAX_INSTITUTION_AMOUNT:,}.", "danger")
+            return redirect(admin_return_url("revenue"))
         amount_minor = int(round(amount_major * 100))
-        currency = (request.form.get("currency") or app.config.get("PAYMENT_CURRENCY") or "TRY").strip().upper()[:3]
+        currency = normalize_currency_code(request.form.get("currency"), app.config.get("PAYMENT_CURRENCY") or "TRY")
+        if currency is None:
+            flash("Currency must be a 3-letter code (e.g. TRY).", "danger")
+            return redirect(admin_return_url("revenue"))
         status_value = (request.form.get("status") or "pending").strip().lower()
         if status_value not in {"pending", "paid"}:
             flash("Manual payments can only be created as pending or paid.", "danger")
