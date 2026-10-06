@@ -720,4 +720,7 @@ body:has(.admin-layout) .flash-stack {
 /* == end page:institutions == */
 
 /* == page:analytics == */
+.admin-audience { align-items: stretch; }
+.admin-audience .admin-section { margin: 0; }
+.admin-audience small { color: var(--color-silver-ash); font-weight: 400; }
 /* == end page:analytics == */

@@ -7476,7 +7476,7 @@ def register_routes(app: Flask) -> None:
             if admin_page == "system"
             else None
         )
-        analytics = analytics_snapshot(days=30) if admin_page == "analytics" else None
+        analytics = analytics_snapshot(days=30, include_trend=False) if admin_page == "analytics" else None
         funnel = funnel_snapshot(days=30) if admin_page == "analytics" else None
         pricing_rows = []
         coupons = []
@@ -7683,7 +7683,7 @@ def register_routes(app: Flask) -> None:
     @login_required
     def admin_analytics_export():
         require_admin()
-        snapshot = analytics_snapshot(days=30)
+        snapshot = analytics_snapshot(days=30, include_trend=False)
         rows = [{
             "period_days": snapshot["days"],
             "model_views": snapshot["views"],
