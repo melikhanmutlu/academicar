@@ -146,7 +146,8 @@ function apply3D(S) {
   if (!S.on) return;
   const f = FIN[S.fin] || FIN.Default, m = G.boneMat;
   m.color.setHex(S.boneColor ?? f.color); m.roughness = f.roughness; m.metalness = f.metalness; m.clearcoat = f.clearcoat; m.transmission = f.transmission;
-  m.opacity = S.op; m.depthWrite = S.op > 0.99; m.transparent = S.op < 0.999 && f.transmission === 0;
+  m.opacity = S.op; m.depthWrite = S.op > 0.99;
+  const tp = S.op < 0.999 && f.transmission === 0; if (m.transparent !== tp) { m.transparent = tp; m.needsUpdate = true; }
   const L = LIGHT[S.light];
   G.key.intensity = L.key; G.head.intensity = L.head; G.scene.environmentIntensity = L.env; renderer.toneMappingExposure = L.exp;
   G.key.position.set(L.side ? 6 : 3, L.side ? 2 : 5, L.side ? -1 : 4); G.shadowMat.opacity = Math.min(1, L.sh);

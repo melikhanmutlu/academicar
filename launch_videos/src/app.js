@@ -413,7 +413,8 @@ function u5(l) {
   const sp = inn(l, 6.9, 0.5, 10); S($('secpill'), { o: sp.o * (1 - P(l, 9.9, 10.3)), y: sp.y });
   if (V.B) {
     const B = V.B;
-    B.boneMat.opacity = op; B.boneMat.depthWrite = op > 0.99; B.boneMat.transparent = op < 0.999;
+    B.boneMat.opacity = op; B.boneMat.depthWrite = op > 0.99;
+    if (B.boneMat.transparent !== op < 0.999) { B.boneMat.transparent = op < 0.999; B.boneMat.needsUpdate = true; }
     B.plane.constant = l > 6.8 && l < 10.6 ? cpos : 5;
     B.cap.visible = l > 6.8 && l < 10.6 && op > 0.99;
     B.guide.visible = kg > 0; B.guide.position.x = cpos; B.guideMat.opacity = 0.14 * kg; B.edgeMat.opacity = kg;

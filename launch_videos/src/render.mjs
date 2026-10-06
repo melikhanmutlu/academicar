@@ -2,7 +2,8 @@ import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
 import { spawn } from 'node:child_process';
 const [w, W] = process.argv.slice(2).map(Number);
 const FPS = 30, DUR = +(process.env.DUR||74), N = FPS * DUR;
-const a = Math.floor(N * w / W), b = Math.floor(N * (w + 1) / W);
+let a = Math.floor(N * w / W), b = Math.floor(N * (w + 1) / W);
+if (process.env.RANGE) [a, b] = process.env.RANGE.split('-').map(Number);
 const ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-',
   '-c:v', 'libx264', '-preset', 'slow', '-crf', '16', '-pix_fmt', 'yuv420p', '-r', String(FPS), `${process.env.PRE||'seg'}${w}.mp4`], { stdio: ['pipe', 'inherit', 'inherit'] });
 const br = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
