@@ -47,3 +47,35 @@ def test_scene_qr_image_is_the_scene_link_and_scoped_to_its_model(app, client):
     free_id, _ = _make_model(app, plan="free", email="free2@example.com")
     free_scene, _ = _scene_public_id(app, free_id)
     assert client.get(f"/qr-image/{free_id}?scene={free_scene}").data == client.get(f"/qr-image/{free_id}").data
+
+
+def test_measure_on_slice_ships_with_the_section_panel_only(app, client):
+    """With a section on, Measure takes its two points on the cut (view ray x
+    plane, kept only inside the solid) and Face turns the camera square to it;
+    without the section plane feature Measure stays on the 3D surface."""
+    mid, _ = _make_model(app, plan="academic", email="slice@example.com")
+    html = _html(client, mid)
+    assert "data-section-face disabled" in html and "window.viewerSection" in html
+    assert "const pointOnSection" in html and "const isInsideSolid" in html
+    assert "section-change" in html  # Measure clears a slice measurement when the cut moves
+    assert "const isMedicalMeasure = false" in html  # in-plane components only for scans
+
+    set_plan_features(app, "free", remove={"section_plane"})
+    free_id, _ = _make_model(app, plan="free", email="slicefree@example.com")
+    free_html = _html(client, free_id)
+    assert 'id="measureBtn"' in free_html  # 3D Measure stays on every plan
+    assert "data-section-face disabled" not in free_html  # no section panel, so Measure stays 3D
+
+
+def test_slice_view_follows_the_model_and_the_screen(app, client):
+    """The 2D slice recomputes when a node animation, a layer or the background
+    changes (signature watcher), resizes with its panel and pinch-zooms."""
+    mid, _ = _make_model(app, plan="academic", email="slice2@example.com")
+    html = _html(client, mid)
+    assert "<canvas data-slice-canvas" in html
+    for marker in ("const sliceStateSignature", "setInterval(watchSlice, 200)", "new ResizeObserver", "const pinchOf", "const sliceBins"):
+        assert marker in html, marker
+
+    set_plan_features(app, "free", remove={"slice_view"})
+    free_id, _ = _make_model(app, plan="free", email="slice2free@example.com")
+    assert "<canvas data-slice-canvas" not in _html(client, free_id)  # the JS stays inert without its markup
