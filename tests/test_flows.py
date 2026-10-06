@@ -1026,7 +1026,7 @@ def test_admin_dashboard_requires_admin_user(client):
 
     expected_pages = {
         "/admin/content": "Search title, slug, or owner email",
-        "/admin/models": "Model and conversion health",
+        "/admin/models": "Conversion health",
         "/admin/jobs": "Conversion jobs",
         "/admin/access": "QR &amp; viewer",
         "/admin/revenue": "Payment states",
