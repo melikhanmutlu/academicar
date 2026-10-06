@@ -1030,7 +1030,7 @@ def test_admin_dashboard_requires_admin_user(client):
         "/admin/jobs": "Conversion jobs",
         "/admin/access": "QR &amp; viewer",
         "/admin/revenue": "Payment states",
-        "/admin/security": "Operations and security",
+        "/admin/security": "Failed logins",
         "/admin/storage": "Storage",
         "/admin/users": "Users",
         "/admin/logs": "Audit log",

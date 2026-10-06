@@ -7265,7 +7265,7 @@ def register_routes(app: Flask) -> None:
                 )
                 .scalar()
             ) or 0
-        if page_is("overview", "security"):
+        if page_is("overview"):
             stats["failed_login_24h"] = AuditLog.query.filter(
                 AuditLog.event_type == "user_login_failed",
                 AuditLog.timestamp >= now - timedelta(hours=24),
@@ -7280,7 +7280,7 @@ def register_routes(app: Flask) -> None:
             .order_by(Model3D.file_size.desc())
             .limit(10)
             .all()
-            if page_is("overview", "security")
+            if page_is("overview")
             else []
         )
         largest_models = (
@@ -7440,7 +7440,7 @@ def register_routes(app: Flask) -> None:
             ]
         # Filesystem scanning (os.walk over four folders) and orphan detection
         # are expensive, so only run them on the pages that actually display the
-        # results: "overview" and "security" need the orphan count for critical
+        # results: "overview" needs the orphan count for critical
         # alerts, and "storage" renders the full breakdown. Other pages get
         # cheap defaults.
         orphan_counts = {"converted": 0, "pdf": 0, "qr": 0}
@@ -7453,14 +7453,14 @@ def register_routes(app: Flask) -> None:
         scan_cache_key = app.config["CONVERTED_FOLDER"]
         cached_scan = _ADMIN_FILE_SCAN_CACHE.get(scan_cache_key)
         if (
-            admin_page in {"overview", "security"}
+            admin_page == "overview"
             and cached_scan is not None
             and time.monotonic() - cached_scan[0] < ADMIN_FILE_SCAN_CACHE_SECONDS
         ):
             # The landing page must not walk the whole volume on every load;
             # the Storage page always rescans (and refreshes this cache).
             orphan_counts, storage_breakdown = cached_scan[1], cached_scan[2]
-        elif admin_page in {"overview", "storage", "security"}:
+        elif admin_page in {"overview", "storage"}:
             upload_size, upload_files = scan_folder_size(app.config["UPLOAD_FOLDER"])
             qr_size, qr_files = scan_folder_size(app.config["QR_FOLDER"])
             pdf_size, pdf_files = scan_folder_size(app.config["PDF_FOLDER"])
@@ -7494,25 +7494,37 @@ def register_routes(app: Flask) -> None:
             _ADMIN_FILE_SCAN_CACHE[scan_cache_key] = (time.monotonic(), orphan_counts, storage_breakdown)
         security_events = {}
         if admin_page == "security":
-            security_events = {
-                # Changes only: page views and downloads are logged as admin_* too.
-                "admin_actions": AuditLog.query.filter(
-                    AuditLog.event_type.like("admin_%"),
-                    AuditLog.event_type.notlike("%_viewed"),
-                    AuditLog.event_type != "admin_backup_downloaded",
-                ).count(),
-                "account_deleted": AuditLog.query.filter(
-                    AuditLog.event_type.in_(["account_deleted", "admin_user_deleted"])
-                ).count(),
-                "email_changed": AuditLog.query.filter_by(event_type="email_changed").count(),
-                "password_changed": AuditLog.query.filter_by(event_type="password_changed").count(),
-                "failed_logins": AuditLog.query.filter_by(event_type="user_login_failed").count(),
-                "rate_limit_hits": AuditLog.query.filter_by(event_type="rate_limit_exceeded").count(),
-                "webhook_signature_failures": AuditLog.query.filter_by(event_type="payment_webhook_signature_invalid").count(),
+            # One grouped query for the last 30 days; the admin_* family is a
+            # LIKE pattern, so it keeps its own count (changes only: page views
+            # and downloads are logged as admin_* too).
+            security_since = now - timedelta(days=30)
+            security_event_names = {
+                "failed_logins": "user_login_failed",
+                "rate_limit_hits": "rate_limit_exceeded",
+                "webhook_signature_failures": "payment_webhook_signature_invalid",
+                "account_deleted": "account_deleted",
+                "email_changed": "email_changed",
+                "password_changed": "password_changed",
             }
+            grouped = dict(
+                db.session.query(AuditLog.event_type, func.count(AuditLog.id))
+                .filter(
+                    AuditLog.timestamp >= security_since,
+                    AuditLog.event_type.in_(list(security_event_names.values())),
+                )
+                .group_by(AuditLog.event_type)
+                .all()
+            )
+            security_events = {key: grouped.get(event, 0) for key, event in security_event_names.items()}
+            security_events["admin_actions"] = AuditLog.query.filter(
+                AuditLog.timestamp >= security_since,
+                AuditLog.event_type.like("admin_%"),
+                AuditLog.event_type.notlike("%_viewed"),
+                AuditLog.event_type != "admin_backup_downloaded",
+            ).count()
         mirror_failed_count = (
             Model3D.query.filter(Model3D.r2_mirror_failed_at.isnot(None), live_model).count()
-            if page_is("storage", "overview", "security")
+            if page_is("storage", "overview")
             else 0
         )
         mirror_failed_models = (
@@ -7524,7 +7536,7 @@ def register_routes(app: Flask) -> None:
             else []
         )
         # statvfs is cheap, but only the storage page and the alert lists use it.
-        storage_disk = storage_disk_status(app) if page_is("overview", "security", "storage") else None
+        storage_disk = storage_disk_status(app) if page_is("overview", "storage") else None
         storage_extra = {"backups": 0, "medical_staging": 0}
         if admin_page == "storage":
             storage_extra = {
@@ -7532,7 +7544,7 @@ def register_routes(app: Flask) -> None:
                 "medical_staging": scan_folder_size(app.config["MEDICAL_STAGING_FOLDER"])[0],
             }
         critical_alerts = []
-        if page_is("overview", "security"):
+        if page_is("overview"):
             if storage_disk and storage_disk["low"]:
                 critical_alerts.append({
                     "text": f"Storage volume is nearly full ({format_file_size(storage_disk['free'])} free)",
