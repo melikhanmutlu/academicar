@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 340" width="960" height="340" role="img" aria-labelledby="t d">
+  <title id="t">The Hounsfield scale and AcademicAR's CT threshold presets</title>
+  <desc id="d">A scale from -1000 HU (air) to +1500 HU. Fat is near -100 HU, water 0 HU, soft tissue 20 to 80 HU, contrast-enhanced blood about 150 to 400 HU, and bone from about 250 HU upward. Preset thresholds: Skin at -300 HU and above, Contrast vessels at 150 HU and above, Bone at 250 HU and above.</desc>
+  <style>
+    .lbl { font: 600 14px Inter, system-ui, sans-serif; fill: #202020; }
+    .sub { font: 400 13px Inter, system-ui, sans-serif; fill: #6b6b6b; }
+    .tick { font: 500 13px Inter, system-ui, sans-serif; fill: #4d4d4d; }
+    .cap { font: 600 12px Inter, system-ui, sans-serif; fill: #6b6b6b; letter-spacing: .08em; }
+    .preset { font: 700 14px Inter, system-ui, sans-serif; fill: #c2410c; }
+  </style>
+  <defs>
+    <linearGradient id="g" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#111111"/>
+      <stop offset="0.36" stop-color="#5a5a5a"/>
+      <stop offset="0.42" stop-color="#8a8a8a"/>
+      <stop offset="0.6" stop-color="#d9d9d9"/>
+      <stop offset="1" stop-color="#ffffff"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="340" fill="#ffffff"/>
+
+  <text class="cap" x="60" y="30">TISSUES (TYPICAL VALUES)</text>
+
+  <!-- tissue markers: x = 60 + (HU + 1000) / 2500 * 840 -->
+  <g>
+    <line x1="60" y1="70" x2="60" y2="130" stroke="#bdbdbd"/>
+    <text class="lbl" x="60" y="56" text-anchor="start">Air</text>
+
+    <line x1="362" y1="86" x2="362" y2="130" stroke="#bdbdbd"/>
+    <text class="lbl" x="362" y="56" text-anchor="end">Fat</text>
+    <text class="sub" x="362" y="74" text-anchor="end">≈ −100</text>
+
+    <line x1="396" y1="86" x2="396" y2="130" stroke="#bdbdbd"/>
+    <text class="lbl" x="400" y="56">Water</text>
+    <text class="sub" x="400" y="74">0 · soft tissue 20–80</text>
+
+
+    <rect x="446" y="96" width="84" height="8" rx="4" fill="#CC2222" opacity=".85"/>
+    <text class="lbl" x="560" y="56">Contrast blood</text>
+    <text class="sub" x="560" y="74">≈ 150–400</text>
+    <line x1="530" y1="98" x2="556" y2="80" stroke="#bdbdbd"/>
+
+    <rect x="480" y="112" width="420" height="8" rx="4" fill="#E8D5B7"/>
+    <text class="lbl" x="760" y="56">Bone</text>
+    <text class="sub" x="760" y="74">≈ 250 to 1000+</text>
+    <line x1="780" y1="112" x2="780" y2="80" stroke="#bdbdbd"/>
+  </g>
+
+  <!-- scale -->
+  <rect x="60" y="136" width="840" height="34" rx="6" fill="url(#g)" stroke="#e8e8e8"/>
+  <g class="tick" text-anchor="middle">
+    <line x1="60" y1="170" x2="60" y2="178" stroke="#6b6b6b"/><text x="60" y="194">−1000</text>
+    <line x1="228" y1="170" x2="228" y2="178" stroke="#6b6b6b"/><text x="228" y="194">−500</text>
+    <line x1="396" y1="170" x2="396" y2="178" stroke="#6b6b6b"/><text x="396" y="194">0</text>
+    <line x1="564" y1="170" x2="564" y2="178" stroke="#6b6b6b"/><text x="564" y="194">500</text>
+    <line x1="732" y1="170" x2="732" y2="178" stroke="#6b6b6b"/><text x="732" y="194">1000</text>
+    <line x1="900" y1="170" x2="900" y2="178" stroke="#6b6b6b"/><text x="900" y="194">1500 HU</text>
+  </g>
+
+  <!-- presets -->
+  <text class="cap" x="620" y="236">PRESET THRESHOLDS</text>
+  <text class="sub" x="620" y="256">Each keeps every voxel at or above its value.</text>
+  <g>
+    <line x1="295" y1="136" x2="295" y2="300" stroke="#ff682c" stroke-width="2" stroke-dasharray="5 4"/>
+    <text class="preset" x="303" y="258">Skin ≥ −300</text>
+
+    <line x1="446" y1="136" x2="446" y2="300" stroke="#ff682c" stroke-width="2" stroke-dasharray="5 4"/>
+    <text class="preset" x="454" y="286">Contrast ≥ 150</text>
+
+    <line x1="480" y1="136" x2="480" y2="324" stroke="#ff682c" stroke-width="2" stroke-dasharray="5 4"/>
+    <text class="preset" x="488" y="316">Bone ≥ 250</text>
+  </g>
+  <text class="sub" x="620" y="284">Auto (Otsu): CT and MR, no HU needed.</text>
+  <text class="sub" x="620" y="304">Custom: your own minimum (and maximum).</text>
+</svg>

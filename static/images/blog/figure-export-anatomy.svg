@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 380" width="960" height="380" role="img" aria-labelledby="t d">
+  <title id="t">Anatomy of an exported publication figure</title>
+  <desc id="d">An exported figure contains an optional title, the model rendered at 2000, 3000 or 4000 pixels wide, a layer legend with each visible structure's colour, a scale bar from the model's real dimensions, and a QR card linking to the interactive model, on a white or transparent background.</desc>
+  <style>
+    .t { font: 700 18px Inter, system-ui, sans-serif; fill: #202020; }
+    .lg { font: 500 13px Inter, system-ui, sans-serif; fill: #202020; }
+    .call { font: 600 14px Inter, system-ui, sans-serif; fill: #202020; }
+    .p { font: 400 13px Inter, system-ui, sans-serif; fill: #6b6b6b; }
+    .cl { stroke: #ff682c; stroke-width: 1.5; fill: none; }
+    .dot { fill: #ff682c; }
+  </style>
+  <rect width="960" height="380" fill="#ffffff"/>
+
+  <!-- figure sheet -->
+  <g transform="translate(260 20)">
+    <rect width="440" height="340" rx="6" fill="#ffffff" stroke="#bdbdbd" stroke-width="1.5"/>
+    <text class="t" x="24" y="40">Proximal femur fracture, 3D reconstruction</text>
+    <!-- model: proximal femur -->
+    <g transform="translate(210 160)">
+      <path d="M-170 -10 C-176 -30, -150 -36, -140 -22 C-130 -36, -104 -30, -110 -10 L-110 10 C-104 30, -130 36, -140 22 C-150 36, -176 30, -170 10 Z" fill="#E8D5B7" stroke="#6b6b6b" stroke-width="1.4"/>
+      <path d="M-112 -14 H70 C84 -16, 90 -30, 96 -44 L104 -40 C100 -24, 96 -6, 92 4 C90 12, 84 16, 70 16 H-112 Z" fill="#E8D5B7" stroke="#6b6b6b" stroke-width="1.4"/>
+      <path d="M60 -16 C62 -40, 74 -50, 86 -46 L92 -30" fill="#E8D5B7" stroke="#6b6b6b" stroke-width="1.4"/>
+      <circle cx="118" cy="-58" r="28" fill="#E8D5B7" stroke="#6b6b6b" stroke-width="1.4"/>
+      <path d="M-90 0 H74" stroke="#6ba3d6" stroke-width="6" stroke-linecap="round"/>
+      <path d="M88 -46 L96 -36 L90 -28 L100 -18" stroke="#e5484d" stroke-width="3" fill="none" stroke-linejoin="round"/>
+    </g>
+    <!-- legend -->
+    <g transform="translate(24 268)">
+      <rect width="12" height="12" rx="2" fill="#E8D5B7" stroke="#bdbdbd"/><text class="lg" x="18" y="11">Femur</text>
+      <rect x="80" width="12" height="12" rx="2" fill="#e5484d"/><text class="lg" x="98" y="11">Fracture line</text>
+      <rect x="196" width="12" height="12" rx="2" fill="#6ba3d6"/><text class="lg" x="214" y="11">Nail</text>
+    </g>
+    <!-- scale bar -->
+    <g transform="translate(24 304)">
+      <rect width="50" height="5" fill="#202020"/><rect x="50" width="50" height="5" fill="#ffffff" stroke="#202020"/>
+      <text class="lg" x="106" y="8">50 mm</text>
+    </g>
+    <!-- qr card -->
+    <g transform="translate(340 252)">
+      <rect width="80" height="72" rx="6" fill="#ffffff" stroke="#e8e8e8"/>
+      <rect x="22" y="8" width="36" height="36" fill="#ffffff" stroke="#202020"/>
+      <path d="M26 12 h10 v10 h-10z M44 12 h10 v10 h-10z M26 30 h10 v10 h-10z M44 32 h6 v6 h-6z" fill="#202020"/>
+      <text class="p" x="40" y="62" text-anchor="middle" font-size="11">Scan for 3D</text>
+    </g>
+  </g>
+
+  <!-- callouts left -->
+  <circle class="dot" cx="282" cy="36" r="4"/><path class="cl" d="M278 36 H210"/>
+  <text class="call" x="200" y="34" text-anchor="end">Title</text>
+  <text class="p" x="200" y="52" text-anchor="end">optional</text>
+
+  <circle class="dot" cx="330" cy="160" r="4"/><path class="cl" d="M326 160 H210"/>
+  <text class="call" x="200" y="158" text-anchor="end">Model render</text>
+  <text class="p" x="200" y="176" text-anchor="end">2000 / 3000 / 4000 px wide</text>
+
+  <circle class="dot" cx="282" cy="294" r="4"/><path class="cl" d="M278 294 H210"/>
+  <text class="call" x="200" y="292" text-anchor="end">Layer legend</text>
+  <text class="p" x="200" y="310" text-anchor="end">visible layers + colours</text>
+
+  <circle class="dot" cx="282" cy="327" r="4"/><path class="cl" d="M278 327 H210 V344"/>
+  <text class="call" x="200" y="350" text-anchor="end">Scale bar</text>
+  <text class="p" x="200" y="368" text-anchor="end">from real dimensions</text>
+
+  <!-- callouts right -->
+  <circle class="dot" cx="680" cy="290" r="4"/><path class="cl" d="M684 290 H750"/>
+  <text class="call" x="760" y="288">QR card</text>
+  <text class="p" x="760" y="306">opens the interactive model</text>
+
+  <circle class="dot" cx="696" cy="80" r="4"/><path class="cl" d="M700 80 H750"/>
+  <text class="call" x="760" y="78">Background</text>
+  <text class="p" x="760" y="96">white or transparent</text>
+</svg>

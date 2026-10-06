@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 320" width="960" height="320" role="img" aria-labelledby="t d">
+  <title id="t">A STEP assembly becomes one layer per part</title>
+  <desc id="d">A STEP assembly tree with a housing, a cover, an input shaft, two identical gears and eight identical bolts is converted to a GLB in which every part becomes a layer; repeats of the same part are grouped into one layer. STEP colours are kept.</desc>
+  <style>
+    .cap { font: 600 12px Inter, system-ui, sans-serif; fill: #6b6b6b; letter-spacing: .08em; }
+    .t { font: 500 14px Inter, system-ui, sans-serif; fill: #202020; }
+    .p { font: 400 13px Inter, system-ui, sans-serif; fill: #6b6b6b; }
+    .tree { stroke: #bdbdbd; stroke-width: 1.2; fill: none; }
+    .badge { font: 600 12px Inter, system-ui, sans-serif; fill: #4d4d4d; }
+  </style>
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#bdbdbd"/>
+    </marker>
+  </defs>
+  <rect width="960" height="320" fill="#ffffff"/>
+
+  <text class="cap" x="40" y="34">STEP / STP ASSEMBLY</text>
+  <g transform="translate(40 56)">
+    <text class="t" x="0" y="12">▾ gearbox_assembly</text>
+    <path class="tree" d="M8 22 V222 M8 40 H24 M8 76 H24 M8 112 H24 M8 148 H24 M8 184 H24 M8 220 H24"/>
+    <text class="t" x="32" y="45">housing</text>
+    <text class="t" x="32" y="81">cover</text>
+    <text class="t" x="32" y="117">input_shaft</text>
+    <text class="t" x="32" y="153">gear_z24</text><text class="p" x="110" y="153">instance 1</text>
+    <text class="t" x="32" y="189">gear_z24</text><text class="p" x="110" y="189">instance 2</text>
+    <text class="t" x="32" y="225">bolt_M6 ×8</text>
+  </g>
+
+  <path d="M290 160 H390" stroke="#bdbdbd" stroke-width="2" marker-end="url(#ah)"/>
+  <text class="p" x="340" y="148" text-anchor="middle">OpenCascade</text>
+  <text class="p" x="340" y="184" text-anchor="middle">→ GLB + USDZ</text>
+
+  <text class="cap" x="420" y="34">LAYERS PANEL</text>
+  <g transform="translate(420 50)">
+    <rect width="290" height="236" rx="10" fill="#ffffff" stroke="#e8e8e8"/>
+    <g transform="translate(20 24)">
+      <rect y="0" width="14" height="14" rx="3" fill="#9aa4ad"/><text class="t" x="26" y="12">housing</text>
+      <rect y="38" width="14" height="14" rx="3" fill="#c9ced3"/><text class="t" x="26" y="50">cover</text>
+      <rect y="76" width="14" height="14" rx="3" fill="#4d4d4d"/><text class="t" x="26" y="88">input_shaft</text>
+      <rect y="114" width="14" height="14" rx="3" fill="#ff682c"/><text class="t" x="26" y="126">gear_z24</text>
+      <rect x="200" y="112" width="44" height="20" rx="10" fill="#f5f5f5"/><text class="badge" x="222" y="126" text-anchor="middle">×2</text>
+      <rect y="152" width="14" height="14" rx="3" fill="#816729"/><text class="t" x="26" y="164">bolt_M6</text>
+      <rect x="200" y="150" width="44" height="20" rx="10" fill="#f5f5f5"/><text class="badge" x="222" y="164" text-anchor="middle">×8</text>
+    </g>
+  </g>
+
+  <g transform="translate(740 70)">
+    <text class="t" x="0" y="0" font-weight="700">What carries over</text>
+    <text class="p" x="0" y="28">• one layer per part</text>
+    <text class="p" x="0" y="50">• repeated parts grouped</text>
+    <text class="p" x="0" y="72">• STEP colours kept</text>
+    <text class="p" x="0" y="94">• smooth holes and fillets</text>
+    <text class="p" x="0" y="130">Hide the housing to see</text>
+    <text class="p" x="0" y="150">the gear train; cut it with</text>
+    <text class="p" x="0" y="170">the section plane.</text>
+  </g>
+</svg>

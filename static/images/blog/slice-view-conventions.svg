@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 400" width="960" height="400" role="img" aria-labelledby="t d">
+  <title id="t">Slice view conventions for scans</title>
+  <desc id="d">Three slice views of a scan. Axial has a red frame, coronal a green frame and sagittal a yellow frame, following the 3D Slicer convention. Orientation labels follow the radiological convention: in axial and coronal views the patient's right is on the left of the screen; axial shows anterior at the top; coronal and sagittal show superior at the top; sagittal shows anterior on the left. Each structure's contour is drawn in its own layer colour, and a two-point measure snaps to the contours.</desc>
+  <style>
+    .panel { fill: #1b1b1b; }
+    .o { font: 700 14px Inter, system-ui, sans-serif; fill: rgba(255,255,255,.8); }
+    .h { font: 700 16px Inter, system-ui, sans-serif; fill: #202020; }
+    .p { font: 400 13px Inter, system-ui, sans-serif; fill: #6b6b6b; }
+    .m { font: 600 12px Inter, system-ui, sans-serif; fill: #ff9a6c; }
+    .c { fill: none; stroke-width: 2.2; stroke-linejoin: round; }
+  </style>
+  <rect width="960" height="400" fill="#ffffff"/>
+
+  <!-- AXIAL -->
+  <g transform="translate(20 20)">
+    <rect class="panel" width="290" height="290" rx="10"/>
+    <rect width="290" height="290" rx="10" fill="none" stroke="#e5484d" stroke-width="4"/>
+    <text class="o" x="145" y="26" text-anchor="middle">A</text>
+    <text class="o" x="145" y="276" text-anchor="middle">P</text>
+    <text class="o" x="16" y="150">R</text>
+    <text class="o" x="264" y="150">L</text>
+    <!-- body outline (skin) -->
+    <path class="c" stroke="#FFCBA4" d="M60 140 C60 80, 230 80, 230 140 C230 210, 190 236, 145 236 C100 236, 60 210, 60 140 Z"/>
+    <!-- liver (patient right = screen left) -->
+    <path class="c" stroke="#b07aa1" d="M80 130 C82 100, 140 96, 150 118 C156 134, 130 170, 96 172 C84 170, 78 150, 80 130 Z"/>
+    <!-- vertebra -->
+    <path class="c" stroke="#E8D5B7" d="M132 196 C132 184, 158 184, 158 196 C158 208, 132 208, 132 196 Z M140 206 L136 222 M150 206 L154 222"/>
+    <!-- aorta -->
+    <circle class="c" stroke="#e5484d" cx="168" cy="176" r="9"/>
+    <!-- kidneys -->
+    <path class="c" stroke="#6ba3d6" d="M100 190 C96 176, 116 172, 118 186 C120 198, 104 204, 100 190 Z"/>
+    <path class="c" stroke="#6ba3d6" d="M190 190 C194 176, 174 172, 172 186 C170 198, 186 204, 190 190 Z"/>
+    <!-- spleen -->
+    <path class="c" stroke="#8c7bd1" d="M196 120 C214 124, 220 150, 206 162 C200 150, 196 136, 196 120 Z"/>
+    <!-- measure -->
+    <line x1="177" y1="176" x2="196" y2="153" stroke="#ff682c" stroke-width="2"/>
+    <circle cx="177" cy="176" r="3.5" fill="#ff682c"/><circle cx="196" cy="153" r="3.5" fill="#ff682c"/>
+    <text class="m" x="202" y="182">8.4 mm</text>
+  </g>
+  <text class="h" x="20" y="340">Axial</text>
+  <text class="p" x="20" y="360">red · anterior up, patient right on the left</text>
+
+  <!-- CORONAL -->
+  <g transform="translate(335 20)">
+    <rect class="panel" width="290" height="290" rx="10"/>
+    <rect width="290" height="290" rx="10" fill="none" stroke="#30a46c" stroke-width="4"/>
+    <text class="o" x="145" y="26" text-anchor="middle">S</text>
+    <text class="o" x="145" y="276" text-anchor="middle">I</text>
+    <text class="o" x="16" y="150">R</text>
+    <text class="o" x="264" y="150">L</text>
+    <path class="c" stroke="#FFCBA4" d="M70 40 C60 120, 60 200, 80 262 M220 40 C230 120, 230 200, 210 262"/>
+    <path class="c" stroke="#b07aa1" d="M84 92 C100 70, 138 76, 138 100 C138 124, 110 146, 88 140 C78 130, 78 106, 84 92 Z"/>
+    <path class="c" stroke="#8c7bd1" d="M186 86 C204 88, 210 116, 196 128 C186 120, 180 100, 186 86 Z"/>
+    <path class="c" stroke="#6ba3d6" d="M104 156 C98 140, 122 136, 122 152 C122 172, 106 178, 104 156 Z"/>
+    <path class="c" stroke="#6ba3d6" d="M186 156 C192 140, 168 136, 168 152 C168 172, 184 178, 186 156 Z"/>
+    <path class="c" stroke="#e5484d" d="M150 60 V220 M150 220 L132 256 M150 220 L168 256"/>
+  </g>
+  <text class="h" x="335" y="340">Coronal</text>
+  <text class="p" x="335" y="360">green · superior up, patient right on the left</text>
+
+  <!-- SAGITTAL -->
+  <g transform="translate(650 20)">
+    <rect class="panel" width="290" height="290" rx="10"/>
+    <rect width="290" height="290" rx="10" fill="none" stroke="#e5b800" stroke-width="4"/>
+    <text class="o" x="145" y="26" text-anchor="middle">S</text>
+    <text class="o" x="145" y="276" text-anchor="middle">I</text>
+    <text class="o" x="16" y="150">A</text>
+    <text class="o" x="264" y="150">P</text>
+    <path class="c" stroke="#FFCBA4" d="M70 40 C56 120, 60 200, 82 262 M232 40 C226 120, 228 200, 222 262"/>
+    <!-- spine column -->
+    <path class="c" stroke="#E8D5B7" d="M196 50 h18 v20 h-18 z M196 76 h18 v20 h-18 z M196 102 h18 v20 h-18 z M196 128 h18 v20 h-18 z M196 154 h18 v20 h-18 z M196 180 h18 v20 h-18 z M196 206 h18 v20 h-18 z"/>
+    <path class="c" stroke="#e5484d" d="M180 50 C176 120, 176 180, 180 240"/>
+    <path class="c" stroke="#b07aa1" d="M90 90 C110 74, 160 80, 162 104 C164 128, 120 140, 96 130 C84 122, 82 102, 90 90 Z"/>
+  </g>
+  <text class="h" x="650" y="340">Sagittal</text>
+  <text class="p" x="650" y="360">yellow · superior up, anterior on the left</text>
+
+  <text class="p" x="20" y="390">Each structure is outlined in its own layer colour. CAD and building models use X red, Y green, Z blue instead.</text>
+</svg>

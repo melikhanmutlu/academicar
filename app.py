@@ -1101,8 +1101,13 @@ def seed_builtin_blog_posts(app: Flask) -> None:
     editable from the admin panel like any other post. Never touches a slug
     that already has a row, so an admin's edits (or a deliberate delete)
     survive every restart — mirrors seed_license_plans.
+
+    A seeded row nobody has edited (``updated_at`` still equals ``created_at``)
+    is refreshed from the code post instead, so later changes to a built-in
+    article (wording, figures) reach the live blog.
     """
     try:
+        _refresh_unedited_builtin_blog_posts()
         existing = {slug for (slug,) in db.session.query(BlogPost.slug).all()} | deleted_builtin_blog_slugs()
         to_insert = [
             BlogPost(
@@ -1128,6 +1133,35 @@ def seed_builtin_blog_posts(app: Flask) -> None:
     except SQLAlchemyError:
         db.session.rollback()
         logger.exception("Could not seed built-in blog post rows")
+
+
+def _refresh_unedited_builtin_blog_posts() -> None:
+    code_posts = {p["slug"]: p for p in get_all_posts()}
+    rows = BlogPost.query.filter(BlogPost.slug.in_(code_posts)).all()
+    changed = []
+    for row in rows:
+        if row.updated_at != row.created_at:
+            continue  # edited (or published/unpublished) from the admin panel
+        p = code_posts[row.slug]
+        fields = {
+            "title": p["title"],
+            "description": p.get("description"),
+            "body": p["body"],
+            "tags": ", ".join(p.get("tags") or []) or None,
+            "persona": p.get("persona"),
+            "read_minutes": p.get("read_minutes"),
+        }
+        if all(getattr(row, k) == v for k, v in fields.items()):
+            continue
+        # A bulk UPDATE with an explicit updated_at skips the column's onupdate,
+        # so the row still counts as unedited next time.
+        BlogPost.query.filter_by(id=row.id).update(
+            {**fields, "updated_at": row.created_at}, synchronize_session=False
+        )
+        changed.append(row.slug)
+    if changed:
+        db.session.commit()
+        logger.info("Refreshed %s unedited built-in blog post row(s): %s", len(changed), changed)
 
 
 def day_label(value: datetime) -> str:

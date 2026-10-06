@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 360" width="960" height="360" role="img" aria-labelledby="t d">
+  <title id="t">What AcademicAR measures on a layered model</title>
+  <desc id="d">For each layer: oriented dimensions, the edges of the tightest box aligned with the structure, and the maximum diameter, the farthest pair of points. Between neighbouring layers: the minimum distance, with the two closest points marked. Values are in millimetres.</desc>
+  <style>
+    .shape { fill: #f5f5f5; stroke: #6b6b6b; stroke-width: 1.5; }
+    .box { fill: none; stroke: #202020; stroke-width: 1.2; stroke-dasharray: 6 5; }
+    .dim { stroke: #202020; stroke-width: 1.2; }
+    .lbl { font: 600 14px Inter, system-ui, sans-serif; fill: #202020; }
+    .sub { font: 400 13px Inter, system-ui, sans-serif; fill: #6b6b6b; }
+    .acc { font: 700 14px Inter, system-ui, sans-serif; fill: #c2410c; }
+    .cap { font: 600 12px Inter, system-ui, sans-serif; fill: #6b6b6b; letter-spacing: .08em; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#202020"/>
+    </marker>
+  </defs>
+  <rect width="960" height="360" fill="#ffffff"/>
+
+  <text class="cap" x="40" y="34">PER LAYER</text>
+  <!-- oblique structure with oriented box -->
+  <g transform="translate(200 180) rotate(-28)">
+    <path class="shape" d="M-120 -10 C-118 -48, -40 -56, 20 -50 C80 -44, 122 -26, 120 6 C118 40, 60 52, 0 50 C-60 48, -122 30, -120 -10 Z"/>
+    <rect class="box" x="-126" y="-60" width="252" height="116"/>
+    <!-- length -->
+    <line class="dim" x1="-126" y1="74" x2="126" y2="74" marker-start="url(#a)" marker-end="url(#a)"/>
+    <!-- width -->
+    <line class="dim" x1="144" y1="-60" x2="144" y2="56" marker-start="url(#a)" marker-end="url(#a)"/>
+    <!-- max diameter -->
+    <line x1="-119" y1="12" x2="112" y2="-34" stroke="#ff682c" stroke-width="2"/>
+    <circle cx="-119" cy="12" r="4" fill="#ff682c"/><circle cx="112" cy="-34" r="4" fill="#ff682c"/>
+  </g>
+  <text class="lbl" x="120" y="322">Oriented dimensions</text>
+  <text class="sub" x="120" y="342">a × b × c of the tightest box, aligned with the structure</text>
+  <text class="acc" x="212" y="212">max diameter</text>
+
+  <line x1="500" y1="40" x2="500" y2="330" stroke="#e8e8e8"/>
+
+  <text class="cap" x="540" y="34">BETWEEN LAYERS</text>
+  <!-- two structures -->
+  <path class="shape" d="M560 120 C560 80, 640 70, 660 110 C680 150, 650 210, 610 220 C574 228, 560 170, 560 120 Z"/>
+  <text class="sub" x="582" y="150">layer A</text>
+  <path class="shape" d="M780 80 C820 70, 870 100, 880 150 C892 210, 850 270, 800 262 C760 256, 744 200, 752 150 C756 120, 760 88, 780 80 Z"/>
+  <text class="sub" x="790" y="180">layer B</text>
+  <line x1="665" y1="140" x2="752" y2="150" stroke="#ff682c" stroke-width="2" stroke-dasharray="6 4"/>
+  <circle cx="665" cy="140" r="4.5" fill="#ff682c"/><circle cx="752" cy="150" r="4.5" fill="#ff682c"/>
+  <text class="acc" x="672" y="128">min distance</text>
+  <text class="lbl" x="540" y="322">Closest distance between neighbours</text>
+  <text class="sub" x="540" y="342">pairs within about 5 cm, closest points marked · all values in mm</text>
+</svg>

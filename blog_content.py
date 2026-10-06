@@ -430,6 +430,9 @@ place on the desk in augmented reality used to take a segmentation workstation, 
 mesh editor, and a web developer. Here is how to do it in one upload — and what to
 think about before you press the button.
 
+![From a DICOM series to an AR-ready 3D model in five steps](/static/images/blog/dicom-pipeline.svg)
+*From an anonymized DICOM series to a GLB + USDZ model. The raw scan is deleted after conversion.*
+
 ## What a DICOM series actually is
 
 A scan is not one file. It is a **series** of 2D slices, each a separate DICOM file
@@ -529,6 +532,9 @@ Because the scale is calibrated, the same threshold means roughly the same tissu
 across scanners — which is what makes presets possible. MRI, by contrast, has no
 absolute intensity scale, so HU thresholds do not apply to it.
 
+![The Hounsfield scale with typical tissue values and the Skin, Contrast and Bone preset thresholds](/static/images/blog/hounsfield-scale.svg)
+*Typical tissue values on the Hounsfield scale, and where the CT presets cut.*
+
 ## The presets, and why they sit where they do
 
 - **Bone (250 HU and above).** High enough to exclude soft tissue and most
@@ -610,6 +616,9 @@ layers per model. That matters for readers:
 - Names come along where the format provides them, so the legend reads "left
   kidney", not "label 7".
 
+![A segmentation label map becomes one named, coloured layer per structure in the viewer](/static/images/blog/segmentation-layers.svg)
+*Each non-empty label becomes its own layer that readers can show, hide, fade or recolour.*
+
 Large multi-structure outputs are handled one mask at a time, so a full-body
 TotalSegmentator result does not need special preparation.
 
@@ -683,6 +692,9 @@ For scans, the slice view follows the conventions clinicians already know:
 For CAD and architectural models, it uses the familiar engineering colours
 instead — X red, Y green, Z blue — with plus/minus axis labels.
 
+![Axial, coronal and sagittal slice views with Slicer plane colours and radiological orientation labels](/static/images/blog/slice-view-conventions.svg)
+*Slice view conventions for scans: each structure in its own colour, Slicer plane colours, radiological orientation.*
+
 The slice view supports zoom and pan, shows a scale bar, and reports which
 structures the plane currently cuts.
 
@@ -742,6 +754,9 @@ And between structures:
 Values are reported in **millimetres**, computed from the full-resolution geometry
 before compression. Layer measurements are included in the paid model plans
 ([pricing](/pricing)).
+
+![Oriented dimensions and maximum diameter of one layer, and the minimum distance between two layers](/static/images/blog/layer-metrics.svg)
+*What is measured per layer and between neighbouring layers.*
 
 ## Why this matters in medicine
 
@@ -877,6 +892,9 @@ such as a set of bolts, are grouped into one layer. Readers can:
 - fade a cover to show what sits behind it,
 - recolour parts to match the colours used in your paper's figures.
 
+![A STEP assembly tree converted into one viewer layer per part, with repeated parts grouped](/static/images/blog/step-assembly-layers.svg)
+*Every part becomes a layer; repeated parts, such as bolts, are grouped.*
+
 ## Look inside with sections
 
 The **section plane** cuts through the assembly along any axis, and the **2D slice
@@ -957,6 +975,9 @@ through the building floor by floor. The **2D slice view** shows the cut as a fl
 drawing with a scale bar, and the snapping measure reads wall thicknesses and room
 widths directly on the section.
 
+![A horizontal cut gives a live plan and a vertical cut gives a live section of a building model](/static/images/blog/architecture-cuts.svg)
+*A horizontal plane gives a live plan, a vertical plane a live section, with a scale bar and a snapping measure.*
+
 ## Saved views and tours for reviews
 
 Save up to 12 **scenes** — each with its own camera, visible layers, colours, and
@@ -1024,6 +1045,9 @@ The **tour** plays your scenes in order, moving smoothly from one to the next. I
 lecture it replaces a series of static screenshots with one live model; for
 self-study, students step through the sequence at their own pace.
 
+![Four saved scenes of a skull model played as a guided tour](/static/images/blog/scenes-tour.svg)
+*A tour plays saved scenes in order; each scene also has its own link and QR code.*
+
 ## Scenes in AR
 
 A scene can also be opened in AR with **only its visible layers, its colours, and
@@ -1082,6 +1106,9 @@ ready-to-use figure with optional:
 Because the figure is built from the same view as the model, you can set up layers,
 colours, lighting, and a section cut first, then export — and export again later
 from a saved scene if a reviewer asks for a different angle.
+
+![An exported figure with title, model render, layer legend, scale bar and QR card](/static/images/blog/figure-export-anatomy.svg)
+*The parts of an exported figure.*
 
 ## Why the QR card matters
 
