@@ -699,6 +699,9 @@ body:has(.admin-layout) .flash-stack {
 /* == end page:pricing == */
 
 /* == page:security == */
+.admin-security-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+a.admin-insight-card { color: inherit; text-decoration: none; }
+a.admin-insight-card:hover { border-color: var(--color-silver-ash); }
 /* == end page:security == */
 
 /* == page:storage == */
