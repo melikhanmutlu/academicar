@@ -717,6 +717,30 @@ body:has(.admin-layout) .flash-stack {
 /* == end page:blog == */
 
 /* == page:institutions == */
+.admin-currency { width: 70px; }
+.admin-show-sm { display: none; }
+@media (max-width: 640px) { .admin-show-sm { display: block; } }
+.admin-mb { margin-bottom: 12px; }
+.admin-nowrap { white-space: nowrap; }
+.admin-logo-label {
+  font-family: var(--font-inter);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-silver-ash);
+}
+.admin-logo-preview {
+  height: 40px;
+  padding: 4px;
+  border: 1px solid var(--color-light-pearl);
+  background: var(--color-canvas-white);
+}
+.admin-new { margin-bottom: 16px; }
+.admin-new > summary { display: inline-flex; cursor: pointer; list-style: none; }
+.admin-new > summary::-webkit-details-marker { display: none; }
+.admin-new[open] > summary { margin-bottom: 12px; }
+.admin-danger-zone { border-top: 1px solid var(--color-light-pearl); }
 /* == end page:institutions == */
 
 /* == page:analytics == */
