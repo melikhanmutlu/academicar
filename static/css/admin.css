@@ -696,6 +696,11 @@ body:has(.admin-layout) .flash-stack {
 /* == end page:revenue == */
 
 /* == page:pricing == */
+.admin-plan-card .admin-editor-actions,
+.admin-coupon-create .admin-editor-actions { margin-top:12px; }
+.admin-coupon-create + .table-wrap { margin-top:16px; }
+.admin-plan-card .admin-editor-grid,
+.admin-coupon-create .admin-editor-grid { align-items:end; }
 /* == end page:pricing == */
 
 /* == page:security == */
