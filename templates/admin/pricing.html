@@ -12,7 +12,7 @@
       <span>{{ pricing_rows|length }} plans</span>
     </div>
     {% for plan in pricing_rows %}
-      <details class="admin-breakdown admin-plan-card" {% if loop.first %}open{% endif %}>
+      <details class="admin-plan-card" {% if loop.first %}open{% endif %}>
         <summary class="admin-plan-summary">
           <span><strong>{{ plan.label }}</strong><small><code>{{ plan.key }}</code> · {{ '$%.2f'|format(plan.price_usd_cents / 100) }} · {{ plan.max_models_per_project or 'Unlimited' }} models/topic</small></span>
           <span class="admin-plan-summary-state">Configure <b aria-hidden="true">⌄</b></span>
@@ -38,7 +38,7 @@
             <div class="admin-feature-options">
               {% for feature_key, feature_label in plan_features %}
                 <label>
-                  <input type="checkbox" name="features" value="{{ feature_key }}" {% if feature_key in get_license_plan(plan.key).features %}checked{% endif %}>
+                  <input type="checkbox" name="features" value="{{ feature_key }}" {% if feature_key in (plan.features if plan.features is not none else get_license_plan(plan.key).features) %}checked{% endif %}>
                   <span>{{ feature_label }}</span>
                 </label>
               {% endfor %}
@@ -56,19 +56,45 @@
 
   <section class="admin-section">
     <div class="admin-section-head"><div><h2>Checkout coupons</h2><p>Discounts are calculated before the PayTR token request, so the hosted checkout receives the exact discounted amount.</p></div><span>{{ coupons|length }} codes</span></div>
-    <form method="POST" action="{{ url_for('admin_coupon_create') }}" class="admin-breakdown admin-coupon-create">
+    <form method="POST" action="{{ url_for('admin_coupon_create') }}" class="admin-coupon-create">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="admin-editor-grid">
         <label class="admin-editor-field"><span>Coupon code</span><input name="code" minlength="3" maxlength="64" placeholder="ACADEMIC25" required></label>
         <label class="admin-editor-field"><span>Discount type</span><select name="discount_type"><option value="percent">Percentage</option><option value="fixed">Fixed USD amount</option></select></label>
         <label class="admin-editor-field"><span>Discount value</span><input type="number" name="discount_value" min="0.01" step="0.01" required placeholder="25"></label>
         <label class="admin-editor-field"><span>Maximum redemptions</span><input type="number" name="max_redemptions" min="1" placeholder="unlimited"></label>
-        <label class="admin-editor-field"><span>Expires at</span><input type="datetime-local" name="expires_at"></label>
+        <label class="admin-editor-field"><span>Expires at (UTC)</span><input type="datetime-local" name="expires_at"></label>
       </div>
       <fieldset class="admin-feature-matrix"><legend>Applicable plans (none selected = all paid plans)</legend><div class="admin-feature-options">{% for key in ['academic', 'extended_archive'] %}<label><input type="checkbox" name="plan_keys" value="{{ key }}" checked><span>{{ get_license_plan(key).label }}</span></label>{% endfor %}</div></fieldset>
       <div class="admin-editor-actions" style="margin-top:12px"><button class="admin-btn admin-btn-primary compact" type="submit">Create coupon</button></div>
     </form>
 
-    {% if coupons %}<div class="admin-table-wrap" style="margin-top:16px"><table class="admin-table"><thead><tr><th>Code</th><th>Discount</th><th>Plans</th><th>Usage</th><th>Expiry</th><th>Status</th><th></th></tr></thead><tbody>{% for coupon in coupons %}<tr><td><code>{{ coupon.code }}</code></td><td>{% if coupon.percent_off %}{{ coupon.percent_off }}%{% else %}${{ '%.2f'|format((coupon.fixed_discount_usd_cents or 0) / 100) }}{% endif %}</td><td>{{ (coupon.applicable_plan_keys or ['All paid'])|join(', ') }}</td><td>{{ coupon.redemption_count }} redeemed{% if coupon.reservation_count %} + {{ coupon.reservation_count }} pending{% endif %} / {{ coupon.max_redemptions or '∞' }}</td><td>{{ coupon.expires_at.strftime('%d %b %Y') if coupon.expires_at else 'No expiry' }}</td><td><span class="status-chip {{ 'is-ready' if coupon.is_active else 'is-failed' }}">{{ 'Active' if coupon.is_active else 'Paused' }}</span></td><td><form method="POST" action="{{ url_for('admin_coupon_toggle', coupon_id=coupon.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="admin-btn admin-btn-secondary compact" type="submit">{{ 'Pause' if coupon.is_active else 'Activate' }}</button></form></td></tr>{% endfor %}</tbody></table></div>{% endif %}
+    <div class="table-wrap" style="margin-top:16px">
+      <table class="data-table admin-table">
+        <thead>
+          <tr><th>Code</th><th>Discount</th><th>Plans</th><th>Usage</th><th>Expiry</th><th>Status</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          {% for coupon in coupons %}
+            <tr>
+              <td><code>{{ coupon.code }}</code></td>
+              <td>{% if coupon.percent_off %}{{ coupon.percent_off }}%{% else %}${{ '%.2f'|format((coupon.fixed_discount_usd_cents or 0) / 100) }}{% endif %}</td>
+              <td>{% if coupon.applicable_plan_keys %}{% for key in coupon.applicable_plan_keys %}{{ get_license_plan(key).label }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}All paid plans{% endif %}</td>
+              <td>{{ coupon.redemption_count }} / {{ coupon.max_redemptions or '∞' }} redeemed{% if coupon.reservation_count %}<small>{{ coupon.reservation_count }} in open checkouts</small>{% endif %}</td>
+              <td>{{ coupon.expires_at.strftime('%Y-%m-%d %H:%M') ~ ' UTC' if coupon.expires_at else 'No expiry' }}</td>
+              <td><span class="status-chip {{ 'is-ready' if coupon.is_active else 'is-failed' }}">{{ 'Active' if coupon.is_active else 'Paused' }}</span></td>
+              <td>
+                <form method="POST" action="{{ url_for('admin_coupon_toggle', coupon_id=coupon.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="admin-btn admin-btn-secondary compact" type="submit">{{ 'Pause' if coupon.is_active else 'Activate' }}</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7">No coupons yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </section>
 {% endblock %}

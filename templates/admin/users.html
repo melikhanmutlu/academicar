@@ -44,17 +44,21 @@
               <td>{{ user.created_at.strftime("%Y-%m-%d") if user.created_at else "-" }}</td>
               <td>
                 <div class="admin-actions">
+                  {% if user.id != current_user.id and not (user.is_admin and user_is_configured_admin(user)) %}
                   <form method="POST" action="{{ url_for('admin_user_role_update', user_id=user.id) }}"{% if not user.is_admin %} onsubmit="return window.confirm('Give this user full admin access to every account, payment and setting?');"{% endif %}>
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="next" value="{{ request.full_path }}">
                     <input type="hidden" name="is_admin" value="{{ '0' if user.is_admin else '1' }}">
                     <button type="submit" class="admin-btn admin-btn-secondary compact">{{ "Remove admin" if user.is_admin else "Make admin" }}</button>
                   </form>
+                  {% endif %}
                   <a href="{{ url_for('admin_user_detail', user_id=user.id) }}" class="admin-btn admin-btn-secondary compact">Manage</a>
                   <a href="{{ url_for('admin_user_dashboard', user_id=user.id) }}" class="admin-btn admin-btn-secondary compact">Dashboard</a>
                   {% if user.id != current_user.id and not user_is_configured_admin(user) %}
                   <form method="POST" action="{{ url_for('admin_user_delete', user_id=user.id) }}"
                         onsubmit="return confirm('Permanently delete this user and ALL of their publications, models, and files? This cannot be undone. Payment records are kept but anonymized.');">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="next" value="{{ request.full_path }}">
                     <button type="submit" class="admin-btn admin-btn-danger compact">Delete</button>
                   </form>
                   {% endif %}

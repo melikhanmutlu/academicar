@@ -7628,8 +7628,8 @@ label.rounded-xl input[type="checkbox"] {
 }
 
 .admin-metrics {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 12px;
   margin-bottom: 24px;
 }
@@ -7770,6 +7770,13 @@ label.rounded-xl input[type="checkbox"] {
   align-items: start;
 }
 
+.admin-three-col {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
 .admin-breakdown,
 .admin-watch-grid > div {
   border: 1px solid var(--color-light-pearl);
@@ -7870,6 +7877,7 @@ label.rounded-xl input[type="checkbox"] {
 }
 
 .admin-bar-chart div {
+  flex: 1 1 0;
   min-width: 42px;
   display: flex;
   flex-direction: column;
@@ -7879,8 +7887,9 @@ label.rounded-xl input[type="checkbox"] {
 }
 
 .admin-bar-chart span {
-  width: 20px;
-  min-height: 8px;
+  width: 100%;
+  max-width: 28px;
+  min-height: 2px;
   max-height: 180px;
   border-radius: 5px 5px 0 0;
   background: var(--color-sunset-orange);

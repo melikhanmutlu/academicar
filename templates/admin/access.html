@@ -46,8 +46,9 @@
       <div class="admin-breakdown">
         <h3>30-day viewer trend</h3>
         <div class="admin-sparkline" aria-label="Viewer trend">
+          {% set peak = (daily_viewer_trend|map(attribute="count")|max) if daily_viewer_trend else 0 %}
           {% for point in daily_viewer_trend %}
-            <span title="{{ point.label }}: {{ point.count }}" style="height: {{ 6 + (point.count * 14) }}px"></span>
+            <span title="{{ point.label }}: {{ point.count }}" style="height: {{ (6 + (point.count / peak * 100))|int if peak else 6 }}px"></span>
           {% endfor %}
         </div>
       </div>
@@ -90,12 +91,13 @@
                 <a href="{{ model_resolver_url(qr.model) }}" target="_blank" rel="noopener noreferrer">{{ qr.public_id }}</a>
                 <small>{{ model_resolver_url(qr.model) }}</small>
               </td>
-              <td><a href="{{ url_for('view_model', model_id=qr.model_id) }}" target="_blank" rel="noopener noreferrer">{{ qr.model_id }}</a></td>
+              <td><a href="{{ url_for('admin_model_detail', model_id=qr.model_id) }}">{{ qr.model.display_name or qr.model.original_filename or qr.model_id if qr.model else qr.model_id }}</a>{% if qr.model %}<small><span class="status-chip {{ admin_chip_class(model_access_status(qr.model)) }}">{{ model_access_status(qr.model)|title }}</span></small>{% endif %}</td>
               <td><span class="status-chip {{ admin_chip_class(qr.status) }}">{{ qr.status|title }}</span></td>
               <td>{{ qr.last_resolved_at.strftime("%Y-%m-%d %H:%M") if qr.last_resolved_at else "-" }}</td>
               <td>
                 <form method="POST" action="{{ url_for('admin_qr_status_update', qr_id=qr.id) }}" class="admin-inline-form" onsubmit="return this.elements.status.value !== 'disabled' || window.confirm('Disable this QR link? Printed posters and slides that use it will show a &quot;Link disabled&quot; page until it is turned back on.');">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="next" value="{{ request.full_path }}">
                   <select name="status" class="field-select compact-select">
                     <option value="active" {% if qr.status == "active" %}selected{% endif %}>Active</option>
                     <option value="disabled" {% if qr.status == "disabled" %}selected{% endif %}>Disabled</option>

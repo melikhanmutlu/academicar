@@ -31,7 +31,7 @@
               <td>{{ (annotation.description or "-")|truncate(120) }}</td>
               <td>
                 {% if annotation.model %}
-                  <a href="{{ url_for('view_model', model_id=annotation.model.id) }}" target="_blank" rel="noopener noreferrer">{{ annotation.model.display_name or annotation.model.original_filename or annotation.model.id }}</a>
+                  <a href="{{ url_for('admin_model_detail', model_id=annotation.model.id) }}">{{ annotation.model.display_name or annotation.model.original_filename or annotation.model.id }}</a>
                 {% else %}
                   {{ annotation.model_id }}
                 {% endif %}
@@ -41,6 +41,7 @@
               <td>
                 <form method="POST" action="{{ url_for('admin_annotation_delete', annotation_id=annotation.id) }}" onsubmit="return confirm('Delete this annotation permanently?')">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="next" value="{{ request.full_path }}">
                   <button type="submit" class="admin-btn admin-btn-danger compact">Delete</button>
                 </form>
               </td>

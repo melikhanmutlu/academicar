@@ -47,8 +47,9 @@
       <div class="admin-breakdown">
         <h3>30-day project trend</h3>
         <div class="admin-sparkline" aria-label="Project trend">
+          {% set peak = (daily_publication_trend|map(attribute="count")|max) if daily_publication_trend else 0 %}
           {% for point in daily_publication_trend %}
-            <span title="{{ point.label }}: {{ point.count }}" style="height: {{ 6 + (point.count * 14) }}px"></span>
+            <span title="{{ point.label }}: {{ point.count }}" style="height: {{ (6 + (point.count / peak * 100))|int if peak else 6 }}px"></span>
           {% endfor %}
         </div>
       </div>
@@ -119,6 +120,7 @@
                 <div class="admin-actions">
                   <form method="POST" action="{{ url_for('admin_paper_visibility_update', paper_id=paper.id) }}" onsubmit="return this.elements.status.value !== 'deleted' || window.confirm('Mark this project deleted? Its pages, models and QR codes go offline for visitors.');">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="next" value="{{ request.full_path }}">
                     <select name="visibility" class="field-select compact-select">
                       <option value="private" {% if project_visibility(paper) == 'private' %}selected{% endif %}>Private</option>
                       <option value="unlisted" {% if project_visibility(paper) == 'unlisted' %}selected{% endif %}>Review link</option>
@@ -133,6 +135,7 @@
                   {% if paper.status == "deleted" %}
                     <form method="POST" action="{{ url_for('admin_paper_restore', paper_id=paper.id) }}">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <input type="hidden" name="next" value="{{ request.full_path }}">
                       <button type="submit" class="admin-btn admin-btn-secondary compact">Restore</button>
                     </form>
                   {% else %}
@@ -144,7 +147,7 @@
                   <div class="admin-editor-body">
                     <form method="POST" action="{{ url_for('admin_paper_metadata_update', paper_id=paper.id) }}">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                      <input type="hidden" name="next" value="content">
+                      <input type="hidden" name="next" value="{{ request.full_path }}">
                       <div class="admin-editor-grid">
                         <label class="admin-editor-field"><span>Title</span><input name="title" value="{{ paper.title }}" required maxlength="500"></label>
                         <label class="admin-editor-field"><span>Contributors</span><input name="authors" value="{{ paper.authors or '' }}" maxlength="500"></label>
@@ -166,7 +169,7 @@
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="6">No projects yet.</td></tr>
+            <tr><td colspan="6">{{ "No projects match these filters." if (filters.paper_q or filters.paper_visibility != "all" or filters.paper_status != "all") else "No projects yet." }}</td></tr>
           {% endfor %}
         </tbody>
       </table>

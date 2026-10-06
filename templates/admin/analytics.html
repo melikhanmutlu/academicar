@@ -20,7 +20,7 @@
         <div class="admin-funnel-row">
           <div class="admin-funnel-label">{{ stage.label }}</div>
           <div class="admin-funnel-track">
-            <div class="admin-funnel-bar" style="width: {{ stage.pct_of_top if stage.pct_of_top else 0 }}%"></div>
+            <div class="admin-funnel-bar" style="width: {{ stage.pct_of_top if stage.pct_of_top else 0 }}%;{% if not stage.count %} display: none;{% endif %}"></div>
           </div>
           <div class="admin-funnel-count">{{ stage.count }}</div>
           <div class="admin-funnel-step">
@@ -53,7 +53,7 @@
       </div>
     {% else %}<p class="admin-empty">No product analytics events have been collected yet.</p>{% endif %}
   </section>
-  <section class="admin-breakdown-grid">
+  <section class="admin-three-col">
     {% for title, rows in [('Devices', analytics.devices), ('Countries', analytics.countries), ('Traffic sources', analytics.sources)] %}
       <div class="admin-section">
         <div class="admin-section-head"><div><h2>{{ title }}</h2></div></div>

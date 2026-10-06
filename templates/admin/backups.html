@@ -15,6 +15,7 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button type="submit" class="admin-btn admin-btn-primary compact"{% if backup_requested %} disabled{% endif %}>Create backup now</button>
       {% if backup_requested %}<span class="admin-editor-note">Requested {{ backup_requested.timestamp.strftime("%Y-%m-%d %H:%M") }} UTC &mdash; the worker is building it.</span>{% endif %}
+      {% if backup_failed %}<span class="admin-editor-note">Last backup failed {{ backup_failed.timestamp.strftime("%Y-%m-%d %H:%M") }} UTC: {{ (backup_failed.details or {}).get("error") or "see the worker log" }}</span>{% endif %}
       {% if backup_skipped %}<span class="admin-editor-note">Last backup skipped {{ backup_skipped.timestamp.strftime("%Y-%m-%d %H:%M") }} UTC: not enough free disk space. Delete old backups or free space.</span>{% endif %}
     </form>
     <div class="table-wrap">
@@ -33,12 +34,14 @@
               <td>{{ backup.filename }}</td>
               <td>{{ backup.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
               <td>{{ format_file_size(backup.size) }}</td>
-              <td class="admin-blog-row-actions">
-                <a href="{{ url_for('admin_backup_download', filename=backup.filename) }}" class="admin-btn admin-btn-secondary compact">Download</a>
-                <form method="POST" action="{{ url_for('admin_backup_delete', filename=backup.filename) }}" style="display:inline" onsubmit="return confirm('Delete this backup permanently, here and in the offsite mirror?')">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                  <button type="submit" class="admin-btn admin-btn-danger compact">Delete</button>
-                </form>
+              <td>
+                <div class="admin-blog-row-actions">
+                  <a href="{{ url_for('admin_backup_download', filename=backup.filename) }}" class="admin-btn admin-btn-secondary compact">Download</a>
+                  <form method="POST" action="{{ url_for('admin_backup_delete', filename=backup.filename) }}" style="display:inline" onsubmit="return confirm('Delete this backup permanently, here and in the offsite mirror?')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="admin-btn admin-btn-danger compact">Delete</button>
+                  </form>
+                </div>
               </td>
             </tr>
           {% else %}

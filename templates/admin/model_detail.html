@@ -27,7 +27,7 @@
     <div class="admin-metric">
       <span>Processing</span>
       <strong><span class="status-chip {{ admin_chip_class(model.processing_status or 'ready') }}">{{ (model.processing_status or "ready")|title }}</span></strong>
-      <small>{{ format_file_size(model.file_size) }}</small>
+      <small>{{ format_file_size(model.file_size) }}{% if model.processing_error %} · <span title="{{ model.processing_error }}">{{ model.processing_error|truncate(120) }}</span>{% endif %}{% if model.replacement_error %} · Replacement: {{ model.replacement_error|truncate(120) }}{% endif %}</small>
     </div>
     <div class="admin-metric">
       <span>Public ID</span>
@@ -61,7 +61,10 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="next" value="model_detail">
             <select name="processing_status" class="field-select compact-select">
-              {% for status in ["queued", "processing", "ready", "failed", "replacement_failed"] %}
+              {% if (model.processing_status or "ready") in ["queued", "processing"] %}
+                <option value="" selected disabled>{{ model.processing_status|title }} (worker)</option>
+              {% endif %}
+              {% for status in ["ready", "failed", "replacement_failed"] %}
                 <option value="{{ status }}" {% if (model.processing_status or "ready") == status %}selected{% endif %}>{{ status|replace("_", " ")|title }}</option>
               {% endfor %}
             </select>
@@ -104,7 +107,11 @@
           <input type="hidden" name="color_changed" value="0">
           <input type="hidden" name="finish_changed" value="0">
           <div class="admin-editor-grid">
+            {% if has_layers %}
+            <div class="admin-editor-field"><span>Color</span><small class="admin-editor-note">Set per layer — use the Layers panel in the model editor.</small></div>
+            {% else %}
             <label class="admin-editor-field"><span>Color</span><input type="color" name="color" value="{{ model.appearance_color or '#cccccc' }}" oninput="this.form.elements.color_changed.value='1'"></label>
+            {% endif %}
             <label class="admin-editor-field"><span>AR placement</span>
               <select name="ar_placement">
                 <option value="floor" {% if (model.ar_placement or 'floor') == 'floor' %}selected{% endif %}>Floor</option>
@@ -155,6 +162,36 @@
       <div><span>Confirmed at</span><strong>{{ model.consent_confirmed_at.strftime("%Y-%m-%d %H:%M") if model.consent_confirmed_at else "-" }}</strong></div>
       <div><span>Consent IP</span><strong>{{ model.consent_ip or "-" }}</strong></div>
       <div><span>Terms version</span><strong>{{ model.terms_version }}</strong></div>
+    </div>
+  </section>
+
+  <section id="jobs" class="admin-section">
+    <div class="admin-section-head">
+      <div>
+        <h2>Conversion jobs</h2>
+        <p>The latest worker jobs for this model. Retry or cancel them from the Conversion jobs page.</p>
+      </div>
+      <a href="{{ url_for('admin_dashboard', admin_page='jobs') }}" class="admin-btn admin-btn-secondary compact">All jobs</a>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
+        <thead>
+          <tr><th>Job</th><th>Status</th><th>Attempts</th><th>Created</th><th>Error</th></tr>
+        </thead>
+        <tbody>
+          {% for job in jobs %}
+            <tr>
+              <td>#{{ job.id }} {{ job.job_type|replace("_", " ")|title }}</td>
+              <td><span class="status-chip {{ admin_chip_class(job.status) }}">{{ job.status|title }}</span></td>
+              <td>{{ job.attempts }} / {{ job.max_attempts }}</td>
+              <td>{{ job.created_at.strftime("%Y-%m-%d %H:%M") if job.created_at else "-" }}</td>
+              <td>{{ job.error|truncate(160) if job.error else "-" }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5">No conversion jobs recorded for this model.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </section>
 
