@@ -1730,6 +1730,7 @@
       <div class="layers-head">
         <h2>Section</h2>
         <div class="layers-head-actions">
+          <button type="button" data-section-face disabled title="Turn the camera to look straight at the cut">Face</button>
           <button type="button" data-section-flip disabled>Flip</button>
           <button type="button" data-section-off disabled>Off</button>
           <button type="button" data-section-close aria-label="Close section">×</button>
@@ -2671,6 +2672,13 @@
         return `${(mm / 1000).toFixed(2)} m`;
       };
       const asPosition = (p) => `${p.x}m ${p.y}m ${p.z}m`;
+      // With a section plane on, both points are taken on the cut itself (see
+      // pointOnSection in the section block) instead of on the mesh surface.
+      const onSlice = () => !!(window.viewerSection && window.viewerSection.active());
+      const startHint = () => (onSlice() ? 'Click or tap two points on the cut' : 'Click or tap two points on the model');
+      const isMedicalMeasure = {{ 'true' if is_medical_model else 'false' }};
+      // In-plane components on a medical slice (axes as in the section block).
+      const SLICE_AXES = { y: [['x', 'L–R'], ['z', 'A–P']], z: [['x', 'L–R'], ['y', 'S–I']], x: [['z', 'A–P'], ['y', 'S–I']] };
       const drawLine = () => {
         if (points.length < 2 || measureLine.hasAttribute('hidden')) return;
         const a = viewer.queryHotspot && viewer.queryHotspot('hotspot-measure-a');
@@ -2704,7 +2712,7 @@
           // Both tools place points with a click; only one at a time.
           if (document.getElementById('annotateBtn')?.classList.contains('is-active')) document.getElementById('annotateBtn').click();
           if (typeof setAutoRotateState === 'function') setAutoRotateState(false);
-          measureHintText.textContent = 'Click or tap two points on the model';
+          measureHintText.textContent = startHint();
         } else {
           clearMeasure();
         }
@@ -2716,11 +2724,21 @@
         if (!measureMode) return;
         if (e.target.closest && e.target.closest('.annotation-hotspot')) return;
         const rect = viewer.getBoundingClientRect();
-        const hit = viewer.positionAndNormalFromPoint(e.clientX - rect.left, e.clientY - rect.top);
-        if (!hit) return;
+        let picked;
+        if (onSlice()) {
+          picked = window.viewerSection.pointAt(e.clientX, e.clientY);
+          if (!picked) {
+            measureHintText.textContent = 'Click on the cut face · Face in the Section panel looks at it straight on';
+            return;
+          }
+        } else {
+          const hit = viewer.positionAndNormalFromPoint(e.clientX - rect.left, e.clientY - rect.top);
+          if (!hit) return;
+          // Copy: model-viewer may reuse the returned vector on the next query.
+          picked = { position: { x: hit.position.x, y: hit.position.y, z: hit.position.z } };
+        }
         if (points.length >= 2) clearMeasure();
-        // Copy: model-viewer may reuse the returned vector on the next query.
-        points.push({ x: hit.position.x, y: hit.position.y, z: hit.position.z });
+        points.push({ ...picked.position, slice: picked.axis ? picked : null });
         const point = points.length === 1 ? pointA : pointB;
         // Unhide first: model-viewer skips hotspots that are display:none.
         point.hidden = false;
@@ -2731,17 +2749,26 @@
         }
         const [a, b] = points;
         const metres = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
-        measureLabel.textContent = formatDistance(metres);
+        const slice = a.slice && b.slice ? a.slice : null;
+        measureLabel.textContent = slice ? `${slice.label} · ${formatDistance(metres)}` : formatDistance(metres);
         measureLabel.hidden = false;
         viewer.updateHotspot({ name: 'hotspot-measure-mid', position: asPosition({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2 }) });
         measureLine.removeAttribute('hidden');
-        measureHintText.textContent = `${formatDistance(metres)} · click again for a new measurement`;
+        const parts = slice && isMedicalMeasure
+          ? ` (${SLICE_AXES[slice.axis].map(([k, name]) => `${name} ${formatDistance(Math.abs(a.slice.local[k] - b.slice.local[k]))}`).join(', ')})`
+          : '';
+        measureHintText.textContent = `${measureLabel.textContent}${parts} · click again for a new measurement`;
         // Hotspot screen positions update on the next rendered frames.
         requestAnimationFrame(() => requestAnimationFrame(drawLine));
         setTimeout(drawLine, 120);
       });
       viewer.addEventListener('camera-change', () => requestAnimationFrame(drawLine));
       window.addEventListener('resize', () => requestAnimationFrame(drawLine));
+      // A measurement belongs to the slice it was taken on (or to the uncut model).
+      viewer.addEventListener('section-change', () => {
+        if (points.length) clearMeasure();
+        if (measureMode) measureHintText.textContent = startHint();
+      });
     }
 
     // --- Owner: interactive annotation placement ---
@@ -4544,6 +4571,7 @@
       const posInput = sectionPanel.querySelector('[data-section-pos]');
       const readoutEl = sectionPanel.querySelector('[data-section-readout]');
       const flipBtn = sectionPanel.querySelector('[data-section-flip]');
+      const faceBtn = sectionPanel.querySelector('[data-section-face]');
       const offBtn = sectionPanel.querySelector('[data-section-off]');
       const plane = { normal: null, constant: 0 };
       const sectionSides = new Map(); // material -> its original `side`
@@ -4660,6 +4688,7 @@
         const on = !!section;
         sectionBtn.classList.toggle('is-active', on);
         flipBtn.disabled = !on;
+        faceBtn.disabled = !on;
         offBtn.disabled = !on;
         posInput.disabled = !on;
         axesEl.querySelectorAll('button').forEach((button) => button.setAttribute('aria-pressed', String(on && button.dataset.axis === section.axis)));
@@ -4679,10 +4708,78 @@
         } else {
           section = null;
           releaseSection();
+          // Face widens the polar limits to look straight down an axis; restore them.
+          if (viewer.hasAttribute('min-camera-orbit')) {
+            viewer.removeAttribute('min-camera-orbit');
+            viewer.removeAttribute('max-camera-orbit');
+          }
         }
         syncSectionUi();
         requestViewerRender();
+        // Measure drops a measurement that belonged to the previous slice.
+        viewer.dispatchEvent(new CustomEvent('section-change'));
       };
+      // Face: orbit the camera onto the removed side of the plane, looking along
+      // its normal at the cut, like a slicer view. Straight down an axis the
+      // azimuth is undefined, so the current one is kept.
+      const faceSection = () => {
+        if (!section || !sectionCtx) return;
+        updatePlane();
+        const dx = -plane.normal.x;
+        const dy = -plane.normal.y;
+        const dz = -plane.normal.z;
+        const current = viewer.getCameraOrbit ? viewer.getCameraOrbit() : null;
+        const theta = Math.abs(dy) > 0.999 && current ? current.theta : Math.atan2(dx, dz);
+        const phi = Math.min(Math.PI - 0.001, Math.max(0.001, Math.acos(Math.max(-1, Math.min(1, dy)))));
+        if (typeof setAutoRotateState === 'function') setAutoRotateState(false);
+        viewer.setAttribute('min-camera-orbit', 'auto 0deg auto');
+        viewer.setAttribute('max-camera-orbit', 'auto 180deg auto');
+        viewer.cameraOrbit = `${theta}rad ${phi}rad auto`;
+      };
+      // Measure on the slice: where the view ray through a viewer click crosses
+      // the plane, in hotspot (scene.target) space and in the model space the
+      // axes are named in. Null unless the cut itself is what the click shows:
+      // the first surface the ray hits must lie at or beyond the plane (behind a
+      // cut the inside faces are visible), so kept geometry in front of the cut
+      // and empty background are refused.
+      const pointOnSection = (clientX, clientY) => {
+        if (!section || !sectionCtx) return null;
+        try {
+          const scene = viewerInternals.getScene();
+          const camera = scene && typeof scene.getCamera === 'function' ? scene.getCamera() : null;
+          const target = scene && scene.target;
+          if (!camera || !target) return null;
+          const { Vec3, root } = sectionCtx;
+          updatePlane();
+          camera.updateMatrixWorld();
+          target.updateMatrixWorld();
+          const rect = viewer.getBoundingClientRect();
+          const x = clientX - rect.left;
+          const y = clientY - rect.top;
+          const origin = new Vec3().setFromMatrixPosition(camera.matrixWorld);
+          const dir = new Vec3((x / rect.width) * 2 - 1, -(y / rect.height) * 2 + 1, 0.5).unproject(camera).sub(origin).normalize();
+          const denom = plane.normal.dot(dir);
+          if (Math.abs(denom) < 1e-6) return null;
+          const t = -(plane.normal.dot(origin) + plane.constant) / denom;
+          if (!(t > 0)) return null;
+          const hit = viewer.positionAndNormalFromPoint(x, y);
+          if (!hit) return null;
+          const hitWorld = new Vec3(hit.position.x, hit.position.y, hit.position.z).applyMatrix4(target.matrixWorld);
+          if (hitWorld.distanceTo(origin) < t - 1e-5) return null;
+          const world = origin.clone().addScaledVector(dir, t);
+          const toTarget = target.matrixWorld.clone().invert();
+          const toRoot = root.matrixWorld.clone().invert();
+          const position = world.clone().applyMatrix4(toTarget);
+          const local = world.clone().applyMatrix4(toRoot);
+          return {
+            position: { x: position.x, y: position.y, z: position.z },
+            local: { x: local.x, y: local.y, z: local.z },
+            axis: section.axis,
+            label: SECTION_AXES.find(([axis]) => axis === section.axis)[1],
+          };
+        } catch (e) { return null; }
+      };
+      window.viewerSection = { active: () => !!(section && sectionCtx), pointAt: pointOnSection };
 
       SECTION_AXES.forEach(([axis, label]) => {
         const button = document.createElement('button');
@@ -4702,6 +4799,7 @@
         setSection({ ...section, offset: lo + ((hi - lo) * Number(posInput.value)) / 1000 });
       });
       flipBtn.addEventListener('click', () => { if (section) setSection({ ...section, flip: !section.flip }); });
+      faceBtn.addEventListener('click', faceSection);
       offBtn.addEventListener('click', () => setSection(null));
       sectionPanel.querySelector('[data-section-close]').addEventListener('click', () => setSectionOpen(false));
 
