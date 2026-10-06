@@ -1,20 +1,17 @@
 {% extends "admin/base.html" %}
 {% block admin_title %}Product analytics{% endblock %}
-{% block admin_subtitle %}Privacy-minimised engagement signals for product decisions and investor reporting.{% endblock %}
-{% block admin_actions %}<a href="{{ url_for('admin_analytics_export') }}" class="admin-btn admin-btn-secondary compact">Export 30-day CSV</a>{% endblock %}
+{% block admin_subtitle %}Viewer activity and signup-to-payment funnel, last {{ analytics.days }} days.{% endblock %}
+{% block admin_actions %}<a href="{{ url_for('admin_analytics_export') }}" class="admin-btn admin-btn-secondary compact">Export CSV</a>{% endblock %}
 {% block admin_body %}
   <section class="admin-metrics">
-    <div class="admin-metric"><span>Model views</span><strong>{{ analytics.views }}</strong><small>last {{ analytics.days }} days</small></div>
-    <div class="admin-metric"><span>Unique visitors</span><strong>{{ analytics.unique_visitors }}</strong><small>pseudonymous first-party visitors</small></div>
-    <div class="admin-metric"><span>QR scans</span><strong>{{ analytics.qr_scans }}</strong><small>resolver activity</small></div>
-    <div class="admin-metric"><span>AR starts</span><strong>{{ analytics.ar_starts }}</strong><small>viewer engagement</small></div>
-    <div class="admin-metric"><span>New projects</span><strong>{{ analytics.projects_created }}</strong><small>created in {{ analytics.days }} days</small></div>
-    <div class="admin-metric"><span>New models</span><strong>{{ analytics.models_uploaded }}</strong><small>{{ analytics.active_creators }} active creators</small></div>
-    <div class="admin-metric"><span>Conversion health</span><strong>{{ analytics.conversion_completed }}</strong><small>{{ analytics.conversion_failed }} failed</small></div>
+    <div class="admin-metric"><span>Model views</span><strong>{{ analytics.views }}</strong></div>
+    <div class="admin-metric"><span>Unique visitors</span><strong>{{ analytics.unique_visitors }}</strong></div>
+    <div class="admin-metric"><span>QR scans</span><strong>{{ analytics.qr_scans }}</strong></div>
+    <div class="admin-metric"><span>AR starts</span><strong>{{ analytics.ar_starts }}</strong></div>
   </section>
   {% if funnel %}
   <section class="admin-section">
-    <div class="admin-section-head"><div><h2>Conversion funnel</h2><p>Distinct users reaching each step over the last {{ funnel.days }} days. The largest drop between two steps is where to run this week's experiment.</p></div></div>
+    <div class="admin-section-head"><div><h2>Conversion funnel</h2></div></div>
     <div class="admin-funnel">
       {% for stage in funnel.stages %}
         <div class="admin-funnel-row">
@@ -23,10 +20,10 @@
             <div class="admin-funnel-bar" style="width: {{ stage.pct_of_top if stage.pct_of_top else 0 }}%;{% if not stage.count %} display: none;{% endif %}"></div>
           </div>
           <div class="admin-funnel-count">{{ stage.count }}</div>
-          <div class="admin-funnel-step">
+          <div class="admin-funnel-step" title="Share of the previous step">
             {%- if stage.pct_of_prev is none -%}—
-            {%- elif not loop.first -%}{{ stage.pct_of_prev }}% of prev
-            {%- else -%}top of funnel{%- endif -%}
+            {%- elif not loop.first -%}{{ '%g' % stage.pct_of_prev }}%
+            {%- endif -%}
           </div>
         </div>
       {% endfor %}
@@ -34,21 +31,23 @@
   </section>
   {% endif %}
   <section class="admin-section">
-    <div class="admin-section-head"><div><h2>Most viewed models</h2><p>Use these signals to identify strong content and institutional traction.</p></div></div>
+    <div class="admin-section-head"><div><h2>Most viewed models</h2></div></div>
     {% if analytics.top_models %}
       <div class="admin-data-list">
         {% for item in analytics.top_models %}
-          <div><span>{{ item.model.display_name or item.model.original_filename if item.model else 'Removed model' }}</span><strong>{{ item.count }} views</strong></div>
+          <div><span>{{ item.model.display_name or item.model.original_filename if item.model else 'Removed model' }}</span><strong>{{ item.count }} view{{ '' if item.count == 1 else 's' }}</strong></div>
         {% endfor %}
       </div>
-    {% else %}<p class="admin-empty">No product analytics events have been collected yet.</p>{% endif %}
+    {% else %}<p class="admin-empty">No views yet.</p>{% endif %}
   </section>
-  <section class="admin-three-col">
+  {% if analytics.devices or analytics.countries or analytics.sources %}
+  <section class="admin-three-col admin-audience">
     {% for title, rows in [('Devices', analytics.devices), ('Countries', analytics.countries), ('Traffic sources', analytics.sources)] %}
       <div class="admin-section">
         <div class="admin-section-head"><div><h2>{{ title }}</h2></div></div>
-        {% if rows %}<div class="admin-data-list">{% for row in rows %}<div><span>{{ row.label }}</span><strong>{{ row.count }}</strong></div>{% endfor %}</div>{% else %}<p class="admin-empty">No data yet.</p>{% endif %}
+        {% if rows %}<div class="admin-data-list">{% for row in rows %}<div><span>{{ row.label }}</span><strong>{{ row.count }} <small>({{ '%g' % row.pct }}%)</small></strong></div>{% endfor %}</div>{% else %}<p class="admin-empty">No data yet.</p>{% endif %}
       </div>
     {% endfor %}
   </section>
+  {% endif %}
 {% endblock %}
