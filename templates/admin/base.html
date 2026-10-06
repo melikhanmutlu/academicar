@@ -40,11 +40,20 @@
     var toggle = document.getElementById('adminMenuToggle');
     var sidebar = document.getElementById('adminSidebar');
     if (!toggle || !sidebar) return;
-    toggle.addEventListener('click', function () {
-      var open = sidebar.classList.toggle('is-open');
+    function setOpen(open) {
+      sidebar.classList.toggle('is-open', open);
+      document.body.classList.toggle('admin-drawer-open', open);
       toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    toggle.addEventListener('click', function () {
+      var open = !sidebar.classList.contains('is-open');
+      setOpen(open);
+      if (open) {
+        var first = sidebar.querySelector('a[href]');
+        if (first) first.focus();
+      }
     });
-    function close() { sidebar.classList.remove('is-open'); toggle.setAttribute('aria-expanded', 'false'); }
+    function close() { setOpen(false); }
     sidebar.addEventListener('click', function (e) {
       if (e.target.closest('a')) close();
     });
@@ -55,6 +64,10 @@
     });
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && sidebar.classList.contains('is-open')) { close(); toggle.focus(); }
+    });
+    // Resizing past the drawer breakpoint must not leave the scroll lock on.
+    window.addEventListener('resize', function () {
+      if (window.innerWidth > 1024 && sidebar.classList.contains('is-open')) close();
     });
   })();
 </script>

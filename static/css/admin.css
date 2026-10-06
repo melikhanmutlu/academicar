@@ -41,6 +41,21 @@
   border-right: 1px solid var(--color-light-pearl);
   background: var(--color-canvas-white);
   z-index: 20;
+  /* Brand and footer stay in view; only the nav list scrolls, so Log out is
+     reachable on short viewports. */
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-sidebar > nav {
+  flex: 1 1 auto;
+  min-height: 96px;
+  overflow-y: auto;
+}
+
+.admin-sidebar-brand,
+.admin-sidebar-foot {
+  flex: 0 0 auto;
 }
 
 .admin-sidebar-brand {
@@ -429,12 +444,6 @@
   margin: 0 0 16px;
 }
 
-/* Wide tables scroll inside their card instead of widening the page. */
-.admin-table-wrap {
-  max-width: 100%;
-  overflow-x: auto;
-}
-
 /* ---- Off-canvas sidebar on smaller screens -----------------------------
    Below 1024px the sidebar becomes a full-viewport overlay drawer (ignores
    the header offset, sits above everything including it) instead of the
@@ -458,11 +467,20 @@
     width: 264px;
     padding: 20px 16px;
     transform: translateX(-100%);
-    transition: transform 0.25s ease;
+    /* A closed drawer is hidden from Tab and assistive tech; visibility flips
+       only after the slide-out finishes. */
+    visibility: hidden;
+    transition: transform 0.25s ease, visibility 0s linear 0.25s;
   }
   .admin-sidebar.is-open {
     transform: translateX(0);
+    visibility: visible;
+    transition-delay: 0s;
     box-shadow: 0 0 0 100vw rgba(32, 32, 32, 0.28);
+  }
+  /* Page behind the open drawer must not scroll. */
+  body.admin-drawer-open {
+    overflow: hidden;
   }
 }
 
@@ -606,3 +624,44 @@
 .admin-main input[type="file"]::file-selector-button { margin-right:10px; padding:7px 11px; border:1px solid var(--color-light-pearl); border-radius:8px; background:var(--color-canvas-white); color:var(--color-midnight-graphite); font-family:var(--font-inter); font-size:12px; font-weight:500; cursor:pointer; }
 .admin-main input[type="file"]::file-selector-button:hover { background:var(--color-cloud-whisper); }
 .admin-main input[type="checkbox"] { accent-color:var(--color-sunset-orange); }
+
+/* ---- Flash messages inside the admin shell ---------------------------------
+   The shared .flash-stack sits above <main> in a flex column; inside the admin
+   shell it must line up with the content column (right of the fixed sidebar,
+   same side padding as .admin-main) instead of shrinking to a centred box. */
+body:has(.admin-layout) .flash-stack {
+  max-width: none;
+  margin: 24px 0 -8px 268px;
+  padding: 0 40px 0 32px;
+}
+
+@media (max-width: 1024px) {
+  body:has(.admin-layout) .flash-stack {
+    margin-left: 0;
+    padding: 0 20px;
+  }
+}
+
+/* ---- Conversion funnel (Analytics) ------------------------------------------ */
+.admin-funnel { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.admin-funnel-row { display: grid; grid-template-columns: 150px 1fr 64px 110px; align-items: center; gap: 12px; font-size: 13px; }
+.admin-funnel-label { color: var(--color-midnight-graphite); font-weight: 500; }
+.admin-funnel-track { background: var(--color-slate-mist); border-radius: 999px; height: 12px; overflow: hidden; }
+.admin-funnel-bar { background: var(--color-sunset-orange); height: 100%; border-radius: 999px; min-width: 2px; transition: width 0.3s ease; }
+.admin-funnel-count { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--color-midnight-graphite); }
+.admin-funnel-step { text-align: right; color: var(--color-silver-ash); font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+  .admin-funnel-row { grid-template-columns: 110px 1fr 48px; }
+  .admin-funnel-step { display: none; }
+}
+
+/* ---- Small layout utilities (use instead of inline style="") ---------------- */
+.admin-grow { flex: 1; min-width: 220px; }
+.admin-wrap-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.admin-mt { margin-top: 12px; }
+.admin-inline { display: inline; }
+.admin-field-narrow { max-width: 520px; }
+/* Secondary table columns drop out on phones. */
+@media (max-width: 640px) {
+  .admin-hide-sm { display: none; }
+}
