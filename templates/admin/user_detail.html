@@ -2,17 +2,12 @@
 {% block admin_title %}{{ user.username }}{% endblock %}
 {% block admin_subtitle %}{{ user.email }} · joined {{ user.created_at.strftime("%Y-%m-%d") if user.created_at else "-" }}{% if user.deactivated_at %} · deactivated{% endif %}{% endblock %}
 {% block admin_actions %}
-  <a href="{{ url_for('admin_user_dashboard', user_id=user.id) }}" class="admin-btn admin-btn-secondary compact">View dashboard</a>
-  <a href="{{ url_for('admin_dashboard', admin_page='users') }}" class="admin-btn admin-btn-secondary compact">All users</a>
+  <a href="{{ url_for('admin_user_dashboard', user_id=user.id) }}" class="admin-btn admin-btn-secondary compact">Dashboard</a>
+  <a href="{{ url_for('admin_dashboard', admin_page='users') }}" class="admin-btn admin-btn-secondary compact">Users</a>
 {% endblock %}
 
 {% block admin_body %}
   <section class="admin-metrics">
-    <div class="admin-metric">
-      <span>Role</span>
-      <strong>{{ "Admin" if user.is_admin else "Member" }}</strong>
-      <small>{% if user.deactivated_at %}Deactivated{% else %}Active account{% endif %}</small>
-    </div>
     <div class="admin-metric">
       <span>Projects</span>
       <strong>{{ papers|length }}</strong>
@@ -33,10 +28,12 @@
   <section class="admin-section">
     <div class="admin-section-head">
       <div>
-        <h2>Account controls</h2>
-        <p>Role, email, and activation changes are logged as admin actions. Model licenses are managed per model.</p>
+        <h2>Account</h2>
       </div>
-      {% if user.deactivated_at %}<span>Deactivated</span>{% else %}<span>Active</span>{% endif %}
+      <div class="admin-wrap-row">
+        <span class="status-chip">{{ "Admin" if user.is_admin else "Member" }}</span>
+        <span class="status-chip {{ 'is-failed' if user.deactivated_at else '' }}">{{ "Deactivated" if user.deactivated_at else "Active" }}</span>
+      </div>
     </div>
     <div class="admin-actions">
       {% if user.id != current_user.id and not (user.is_admin and user_is_configured_admin(user)) %}
@@ -52,7 +49,7 @@
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="admin-btn admin-btn-secondary compact">Reactivate account</button>
         </form>
-      {% else %}
+      {% elif user.id != current_user.id and not user_is_configured_admin(user) %}
         <form method="POST" action="{{ url_for('admin_user_deactivate', user_id=user.id) }}" onsubmit="return confirm('Deactivate this account? The user will be logged out and unable to sign in.')">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="admin-btn admin-btn-danger compact">Deactivate account</button>
@@ -68,7 +65,7 @@
         {% else %}
           <form method="POST" action="{{ url_for('admin_user_email_update', user_id=user.id) }}" class="admin-editor-actions">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <label class="admin-editor-field" style="flex:1;min-width:220px">
+            <label class="admin-editor-field admin-grow">
               <span>Email</span>
               <input type="email" name="email" value="{{ user.email }}" required>
             </label>
@@ -84,19 +81,18 @@
     <div class="admin-section-head">
       <div>
         <h2>Projects</h2>
-        <p>Edit publication metadata or open the public record. The slug (public URL) is fixed.</p>
       </div>
-      <span>{{ papers|length }} records</span>
+      <span>{{ papers|length }} {{ "project" if papers|length == 1 else "projects" }}</span>
     </div>
     <div class="table-wrap">
-      <table class="data-table admin-table">
+      <table class="data-table admin-table admin-users-table">
         <thead>
           <tr>
             <th>Project</th>
             <th>Status</th>
             <th>Models</th>
-            <th>Created</th>
-            <th>Edit</th>
+            <th class="admin-hide-sm">Created</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -108,7 +104,7 @@
               </td>
               <td><span class="status-chip {{ admin_chip_class(project_visibility(paper)) }}">{{ visibility_label(paper) }}</span></td>
               <td>{{ paper.models|length }}</td>
-              <td>{{ paper.created_at.strftime("%Y-%m-%d") if paper.created_at else "-" }}</td>
+              <td class="admin-hide-sm">{{ paper.created_at.strftime("%Y-%m-%d") if paper.created_at else "-" }}</td>
               <td>
                 <details class="admin-editor">
                   <summary>Edit metadata</summary>
@@ -125,7 +121,6 @@
                         <label class="admin-editor-field"><span>PMID</span><input name="pmid" value="{{ paper.pmid or '' }}" maxlength="100"></label>
                         <label class="admin-editor-field"><span>Institution</span><input name="institution" value="{{ paper.institution or '' }}" maxlength="300"></label>
                       </div>
-                      <p class="admin-editor-note">Projects never expire; access windows live on each model's license.</p>
                       <div class="admin-editor-actions">
                         <button type="submit" class="admin-btn admin-btn-primary compact">Save metadata</button>
                       </div>
@@ -135,7 +130,7 @@
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="5">No publications.</td></tr>
+            <tr><td colspan="5" class="admin-empty">No projects yet.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -146,19 +141,18 @@
     <div class="admin-section-head">
       <div>
         <h2>Models</h2>
-        <p>Open a model's detail page to manage license, appearance, access window, QR, and compliance.</p>
       </div>
-      <span>{{ models|length }} records</span>
+      <span>{{ models|length }} {{ "model" if models|length == 1 else "models" }}</span>
     </div>
     <div class="table-wrap">
-      <table class="data-table admin-table">
+      <table class="data-table admin-table admin-users-table">
         <thead>
           <tr>
             <th>Model</th>
-            <th>Project</th>
-            <th>License</th>
+            <th class="admin-hide-sm">Project</th>
+            <th class="admin-hide-sm">License</th>
             <th>Status</th>
-            <th>Manage</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -168,15 +162,15 @@
                 {% if paper_is_deleted(model.paper) %}<span>{{ model.display_name or model.original_filename or model.id }}</span> <small>Project deleted</small>{% else %}<a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener noreferrer">{{ model.display_name or model.original_filename or model.id }}</a>{% endif %}
                 <small>{{ model_resolver_url(model) if model.public_id else "No public id" }}</small>
               </td>
-              <td>{{ model.paper.title if model.paper else "-" }}</td>
-              <td>{{ get_license_plan(model.license_type).label }}</td>
-              <td><span class="status-chip {{ admin_chip_class(model_access_status(model)) }}">{{ model_access_status(model)|title }}</span></td>
+              <td class="admin-hide-sm">{{ model.paper.title if model.paper else "-" }}</td>
+              <td class="admin-hide-sm">{{ get_license_plan(model.license_type).label }}</td>
+              <td><span class="status-chip {{ admin_chip_class(model_access_status(model)) }}">{{ model_access_status(model)|replace("_", " ")|capitalize }}</span></td>
               <td>
-                <a href="{{ url_for('admin_model_detail', model_id=model.id) }}" class="admin-btn admin-btn-primary compact">Manage</a>
+                <a href="{{ url_for('admin_model_detail', model_id=model.id) }}" class="admin-btn admin-btn-secondary compact">Manage</a>
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="5">No models.</td></tr>
+            <tr><td colspan="5" class="admin-empty">No models yet.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -187,7 +181,6 @@
     <div class="admin-section-head">
       <div>
         <h2>Payments and activity</h2>
-        <p>Recent payments, the user audit trail, and manual payment recording.</p>
       </div>
     </div>
 
@@ -196,6 +189,7 @@
       <div class="admin-editor-body">
         <form method="POST" action="{{ url_for('admin_payment_create') }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="next" value="{{ request.path }}">
           <div class="admin-editor-grid">
             <label class="admin-editor-field"><span>User email</span><input name="user_email" value="{{ user.email }}" required></label>
             <label class="admin-editor-field"><span>Model id (optional)</span><input name="model_id" placeholder="grants license when paid"></label>
@@ -224,21 +218,21 @@
       </div>
     </details>
 
-    <div class="admin-two-col" style="margin-top:16px">
+    <div class="admin-two-col admin-mt">
       <div class="admin-breakdown">
         <h3>Payments</h3>
         {% for payment in payments %}
-          <div><span>{{ payment.invoice_number or payment.provider }}</span><strong>{{ "%.2f"|format(payment.amount_kurus / 100) }} {{ payment.currency }} / {{ payment.status }}</strong></div>
+          <div><span>{{ payment.invoice_number or payment.provider }}</span><strong>{{ "%.2f"|format(payment.amount_kurus / 100) }} {{ payment.currency }} <span class="status-chip {{ admin_chip_class(payment.status) }}">{{ payment.status|replace("_", " ")|capitalize }}</span></strong></div>
         {% else %}
-          <div><span>No payments</span><strong>-</strong></div>
+          <p class="admin-empty">No payments yet.</p>
         {% endfor %}
       </div>
       <div class="admin-breakdown">
         <h3>Recent audit events</h3>
         {% for event in audit_events %}
-          <div><span>{{ event.event_type }}</span><strong>{{ event.timestamp.strftime("%Y-%m-%d %H:%M") if event.timestamp else "-" }}</strong></div>
+          <div><span>{{ event.event_type|replace("_", " ")|capitalize }}</span><strong>{{ event.timestamp.strftime("%Y-%m-%d %H:%M") if event.timestamp else "-" }}</strong></div>
         {% else %}
-          <div><span>No audit events</span><strong>-</strong></div>
+          <p class="admin-empty">No activity yet.</p>
         {% endfor %}
       </div>
     </div>

@@ -7738,6 +7738,9 @@ def register_routes(app: Flask) -> None:
         user = db.session.get(User, user_id)
         if not user:
             abort(404)
+        # log_audit commits, which expires every loaded object: record the view
+        # before the queries so the template does not re-fetch each row lazily.
+        log_audit("admin_user_detail_viewed", user_id=current_user.id, resource_id=str(user.id))
         papers = active_paper_query().options(selectinload(Paper.models)).filter_by(user_id=user.id).order_by(Paper.created_at.desc()).all()
         # Same live-project scope as the Projects list, so the counters agree.
         models = (
@@ -7767,7 +7770,6 @@ def register_routes(app: Flask) -> None:
         )
         # Never add amounts in different currencies together.
         total_spent = format_money_by_currency(paid_revenue_by_currency(Payment.user_id == user.id))
-        log_audit("admin_user_detail_viewed", user_id=current_user.id, resource_id=str(user.id))
         return render_template(
             "admin/user_detail.html",
             user=user,
@@ -7786,13 +7788,14 @@ def register_routes(app: Flask) -> None:
         user = db.session.get(User, user_id)
         if not user:
             abort(404)
-        papers = active_paper_query().filter_by(user_id=user.id).order_by(Paper.created_at.desc()).all()
+        # Audit first: its commit would expire the rows loaded below (N+1 refetch).
+        log_audit("admin_user_dashboard_viewed", user_id=current_user.id, resource_id=str(user.id))
+        papers = active_paper_query().options(selectinload(Paper.models)).filter_by(user_id=user.id).order_by(Paper.created_at.desc()).all()
         latest_models = (
             Model3D.query.join(Paper).options(selectinload(Model3D.paper))
             .filter(Model3D.user_id == user.id, Paper.deleted_at.is_(None))
             .order_by(Model3D.created_at.desc()).limit(6).all()
         )
-        log_audit("admin_user_dashboard_viewed", user_id=current_user.id, resource_id=str(user.id))
         return render_template(
             "dashboard.html",
             papers=papers,
@@ -9497,31 +9500,31 @@ def register_routes(app: Flask) -> None:
         target_user = User.query.filter(func.lower(User.email) == email).first() if email else None
         if target_user is None:
             flash("No user found for that email.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="revenue"))
+            return redirect(admin_return_url("revenue"))
         model_id = (request.form.get("model_id") or "").strip()
         model = db.session.get(Model3D, model_id) if model_id else None
         if model_id and model is None:
             flash("No model found for that id.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="revenue"))
+            return redirect(admin_return_url("revenue"))
         plan_key = (request.form.get("plan_key") or "").strip()
         if plan_key and plan_key not in PAID_PLAN_KEYS:
             flash("Invalid plan key.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="revenue"))
+            return redirect(admin_return_url("revenue"))
         amount_raw = (request.form.get("amount") or "").strip()
         try:
             amount_major = float(amount_raw)
         except ValueError:
             flash("Amount must be a number.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="revenue"))
+            return redirect(admin_return_url("revenue"))
         if amount_major <= 0:
             flash("Amount must be greater than zero.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="revenue"))
+            return redirect(admin_return_url("revenue"))
         amount_minor = int(round(amount_major * 100))
         currency = (request.form.get("currency") or app.config.get("PAYMENT_CURRENCY") or "TRY").strip().upper()[:3]
         status_value = (request.form.get("status") or "pending").strip().lower()
         if status_value not in {"pending", "paid"}:
             flash("Manual payments can only be created as pending or paid.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="revenue"))
+            return redirect(admin_return_url("revenue"))
         payment = Payment(
             user_id=target_user.id,
             paper_id=model.paper_id if model else None,
@@ -9545,7 +9548,7 @@ def register_routes(app: Flask) -> None:
         except SQLAlchemyError:
             db.session.rollback()
             flash("Could not create the payment. Please try again.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="revenue"))
+            return redirect(admin_return_url("revenue"))
         log_audit(
             "admin_payment_created",
             user_id=current_user.id,
@@ -9553,7 +9556,7 @@ def register_routes(app: Flask) -> None:
             details={"user_id": target_user.id, "model_id": payment.model_id, "status": status_value, "amount_kurus": amount_minor},
         )
         flash("Manual payment recorded.", "success")
-        return redirect(url_for("admin_dashboard", admin_page="revenue"))
+        return redirect(admin_return_url("revenue"))
 
     @app.route("/admin/users/<int:user_id>/email", methods=["POST"])
     @login_required
