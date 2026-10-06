@@ -1052,3 +1052,64 @@ def test_detect_accepts_dicom_zip_without_preamble_or_with_junk_first(tmp_path):
     assert detect_medical_format(zip_folder(bare, tmp_path / "bare.zip"), "bare.zip") == ("dicom", None)
     with_junk = zip_folder(folder, tmp_path / "junk.zip", extra={"README.txt": "hi", "autorun.inf": "x", "a.exe": "MZ"})
     assert detect_medical_format(with_junk, "junk.zip") == ("dicom", None)
+
+
+# ------------------------------------------- field-of-view padding, head holder
+
+def _head_ct(with_holder=True):
+    """64x64x40 CT (1 mm voxels): padding outside the scanner's circular field of
+    view, air inside it, a soft-tissue head with a bone shell and, separate from
+    the head, a dense head-holder block."""
+    shape = (64, 64, 40)
+    x, y = np.meshgrid(np.arange(64), np.arange(64), indexing="ij")
+    vol = np.full(shape, -3024, dtype=np.int16)
+    vol[(x - 32) ** 2 + (y - 32) ** 2 <= 30**2] = -1000
+    vol[sphere(shape, (32, 32, 20), 15)] = 40
+    vol[sphere(shape, (32, 32, 20), 15) & ~sphere(shape, (32, 32, 20), 14)] = 700  # thin skull, as in a real head
+    if with_holder:
+        vol[4:10, 29:35, 14:26] = 600  # outside the head, inside the field of view
+    return vol
+
+
+def _layer_masks(vol, keys, modality="CT"):
+    from converters.medical.dicom_series import _threshold_layers
+
+    notes = []
+    layers = _threshold_layers(vol, keys, modality=modality, notes=notes)
+    return {layer.name: layer.load() for layer in layers}, notes
+
+
+def test_auto_threshold_on_ct_ignores_field_of_view_padding():
+    masks, _ = _layer_masks(_head_ct(with_holder=False), ["auto"])
+    head = int(sphere((64, 64, 40), (32, 32, 20), 15).sum())
+    # Before: Otsu split padding from everything else and returned the whole
+    # reconstruction circle (~113 000 voxels) as the "structure".
+    assert masks["Auto threshold"].sum() == pytest.approx(head, rel=0.1)
+
+
+def test_dense_parts_outside_the_body_are_left_out_with_a_note():
+    masks, notes = _layer_masks(_head_ct(), ["bone", "skin"])
+    assert not masks["Bone"][4:10, 29:35, 14:26].any()  # head holder
+    shell = sphere((64, 64, 40), (32, 32, 20), 15) & ~sphere((64, 64, 40), (32, 32, 20), 14)
+    assert masks["Bone"].sum() == pytest.approx(int(shell.sum()), rel=0.05)
+    assert any("outside the body" in note for note in notes)
+
+
+def test_layer_mostly_outside_the_largest_piece_is_kept():
+    """A small hand on a large table: the table is the largest piece, but the
+    bone must not be cut away because of it."""
+    shape = (64, 64, 40)
+    vol = np.full(shape, -1000, dtype=np.int16)
+    vol[2:62, 2:62, 2:8] = 0  # table slab, bigger than the hand
+    vol[sphere(shape, (32, 32, 25), 6)] = 700  # the hand's bone, away from the table
+    masks, notes = _layer_masks(vol, ["bone"])
+    assert masks["Bone"].sum() == int(sphere(shape, (32, 32, 25), 6).sum())
+    assert notes == []
+
+
+def test_mr_auto_threshold_is_unchanged():
+    vol = np.zeros((40, 40, 20), dtype=np.float32)
+    vol[sphere((40, 40, 20), (20, 20, 10), 8)] = 500.0
+    masks, notes = _layer_masks(vol, ["auto"], modality="MR")
+    assert masks["Auto threshold"].sum() == int(sphere((40, 40, 20), (20, 20, 10), 8).sum())
+    assert notes == []

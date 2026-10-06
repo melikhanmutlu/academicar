@@ -222,7 +222,7 @@ def load_series(paths, preset: str) -> Source:
     notes.extend(preset_notes)
     return Source(
         grid=Grid(shape=shape, affine=affine, frame="LPS"),
-        layers=_threshold_layers(volume, infos),
+        layers=_threshold_layers(volume, infos, modality=modality, notes=notes),
         notes=notes,
         empty_error="No structure matched the selected preset in this scan.",
         modality=modality,
@@ -250,31 +250,59 @@ def _resolve_presets(presets, modality):
     return keys, notes
 
 
-def _threshold_layers(volume: np.ndarray, keys) -> list:
+# Real CT values start at about -1024 HU (air). Lower values are padding the
+# scanner writes outside its circular field of view (-2000, -3024, ...).
+_CT_MIN_HU = -1024
+# A dense structure that is not inside the body (scanner table, head holder).
+_OUTSIDE_BODY_NOTE = "Dense parts outside the body (such as the scanner table or a head holder) were left out."
+
+
+def _threshold_layers(volume: np.ndarray, keys, modality=None, notes=None) -> list:
     from scipy import ndimage
     from skimage.filters import threshold_otsu
 
+    ct = modality == "CT"
     cache: dict = {}
+
+    def body():
+        """The patient: everything above the skin threshold, airways filled per
+        axial slice, largest connected piece only."""
+        if "body" not in cache:
+            mask = volume >= MEDICAL_PRESETS["skin"]["threshold_hu"]
+            for k in range(mask.shape[2]):
+                mask[:, :, k] = ndimage.binary_fill_holes(mask[:, :, k])
+            cache["body"] = _largest_component(mask)
+        return cache["body"]
 
     def mask_for(key):
         if key not in cache:
             info = MEDICAL_PRESETS[key]
+            if key == "skin":
+                cache[key] = body()  # the outer surface; the scanner table is not the largest piece
+                return cache[key]
             if info["mode"] == "otsu":
-                threshold = float(threshold_otsu(volume))
+                # Field-of-view padding would otherwise be one of Otsu's two classes
+                # and the "structure" would be the scanner's whole reconstruction circle.
+                threshold = float(threshold_otsu(np.maximum(volume, _CT_MIN_HU) if ct else volume))
             else:
                 threshold = info["threshold_hu"]
             mask = volume >= threshold if info["mode"] == "min" else volume > threshold
             if key == "contrast" and "bone" in keys:
                 # Bone (plus one voxel of partial-volume rim) belongs to the Bone layer only.
                 mask &= ~ndimage.binary_dilation(mask_for("bone"))
-            if key == "skin":
-                # Fill the lungs / airways per axial slice so only the outer skin surface is meshed.
-                for k in range(mask.shape[2]):
-                    mask[:, :, k] = ndimage.binary_fill_holes(mask[:, :, k])
-                mask = _largest_component(mask)  # the body, not the scanner table
-            else:
-                mask = _clean(mask)
-            cache[key] = mask
+            total = int(mask.sum())
+            # Only a patient scan has a soft-tissue body several times larger than its
+            # dense structures; dry specimens scanned side by side (bone ~ body) keep
+            # every piece. And when most of the layer lies outside the largest piece,
+            # that piece was not the patient (a hand on a big table): leave it alone.
+            if ct and total and int(body().sum()) >= 3 * total:
+                inside = mask & ndimage.binary_dilation(body(), iterations=2)
+                removed = total - int(inside.sum())
+                if removed and removed * 2 <= total:
+                    mask = inside
+                    if notes is not None and removed >= 100 and _OUTSIDE_BODY_NOTE not in notes:
+                        notes.append(_OUTSIDE_BODY_NOTE)
+            cache[key] = _clean(mask)
         return cache[key]
 
     return [

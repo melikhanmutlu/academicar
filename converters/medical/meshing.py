@@ -199,6 +199,7 @@ def build_glb(source: Source, output_path: str):
     ``[{"name", "color", "volume_ml"}, ...]``.
     """
     notes = list(source.notes)
+    initial_notes = len(source.notes)  # masks load lazily and may add notes while meshing
     grid = source.grid
     spacing = voxel_spacing(grid.affine)
     layers = list(source.layers)
@@ -238,6 +239,7 @@ def build_glb(source: Source, output_path: str):
     if resample_note:
         notes.append(resample_note)
     notes.extend(mesh_notes)
+    notes.extend(note for note in source.notes[initial_notes:] if note not in notes)
 
     names = _unique_names([b[0].name for b in built])
     colors = [
