@@ -445,7 +445,7 @@
           {% if scenes_enabled(model) %}
           <p>Saved views of this model, each with its own link and QR code. Arrange layers and camera in the viewer, then choose "Save this view" in the Scenes panel.</p>
           {% else %}
-          <p>Saved scenes (a view with its own link and QR code, plus a presentation mode) are available on paid plans.{% if is_project_owner and model.license_type != 'institutional' %} <a href="{{ url_for('model_upgrade_page', model_id=model.id) }}" class="underline">Upgrade this model</a> to use them.{% endif %}</p>
+          <p>Saved scenes (a view with its own link and QR code, plus a presentation mode) are not included in this model's plan.{% if is_project_owner and model.license_type != 'institutional' %} <a href="{{ url_for('model_upgrade_page', model_id=model.id) }}" class="underline">Upgrade this model</a> to use them.{% endif %}</p>
           {% endif %}
         </div>
         {% if model.scenes %}
@@ -511,7 +511,7 @@
         {% include "_medical_upload_options.html" %}
         <label class="model-edit-confirm">
           <input type="checkbox" name="compliance_confirm" value="yes" required class="mt-1">
-          <span>I confirm that this replacement model is anonymized, that I have the right to share/publish it, and that I am responsible for all required ethical approval and consent processes.</span>
+          <span>I confirm that this replacement model is anonymized, that I have the right to share/publish it, and that I am responsible for all required ethical approval and consent processes. <a href="{{ url_for('content_policy') }}" target="_blank" rel="noopener" class="text-[#ff682c] hover:underline">How we use uploads</a></span>
         </label>
         <div data-upload-progress-host></div>
         <div class="model-edit-actions">

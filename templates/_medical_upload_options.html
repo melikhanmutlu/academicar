@@ -10,6 +10,18 @@
       <label class="flex items-center gap-2"><input type="checkbox" name="medical_preset" value="skin"> <span>Skin / body surface (CT)</span></label>
       <label class="flex items-center gap-2"><input type="checkbox" name="medical_preset" value="contrast"> <span>Contrast-filled vessels, with bone (CT)</span></label>
       <label class="flex items-center gap-2"><input type="checkbox" name="medical_preset" value="auto"> <span>Automatic threshold (MR or other scans)</span></label>
+      {% if 'custom_threshold' in get_license_plan('free').features or 'custom_threshold' in get_license_plan('institutional').features %}
+      <label class="flex items-center gap-2"><input type="checkbox" name="medical_preset" value="custom" data-medical-custom> <span>Custom threshold (CT, Hounsfield units)</span></label>
+      <div class="ml-6 grid grid-cols-2 gap-3 max-w-xs" data-medical-custom-fields style="display: none">
+        <label class="text-xs text-[#5c6473]">From (HU)
+          <input type="number" name="medical_hu_min" min="-1024" max="4000" step="1" value="300" class="mt-1 w-full rounded-lg border border-[#e2e8f0] px-2 py-1.5 text-sm text-[#111827]">
+        </label>
+        <label class="text-xs text-[#5c6473]">To (HU, optional)
+          <input type="number" name="medical_hu_max" min="-1023" max="4000" step="1" placeholder="no limit" class="mt-1 w-full rounded-lg border border-[#e2e8f0] px-2 py-1.5 text-sm text-[#111827]">
+        </label>
+        <p class="col-span-2 text-xs text-[#5c6473]">Typical CT values: fat −100, soft tissue 20 to 80, contrast vessels 150 to 500, bone 250 and above.</p>
+      </div>
+      {% endif %}
     </div>
     <p class="text-xs text-[#5c6473] mt-1">Used for a DICOM series (ZIP). Pick several to get one layer per structure; you can fade each layer in the viewer. Choosing differently later means uploading the scan again, because the raw scan is deleted after processing. A segmentation (NIfTI, NRRD, DICOM-SEG, or a ZIP of masks) keeps its own structures, one layer each.</p>
   </fieldset>
@@ -26,6 +38,15 @@
     if (!input) return;
     const confirm = box.querySelector('[data-medical-confirm]');
     const presetRow = box.querySelector('[data-medical-preset-row]');
+    const customToggle = box.querySelector('[data-medical-custom]');
+    const customFields = box.querySelector('[data-medical-custom-fields]');
+    // The HU fields show (and the lower one is required) only while Custom is ticked for a ZIP.
+    const syncCustom = () => {
+      if (!customToggle || !customFields) return;
+      customFields.style.display = customToggle.checked ? '' : 'none'; // style: the grid class sets its own display
+      customFields.querySelector('[name="medical_hu_min"]').required = customToggle.checked && !box.hidden && !presetRow.hidden;
+    };
+    if (customToggle) customToggle.addEventListener('change', syncCustom);
     const sync = () => {
       const name = (input.files && input.files[0] ? input.files[0].name : '').toLowerCase();
       const ext = name.endsWith('.nii.gz') ? 'nii.gz' : (name.includes('.') ? name.split('.').pop() : '');
@@ -33,6 +54,7 @@
       box.hidden = !medical;
       confirm.required = medical;
       presetRow.hidden = ext !== 'zip';
+      syncCustom();
       // Scans take their colours from the preset / segmentation, so the colour
       // picker (where the form has one) is hidden while a scan is selected.
       form.querySelectorAll('[data-color-control], [data-color-input], [data-color-presets], [data-color-hex]').forEach((el) => {

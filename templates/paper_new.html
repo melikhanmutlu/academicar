@@ -90,7 +90,7 @@
           {% include "_medical_upload_options.html" %}
           <label class="flex items-start gap-3 rounded-xl border border-[#e2e8f0] bg-white p-4 text-sm text-[#475569]">
             <input type="checkbox" name="compliance_confirm" value="yes" class="mt-1" data-model-required>
-            <span>I confirm that this model has been anonymized, that I have the right to share/publish it, and that I am responsible for all required ethical approval and consent processes.</span>
+            <span>I confirm that this model has been anonymized, that I have the right to share/publish it, and that I am responsible for all required ethical approval and consent processes. <a href="{{ url_for('content_policy') }}" target="_blank" rel="noopener" class="text-[#ff682c] hover:underline">How we use uploads</a></span>
           </label>
         </section>
       {% endif %}

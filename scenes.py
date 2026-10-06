@@ -6,7 +6,7 @@ object in ``ModelScene.state``. The browser captures it with
 ``window.viewerView.getState()`` and this module whitelists it before saving.
 ``/s/<public_id>`` resolves a scene like the stable ``/m/<public_id>`` QR
 resolver does and redirects to ``/view/<model_id>?scene=<id>``; the viewer then
-applies the saved state. Scenes are a paid-plan feature (plan key "scenes");
+applies the saved state. Scenes are a plan feature (plan key "scenes");
 when a plan no longer has it the link falls back to the plain viewer.
 Registered in create_app next to the layer editor blueprint.
 """
@@ -45,6 +45,7 @@ _FOV_VALUE = re.compile(_TOKEN)
 _CAMERA_LIMITS = {"orbit": (_CAMERA_VALUE, 96), "target": (_CAMERA_VALUE, 96), "fov": (_FOV_VALUE, 32)}
 _BACKGROUNDS = ("dark", "light", "white")
 _SECTION_OFFSET_LIMIT = 1000.0
+_HEX_COLOR = re.compile(r"#[0-9a-f]{6}")
 
 
 def _number(value):
@@ -84,6 +85,9 @@ def clean_scene_state(state, model) -> dict:
                 "visible": entry.get("visible") is not False,
                 "opacity": 1.0 if opacity is None else round(min(1.0, max(0.0, opacity)), 2),
             }
+            color = str(entry.get("color") or "").lower()
+            if _HEX_COLOR.fullmatch(color):
+                kept[name]["color"] = color  # a colour previewed in the viewer for this scene only
         if kept:
             cleaned["layers"] = kept
 
@@ -116,16 +120,28 @@ def scenes_enabled(model) -> bool:
 
 
 def scene_ar_signature(state) -> list:
-    """What an AR variant depends on: the layers a scene hides or fades, as a
-    sorted list. Empty means the full model is already the right AR view."""
-    layers = (state or {}).get("layers") if isinstance(state, dict) else None
-    if not isinstance(layers, dict):
+    """What an AR variant depends on: the layers a scene hides, fades or
+    recolours and its section plane, as a sorted list. Empty means the full
+    model is already the right AR view."""
+    if not isinstance(state, dict):
         return []
-    return sorted(
-        [name, entry.get("visible") is not False, entry.get("opacity", 1.0)]
-        for name, entry in layers.items()
-        if isinstance(entry, dict) and (entry.get("visible") is False or (entry.get("opacity", 1.0) or 0) < 1)
-    )
+    layers = state.get("layers")
+    signature = []
+    for name, entry in (layers.items() if isinstance(layers, dict) else []):
+        if not isinstance(entry, dict):
+            continue
+        changed = entry.get("visible") is False or (entry.get("opacity", 1.0) or 0) < 1
+        item = [name, entry.get("visible") is not False, entry.get("opacity", 1.0)]
+        if entry.get("color"):
+            item.append(entry["color"])
+            changed = True
+        if changed:
+            signature.append(item)
+    signature.sort()
+    section = state.get("section")
+    if isinstance(section, dict) and section.get("axis"):
+        signature.append(["@section", section["axis"], section.get("offset", 0.0), section.get("flip") is True])
+    return signature
 
 
 def scene_ar_enabled(model) -> bool:
@@ -163,8 +179,8 @@ def queue_scene_ar(scene: ModelScene, model) -> None:
 
 
 def refresh_scene_ar(scene: ModelScene, model, previous_signature) -> None:
-    """After a scene's state was saved: queue its AR variant when the hidden/faded
-    layers changed (and the plan has scene AR); drop a variant that is no longer
+    """After a scene's state was saved: queue its AR variant when the hidden/faded/
+    recoloured layers or the section changed (and the plan has scene AR); drop a variant that is no longer
     needed. Never fails the save: the scene is already stored."""
     if not scene_ar_enabled(model):
         return
@@ -273,7 +289,7 @@ def create_scene(model_id):
 
     model = _load_model(model_id)
     if not scenes_enabled(model):
-        return _error("Saved scenes are available on paid plans.", 403)
+        return _error("Saved scenes are not included in this model's plan.", 403)
     payload = _json_payload()
     if payload is None:
         return _error("Invalid request.", 400)
@@ -318,7 +334,7 @@ def create_scene(model_id):
 def reorder_scenes(model_id):
     model = _load_model(model_id)
     if not scenes_enabled(model):
-        return _error("Saved scenes are available on paid plans.", 403)
+        return _error("Saved scenes are not included in this model's plan.", 403)
     payload = _json_payload()
     order = payload.get("order") if payload else None
     by_id = {scene.id: scene for scene in model.scenes}
@@ -356,7 +372,7 @@ def update_scene(model_id, scene_id):
     model = _load_model(model_id)
     scene = _model_scene_or_404(model, scene_id)
     if not scenes_enabled(model):
-        return _error("Saved scenes are available on paid plans.", 403)
+        return _error("Saved scenes are not included in this model's plan.", 403)
     payload = _json_payload()
     if payload is None:
         return _error("Invalid request.", 400)

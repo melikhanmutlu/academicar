@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Content & Data Use - AcademicAR{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+  <h1 class="font-serif text-4xl font-bold text-[#111827] mb-8">Content &amp; Data Use</h1>
+
+  <div class="prose prose-lg max-w-none space-y-8 text-[#374151]">
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">1. Your models stay yours</h2>
+      <p>You keep the copyright and all other rights in the models, images and documents you upload. By uploading, you only allow AcademicAR to store, convert and display them so that the viewer, AR, QR and sharing features you choose can work.</p>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">2. We store your content, we do not use it</h2>
+      <ul class="list-disc pl-6 space-y-2">
+        <li>We keep your uploaded files and the 3D files made from them only to run the service: viewing, AR, QR links, re-processing on request and backups.</li>
+        <li>We do not sell, license or share your content, do not use it in our own marketing without your permission, and do not use it to train AI models.</li>
+        <li>Authorised AcademicAR staff open or download a model only when needed for support, moderation, security or a legal obligation, and such access is logged.</li>
+        <li>When you delete a model, its files are removed from our storage; copies in rolling backups expire with those backups.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">3. Medical scans are reduced to anonymous geometry</h2>
+      <ul class="list-disc pl-6 space-y-2">
+        <li>From a CT/MR scan (DICOM) or a segmentation we keep only the 3D surface geometry. Patient data in the scan headers is not copied into the 3D model.</li>
+        <li>The raw scan is deleted right after processing, whether it succeeds or fails. It is never archived or backed up.</li>
+        <li>You remain responsible for removing identifying information before upload, including from file names, and for having the required ethical approval and consent.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="text-2xl font-bold text-[#111827] mb-4">4. Questions and removal requests</h2>
+      <p>If you believe content on AcademicAR infringes your rights or identifies a person, please <a href="{{ url_for('contact_info') }}" class="text-[#ff682c] hover:underline">contact us</a> and we will review it promptly. See also our <a href="{{ url_for('terms') }}" class="text-[#ff682c] hover:underline">Terms</a> and <a href="{{ url_for('privacy') }}" class="text-[#ff682c] hover:underline">Privacy Policy</a>.</p>
+    </section>
+
+  </div>
+</div>
+{% endblock %}

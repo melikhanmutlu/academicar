@@ -1,4 +1,5 @@
-"""Per-scene AR variants: a GLB holding only a saved scene's visible layers.
+"""Per-scene AR variants: a GLB holding only a saved scene's visible layers
+(recoloured and cut by its section plane when the scene has them).
 
 Mobile AR (Android Scene Viewer, iOS Quick Look) has no layer controls, so a
 saved scene that hides or fades layers gets its own GLB (and USDZ) built by the
@@ -84,6 +85,78 @@ def _fade_materials(gltf: GLTF2, faded: dict) -> None:
         material.alphaMode = "BLEND"
 
 
+def _srgb_to_linear(channel: float) -> float:
+    return channel / 12.92 if channel <= 0.04045 else ((channel + 0.055) / 1.055) ** 2.4
+
+
+def _recolor_materials(gltf: GLTF2, colors: dict) -> None:
+    """Set the base colour (``#rrggbb``, sRGB) of the named materials, keeping their alpha."""
+    from pygltflib import PbrMetallicRoughness
+
+    for material in gltf.materials or []:
+        hex_color = colors.get(material.name)
+        if not hex_color:
+            continue
+        pbr = material.pbrMetallicRoughness or PbrMetallicRoughness()
+        material.pbrMetallicRoughness = pbr
+        factor = list(pbr.baseColorFactor or [1.0, 1.0, 1.0, 1.0])
+        factor += [1.0] * (4 - len(factor))
+        rgb = [_srgb_to_linear(int(hex_color[k:k + 2], 16) / 255) for k in (1, 3, 5)]
+        pbr.baseColorFactor = [round(c, 6) for c in rgb] + [factor[3]]
+
+
+def section_cut(path: str, section: dict) -> bool:
+    """Cut the (Draco-free) GLB at ``path`` in place with the viewer's section plane.
+
+    The plane is the viewer's: glTF scene space, axis ``x|y|z`` at the centre of
+    the union of every mesh's transformed bounding-box corners plus ``offset``
+    metres; the lower side is kept, or the upper one with ``flip``. Like the
+    viewer the cut is not capped: every material becomes double-sided so the
+    inside shows. Meshes are baked into scene space (node names and materials
+    are kept). Returns False when nothing is left or the file cannot be cut.
+    """
+    import numpy as np
+    import trimesh
+
+    axis = "xyz".index(section["axis"])
+    scene = trimesh.load(path, force="scene", process=False)
+    nodes = [(node, *scene.graph[node]) for node in scene.graph.nodes_geometry]
+    lo, hi = np.full(3, np.inf), np.full(3, -np.inf)
+    for _, transform, geom_name in nodes:
+        corners = trimesh.transform_points(trimesh.bounds.corners(scene.geometry[geom_name].bounds), transform)
+        lo, hi = np.minimum(lo, corners.min(axis=0)), np.maximum(hi, corners.max(axis=0))
+    origin = np.zeros(3)
+    origin[axis] = (lo[axis] + hi[axis]) / 2 + float(section.get("offset") or 0.0)
+    normal = np.zeros(3)
+    normal[axis] = 1.0 if section.get("flip") else -1.0
+    out = trimesh.Scene()
+    for node, transform, geom_name in nodes:
+        mesh = scene.geometry[geom_name].copy()
+        if not isinstance(mesh, trimesh.Trimesh):
+            continue
+        mesh.apply_transform(transform)
+        material = getattr(mesh.visual, "material", None)
+        uv = getattr(mesh.visual, "uv", None)
+        # slice_faces_plane, not Trimesh.slice_plane: that one needs shapely, used only for capping.
+        vertices, faces, uv = trimesh.intersections.slice_faces_plane(
+            mesh.vertices, mesh.faces, plane_normal=normal, plane_origin=origin, uv=uv
+        )
+        if len(faces) == 0:
+            continue
+        cut = trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
+        if material is not None:
+            material = material.copy()
+            if hasattr(material, "doubleSided"):
+                material.doubleSided = True
+            cut.visual = trimesh.visual.TextureVisuals(uv=uv, material=material)
+        out.add_geometry(cut, node_name=node, geom_name=node)
+    if not out.geometry:
+        return False
+    with open(path, "wb") as handle:
+        handle.write(out.export(file_type="glb"))
+    return True
+
+
 def _prune(path: str) -> None:
     """Best-effort ``gltf-transform prune``: drops the accessors and buffers the
     removed primitives left behind (it never merges materials). Keeps the file as is on failure."""
@@ -108,11 +181,15 @@ def build_scene_variant(
     hidden_materials: set,
     faded: dict,
     *,
+    colors: dict | None = None,
+    section: dict | None = None,
     round_faded: bool = False,
     compress: bool = True,
 ) -> bool:
-    """Write ``out_glb``: ``source_glb`` without ``hidden_materials`` and with
-    ``faded`` (material name -> opacity 0..1) blended.
+    """Write ``out_glb``: ``source_glb`` without ``hidden_materials``, with
+    ``faded`` (material name -> opacity 0..1) blended, ``colors`` (material
+    name -> ``#rrggbb``) applied and, given a ``section`` (the viewer's
+    {axis, offset, flip}), cut by that plane (see ``section_cut``).
 
     ``round_faded`` resolves faded layers to visible/hidden instead (see the module
     docstring; used for USDZ). ``compress=False`` keeps the output Draco-free,
@@ -135,7 +212,11 @@ def build_scene_variant(
                 logger.warning("Scene variant would be empty; not built")
                 return False
             _fade_materials(gltf, faded)
+            _recolor_materials(gltf, colors or {})
             gltf.save(work)
+            if section and not section_cut(work, section):
+                logger.warning("Scene variant would be empty after the section cut; not built")
+                return False
             _prune(work)
             if compress:
                 optimize_glb(work, keep_layers=True)  # best effort: stays plain if gltf-transform is missing

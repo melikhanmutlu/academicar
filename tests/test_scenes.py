@@ -6,6 +6,7 @@ import pytest
 
 from models import Model3D, ModelScene, Paper, ProjectCollaborator, User, db
 from scenes import MAX_SCENES_PER_MODEL, clean_scene_state
+from tests.plan_helpers import set_plan_features
 from tests.conftest import create_user, login
 
 PASSWORD = "password123"
@@ -119,12 +120,13 @@ def test_stranger_forbidden_and_editor_allowed(app, client):
     assert stranger.get(f"/qr-print/scene/{scene_id}/label.png").status_code == 403
 
 
-def test_free_plan_is_refused(app, client):
+def test_plan_without_scenes_is_refused(app, client):
+    set_plan_features(app, "free", remove={"scenes"})  # Free has scenes by default; an admin can turn them off
     mid, _ = _make_model(app, plan="free")
     _login(client)
     response = _create(client, mid)
     assert response.status_code == 403
-    assert "paid" in response.get_json()["error"].lower()
+    assert "not included" in response.get_json()["error"].lower()
     with app.app_context():
         assert ModelScene.query.count() == 0
 
@@ -219,6 +221,7 @@ def test_scene_link_expired_model_410(app, client):
 
 
 def test_scene_link_falls_back_when_plan_lost_scenes(app, client):
+    set_plan_features(app, "free", remove={"scenes"})
     mid, _ = _make_model(app, plan="free")
     _, public_id = _scene_public_id(app, mid)
     response = client.get(f"/s/{public_id}")
@@ -266,7 +269,7 @@ def test_model_deletion_cascades_scenes(app, client):
         assert ModelScene.query.count() == 0
 
 
-def test_viewer_shows_scenes_panel_only_on_paid_plans(app, client):
+def test_viewer_shows_scenes_panel_only_when_the_plan_has_scenes(app, client):
     mid, _ = _make_model(app, plan="academic")
     _scene_public_id(app, mid, "Heart view")
     html = client.get(f"/view/{mid}").get_data(as_text=True)
@@ -280,6 +283,7 @@ def test_viewer_shows_scenes_panel_only_on_paid_plans(app, client):
     embed_html = client.get(f"/view/{mid}?embed=true").get_data(as_text=True)
     assert 'id="scenesPanel"' in embed_html and SAVE_BUTTON not in embed_html
 
+    set_plan_features(app, "free", remove={"scenes"})
     free_id, _ = _make_model(app, plan="free", email="free@example.com")
     _scene_public_id(app, free_id, "Hidden scene")
     free_client = app.test_client()

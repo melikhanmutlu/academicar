@@ -3,6 +3,9 @@
 {% block admin_subtitle %}Model {{ model.id }} — license, processing, appearance, access, and compliance in one place.{% endblock %}
 {% block admin_actions %}
   {% if paper_is_deleted(model.paper) %}<span class="admin-btn admin-btn-secondary compact" aria-disabled="true" title="The project was deleted, so its viewer is offline.">Project deleted</span>{% else %}<a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener noreferrer" class="admin-btn admin-btn-secondary compact">Viewer</a>{% endif %}
+  <a href="{{ url_for('admin_model_download', model_id=model.id, kind='glb') }}" class="admin-btn admin-btn-secondary compact" title="Download the converted GLB (logged)">Download GLB</a>
+  <a href="{{ url_for('admin_model_download', model_id=model.id, kind='usdz') }}" class="admin-btn admin-btn-secondary compact" title="Download the iOS AR file (logged)">USDZ</a>
+  {% if model.current_source_path %}<a href="{{ url_for('admin_model_download', model_id=model.id, kind='source') }}" class="admin-btn admin-btn-secondary compact" title="Download the uploaded source file (logged)">Original file</a>{% endif %}
   <a href="{{ url_for('admin_dashboard', admin_page='models') }}" class="admin-btn admin-btn-secondary compact">Back to models</a>
 {% endblock %}
 

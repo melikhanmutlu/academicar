@@ -33,6 +33,7 @@ from auth import auth_bp, init_oauth, is_safe_redirect_url
 from config import Config
 from extensions import csrf, limiter, rate_limit_key
 from converters import FBXConverter, OBJConverter, STLConverter
+from converters.medical.common import CUSTOM_HU_MAX, CUSTOM_HU_MIN, parse_custom_preset
 from converters.glb_quality import (
     GLBQualityError,
     apply_pbr_factors,
@@ -1725,14 +1726,36 @@ MEDICAL_DEFAULT_NAMES = {"dicom": "CT/MR scan", "segmentation": "Segmentation"}
 
 
 def normalize_medical_presets(values) -> str | None:
-    """Comma-joined presets in canonical order (``"bone,skin"``), or None when
-    nothing valid was chosen. Accepts a list of form values or one string."""
+    """Comma-joined presets in canonical order (``"bone,skin"``, a custom HU
+    threshold last: ``"bone,custom:300:900"``), or None when nothing valid was
+    chosen. Accepts a list of form values or one string."""
     if isinstance(values, str):
         values = [values]
     chosen = {part.strip().lower() for value in (values or []) for part in str(value).split(",") if part.strip()}
-    if not chosen or not chosen <= set(MEDICAL_PRESET_ORDER):
+    custom = {value for value in chosen if parse_custom_preset(value) is not None}
+    if not chosen or len(custom) > 1 or not chosen - custom <= set(MEDICAL_PRESET_ORDER):
         return None
-    return ",".join(name for name in MEDICAL_PRESET_ORDER if name in chosen)
+    return ",".join([name for name in MEDICAL_PRESET_ORDER if name in chosen] + sorted(custom))
+
+
+def custom_threshold_error(preset: str | None, license_type: str | None) -> str | None:
+    """Error when a custom HU threshold was chosen but the model's plan lacks it."""
+    if not preset or "custom:" not in preset or plan_supports_feature(license_type, "custom_threshold"):
+        return None
+    return f"A custom threshold is not included in the {get_license_plan(license_type).label} plan. Choose a preset instead."
+
+
+def medical_presets_from_form(form) -> list[str]:
+    """The ``medical_preset`` checkboxes, with "custom" turned into a
+    ``custom:<min>[:<max>]`` key from the HU fields. An unusable custom range
+    stays the bare "custom" (rejected by normalize_medical_presets)."""
+    values = [value for value in form.getlist("medical_preset") if value != "custom"]
+    if "custom" in form.getlist("medical_preset"):
+        low = (form.get("medical_hu_min") or "").strip()
+        high = (form.get("medical_hu_max") or "").strip()
+        key = f"custom:{low}" + (f":{high}" if high else "")
+        values.append(key if parse_custom_preset(key) is not None else "custom")
+    return values
 
 
 def inspect_medical_upload(path: str, original_name: str, file_size: int, presets) -> tuple[str | None, str | None, str | None]:
@@ -1750,9 +1773,14 @@ def inspect_medical_upload(path: str, original_name: str, file_size: int, preset
         return None, None, error
     if source_format != "dicom":
         return source_format, None, None
+    if any(str(value).strip().lower() == "custom" for value in ([presets] if isinstance(presets, str) else presets or [])):
+        return None, None, (
+            f"Enter a custom threshold between {CUSTOM_HU_MIN} and {CUSTOM_HU_MAX} HU "
+            "(the upper limit is optional and must be above the lower one)."
+        )
     preset = normalize_medical_presets(presets)
     if preset is None:
-        return None, None, "Choose what to extract from the scan (bone, skin, contrast or automatic)."
+        return None, None, "Choose what to extract from the scan (bone, skin, contrast, automatic or a custom threshold)."
     return source_format, preset, None
 
 
@@ -3814,22 +3842,26 @@ def process_layer_metrics_job(
             db.session.rollback()
 
 
-def _scene_ar_materials(scene: ModelScene, model: Model3D) -> tuple[set, dict]:
-    """(hidden material names, faded material name -> opacity) of a saved scene.
-    Layer names the model no longer has (a stale scene) are ignored."""
+def _scene_ar_materials(scene: ModelScene, model: Model3D) -> tuple[set, dict, dict]:
+    """(hidden material names, faded material name -> opacity, material name ->
+    "#rrggbb" colour) of a saved scene. Layer names the model no longer has (a
+    stale scene) are ignored."""
     by_name = {str(layer.get("name")): layer.get("materials") or [] for layer in model_layers(model)}
     hidden: set = set()
     faded: dict = {}
+    colors: dict = {}
     layers = (scene.state or {}).get("layers")
     for name, entry in (layers.items() if isinstance(layers, dict) else []):
         if name not in by_name or not isinstance(entry, dict):
             continue
+        if entry.get("color"):
+            colors.update({material: entry["color"] for material in by_name[name]})
         if entry.get("visible") is False:
             hidden.update(by_name[name])
         elif (entry.get("opacity", 1.0) or 0) < 1:
             for material in by_name[name]:
                 faded[material] = min(faded.get(material, 1.0), float(entry["opacity"]))
-    return hidden, {m: o for m, o in faded.items() if m not in hidden}
+    return hidden, {m: o for m, o in faded.items() if m not in hidden}, {m: c for m, c in colors.items() if m not in hidden}
 
 
 def _set_scene_ar(scene: ModelScene, status: str, glb: str | None = None, usdz: str | None = None) -> None:
@@ -3844,8 +3876,9 @@ def process_scene_ar_job(app: Flask, *, scene_id: int, job_id: int | None = None
     """Build a saved scene's AR variant: a GLB (and iOS USDZ) with only the
     layers the scene shows.
 
-    Android Scene Viewer / iOS Quick Look have no layer controls, so a scene
-    that hides or fades layers needs its own file. Files go to
+    Android Scene Viewer / iOS Quick Look have no layer or section controls,
+    so a scene that hides, fades or recolours layers or cuts the model needs
+    its own file. Files go to
     converted/<model>/scenes/<scene>.glb|usdz and are mirrored to R2. Optional
     like the layer-metrics backfill: a failure leaves ``ar_status`` "failed"
     (the viewer then opens the full model in AR) and never touches the model.
@@ -3887,9 +3920,10 @@ def _build_scene_ar(app: Flask, scene: ModelScene, model: Model3D) -> None:
     final_glb = os.path.join(scene_dir, f"{scene.id}.glb")
     final_usdz = os.path.join(scene_dir, f"{scene.id}.usdz")
     signature = scene_ar_signature(scene.state)
-    hidden, faded = _scene_ar_materials(scene, model)
+    hidden, faded, colors = _scene_ar_materials(scene, model)
+    section = (scene.state or {}).get("section") if isinstance((scene.state or {}).get("section"), dict) else None
 
-    if not scene_ar_enabled(model) or not (hidden or faded):
+    if not scene_ar_enabled(model) or not (hidden or faded or colors or section):
         # Nothing to build: the full model is already this scene's AR view.
         remove_scene_ar_files(folder, model.id, scene.id)
         _set_scene_ar(scene, "none")
@@ -3915,7 +3949,7 @@ def _build_scene_ar(app: Flask, scene: ModelScene, model: Model3D) -> None:
         _set_scene_ar(scene, "failed")
         return
 
-    ok = build_scene_variant(source, final_glb, hidden, faded)
+    ok = build_scene_variant(source, final_glb, hidden, faded, colors=colors, section=section)
     usdz_ok = False
     if ok:
         with tempfile.TemporaryDirectory(prefix="academicar-scene-ar-") as tmp:
@@ -3924,7 +3958,9 @@ def _build_scene_ar(app: Flask, scene: ModelScene, model: Model3D) -> None:
                 # Quick Look's BLEND support is uncertain: the USDZ gets faded layers
                 # rounded to visible/hidden (see converters/scene_variant.py).
                 usdz_source = os.path.join(tmp, "usdz_source.glb")
-                if not build_scene_variant(source, usdz_source, hidden, faded, round_faded=True, compress=False):
+                if not build_scene_variant(
+                    source, usdz_source, hidden, faded, colors=colors, section=section, round_faded=True, compress=False
+                ):
                     usdz_source = None
             tmp_usdz = os.path.join(tmp, "scene.usdz")
             try:
@@ -4368,7 +4404,11 @@ def _create_model_for_paper(
 
     # A raw scan is not what gets stored (only the resulting GLB), so it is
     # capped by MEDICAL_UPLOAD_MAX_BYTES above instead of the plan's model limit.
-    size_error = None if is_medical_upload else model_file_limit_error(file_size, license_normalized)
+    size_error = (
+        custom_threshold_error(medical_preset, license_normalized)
+        if is_medical_upload
+        else model_file_limit_error(file_size, license_normalized)
+    )
     if size_error:
         cleanup_dir(upload_dir)
         cleanup_dir(converted_dir)
@@ -4966,6 +5006,10 @@ def register_routes(app: Flask) -> None:
     @app.route("/data-protection")
     def data_protection():
         return render_template("legal/data_protection.html")
+
+    @app.route("/content-policy")
+    def content_policy():
+        return render_template("legal/content_policy.html")
 
     @app.route("/refund-policy")
     def refund_policy():
@@ -8619,6 +8663,41 @@ def register_routes(app: Flask) -> None:
         )
         return render_template("admin/model_detail.html", model=model, versions=versions, active_page="models")
 
+    def _admin_model_download_target(model: Model3D, kind: str) -> tuple[str, str] | None:
+        """(local path, R2 key) of one stored file of a model, or None. Medical
+        raw scans are deleted after conversion, so their source is never here."""
+        if kind in ("glb", "usdz"):
+            filename = f"model.{kind}"
+            return os.path.join(app.config["CONVERTED_FOLDER"], model.id, filename), f"converted/{model.id}/{filename}"
+        if kind == "source" and model.current_source_path:
+            path = os.path.abspath(model.current_source_path)
+            upload_root = os.path.abspath(app.config["UPLOAD_FOLDER"])
+            if os.path.commonpath([path, upload_root]) != upload_root:
+                return None
+            return path, "uploads/" + os.path.relpath(path, upload_root).replace(os.sep, "/")
+        return None
+
+    @app.route("/admin/models/<model_id>/download/<any(glb,usdz,source):kind>")
+    @login_required
+    def admin_model_download(model_id, kind):
+        """Admin copy of a user's model (support / moderation); every download is audited."""
+        require_admin()
+        model = db.session.get(Model3D, model_id)
+        if not model:
+            abort(404)
+        target = _admin_model_download_target(model, kind)
+        if not target:
+            abort(404)
+        path, r2_key = target
+        if not os.path.isfile(path):
+            ensure_local(path, r2_key)
+        if not os.path.isfile(path):
+            abort(404)
+        log_audit("admin_model_downloaded", user_id=current_user.id, resource_id=model.id, details={"kind": kind})
+        stem = secure_filename(os.path.splitext(model.display_name or model.original_filename or "")[0]) or model.id
+        name = os.path.basename(path) if kind == "source" else f"{stem}.{kind}"
+        return send_from_directory(os.path.dirname(path), os.path.basename(path), as_attachment=True, download_name=name)
+
     @app.route("/admin/models/<model_id>/versions")
     @login_required
     def admin_model_versions(model_id):
@@ -9723,7 +9802,7 @@ def register_routes(app: Flask) -> None:
                     color=request.form.get("color") if request.form.get("color_enabled") == "yes" else None,
                     source_unit=request.form.get("source_unit"),
                     compliance_confirm=request.form.get("compliance_confirm"),
-                    medical_preset=request.form.getlist("medical_preset"),
+                    medical_preset=medical_presets_from_form(request.form),
                     medical_confirm=request.form.get("medical_confirm"),
                 )
                 if ok:
@@ -10130,7 +10209,7 @@ def register_routes(app: Flask) -> None:
             color=request.form.get("color") if request.form.get("color_enabled") == "yes" else None,
             source_unit=request.form.get("source_unit"),
             compliance_confirm=request.form.get("compliance_confirm"),
-            medical_preset=request.form.getlist("medical_preset"),
+            medical_preset=medical_presets_from_form(request.form),
             medical_confirm=request.form.get("medical_confirm"),
         )
         flash(message, "success" if ok else "danger")
@@ -10226,9 +10305,9 @@ def register_routes(app: Flask) -> None:
         medical_preset = None
         if is_medical_upload:
             source_format, medical_preset, error = inspect_medical_upload(
-                source_path, original_name, os.path.getsize(source_path), request.form.getlist("medical_preset")
+                source_path, original_name, os.path.getsize(source_path), medical_presets_from_form(request.form)
             )
-            size_error = error
+            size_error = error or custom_threshold_error(medical_preset, model.license_type)
         else:
             step_errors = validate_step_file(source_path) if source_format == "step" else []
             size_error = ("Invalid STEP file: " + "; ".join(step_errors)) if step_errors else (

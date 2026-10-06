@@ -11,7 +11,7 @@ import math
 import numpy as np
 
 from . import progress
-from .common import MEDICAL_PRESETS, MedicalError, max_voxels, parse_presets
+from .common import MEDICAL_PRESETS, MedicalError, max_voxels, parse_presets, preset_info
 from .meshing import Grid, LayerSource, Source, choose_strides, fmt_mm
 from .segmentation import _load_dicom_seg
 
@@ -233,7 +233,7 @@ def _resolve_presets(presets, modality):
     """Preset keys to build, in order. Without Hounsfield units (not CT) every HU preset becomes "auto"."""
     keys, fallback = [], []
     for key in presets:
-        info = MEDICAL_PRESETS[key]
+        info = preset_info(key)
         if info["modality"] == "CT" and modality != "CT":
             fallback.append(info["label"])
             key = "auto"
@@ -304,7 +304,7 @@ def _threshold_layers(volume: np.ndarray, keys, modality=None, notes=None) -> li
 
     def mask_for(key):
         if key not in cache:
-            info = MEDICAL_PRESETS[key]
+            info = preset_info(key)
             if key == "skin":
                 cache[key] = body()  # the outer surface; the scanner table is not the largest piece
                 return cache[key]
@@ -314,7 +314,12 @@ def _threshold_layers(volume: np.ndarray, keys, modality=None, notes=None) -> li
                 threshold = float(threshold_otsu(np.maximum(volume, _CT_MIN_HU) if ct else volume))
             else:
                 threshold = info["threshold_hu"]
-            mask = volume >= threshold if info["mode"] == "min" else volume > threshold
+            if info["mode"] == "range":
+                mask = volume >= threshold
+                if info["max_hu"] is not None:
+                    mask &= volume <= info["max_hu"]
+            else:
+                mask = volume >= threshold if info["mode"] == "min" else volume > threshold
             if key == "contrast" and "bone" in keys:
                 # Bone (plus one voxel of partial-volume rim) belongs to the Bone layer only.
                 mask &= ~ndimage.binary_dilation(mask_for("bone"))
@@ -335,8 +340,8 @@ def _threshold_layers(volume: np.ndarray, keys, modality=None, notes=None) -> li
 
     return [
         LayerSource(
-            name=MEDICAL_PRESETS[k]["label"],
-            color=MEDICAL_PRESETS[k]["color"],
+            name=preset_info(k)["label"],
+            color=preset_info(k)["color"],
             load=lambda k=k: mask_for(k),
             public_name=True,
         )

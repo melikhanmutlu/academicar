@@ -81,14 +81,63 @@ class MedicalError(Exception):
     """A user-facing problem with the uploaded scan. The message is shown as-is."""
 
 
+# A user-chosen CT threshold: "custom:<min HU>" or "custom:<min HU>:<max HU>".
+CUSTOM_PRESET = "custom"
+CUSTOM_HU_MIN = -1024
+CUSTOM_HU_MAX = 4000
+CUSTOM_COLOR = "#7FB3D5"
+
+
+def parse_custom_preset(key: str) -> tuple[int, int | None] | None:
+    """(min, max or None) of a "custom:..." key, or None when it is not a valid one."""
+    parts = str(key).split(":")
+    if parts[0] != CUSTOM_PRESET or len(parts) not in (2, 3):
+        return None
+    try:
+        low = int(parts[1])
+        high = int(parts[2]) if len(parts) == 3 else None
+    except ValueError:
+        return None
+    if not CUSTOM_HU_MIN <= low <= CUSTOM_HU_MAX:
+        return None
+    if high is not None and not low < high <= CUSTOM_HU_MAX:
+        return None
+    return low, high
+
+
+def custom_preset_key(low: int, high: int | None = None) -> str:
+    return f"{CUSTOM_PRESET}:{low}" + (f":{high}" if high is not None else "")
+
+
+def preset_info(key: str) -> dict:
+    """The MEDICAL_PRESETS entry for a key, or one built for a "custom:..." key."""
+    if key in MEDICAL_PRESETS:
+        return MEDICAL_PRESETS[key]
+    bounds = parse_custom_preset(key)
+    if bounds is None:
+        raise MedicalError("Unknown preset.")
+    low, high = bounds
+    shown = f"{low} to {high} HU" if high is not None else f"{low} HU and above"
+    return {
+        "label": f"Custom ({shown})",
+        "description": f"User-chosen CT threshold ({shown}).",
+        "color": CUSTOM_COLOR,
+        "modality": "CT",
+        "threshold_hu": low,
+        "max_hu": high,
+        "mode": "range",
+    }
+
+
 def parse_presets(value) -> list[str]:
-    """Preset keys from a comma-separated string ("bone,skin"); empty -> ["auto"], duplicates dropped."""
+    """Preset keys from a comma-separated string ("bone,skin" or "bone,custom:300:900");
+    empty -> ["auto"], duplicates dropped."""
     keys: list[str] = []
     for part in str(value or "").split(","):
         key = part.strip().lower()
         if key and key not in keys:
             keys.append(key)
-    if any(k not in MEDICAL_PRESETS for k in keys):
+    if any(k not in MEDICAL_PRESETS and parse_custom_preset(k) is None for k in keys):
         raise MedicalError("Unknown preset.")
     return keys or ["auto"]
 

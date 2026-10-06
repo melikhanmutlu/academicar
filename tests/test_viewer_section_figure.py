@@ -1,4 +1,5 @@
-"""Section plane and publication-figure export: paid-plan viewer controls and the scene QR image."""
+"""Section plane and publication-figure export: plan-gated viewer controls and the scene QR image."""
+from tests.plan_helpers import set_plan_features
 from tests.test_scenes import _make_model, _scene_public_id
 
 
@@ -6,16 +7,27 @@ def _html(client, mid, query=""):
     return client.get(f"/view/{mid}{query}").get_data(as_text=True)
 
 
-def test_section_and_figure_controls_render_only_on_paid_plans(app, client):
+def test_section_and_figure_controls_follow_the_plan(app, client):
     paid_id, _ = _make_model(app, plan="academic")
     html = _html(client, paid_id)
-    assert 'id="sectionBtn"' in html and 'id="sectionPanel"' in html
+    assert 'id="sectionBtn"' in html and 'id="sectionPanel"' in html and 'class="slice-view"' in html
     assert "data-export-figure disabled" in html and 'id="figureModal"' in html
     assert 'id="sectionBtn"' in _html(client, paid_id, "?embed=true")
 
+    # Free has the section plane and slice view, not figure export.
     free_id, _ = _make_model(app, plan="free", email="free@example.com")
     free_html = _html(client, free_id)
-    for marker in ('id="sectionBtn"', 'id="sectionPanel"', "data-export-figure disabled", 'id="figureModal"'):
+    assert 'id="sectionBtn"' in free_html and 'class="slice-view"' in free_html
+    for marker in ("data-export-figure disabled", 'id="figureModal"'):
+        assert marker not in free_html, marker
+
+    # Features an admin turns off on /admin/pricing disappear from the viewer.
+    set_plan_features(app, "free", remove={"slice_view"})
+    free_html = _html(client, free_id)
+    assert 'id="sectionPanel"' in free_html and 'class="slice-view"' not in free_html
+    set_plan_features(app, "free", remove={"section_plane"})
+    free_html = _html(client, free_id)
+    for marker in ('id="sectionBtn"', 'id="sectionPanel"', 'id="sectionOverlay"'):
         assert marker not in free_html, marker
     assert 'id="sectionBtn"' not in _html(client, free_id, "?embed=true")
 
@@ -31,6 +43,7 @@ def test_scene_qr_image_is_the_scene_link_and_scoped_to_its_model(app, client):
     # A scene of another model falls back to that model's own QR rather than leaking the scene link.
     assert client.get(f"/qr-image/{other_id}?scene={scene_id}").data == client.get(f"/qr-image/{other_id}").data
 
+    set_plan_features(app, "free", remove={"scenes"})
     free_id, _ = _make_model(app, plan="free", email="free2@example.com")
     free_scene, _ = _scene_public_id(app, free_id)
     assert client.get(f"/qr-image/{free_id}?scene={free_scene}").data == client.get(f"/qr-image/{free_id}").data

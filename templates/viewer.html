@@ -1168,7 +1168,7 @@
     .viewer-control-panel[data-collapsed="true"] #panelChevron {
       transform: rotate(180deg);
     }
-    /* Section plane panel + publication figure export (paid plans). */
+    /* Section plane panel + publication figure export (plan features: section_plane, slice_view, figure_export). */
     #sectionBtn[hidden] { display: none; }
     #sectionBtn.is-active {
       background: #ff682c !important;
@@ -1192,6 +1192,46 @@
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .section-axes button[aria-pressed="true"] { color: #fff; background: #ff682c; border-color: #ff682c; }
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .section-pos { color: #6b6b6b; }
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .section-readout { color: #202020; }
+    /* Section guides over the 3D view: the cut plane's frame and the model's axes. */
+    .section-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 11; overflow: visible; }
+    .section-overlay[hidden] { display: none; }
+    .section-overlay polygon { stroke-width: 2; stroke-linejoin: round; fill-opacity: 0.08; }
+    .section-overlay line { stroke-width: 1.5; stroke-opacity: 0.85; }
+    .section-overlay line.is-cut-axis { stroke-width: 2.5; stroke-opacity: 1; }
+    .section-overlay text { font: 700 12px Inter, system-ui, sans-serif; paint-order: stroke; stroke: rgba(0, 0, 0, 0.65); stroke-width: 3px; }
+    .tour-mode .section-overlay { display: none !important; }
+    /* 2D slice view (Slicer-like): the cross-section at the plane, with its own measure tool. */
+    .section-panel { overflow-y: auto; }
+    .section-panel.is-wide { width: min(48vw, 720px); }
+    .slice-view { margin: 12px 14px 0; }
+    .slice-view[hidden] { display: none; }
+    .slice-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+    .slice-title { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.6); }
+    .slice-actions { display: flex; gap: 6px; }
+    .slice-actions button { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; color: #fff; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.14); }
+    .slice-actions button:hover { background: rgba(255, 255, 255, 0.18); }
+    .slice-actions button[aria-pressed="true"] { background: #ff682c; border-color: #ff682c; }
+    .slice-stage { position: relative; border-radius: 10px; overflow: hidden; border: 2px solid rgba(255, 255, 255, 0.2); background: #0b0b0b; }
+    .slice-stage canvas { display: block; width: 100%; aspect-ratio: 1 / 1; max-height: 52vh; touch-action: none; cursor: grab; }
+    .slice-stage.is-measuring canvas { cursor: crosshair; }
+    .slice-orient { position: absolute; font-size: 11px; font-weight: 700; color: rgba(255, 255, 255, 0.75); pointer-events: none; }
+    .slice-orient.is-left { left: 6px; top: 50%; transform: translateY(-50%); }
+    .slice-orient.is-right { right: 6px; top: 50%; transform: translateY(-50%); }
+    .slice-orient.is-top { top: 4px; left: 50%; transform: translateX(-50%); }
+    .slice-orient.is-bottom { bottom: 4px; left: 50%; transform: translateX(-50%); }
+    .slice-readout { margin: 6px 0 0; font-size: 12.5px; font-weight: 600; color: #fff; min-height: 1em; }
+    .slice-readout .is-distance { color: #ff9a6c; }
+    .slice-hint { margin: 2px 0 0; font-size: 11.5px; color: rgba(255, 255, 255, 0.5); }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .slice-title,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .slice-hint { color: #6b6b6b; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .slice-readout { color: #202020; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .slice-readout .is-distance { color: #c2410c; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .slice-actions button { color: #202020; background: #f5f5f5; border-color: #e8e8e8; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .slice-actions button[aria-pressed="true"] { color: #fff; background: #ff682c; border-color: #ff682c; }
+    @media (max-width: 640px) {
+      .section-panel.is-wide { width: auto; }
+      .slice-stage canvas { max-height: 30vh; }
+    }
     #figureModal:not(.hidden) { display: flex; align-items: center; justify-content: center; }
     .fig-layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 1rem; }
     .fig-options { min-width: 0; font-size: 0.78rem; color: rgba(255, 255, 255, 0.8); }
@@ -1223,7 +1263,7 @@
 </head>
 <body class="bg-[#050505] text-white min-h-screen overflow-hidden max-w-[100vw]">
   {% set viewer_features = get_license_plan(model.license_type).features %}
-  {# Saved scenes (paid plans): readers see them, editors also manage them (not inside an embed). #}
+  {# Saved scenes (plan feature "scenes"): readers see them, editors also manage them (not inside an embed). #}
   {% set viewer_scenes = (scenes or []) if (scenes is defined and 'scenes' in viewer_features) else [] %}
   {% set scenes_edit = is_owner and 'scenes' in viewer_features and not is_embed %}
   {% set show_scenes = viewer_scenes or scenes_edit %}
@@ -1290,6 +1330,7 @@
       {% endif %}
     </model-viewer>
     <svg class="measure-line" id="measureLine" aria-hidden="true" hidden><line x1="0" y1="0" x2="0" y2="0"></line></svg>
+    {% if 'section_plane' in viewer_features %}<svg class="section-overlay" id="sectionOverlay" aria-hidden="true" hidden><g data-section-axes-lines></g><polygon data-section-frame points=""></polygon></svg>{% endif %}
     {% if viewer_metrics and viewer_metrics.pairs %}<svg class="measure-line layers-dist-line" id="distLine" aria-hidden="true" hidden><line x1="0" y1="0" x2="0" y2="0"></line></svg>{% endif %}
     <div id="measureHint" class="annotate-hint" role="status" hidden>
       <span class="annotate-hint-dot" aria-hidden="true"></span>
@@ -1734,6 +1775,30 @@
           <span class="section-readout" data-section-readout>Choose an axis to cut the model.</span>
         </label>
       </div>
+      {% if 'slice_view' in viewer_features %}
+      <div class="slice-view" data-slice-view hidden>
+        <div class="slice-toolbar">
+          <span class="slice-title" data-slice-title>Slice</span>
+          <div class="slice-actions">
+            <button type="button" data-slice-measure aria-pressed="false" title="Measure a distance on this slice">Measure</button>
+            <button type="button" data-slice-fit title="Fit the slice to the view (or double-click it)">Fit</button>
+            <button type="button" data-slice-wide aria-pressed="false" aria-label="Enlarge the slice view" title="Enlarge">⤢</button>
+          </div>
+        </div>
+        <div class="slice-stage" data-slice-stage>
+          <canvas data-slice-canvas role="img" aria-label="Cross-section of the model at the section plane"></canvas>
+          <span class="slice-orient is-left" data-slice-orient="left"></span>
+          <span class="slice-orient is-right" data-slice-orient="right"></span>
+          <span class="slice-orient is-top" data-slice-orient="top"></span>
+          <span class="slice-orient is-bottom" data-slice-orient="bottom"></span>
+        </div>
+        <p class="slice-readout" data-slice-readout></p>
+        <p class="slice-hint" data-slice-hint>Scroll to zoom, drag to pan.</p>
+      </div>
+      {% endif %}
+      {% if scenes_edit and 'scene_ar' in viewer_features and 'ar' in viewer_features %}
+      <div class="scene-foot"><button type="button" data-section-save-scene title="Saves the cut, hidden layers and colours as a scene; its AR file is prepared in a minute">Save this view for AR</button></div>
+      {% endif %}
       <p class="layers-note">{% if is_medical_model %}Planes follow the scan's patient orientation. For education and presentation only — not for diagnosis.{% else %}Cuts the model along a plane in its own axes; interior faces stay visible.{% endif %}</p>
     </section>
     {% endif %}
@@ -2356,6 +2421,7 @@
           });
           if (typeof viewer.queueRender === 'function') viewer.queueRender();
         } catch (e) { /* internals differ: material alpha still hides the layer */ }
+        viewer.dispatchEvent(new CustomEvent('viewer-layers-change'));
       };
       const apply = (i, syncLayers = true) => {
         const entries = resolveMaterials()?.[i] || [];
@@ -2423,7 +2489,7 @@
         const swatchInput = row.querySelector('.layer-swatch');
         swatchInput.value = /^#[0-9a-f]{6}$/i.test(layer.color || '') ? layer.color.toLowerCase() : '#cccccc';
         swatchInput.setAttribute('aria-label', `Colour of ${layer.name}`);
-        swatchInput.addEventListener('input', () => setLayerColor(i, swatchInput.value));
+        swatchInput.addEventListener('input', () => { leaveScene(); setLayerColor(i, swatchInput.value); });
         row.querySelector('.layer-opacity').setAttribute('aria-label', `Opacity of ${layer.name}`);
         // A hand edit leaves the saved scene: AR then opens the full model, not
         // that scene's variant, which would no longer match what is on screen.
@@ -2460,15 +2526,26 @@
       // save it, which rewrites those materials in the GLB (and its AR file)
       // through the layer editor, the same as the model page. ---
       const pendingColors = new Map();
+      // Per layer, the colour shown when it differs from the saved one (a
+      // preview or a saved scene's colour): part of the view state, so a scene
+      // and its AR variant keep it.
+      const viewColors = layerData.map(() => null);
       const saveBox = layersPanel.querySelector('[data-layers-save]');
       const srgbToLinear = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
-      const setLayerColor = (i, hex) => {
+      const paintLayer = (i, hex) => {
         const linear = [1, 3, 5].map((k) => srgbToLinear(parseInt(hex.slice(k, k + 2), 16) / 255));
         (resolveMaterials()?.[i] || []).forEach((entry) => {
           const pbr = entry.material.pbrMetallicRoughness;
           entry.factor = [...linear, entry.factor[3]]; // what showing / un-fading the layer restores
           pbr.setBaseColorFactor([...linear, pbr.baseColorFactor[3]]);
         });
+        const swatch = list.children[i]?.querySelector('.layer-swatch');
+        if (swatch && !swatch.disabled) swatch.value = hex;
+        if (layerData[i].color) viewColors[i] = hex.toLowerCase() === layerData[i].color.toLowerCase() ? null : hex.toLowerCase();
+        viewer.dispatchEvent(new CustomEvent('viewer-layers-change'));
+      };
+      const setLayerColor = (i, hex) => {
+        paintLayer(i, hex);
         if (saveBox && layerData[i].color) {
           pendingColors.set(i, hex);
           saveBox.hidden = false;
@@ -2494,7 +2571,7 @@
             });
             const result = await response.json().catch(() => ({}));
             if (!response.ok || !result.ok) throw new Error(result.message || 'The colours could not be saved.');
-            pendingColors.forEach((hex, i) => { layerData[i].color = hex; });
+            pendingColors.forEach((hex, i) => { layerData[i].color = hex; viewColors[i] = null; });
             pendingColors.clear();
             saveStatus.textContent = 'Colours saved. The AR file updates in a minute.';
           } catch (error) {
@@ -2621,14 +2698,19 @@
         list.querySelectorAll('.layer-opacity').forEach((input) => { input.value = 100; });
         applyAll();
       });
-      const onLoad = () => { mats = null; resolveMaterials(); refreshSwatches(); applyAll(); };
+      const applyViewColors = () => viewColors.forEach((hex, i) => { if (hex) paintLayer(i, hex); });
+      const onLoad = () => { mats = null; resolveMaterials(); refreshSwatches(); applyViewColors(); applyAll(); };
       if (viewer.loaded) onLoad();
       viewer.addEventListener('load', onLoad);
       // Keyed by layer name so a saved view survives a model replacement that
       // keeps the part names; layers it does not mention are shown.
       window.viewerView.register('layers', {
         get: () => Object.fromEntries(layerData.map((layer, i) => [
-          layer.name, { visible: state[i].visible, opacity: Math.round(state[i].opacity * 100) / 100 },
+          layer.name, {
+            visible: state[i].visible,
+            opacity: Math.round(state[i].opacity * 100) / 100,
+            ...(viewColors[i] ? { color: viewColors[i] } : {}),
+          },
         ])),
         apply: (saved) => {
           layerData.forEach((layer, i) => {
@@ -2638,6 +2720,11 @@
             state[i].opacity = Number.isFinite(opacity) ? Math.min(1, Math.max(0, opacity)) : 1;
             const input = list.children[i]?.querySelector('.layer-opacity');
             if (input) input.value = Math.round(state[i].opacity * 100);
+            // A scene's own colour, or back to the saved colour (unless an unsaved edit is pending).
+            if (!layer.color || pendingColors.has(i)) return;
+            const color = /^#[0-9a-f]{6}$/i.test(entry?.color || '') ? entry.color.toLowerCase() : null;
+            if (viewer.loaded && mats) paintLayer(i, color || layer.color);
+            else viewColors[i] = color && color !== layer.color.toLowerCase() ? color : null;
           });
           if (viewer.loaded) applyAll(); // otherwise onLoad applies the new state
         },
@@ -4499,7 +4586,7 @@
       }
     }
 
-    // --- Section plane (paid plans). One clipping plane through model-viewer's
+    // --- Section plane (plan feature "section_plane"). One clipping plane through model-viewer's
     // three.js materials: renderer.localClippingEnabled + material.clippingPlanes
     // (a duck-typed { normal, constant } in WORLD space, because THREE.Plane is
     // not exported). The plane is defined in the model's own space (the first
@@ -4542,7 +4629,8 @@
       const patchedMeshes = new Set();
       let section = null; // { axis: 'x'|'y'|'z', offset: metres from the model-space bbox centre, flip }
       let pendingSection; // a saved section that arrived before the model was ready
-      let sectionCtx = null; // { three, root, meshes, Vec3, scratchP, scratchN, min, max, centre }
+      let sectionCtx = null; // { three, root, meshes, Vec3, Mat4, scratchP, scratchN, min, max, centre }
+      let onSectionChanged = () => {}; // the guides and the slice view (below) follow every change
 
       const prepareSection = () => {
         try {
@@ -4582,7 +4670,7 @@
           if (!min.every(Number.isFinite) || !max.every(Number.isFinite)) return null;
           plane.normal = plane.normal || new Vec3(0, 1, 0);
           return {
-            three, root, meshes, Vec3, min, max,
+            three, root, meshes, Vec3, Mat4, min, max,
             centre: min.map((value, i) => (value + max[i]) / 2),
             scratchP: new Vec3(), scratchN: new Vec3(),
           };
@@ -4674,6 +4762,7 @@
         }
         syncSectionUi();
         requestViewerRender();
+        onSectionChanged();
       };
 
       SECTION_AXES.forEach(([axis, label]) => {
@@ -4696,6 +4785,14 @@
       flipBtn.addEventListener('click', () => { if (section) setSection({ ...section, flip: !section.flip }); });
       offBtn.addEventListener('click', () => setSection(null));
       sectionPanel.querySelector('[data-section-close]').addEventListener('click', () => setSectionOpen(false));
+      // Shortcut to Scenes > "Save this view": the scene keeps the cut, and its AR file is cut the same way.
+      sectionPanel.querySelector('[data-section-save-scene]')?.addEventListener('click', () => {
+        const scenesToggle = document.getElementById('scenesBtn');
+        const saveView = document.querySelector('#scenesPanel [data-scene-save-view]');
+        if (!scenesToggle || !saveView) return;
+        if (scenesToggle.getAttribute('aria-expanded') !== 'true') scenesToggle.click();
+        saveView.click();
+      });
 
       // One corner panel at a time (Scenes / Layers sit in the same place).
       const otherPanelToggles = ['scenesBtn', 'layersBtn'].map((id) => document.getElementById(id)).filter(Boolean);
@@ -4703,9 +4800,472 @@
         if (open) otherPanelToggles.forEach((toggle) => { if (toggle.getAttribute('aria-expanded') === 'true') toggle.click(); });
         sectionPanel.hidden = !open;
         sectionBtn.setAttribute('aria-expanded', String(open));
+        onSectionChanged();
       };
       sectionBtn.addEventListener('click', () => setSectionOpen(sectionPanel.hidden));
       otherPanelToggles.forEach((toggle) => toggle.addEventListener('click', () => { if (!sectionPanel.hidden) setSectionOpen(false); }));
+
+
+      // --- Section guides and the 2D slice view (while the panel is open).
+      // Guides: the cut plane's frame and the model's axes, drawn as an SVG
+      // over the 3D view (projected with model-viewer's camera every frame, so
+      // they never end up in screenshots or figures). Slice view: the
+      // cross-section of the visible layers at the same plane, computed from
+      // the meshes' triangles (no volume data is kept), drawn on a canvas in
+      // each layer's colour, with zoom / pan and a two-point measure that
+      // snaps to the contours. Colours follow Slicer for scans (axial red,
+      // coronal green, sagittal yellow) and X red / Y green / Z blue otherwise.
+      const PLANE_COLORS = isMedicalScan
+        ? { x: '#e5b800', y: '#e5484d', z: '#30a46c' }
+        : { x: '#e5484d', y: '#30a46c', z: '#3e63dd' };
+      // Axis end labels [negative, positive]; scans: glTF X = left, Y = superior, Z = anterior.
+      const AXIS_ENDS = isMedicalScan
+        ? { x: ['R', 'L'], y: ['I', 'S'], z: ['P', 'A'] }
+        : { x: ['−X', '+X'], y: ['−Y', '+Y'], z: ['−Z', '+Z'] };
+      // How each cut is laid out on screen: [axis, sign] to the right and up.
+      // Scans use the radiological convention (patient right on the left,
+      // anterior up in axial, anterior on the left in sagittal).
+      const SLICE_LAYOUT = isMedicalScan
+        ? { y: { h: ['x', 1], v: ['z', 1] }, z: { h: ['x', 1], v: ['y', 1] }, x: { h: ['z', -1], v: ['y', 1] } }
+        : { x: { h: ['z', -1], v: ['y', 1] }, y: { h: ['x', 1], v: ['z', -1] }, z: { h: ['x', 1], v: ['y', 1] } };
+      const overlay = document.getElementById('sectionOverlay');
+      const sliceView = sectionPanel.querySelector('[data-slice-view]');
+      const guidesOn = () => !!(section && sectionCtx && !sectionPanel.hidden);
+      let guidesFrame = 0;
+      const drawGuides = () => {
+        guidesFrame = 0;
+        if (!overlay) return;
+        let camera = null;
+        try {
+          const scene = viewerInternals.getScene();
+          camera = scene && typeof scene.getCamera === 'function' ? scene.getCamera() : null;
+        } catch (e) { camera = null; }
+        if (!guidesOn() || !camera) { overlay.setAttribute('hidden', ''); return; }
+        const { root, min, max, centre, Vec3 } = sectionCtx;
+        const rect = overlay.getBoundingClientRect();
+        root.updateMatrixWorld();
+        camera.updateMatrixWorld();
+        const project = (p) => {
+          const v = new Vec3(p[0], p[1], p[2]).applyMatrix4(root.matrixWorld).project(camera);
+          return { x: ((v.x + 1) / 2) * rect.width, y: ((1 - v.y) / 2) * rect.height, ok: v.z > -1 && v.z < 1 };
+        };
+        const i = AXIS_INDEX[section.axis];
+        const [a, b] = [0, 1, 2].filter((k) => k !== i);
+        const grow = (k, value) => value + Math.sign(value - centre[k]) * (max[k] - min[k]) * 0.06;
+        const corners = [[min[a], min[b]], [max[a], min[b]], [max[a], max[b]], [min[a], max[b]]].map(([ua, ub]) => {
+          const p = [0, 0, 0];
+          p[i] = centre[i] + section.offset;
+          p[a] = grow(a, ua);
+          p[b] = grow(b, ub);
+          return project(p);
+        });
+        const frame = overlay.querySelector('[data-section-frame]');
+        const color = PLANE_COLORS[section.axis];
+        frame.setAttribute('points', corners.every((c) => c.ok) ? corners.map((c) => `${c.x},${c.y}`).join(' ') : '');
+        frame.style.stroke = color;
+        frame.style.fill = color;
+        const NS = 'http://www.w3.org/2000/svg';
+        const lines = overlay.querySelector('[data-section-axes-lines]');
+        lines.textContent = '';
+        Object.keys(AXIS_INDEX).forEach((axis) => {
+          const k = AXIS_INDEX[axis];
+          const ends = [min[k], max[k]].map((value) => {
+            const p = centre.slice();
+            p[k] = value + Math.sign(value - centre[k]) * (max[k] - min[k]) * 0.15;
+            return project(p);
+          });
+          if (!ends.every((end) => end.ok)) return;
+          const line = document.createElementNS(NS, 'line');
+          line.setAttribute('x1', ends[0].x); line.setAttribute('y1', ends[0].y);
+          line.setAttribute('x2', ends[1].x); line.setAttribute('y2', ends[1].y);
+          line.style.stroke = PLANE_COLORS[axis];
+          if (axis === section.axis) line.classList.add('is-cut-axis');
+          lines.appendChild(line);
+          ends.forEach((end, j) => {
+            const label = document.createElementNS(NS, 'text');
+            label.setAttribute('x', end.x); label.setAttribute('y', end.y);
+            label.setAttribute('text-anchor', 'middle');
+            label.setAttribute('dominant-baseline', 'middle');
+            label.style.fill = PLANE_COLORS[axis];
+            label.textContent = AXIS_ENDS[axis][j];
+            lines.appendChild(label);
+          });
+        });
+        overlay.removeAttribute('hidden');
+        guidesFrame = requestAnimationFrame(drawGuides); // follows orbit, zoom and the orientation sliders
+      };
+      const startGuides = () => {
+        if (!guidesFrame) guidesFrame = requestAnimationFrame(drawGuides);
+      };
+
+      // Root-space positions per mesh (computed once per load; meshes do not
+      // move inside the model root, the orientation sliders turn the root).
+      const meshPositions = new WeakMap();
+      const rootPositions = (mesh) => {
+        let data = meshPositions.get(mesh);
+        if (data) return data;
+        const { root, Vec3, Mat4 } = sectionCtx;
+        root.updateMatrixWorld(true);
+        const matrix = new Mat4().copy(root.matrixWorld).invert().multiply(mesh.matrixWorld);
+        const attribute = mesh.geometry.attributes.position;
+        const pos = new Float32Array(attribute.count * 3);
+        const lo = [Infinity, Infinity, Infinity];
+        const hi = [-Infinity, -Infinity, -Infinity];
+        const v = new Vec3();
+        for (let k = 0; k < attribute.count; k += 1) {
+          v.fromBufferAttribute(attribute, k).applyMatrix4(matrix);
+          pos[k * 3] = v.x; pos[k * 3 + 1] = v.y; pos[k * 3 + 2] = v.z;
+          if (v.x < lo[0]) lo[0] = v.x; if (v.x > hi[0]) hi[0] = v.x;
+          if (v.y < lo[1]) lo[1] = v.y; if (v.y > hi[1]) hi[1] = v.y;
+          if (v.z < lo[2]) lo[2] = v.z; if (v.z > hi[2]) hi[2] = v.z;
+        }
+        data = { pos, index: mesh.geometry.index ? mesh.geometry.index.array : null, count: attribute.count, lo, hi };
+        meshPositions.set(mesh, data);
+        return data;
+      };
+      // Plane-triangle intersections of every visible mesh, as 2D segments
+      // [u1, v1, u2, v2, ...] in metres (u right, v up), grouped per material.
+      const computeSlice = () => {
+        const i = AXIS_INDEX[section.axis];
+        const layout = SLICE_LAYOUT[section.axis];
+        const h = AXIS_INDEX[layout.h[0]]; const hs = layout.h[1];
+        const w = AXIS_INDEX[layout.v[0]]; const ws = layout.v[1];
+        const c = sectionCtx.centre[i] + section.offset;
+        const groups = new Map();
+        sectionCtx.meshes.forEach((mesh) => {
+          const material = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+          if (!material || !mesh.visible || !mesh.layers.isEnabled(0) || material.opacity <= 0.01) return; // hidden layer
+          const data = rootPositions(mesh);
+          if (c < data.lo[i] || c > data.hi[i]) return;
+          const key = material.uuid || material.name;
+          if (!groups.has(key)) {
+            let color = '#cccccc';
+            try { if (material.color) color = `#${material.color.getHexString()}`; } catch (e) { /* keep grey */ }
+            groups.set(key, { name: material.name || '', color, segs: [] });
+          }
+          const segs = groups.get(key).segs;
+          const { pos, index } = data;
+          const triangles = index ? Math.floor(index.length / 3) : Math.floor(data.count / 3);
+          const cross = (p, q, dp, dq) => {
+            const t = dp / (dp - dq);
+            segs.push(hs * (pos[p + h] + t * (pos[q + h] - pos[p + h])), ws * (pos[p + w] + t * (pos[q + w] - pos[p + w])));
+          };
+          for (let t = 0; t < triangles; t += 1) {
+            const a = (index ? index[t * 3] : t * 3) * 3;
+            const b = (index ? index[t * 3 + 1] : t * 3 + 1) * 3;
+            const d = (index ? index[t * 3 + 2] : t * 3 + 2) * 3;
+            const da = pos[a + i] - c; const db = pos[b + i] - c; const dd = pos[d + i] - c;
+            const sa = da >= 0; const sb = db >= 0; const sd = dd >= 0;
+            if (sa === sb && sb === sd) continue;
+            if (sa !== sb) cross(a, b, da, db);
+            if (sb !== sd) cross(b, d, db, dd);
+            if (sd !== sa) cross(d, a, dd, da);
+          }
+        });
+        // Join segments into loops (filled) and open chains (outlined only).
+        const span = Math.max(...sectionCtx.max.map((value, k) => value - sectionCtx.min[k])) || 1;
+        const eps = span * 1e-5;
+        const out = [];
+        groups.forEach((group) => {
+          const segs = group.segs;
+          const n = segs.length / 4;
+          if (!n) return;
+          const keyOf = (u, v) => `${Math.round(u / eps)},${Math.round(v / eps)}`;
+          const at = new Map();
+          for (let k = 0; k < n; k += 1) {
+            [0, 2].forEach((end) => {
+              const key = keyOf(segs[k * 4 + end], segs[k * 4 + end + 1]);
+              if (!at.has(key)) at.set(key, []);
+              at.get(key).push(k);
+            });
+          }
+          const used = new Uint8Array(n);
+          const loops = [];
+          const open = [];
+          for (let start = 0; start < n; start += 1) {
+            if (used[start]) continue;
+            used[start] = 1;
+            const chain = [segs[start * 4], segs[start * 4 + 1], segs[start * 4 + 2], segs[start * 4 + 3]];
+            const startKey = keyOf(chain[0], chain[1]);
+            let closed = false;
+            for (;;) {
+              const tail = keyOf(chain[chain.length - 2], chain[chain.length - 1]);
+              if (tail === startKey && chain.length > 4) { closed = true; break; }
+              const next = (at.get(tail) || []).find((k) => !used[k]);
+              if (next === undefined) break;
+              used[next] = 1;
+              const forward = keyOf(segs[next * 4], segs[next * 4 + 1]) === tail;
+              chain.push(forward ? segs[next * 4 + 2] : segs[next * 4], forward ? segs[next * 4 + 3] : segs[next * 4 + 1]);
+            }
+            (closed ? loops : open).push(chain);
+          }
+          out.push({ name: group.name, color: group.color, segs, loops, open });
+        });
+        return out;
+      };
+
+      const sliceCanvas = sliceView && sliceView.querySelector('[data-slice-canvas]');
+      const sliceStage = sliceView && sliceView.querySelector('[data-slice-stage]');
+      const sliceReadout = sliceView && sliceView.querySelector('[data-slice-readout]');
+      const sliceMeasureBtn = sliceView && sliceView.querySelector('[data-slice-measure]');
+      const sliceWideBtn = sliceView && sliceView.querySelector('[data-slice-wide]');
+      const sliceHint = sliceView && sliceView.querySelector('[data-slice-hint]');
+      let slice = null; // computeSlice() result for sliceKey
+      let sliceKey = '';
+      let sliceZoom = 1;
+      let slicePan = [0, 0]; // metres, added to the view centre
+      let sliceMeasuring = false;
+      let slicePoints = []; // [[u, v], ...] in metres
+      let sliceHover = null; // { u, v, snapped }
+      let sliceFrame = 0;
+      const formatSliceLength = (metres) => {
+        const mm = metres * 1000;
+        return mm < 100 ? `${mm.toFixed(1)} mm` : `${(mm / 10).toFixed(1)} cm`;
+      };
+      const sliceBounds = () => {
+        // The model's extent in the slice's two axes, so the scale stays put while scrolling.
+        const layout = SLICE_LAYOUT[section.axis];
+        return ['h', 'v'].map((dim) => {
+          const [axis, sign] = layout[dim];
+          const k = AXIS_INDEX[axis];
+          const ends = [sectionCtx.min[k] * sign, sectionCtx.max[k] * sign];
+          return [Math.min(...ends), Math.max(...ends)];
+        });
+      };
+      const sliceTransform = () => {
+        const dpr = window.devicePixelRatio || 1;
+        const width = sliceCanvas.width / dpr;
+        const height = sliceCanvas.height / dpr;
+        const [[u0, u1], [v0, v1]] = sliceBounds();
+        const fit = Math.min(width / ((u1 - u0) || 1e-3), height / ((v1 - v0) || 1e-3)) * 0.86;
+        const scale = fit * sliceZoom;
+        const cu = (u0 + u1) / 2 + slicePan[0];
+        const cv = (v0 + v1) / 2 + slicePan[1];
+        return {
+          scale, width, height,
+          toX: (u) => width / 2 + (u - cu) * scale,
+          toY: (v) => height / 2 - (v - cv) * scale,
+          toU: (x) => cu + (x - width / 2) / scale,
+          toV: (y) => cv - (y - height / 2) / scale,
+        };
+      };
+      const snapPoint = (u, v, tf) => {
+        // Nearest point on any contour within 10 px, else the point itself.
+        let best = null;
+        let bestD = (10 / tf.scale) ** 2;
+        (slice || []).forEach(({ segs }) => {
+          for (let k = 0; k < segs.length; k += 4) {
+            const ax = segs[k]; const ay = segs[k + 1];
+            const dx = segs[k + 2] - ax; const dy = segs[k + 3] - ay;
+            const len = dx * dx + dy * dy;
+            const t = len ? Math.min(1, Math.max(0, ((u - ax) * dx + (v - ay) * dy) / len)) : 0;
+            const px = ax + t * dx; const py = ay + t * dy;
+            const d = (px - u) ** 2 + (py - v) ** 2;
+            if (d < bestD) { bestD = d; best = [px, py]; }
+          }
+        });
+        return best ? { u: best[0], v: best[1], snapped: true } : { u, v, snapped: false };
+      };
+      const drawSlice = () => {
+        sliceFrame = 0;
+        if (!sliceCanvas || !section || !sectionCtx || sliceView.hidden) return;
+        const key = `${section.axis}|${section.offset}`;
+        if (!slice || key !== sliceKey) {
+          if (key !== sliceKey) slicePoints = [];
+          try { slice = computeSlice(); } catch (e) { slice = []; }
+          sliceKey = key;
+        }
+        const dpr = window.devicePixelRatio || 1;
+        const box = sliceCanvas.getBoundingClientRect();
+        if (!box.width || !box.height) return;
+        const w = Math.round(box.width * dpr); const hgt = Math.round(box.height * dpr);
+        if (sliceCanvas.width !== w || sliceCanvas.height !== hgt) { sliceCanvas.width = w; sliceCanvas.height = hgt; }
+        const ctx = sliceCanvas.getContext('2d');
+        const tf = sliceTransform();
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.fillStyle = '#0b0b0b';
+        ctx.fillRect(0, 0, tf.width, tf.height);
+        const trace = (chain, close) => {
+          ctx.moveTo(tf.toX(chain[0]), tf.toY(chain[1]));
+          for (let k = 2; k < chain.length; k += 2) ctx.lineTo(tf.toX(chain[k]), tf.toY(chain[k + 1]));
+          if (close) ctx.closePath();
+        };
+        slice.forEach((group) => {
+          ctx.beginPath();
+          group.loops.forEach((chain) => trace(chain, true));
+          ctx.globalAlpha = 0.5;
+          ctx.fillStyle = group.color;
+          ctx.fill('evenodd');
+          ctx.globalAlpha = 1;
+          group.open.forEach((chain) => trace(chain, false));
+          ctx.strokeStyle = group.color;
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        });
+        // Scale bar: a round length about a fifth of the view wide.
+        const target = (tf.width / 5) / tf.scale;
+        const magnitude = 10 ** Math.floor(Math.log10(target));
+        const length = [5, 2, 1].map((m) => m * magnitude).find((value) => value <= target) || magnitude;
+        const barX = 12; const barY = tf.height - 14;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(barX, barY - 4); ctx.lineTo(barX, barY); ctx.lineTo(barX + length * tf.scale, barY); ctx.lineTo(barX + length * tf.scale, barY - 4);
+        ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '600 11px Inter, system-ui, sans-serif';
+        ctx.fillText(formatSliceLength(length), barX, barY - 8);
+        // Measurement: the points placed so far, the hover preview and the distance.
+        const pts = slicePoints.slice();
+        if (sliceMeasuring && sliceHover && pts.length === 1) pts.push([sliceHover.u, sliceHover.v]);
+        if (pts.length === 2) {
+          ctx.strokeStyle = '#ff682c';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([6, 4]);
+          ctx.beginPath();
+          ctx.moveTo(tf.toX(pts[0][0]), tf.toY(pts[0][1]));
+          ctx.lineTo(tf.toX(pts[1][0]), tf.toY(pts[1][1]));
+          ctx.stroke();
+          ctx.setLineDash([]);
+          const text = formatSliceLength(Math.hypot(pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]));
+          const mx = (tf.toX(pts[0][0]) + tf.toX(pts[1][0])) / 2;
+          const my = (tf.toY(pts[0][1]) + tf.toY(pts[1][1])) / 2;
+          ctx.font = '700 12px Inter, system-ui, sans-serif';
+          const tw = ctx.measureText(text).width;
+          ctx.fillStyle = 'rgba(17, 17, 17, 0.85)';
+          ctx.fillRect(mx - tw / 2 - 6, my - 20, tw + 12, 18);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(text, mx - tw / 2, my - 7);
+        }
+        pts.forEach(([u, v]) => {
+          ctx.beginPath();
+          ctx.arc(tf.toX(u), tf.toY(v), 4, 0, Math.PI * 2);
+          ctx.fillStyle = '#ff682c';
+          ctx.fill();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        });
+        if (sliceMeasuring && sliceHover && sliceHover.snapped) {
+          ctx.beginPath();
+          ctx.arc(tf.toX(sliceHover.u), tf.toY(sliceHover.v), 7, 0, Math.PI * 2);
+          ctx.strokeStyle = '#ff682c';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+        // Readout: the plane, what it cuts and the measured distance.
+        const label = SECTION_AXES.find(([axis]) => axis === section.axis)[1];
+        const cut = slice.filter((group) => group.segs.length).map((group) => group.name).filter(Boolean);
+        sliceReadout.textContent = `${label} · ${formatOffset(section.offset)}${cut.length ? ` · ${cut.length} structure${cut.length > 1 ? 's' : ''}` : ' · nothing cut here'}`;
+        if (slicePoints.length === 2) {
+          const span = document.createElement('span');
+          span.className = 'is-distance';
+          span.textContent = ` · ${formatSliceLength(Math.hypot(slicePoints[1][0] - slicePoints[0][0], slicePoints[1][1] - slicePoints[0][1]))}`;
+          sliceReadout.appendChild(span);
+        }
+      };
+      const requestSliceDraw = (recompute = false) => {
+        if (recompute) slice = null;
+        if (!sliceFrame && sliceCanvas) sliceFrame = requestAnimationFrame(drawSlice);
+      };
+      const setSliceMeasuring = (on) => {
+        sliceMeasuring = on;
+        slicePoints = [];
+        sliceHover = null;
+        sliceMeasureBtn.setAttribute('aria-pressed', String(on));
+        sliceStage.classList.toggle('is-measuring', on);
+        sliceHint.textContent = on ? 'Click two points; they snap to the outlines. Scroll to zoom.' : 'Scroll to zoom, drag to pan.';
+        requestSliceDraw();
+      };
+      const resetSliceView = () => { sliceZoom = 1; slicePan = [0, 0]; requestSliceDraw(); };
+      if (sliceCanvas) {
+        let press = null; // { x, y, pan, moved }
+        const local = (event) => {
+          const box = sliceCanvas.getBoundingClientRect();
+          return [event.clientX - box.left, event.clientY - box.top];
+        };
+        sliceCanvas.addEventListener('pointerdown', (event) => {
+          const [x, y] = local(event);
+          press = { x, y, pan: slicePan.slice(), moved: false };
+          sliceCanvas.setPointerCapture(event.pointerId);
+        });
+        sliceCanvas.addEventListener('pointermove', (event) => {
+          if (!section) return;
+          const [x, y] = local(event);
+          const tf = sliceTransform();
+          if (press) {
+            if (Math.hypot(x - press.x, y - press.y) > 4) press.moved = true;
+            if (press.moved) {
+              slicePan = [press.pan[0] - (x - press.x) / tf.scale, press.pan[1] + (y - press.y) / tf.scale];
+              requestSliceDraw();
+            }
+            return;
+          }
+          if (sliceMeasuring) {
+            sliceHover = snapPoint(tf.toU(x), tf.toV(y), tf);
+            requestSliceDraw();
+          }
+        });
+        sliceCanvas.addEventListener('pointerup', (event) => {
+          const wasPress = press;
+          press = null;
+          if (!wasPress || wasPress.moved || !sliceMeasuring || !section) return;
+          const [x, y] = local(event);
+          const tf = sliceTransform();
+          const point = snapPoint(tf.toU(x), tf.toV(y), tf);
+          if (slicePoints.length >= 2) slicePoints = [];
+          slicePoints.push([point.u, point.v]);
+          requestSliceDraw();
+        });
+        sliceCanvas.addEventListener('pointercancel', () => { press = null; });
+        sliceCanvas.addEventListener('pointerleave', () => { if (sliceHover) { sliceHover = null; requestSliceDraw(); } });
+        sliceCanvas.addEventListener('wheel', (event) => {
+          if (!section) return;
+          event.preventDefault();
+          const [x, y] = local(event);
+          const before = sliceTransform();
+          const u = before.toU(x); const v = before.toV(y);
+          sliceZoom = Math.min(40, Math.max(0.5, sliceZoom * Math.exp(-event.deltaY * 0.0015)));
+          const after = sliceTransform();
+          // Keep the point under the cursor in place.
+          slicePan = [slicePan[0] + u - after.toU(x), slicePan[1] + v - after.toV(y)];
+          requestSliceDraw();
+        }, { passive: false });
+        sliceCanvas.addEventListener('dblclick', resetSliceView);
+        sliceMeasureBtn.addEventListener('click', () => setSliceMeasuring(!sliceMeasuring));
+        sliceView.querySelector('[data-slice-fit]').addEventListener('click', resetSliceView);
+        sliceWideBtn.addEventListener('click', () => {
+          const wide = !sectionPanel.classList.contains('is-wide');
+          sectionPanel.classList.toggle('is-wide', wide);
+          sliceWideBtn.setAttribute('aria-pressed', String(wide));
+          requestSliceDraw();
+        });
+        window.addEventListener('resize', () => requestSliceDraw());
+        // Showing, hiding or recolouring a layer changes what the slice cuts.
+        viewer.addEventListener('viewer-layers-change', () => requestSliceDraw(true));
+      }
+      let lastSliceAxis = null;
+      onSectionChanged = () => {
+        if (guidesOn()) startGuides();
+        else if (overlay) overlay.setAttribute('hidden', '');
+        if (!sliceView) return;
+        const show = guidesOn();
+        sliceView.hidden = !show;
+        if (!show) return;
+        if (section.axis !== lastSliceAxis) {
+          lastSliceAxis = section.axis;
+          slicePan = [0, 0];
+          sliceZoom = 1;
+          const layout = SLICE_LAYOUT[section.axis];
+          [['left', 'h', 0], ['right', 'h', 1], ['bottom', 'v', 0], ['top', 'v', 1]].forEach(([side, dim, end]) => {
+            const [axis, sign] = layout[dim];
+            sliceView.querySelector(`[data-slice-orient="${side}"]`).textContent = AXIS_ENDS[axis][sign > 0 ? end : 1 - end];
+          });
+          sliceStage.style.borderColor = PLANE_COLORS[section.axis];
+          sliceView.querySelector('[data-slice-title]').textContent = `${SECTION_AXES.find(([axis]) => axis === section.axis)[1]} slice`;
+        }
+        requestSliceDraw();
+      };
 
       viewer.addEventListener('before-render', () => { if (section && sectionCtx) updatePlane(); });
       const onSectionModelLoad = () => {
@@ -4713,6 +5273,8 @@
         sectionSides.clear();
         patchedMeshes.clear();
         sectionCtx = prepareSection();
+        slice = null; // new meshes: the slice view recomputes
+        lastSliceAxis = null;
         sectionBtn.hidden = !sectionCtx; // internals differ -> the feature hides
         if (!sectionCtx) { section = null; syncSectionUi(); return; }
         const next = pendingSection !== undefined ? pendingSection : section;

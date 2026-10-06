@@ -50,12 +50,16 @@ PLAN_FEATURES: tuple[tuple[str, str], ...] = (
     ("layer_metrics", "Structure measurements and distances"),
     ("figure_export", "Publication figure export"),
     ("comparison", "Before / after comparison"),
+    ("slice_view", "2D slice view and slice measurement"),
+    ("custom_threshold", "Custom CT threshold (HU) for DICOM uploads"),
 )
 
-# Paid-only viewer capabilities (v39). Free keeps every older feature but none
-# of these; migration b6c7d8e9f0a1 applies the same split to existing rows.
+# Paid-only viewer capabilities. Migration b6c7d8e9f0a1 made the six v39 tools
+# paid-only; c7d8e9f0a1b2 opened scenes, scene AR and the section plane (with the
+# slice view and custom threshold built on them) to Free as well. Admins can
+# still change every plan's features on /admin/pricing.
 PAID_ONLY_FEATURES: frozenset[str] = frozenset({
-    "scenes", "scene_ar", "section_plane", "layer_metrics", "figure_export", "comparison",
+    "layer_metrics", "figure_export", "comparison",
 })
 
 PLAN_RANK: dict[str, int] = {
@@ -100,11 +104,7 @@ _DEFAULT_LICENSE_PLANS: dict[str, LicensePlan] = {
             "Persistent QR and viewer URL",
         ),
         max_models_per_project=5,
-        features=frozenset({
-            "ar", "annotations", "screenshots", "combined_view",
-            "video_recording", "medical_colors", "presentation_library",
-            "detailed_insights",
-        }) | PAID_ONLY_FEATURES,
+        features=frozenset(key for key, _ in PLAN_FEATURES),
     ),
     "extended_archive": LicensePlan(
         key="extended_archive",
@@ -121,11 +121,7 @@ _DEFAULT_LICENSE_PLANS: dict[str, LicensePlan] = {
             "Persistent QR and viewer URL",
         ),
         max_models_per_project=20,
-        features=frozenset({
-            "ar", "annotations", "screenshots", "combined_view",
-            "video_recording", "medical_colors", "presentation_library",
-            "detailed_insights",
-        }) | PAID_ONLY_FEATURES,
+        features=frozenset(key for key, _ in PLAN_FEATURES),
     ),
     "institutional": LicensePlan(
         key="institutional",
