@@ -1076,12 +1076,17 @@ def _describe_cli_resolution(command: list[str]) -> dict:
     package isn't cached locally.
     """
     if not command:
-        return {"available": False, "detail": "not configured"}
+        return {"available": False, "mode": "missing", "detail": "not configured"}
     if command[0] == "npx":
-        return {"available": False, "detail": f"npx fallback (not installed locally): {' '.join(command)}"}
+        # Not installed locally, but runnable on demand: not "missing".
+        return {
+            "available": False,
+            "mode": "npx",
+            "detail": f"npx fallback (not installed locally): {' '.join(command)}",
+        }
     target = command[-1]
     available = os.path.isfile(target) or bool(shutil.which(command[0]))
-    return {"available": available, "detail": " ".join(command)}
+    return {"available": available, "mode": "local" if available else "missing", "detail": " ".join(command)}
 
 
 def _admin_system_health() -> dict:
@@ -1119,7 +1124,12 @@ def _admin_system_health() -> dict:
     ]
     avg_recent_seconds = int(sum(durations) / len(durations)) if durations else None
     return {
-        "blender": {"available": bool(blender_path), "detail": blender_path or "not on PATH"},
+        "blender": {
+            "available": bool(blender_path),
+            "mode": "local" if blender_path else "missing",
+            "detail": blender_path or "not on PATH",
+        },
+        "disk": storage_disk_status(current_app),
         "gltf_transform": _describe_cli_resolution(find_gltf_transform_cli()),
         "obj2gltf": _describe_cli_resolution(OBJConverter()._command()),
         "fbx2gltf": _describe_cli_resolution(FBXConverter()._command()),
