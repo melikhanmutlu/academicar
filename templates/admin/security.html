@@ -16,8 +16,8 @@
       ] %}
       {% for label, key, event, hint in cards %}
         <a class="admin-insight-card"
-           href="{{ url_for('admin_dashboard', admin_page='logs', audit_event=event) if event else url_for('admin_dashboard', admin_page='logs', audit_q='admin_') }}"
-           title="Open in the audit log (the log lists all time)">
+           href="{{ url_for('admin_dashboard', admin_page='logs', audit_event=event) if event else url_for('admin_dashboard', admin_page='logs', audit_event='actions') }}"
+           title="{{ 'Open the audit log (all time)' if event else 'Open the audit log: all actions, all time' }}">
           <span>{{ label }}</span>
           <strong>{{ security_events[key] }}</strong>
           <small>{{ hint }}</small>
