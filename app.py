@@ -1056,11 +1056,13 @@ def seed_license_plans(app: Flask) -> None:
         # One-time compatibility backfill for rows created before capability
         # controls existed. An explicit [] remains an intentional admin choice.
         defaults = default_license_plans()
+        backfilled = False
         for key, row in existing_rows.items():
             if row.features is None and key in defaults:
                 row.features = sorted(defaults[key].features)
                 row.max_models_per_project = defaults[key].max_models_per_project
-        if to_insert or any(row.features is not None for row in existing_rows.values()):
+                backfilled = True
+        if to_insert or backfilled:
             db.session.commit()
     except SQLAlchemyError:
         db.session.rollback()
@@ -7665,10 +7667,14 @@ def register_routes(app: Flask) -> None:
         pricing_rows = []
         coupons = []
         if admin_page == "pricing":
-            # Self-heal on every visit (cheap, idempotent).
-            seed_license_plans(app)
+            # Self-heal only when a default plan row is missing or still needs
+            # the features backfill; otherwise skip the seed commit + cache refresh.
             plan_order = {"free": 0, "academic": 1, "extended_archive": 2, "institutional": 3}
-            pricing_rows = sorted(LicensePlanConfig.query.all(), key=lambda r: plan_order.get(r.key, 99))
+            pricing_rows = LicensePlanConfig.query.all()
+            if len(pricing_rows) < len(plan_order) or any(r.features is None for r in pricing_rows):
+                seed_license_plans(app)
+                pricing_rows = LicensePlanConfig.query.all()
+            pricing_rows = sorted(pricing_rows, key=lambda r: plan_order.get(r.key, 99))
             coupons = Coupon.query.order_by(Coupon.created_at.desc()).all()
         return render_template(
             f"admin/{admin_page}.html",
