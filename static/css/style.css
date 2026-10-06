@@ -5417,6 +5417,7 @@ input[type="file"]::-webkit-file-upload-button {
 .model-card-footer .model-actions-secondary { margin-right: auto; }
 
 /* Quiet secondary actions: small text links separated by middots. */
+.model-actions > .model-actions-secondary { margin-left: 10px; }
 .model-actions-secondary {
   display: flex;
   flex-wrap: wrap;

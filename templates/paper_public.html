@@ -59,11 +59,11 @@
       {% if first_pdf_article or (presentation_enabled and paper.attachments) or paper.pdf_path %}
       <div class="share-actions mt-5">
         {% if first_pdf_article %}
-          <a href="{{ url_for('project_article_reader', slug=paper.slug, article_id=first_pdf_article.id) }}" class="btn-primary compact">{{ 'View first article' if first_pdf_article == paper.articles[0] else 'View article PDF' }}</a>
+          <a href="{{ url_for('project_article_reader', slug=paper.slug, article_id=first_pdf_article.id) }}" class="detail-action detail-action-primary">{{ 'View first article' if first_pdf_article == paper.articles[0] else 'View article PDF' }}</a>
         {% elif presentation_enabled and paper.attachments %}
-          <a href="{{ url_for('project_attachment_reader', slug=paper.slug, attachment_id=paper.attachments[0].id) }}" class="btn-primary compact">Open materials</a>
+          <a href="{{ url_for('project_attachment_reader', slug=paper.slug, attachment_id=paper.attachments[0].id) }}" class="detail-action detail-action-primary">Open materials</a>
         {% elif paper.pdf_path %}
-          <a href="{{ url_for('paper_public_pdf', slug=paper.slug) }}" class="btn-primary compact">View legacy document</a>
+          <a href="{{ url_for('paper_public_pdf', slug=paper.slug) }}" class="detail-action detail-action-primary">View legacy document</a>
         {% endif %}
       </div>
       {% endif %}
@@ -144,8 +144,10 @@
                   </a>
                 {% endif %}
                 <div class="model-actions mt-4">
-                  <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="btn-primary compact">Open 3D / AR</a>
-                  <button type="button" class="btn-secondary compact" data-copy-link="{{ public_url('view_model', model_id=m.id) }}" data-analytics-model-id="{{ m.id }}" aria-label="Copy viewer link">Copy link</button>
+                  <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action detail-action-primary">Open 3D / AR</a>
+                  <div class="model-actions-secondary">
+                    <button type="button" class="model-link-action" data-copy-link="{{ public_url('view_model', model_id=m.id) }}" data-analytics-model-id="{{ m.id }}" aria-label="Copy viewer link">Copy link</button>
+                  </div>
                 </div>
               </div>
 
