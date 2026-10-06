@@ -4736,12 +4736,60 @@
         viewer.setAttribute('max-camera-orbit', 'auto 180deg auto');
         viewer.cameraOrbit = `${theta}rad ${phi}rad auto`;
       };
+      // Whether a world point lies inside the solid of any visible mesh: a ray
+      // from it crosses a closed surface an odd number of times. Uses the full,
+      // unclipped triangles, so a gap between parts or a hollow on the plane
+      // counts as outside.
+      const isInsideSolid = (world, dir) => {
+        const { Vec3 } = sectionCtx;
+        const o = new Vec3();
+        const d = new Vec3();
+        const a = new Vec3();
+        const e1 = new Vec3();
+        const e2 = new Vec3();
+        const p = new Vec3();
+        const q = new Vec3();
+        const s0 = new Vec3();
+        const shown = (object) => { for (let o2 = object; o2; o2 = o2.parent) if (o2.visible === false) return false; return true; };
+        return sectionCtx.meshes.some((mesh) => {
+          const position = mesh.geometry.attributes && mesh.geometry.attributes.position;
+          if (!position || !shown(mesh)) return false;
+          const toLocal = mesh.matrixWorld.clone().invert();
+          o.copy(world).applyMatrix4(toLocal);
+          d.copy(dir).transformDirection(toLocal);
+          const index = mesh.geometry.index;
+          const count = index ? index.count : position.count;
+          const vertex = (k, out) => {
+            const v = index ? index.getX(k) : k;
+            return out.set(position.getX(v), position.getY(v), position.getZ(v));
+          };
+          let crossings = 0;
+          for (let k = 0; k + 2 < count; k += 3) {
+            vertex(k, a);
+            vertex(k + 1, e1).sub(a);
+            vertex(k + 2, e2).sub(a);
+            p.crossVectors(d, e2);
+            const det = e1.dot(p);
+            if (Math.abs(det) < 1e-12) continue;
+            const inv = 1 / det;
+            s0.subVectors(o, a);
+            const u = s0.dot(p) * inv;
+            if (u < 0 || u > 1) continue;
+            q.crossVectors(s0, e1);
+            const v = d.dot(q) * inv;
+            if (v < 0 || u + v > 1) continue;
+            if (e2.dot(q) * inv > 1e-9) crossings += 1;
+          }
+          return crossings % 2 === 1;
+        });
+      };
       // Measure on the slice: where the view ray through a viewer click crosses
       // the plane, in hotspot (scene.target) space and in the model space the
       // axes are named in. Null unless the cut itself is what the click shows:
       // the first surface the ray hits must lie at or beyond the plane (behind a
       // cut the inside faces are visible), so kept geometry in front of the cut
-      // and empty background are refused.
+      // and empty background are refused; and the point must lie inside the
+      // solid, not in a gap between parts that happens to have a surface behind.
       const pointOnSection = (clientX, clientY) => {
         if (!section || !sectionCtx) return null;
         try {
@@ -4767,6 +4815,7 @@
           const hitWorld = new Vec3(hit.position.x, hit.position.y, hit.position.z).applyMatrix4(target.matrixWorld);
           if (hitWorld.distanceTo(origin) < t - 1e-5) return null;
           const world = origin.clone().addScaledVector(dir, t);
+          if (!isInsideSolid(world, dir)) return null;
           const toTarget = target.matrixWorld.clone().invert();
           const toRoot = root.matrixWorld.clone().invert();
           const position = world.clone().applyMatrix4(toTarget);
