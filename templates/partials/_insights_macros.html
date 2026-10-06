@@ -9,34 +9,41 @@
 {% macro period(days) -%}{{ '12 months' if days == 365 else days ~ ' days' }}{%- endmacro %}
 
 {% macro engagement_sub(a) -%}
-  {%- if a.unique_visitors -%}{{ a.engaged_visitors }} of {{ a.unique_visitors }} {{ 'visitor' if a.unique_visitors == 1 else 'visitors' }} rotated, went fullscreen, started AR or shared
-    {%- if a.ar_visitors %} &middot; {{ a.ar_visitors }} started AR{% endif -%}
+  {%- if a.unique_visitors -%}{{ a.engaged_visitors }} of {{ a.unique_visitors }} {{ 'visitor' if a.unique_visitors == 1 else 'visitors' }} interacted
   {%- endif -%}
 {%- endmacro %}
 
 {% macro partial_note(a) -%}
   {%- if a.engagement_partial and a.engagement_since -%}
-    <span class="ins-note">Rotation and fullscreen are counted since {{ a.engagement_since.strftime('%-d %b %Y') }}.</span>
+    <span>Rotation and fullscreen are counted since {{ a.engagement_since.strftime('%-d %b %Y') }}.</span>
   {%- endif -%}
 {%- endmacro %}
 
+{% macro changes_caption(a) %}
+  {% set pairs = [(a.changes.views, a.views), (a.changes.unique_visitors, a.unique_visitors), (a.changes.qr_scans, a.qr_scans), (a.changes.engaged_visitors, a.engaged_visitors)] %}
+  {% set ns = namespace(any=false) %}
+  {% for c, cur in pairs %}{% if c and (c.pct is not none or cur) %}{% set ns.any = true %}{% endif %}{% endfor %}
+  {% if ns.any %}
+  <p class="ins-caption">Changes vs previous {{ period(a.days) }}</p>
+  {% endif %}
+{% endmacro %}
+
 {% macro change_line(change, current, days) -%}
   {%- if change and change.pct is not none -%}
-    {%- if change.direction == 'up' -%}<span class="ins-change is-up">&#9650; {{ change.pct }}% vs previous {{ period(days) }}</span>
-    {%- elif change.direction == 'down' -%}<span class="ins-change is-down">&#9660; {{ change.pct|abs }}% vs previous {{ period(days) }}</span>
-    {%- elif current -%}<span class="ins-change">No change vs previous {{ period(days) }}</span>{%- endif -%}
+    {%- if change.direction == 'up' -%}<span class="ins-change is-up">&#9650; {{ change.pct }}%<span class="ins-change-ctx"> vs previous {{ period(days) }}</span></span>
+    {%- elif change.direction == 'down' -%}<span class="ins-change is-down">&#9660; {{ change.pct|abs }}%<span class="ins-change-ctx"> vs previous {{ period(days) }}</span></span>
+    {%- elif current -%}<span class="ins-change">No change<span class="ins-change-ctx"> vs previous {{ period(days) }}</span></span>{%- endif -%}
   {%- elif change and current -%}<span class="ins-change">New this period</span>
   {%- endif -%}
 {%- endmacro %}
 
-{% macro kpi(label, value, sub, change, current, days, hint=none, hint_url=none, note=none) %}
+{% macro kpi(label, value, sub, change, current, days, hint=none, hint_url=none, sub_title=none) %}
   <div class="ins-kpi">
     <span class="ins-kpi-label">{{ label }}</span>
     <strong>{{ value }}</strong>
-    {% if sub %}<span class="ins-kpi-sub">{{ sub }}</span>{% endif %}
+    {% if sub %}<span class="ins-kpi-sub"{% if sub_title %} title="{{ sub_title }}"{% endif %}>{{ sub }}{% if sub_title %} <span aria-hidden="true">&#9432;</span>{% endif %}</span>{% endif %}
     {{ change_line(change, current, days) }}
     {% if hint %}<span class="ins-kpi-hint">{% if hint_url %}<a href="{{ hint_url }}">{{ hint }}</a>{% else %}{{ hint }}{% endif %}</span>{% endif %}
-    {% if note %}{{ note }}{% endif %}
   </div>
 {% endmacro %}
 
@@ -62,8 +69,9 @@
     </div>
     {% if max_views %}
       <div class="ins-chart">
-        <div class="ins-y" aria-hidden="true"><span>{{ tmax }}</span><span>0</span></div>
-        <div class="ins-plot{% if n > 30 %} is-dense{% endif %}" id="ins-plot" role="list" aria-label="{{ gran }} model views">
+        {% set mid = tmax >= 4 and tmax % 2 == 0 %}
+        <div class="ins-y" aria-hidden="true"><span>{{ tmax }}</span>{% if mid %}<span>{{ (tmax // 2)|int }}</span>{% endif %}<span>0</span></div>
+        <div class="ins-plot{% if n > 30 %} is-dense{% endif %}{% if mid %} has-mid{% endif %}" id="ins-plot" role="list" aria-label="{{ gran }} model views">
           {% for point in trend %}
             {% set pos = 'is-left' if loop.index0 < n * 0.2 else ('is-right' if loop.index0 > n * 0.8 else '') %}
             <div class="ins-col {{ pos }}{% if peak and point.start == peak.start %} is-peak{% endif %}" role="listitem" tabindex="0"
@@ -120,9 +128,11 @@
 
 {% macro secondary_line(a) %}
   {% set items = [(a.ar_starts, 'AR starts'), (a.shares, 'link copies'), (a.review_visits, 'review visits'), (a.fullscreen_opens, 'fullscreen opens')] %}
-  {% if items|selectattr(0)|list %}
+  {% set note = partial_note(a)|trim %}
+  {% if items|selectattr(0)|list or note %}
   <p class="ins-secondary">
     {% for count, label in items if count %}<span><strong>{{ count }}</strong> {{ label }}</span>{% endfor %}
+    {{ note|safe }}
   </p>
   {% endif %}
 {% endmacro %}
