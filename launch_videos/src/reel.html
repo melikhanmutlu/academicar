@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AcademicAR Showreel</title>
+<style>
+@font-face{font-family:Mont;font-weight:500;src:url(assets/fonts/montserrat-latin-500-normal.woff2)}
+@font-face{font-family:Mont;font-weight:600;src:url(assets/fonts/montserrat-latin-600-normal.woff2)}
+@font-face{font-family:Int;font-weight:400;src:url(assets/fonts/inter-latin-400-normal.woff2)}
+@font-face{font-family:Int;font-weight:500;src:url(assets/fonts/inter-latin-500-normal.woff2)}
+@font-face{font-family:Int;font-weight:600;src:url(assets/fonts/inter-latin-600-normal.woff2)}
+*{box-sizing:border-box}
+html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#000}
+#stage{position:absolute;inset:0;overflow:hidden;background:#fff;font-family:Int,sans-serif;color:#202020}
+.L{position:absolute;inset:0}
+.big{font-family:Mont,sans-serif;font-weight:600;letter-spacing:-.045em;line-height:.86;white-space:nowrap}
+.cen{display:flex;align-items:center;justify-content:center}
+#gl{z-index:2}
+#bgtext{z-index:1}
+#ui{z-index:3}
+#fx{z-index:6;pointer-events:none}
+#gl canvas{position:absolute;left:0;top:0}
+.outline{color:transparent;-webkit-text-stroke:3px rgba(255,255,255,.22)}
+.tbar{position:absolute;left:50%;bottom:56px;transform:translateX(-50%);display:flex;gap:8px;padding:10px;border-radius:999px;background:rgba(32,32,32,.78);border:1px solid rgba(255,255,255,.12)}
+.tb{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.6)}
+.tb.on{background:#ff682c;color:#fff}
+.eb{position:absolute;left:84px;top:84px;font:600 22px/1 Int;letter-spacing:.2em;color:#ff682c}
+.ttl{position:absolute;left:78px;top:122px;font-family:Mont;font-weight:600;font-size:150px;letter-spacing:-.05em;line-height:.9;color:#fff}
+.sub{position:absolute;left:84px;font:400 30px/1.35 Int;color:rgba(255,255,255,.7);width:620px}
+.chipd{display:inline-flex;align-items:center;gap:12px;padding:14px 24px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);color:#fff;font:500 26px/1 Int;white-space:nowrap}
+.pin{position:absolute;display:flex;align-items:center;gap:12px;transform-origin:0 50%}
+.pin i{width:20px;height:20px;border-radius:50%;background:#ff682c;border:4px solid #fff;box-shadow:0 0 0 8px rgba(255,104,44,.25)}
+.pin span{padding:10px 16px;border-radius:10px;background:#fff;color:#202020;font:600 22px/1 Int;white-space:nowrap}
+.dotx{width:14px;height:14px;border-radius:50%;background:#ff682c;display:inline-block}
+.tile{background:#202020;color:#fff;display:flex;align-items:center;justify-content:center;font-family:Mont;font-weight:600}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="L" id="bgtext"></div>
+  <div class="L" id="gl"></div>
+  <div class="L" id="ui"></div>
+  <div class="L" id="fx"></div>
+</div>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+<script type="module" src="reel.js"></script>
+</body>
+</html>

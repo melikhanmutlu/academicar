@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AcademicAR Launch</title>
+<style>
+@font-face{font-family:Mont;font-weight:400;src:url(assets/fonts/montserrat-latin-400-normal.woff2)}
+@font-face{font-family:Mont;font-weight:500;src:url(assets/fonts/montserrat-latin-500-normal.woff2)}
+@font-face{font-family:Mont;font-weight:600;src:url(assets/fonts/montserrat-latin-600-normal.woff2)}
+@font-face{font-family:Int;font-weight:400;src:url(assets/fonts/inter-latin-400-normal.woff2)}
+@font-face{font-family:Int;font-weight:500;src:url(assets/fonts/inter-latin-500-normal.woff2)}
+@font-face{font-family:Int;font-weight:600;src:url(assets/fonts/inter-latin-600-normal.woff2)}
+:root{--g:#202020;--shale:#4d4d4d;--ash:#6b6b6b;--mist:#efefef;--cloud:#f5f5f5;--pearl:#e8e8e8;--ivory:#ebe6dd;--o:#ff682c;--gold:#816729}
+*{box-sizing:border-box}
+html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#fff;color:var(--g);font-family:Int,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+#stage{position:absolute;inset:0;overflow:hidden;background:#fff}
+.bg-dots{position:absolute;inset:0;background-image:radial-gradient(#e6e6e6 1.4px,transparent 1.4px);background-size:40px 40px;opacity:.55}
+.scene{position:absolute;inset:0;display:none;transform-origin:50% 50%}
+.abs{position:absolute}
+.h{font-family:Mont,sans-serif;font-weight:500;letter-spacing:-0.025em;line-height:1.02;margin:0}
+.acc{color:var(--o)}
+.w{display:inline-block;will-change:transform}
+.eyebrow{font:500 22px/1 Int;letter-spacing:.16em;text-transform:uppercase;color:var(--ash);display:flex;align-items:center;gap:14px}
+.eyebrow b{font-weight:600;color:var(--o)}
+.eyebrow i{display:inline-block;width:36px;height:2px;background:var(--o)}
+.sub{font:400 30px/1.4 Int;color:var(--shale);margin:0}
+.card{background:#fff;border:1px solid var(--pearl);border-radius:20px;box-shadow:0 30px 80px -40px rgba(32,32,32,.25)}
+.chip{display:inline-flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--pearl);border-radius:999px;padding:14px 24px;font:500 24px/1 Int;color:var(--g);white-space:nowrap;box-shadow:0 14px 30px -18px rgba(0,0,0,.25)}
+.tag{display:inline-flex;align-items:center;justify-content:center;min-width:64px;height:34px;padding:0 10px;border-radius:8px;background:var(--g);color:#fff;font:600 16px/1 Int;letter-spacing:.04em}
+.tag.o{background:var(--o)}
+.tag.l{background:var(--mist);color:var(--g)}
+.pill{display:inline-flex;align-items:center;gap:12px;border-radius:999px;padding:12px 22px;font:500 22px/1 Int;border:1px solid var(--pearl);background:#fff}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--o);display:inline-block}
+svg{overflow:visible}
+
+/* header */
+#hdr{position:absolute;left:0;right:0;top:0;height:110px;display:flex;align-items:center;justify-content:space-between;padding:0 64px;z-index:20}
+.logo{display:flex;align-items:center;gap:16px;font:600 30px/1 Mont;letter-spacing:-.02em}
+.tile{width:48px;height:48px;border-radius:10px;background:var(--g);color:#fff;display:flex;align-items:center;justify-content:center;font:600 30px/1 Mont}
+#hdr .url{font:500 22px/1 Int;color:var(--ash)}
+#prog{position:absolute;left:0;bottom:0;height:5px;background:var(--o);z-index:20}
+
+/* S1 */
+#s1paper{left:300px;top:150px;width:560px;height:780px;padding:56px 54px;border-radius:6px;background:#fff;border:1px solid var(--pearl);box-shadow:0 40px 90px -40px rgba(0,0,0,.35);transform-origin:50% 62%}
+.bar{height:14px;border-radius:7px;background:var(--mist);margin:0 0 14px}
+#s1fig{margin:30px 0 10px;height:300px;border:1px solid var(--pearl);background:#fafafa;display:flex;align-items:center;justify-content:center}
+.cap{font:400 17px/1.3 Int;color:var(--ash);margin-bottom:26px}
+
+/* S2 */
+#s2tile{width:200px;height:200px;border-radius:40px;background:var(--g);color:#fff;display:flex;align-items:center;justify-content:center;font:600 128px/1 Mont}
+#s2word{font:600 168px/1 Mont;letter-spacing:-.035em;white-space:nowrap}
+.ring{position:absolute;border:3px solid var(--o);border-radius:50%}
+
+/* S3 */
+#up{left:930px;top:160px;width:860px;height:790px;padding:44px}
+#drop{margin-top:28px;height:290px;border:2.5px dashed #cfcfcf;border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#fcfcfc;position:relative}
+.frow{display:flex;align-items:center;gap:18px;margin-top:26px;padding:20px 22px;border:1px solid var(--pearl);border-radius:14px}
+.track{height:10px;border-radius:5px;background:var(--mist);overflow:hidden;flex:1}
+.fill{height:100%;background:var(--o);width:0}
+.check{display:flex;gap:18px;align-items:flex-start;margin-top:26px;font:400 21px/1.4 Int;color:var(--shale)}
+.box{flex:0 0 34px;height:34px;border:2px solid #bdbdbd;border-radius:8px;display:flex;align-items:center;justify-content:center;background:#fff}
+.btn{display:inline-flex;align-items:center;justify-content:center;height:68px;padding:0 40px;border-radius:999px;background:var(--g);color:#fff;font:500 24px/1 Int}
+#cursor{width:44px;height:44px;z-index:30;filter:drop-shadow(0 4px 6px rgba(0,0,0,.25))}
+
+/* S4 */
+#pipe{left:80px;top:300px;width:1000px;height:680px}
+.vcard{background:linear-gradient(180deg,#fafafa,#ececec);border:1px solid var(--pearl);border-radius:20px;overflow:hidden}
+.vbar{position:absolute;left:0;right:0;top:0;height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;background:rgba(255,255,255,.86);border-bottom:1px solid var(--pearl);z-index:3;font:500 20px/1 Int}
+.vcard canvas{position:absolute;left:0;top:0}
+.status{display:inline-flex;align-items:center;gap:10px;padding:10px 18px;border-radius:999px;font:500 20px/1 Int;background:var(--mist)}
+
+/* S5 */
+#vb{left:100px;top:140px;width:1200px;height:820px}
+.tool{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;color:var(--shale)}
+.tool.on{background:var(--g);color:#fff}
+#layers{left:28px;top:92px;width:330px;padding:22px;border-radius:16px;background:rgba(255,255,255,.95);border:1px solid var(--pearl);z-index:4;font:500 19px/1 Int;box-shadow:0 20px 40px -24px rgba(0,0,0,.3)}
+.lrow{display:flex;align-items:center;gap:14px;padding:12px 0;border-top:1px solid var(--cloud)}
+.sw{width:18px;height:18px;border-radius:5px}
+.slider{height:6px;border-radius:3px;background:var(--mist);position:relative;margin:12px 0 4px}
+.slider .k{position:absolute;top:-8px;width:22px;height:22px;border-radius:50%;background:#fff;border:2px solid var(--g)}
+.feat{display:flex;gap:20px;align-items:flex-start;padding:22px 0;border-top:1px solid var(--pearl);position:relative}
+.feat .ix{flex:0 0 46px;height:46px;border-radius:12px;background:var(--cloud);display:flex;align-items:center;justify-content:center;color:var(--g)}
+.feat b{display:block;font:600 25px/1.2 Int}
+.feat span{display:block;font:400 19px/1.35 Int;color:var(--ash);margin-top:4px}
+.feat .ind{position:absolute;left:-26px;top:22px;width:4px;height:46px;border-radius:2px;background:var(--o)}
+#meas{left:0;top:0;width:1200px;height:820px;z-index:3;pointer-events:none}
+.mlabel{position:absolute;padding:10px 16px;border-radius:10px;background:var(--g);color:#fff;font:600 22px/1 Int;white-space:nowrap}
+
+/* S6 */
+#poster{left:760px;top:200px;width:520px;height:700px;padding:44px;border-radius:6px;background:#fff;border:1px solid var(--pearl);box-shadow:0 40px 90px -40px rgba(0,0,0,.35)}
+#qrbig{z-index:5}
+#phone{left:1390px;top:120px;width:484px;height:860px}
+#phone img{width:484px;height:860px;display:block}
+#pscreen{left:92px;top:78px;width:300px;height:678px;border-radius:38px;overflow:hidden;background:radial-gradient(120% 80% at 50% 40%,#5d5a55,#2c2b29)}
+
+/* S7 */
+.fcard{position:absolute;width:390px;height:250px;padding:32px;border-radius:20px;background:#fff;border:1px solid var(--pearl);overflow:hidden}
+.fcard .ic{width:56px;height:56px;border-radius:14px;background:var(--cloud);display:flex;align-items:center;justify-content:center;margin-bottom:22px}
+.fcard b{display:block;font:600 26px/1.2 Int;margin-bottom:10px}
+.fcard span{display:block;font:400 19px/1.4 Int;color:var(--ash)}
+.fcard .top{position:absolute;left:0;top:0;height:4px;background:var(--o);width:0}
+
+/* S8 */
+.ucard{position:absolute;width:400px;top:330px;border-radius:20px;overflow:hidden;background:#fff;border:1px solid var(--pearl)}
+.ucard .im{height:300px;overflow:hidden;background:var(--cloud)}
+.ucard img{width:100%;height:100%;object-fit:cover;display:block}
+.ucard b{display:block;padding:26px 28px 6px;font:600 26px/1.2 Int}
+.ucard span{display:block;padding:0 28px 28px;font:400 19px/1.4 Int;color:var(--ash)}
+
+/* S9 */
+#inst{left:1000px;top:230px;width:820px;padding:44px}
+.qrow{margin-top:30px}
+.qrow .lb{display:flex;justify-content:space-between;font:500 22px/1 Int;margin-bottom:14px}
+.qrow .track{height:14px;border-radius:7px}
+.av{width:58px;height:58px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font:600 20px/1 Int;color:#fff;border:3px solid #fff;margin-left:-14px}
+
+/* S10 */
+#urlpill{font:500 54px/1 Int;padding:26px 46px;border-width:2px;gap:20px}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="bg-dots" id="dots"></div>
+
+  <!-- ============ S1 problem ============ -->
+  <div class="scene" id="s1">
+    <h1 class="h abs" id="s1a" style="left:0;right:0;top:400px;text-align:center;font-size:132px">
+      <span class="w">Your</span> <span class="w">research</span> <span class="w">lives</span> <span class="w">in</span> <span class="w acc">3D.</span>
+    </h1>
+    <div class="abs" id="s1paper">
+      <div class="bar" style="width:86%;height:22px;background:#dcdcdc"></div>
+      <div class="bar" style="width:60%;height:22px;background:#dcdcdc;margin-bottom:30px"></div>
+      <div class="bar" style="width:100%"></div><div class="bar" style="width:94%"></div><div class="bar" style="width:97%"></div><div class="bar" style="width:70%"></div>
+      <div id="s1fig">
+        <svg width="260" height="200" viewBox="0 0 260 200"><path d="M30 140 C20 100 60 70 100 74 C130 40 190 44 214 80 C246 90 248 140 220 150 C190 170 150 150 120 160 C80 176 40 170 30 140Z" fill="#d9d9d9" stroke="#bdbdbd" stroke-width="2"/><path d="M80 120 C110 104 150 110 180 100" fill="none" stroke="#c4c4c4" stroke-width="2"/></svg>
+      </div>
+      <div class="cap">Fig. 3 — Calcaneus fracture, lateral view (2D)</div>
+      <div class="bar" style="width:100%"></div><div class="bar" style="width:91%"></div><div class="bar" style="width:96%"></div><div class="bar" style="width:55%"></div>
+    </div>
+    <div class="abs" id="s1b" style="left:980px;top:360px;width:820px">
+      <h2 class="h" style="font-size:96px">But your paper<br>is still <span style="color:#a8a8a8">flat.</span></h2>
+      <p class="sub" style="margin-top:34px;font-size:32px">Readers squint at 2D screenshots of 3D data.</p>
+    </div>
+  </div>
+
+  <!-- ============ S2 brand ============ -->
+  <div class="scene" id="s2">
+    <svg class="abs" id="s2grid" width="1920" height="1080" style="left:0;top:0"></svg>
+    <div class="ring" id="s2ring1"></div><div class="ring" id="s2ring2"></div>
+    <div class="abs" id="s2tile">A</div>
+    <div class="abs" id="s2wordwrap" style="overflow:hidden;height:200px"><div id="s2word">Academic<span class="acc">AR</span></div></div>
+    <p class="abs sub" id="s2tag" style="left:0;right:0;top:680px;text-align:center;font-size:46px;color:var(--shale)">Share interactive 3D models with your work.</p>
+    <div class="abs" id="s2checks" style="left:0;right:0;top:790px;display:flex;justify-content:center;gap:22px"></div>
+  </div>
+
+  <!-- ============ S3 upload ============ -->
+  <div class="scene" id="s3">
+    <div class="abs" style="left:130px;top:250px;width:740px">
+      <div class="eyebrow" id="s3e"><b>01</b><i></i>Upload</div>
+      <h2 class="h" id="s3h" style="font-size:104px;margin-top:34px"><span class="w">Drop</span> <span class="w">in</span> <span class="w">any</span><br><span class="w">3D</span> <span class="w acc">format.</span></h2>
+      <p class="sub" id="s3s" style="margin-top:36px">GLB, STL, OBJ, FBX, STEP — even CT/MR scans and segmentations.</p>
+    </div>
+    <div class="abs card" id="up">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><div style="font:500 18px/1 Int;color:var(--ash);letter-spacing:.08em;text-transform:uppercase">New model</div>
+        <div style="font:600 32px/1.2 Mont;letter-spacing:-.02em;margin-top:10px">Calcaneus fixation study</div></div>
+        <span class="tag l">Project</span>
+      </div>
+      <div id="drop">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#202020" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>
+        <div style="font:500 26px/1 Int">Drag &amp; drop your model</div>
+        <div style="font:400 19px/1 Int;color:var(--ash)">GLB · STL · OBJ · FBX · STEP · DICOM · NIfTI</div>
+      </div>
+      <div class="frow" id="frow">
+        <span class="tag o">STL</span>
+        <div style="flex:1">
+          <div style="display:flex;justify-content:space-between;font:500 21px/1 Int;margin-bottom:12px"><span>calcaneus_fixation.stl</span><span id="pct" style="color:var(--ash)">0%</span></div>
+          <div class="track"><div class="fill" id="pfill"></div></div>
+        </div>
+      </div>
+      <div class="check" id="chk"><div class="box" id="cbox"><svg width="22" height="22" viewBox="0 0 16 16"><path id="ctick" d="M3 8.5l3 3 7-7" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="20" stroke-dashoffset="20"/></svg></div>
+        <div>I confirm the model is anonymized, I hold the rights, and I take responsibility for ethics approval.</div></div>
+      <div style="margin-top:30px;display:flex;justify-content:flex-end"><div class="btn" id="ubtn">Upload &amp; convert →</div></div>
+    </div>
+    <div id="s3chips"></div>
+    <svg class="abs" id="cursor" viewBox="0 0 24 24"><path d="M4 2l16 9-7 2-3 7z" fill="#202020" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>
+  </div>
+
+  <!-- ============ S4 convert ============ -->
+  <div class="scene" id="s4">
+    <div class="abs" style="left:0;right:0;top:140px;text-align:center">
+      <div class="eyebrow" id="s4e" style="justify-content:center"><b>02</b><i></i>Convert &amp; optimize</div>
+      <h2 class="h" id="s4h" style="font-size:86px;margin-top:26px"><span class="w">Web</span> <span class="w">&amp;</span> <span class="w">AR-ready</span> <span class="w">in</span> <span class="w acc">minutes.</span></h2>
+    </div>
+    <svg class="abs" id="pipe" viewBox="0 0 1000 680"></svg>
+    <div class="abs vcard" id="va" style="left:1110px;top:350px;width:720px;height:580px">
+      <div class="vbar"><span>calcaneus_fixation.glb</span><span class="status" id="vstat"><span class="dot" id="vdot"></span><span id="vstxt">Queued</span></span></div>
+      <svg class="abs" id="vspin" width="120" height="120" style="left:300px;top:250px"><circle cx="60" cy="60" r="48" fill="none" stroke="#dcdcdc" stroke-width="6"/><circle id="vspinarc" cx="60" cy="60" r="48" fill="none" stroke="#ff682c" stroke-width="6" stroke-linecap="round" stroke-dasharray="80 400"/></svg>
+    </div>
+    <div class="abs" id="s4size" style="left:1110px;top:950px;width:720px;display:flex;justify-content:space-between;font:500 24px/1 Int;color:var(--shale)">
+      <span>File size <b id="szA" style="color:var(--g)">9.4 MB</b> → <b id="szB" style="color:var(--g)">9.4 MB</b></span><span class="acc" id="szP" style="font-weight:600">−0%</span>
+    </div>
+  </div>
+
+  <!-- ============ S5 explore ============ -->
+  <div class="scene" id="s5">
+    <div class="abs vcard" id="vb">
+      <div class="vbar"><span style="display:flex;gap:14px;align-items:center"><span class="tile" style="width:36px;height:36px;font-size:20px;border-radius:8px">A</span>Calcaneus fixation — Study 12</span>
+        <span style="display:flex;gap:6px" id="tools"></span></div>
+      <div class="abs" id="layers">
+        <div style="display:flex;justify-content:space-between;font:600 20px/1 Int;margin-bottom:10px"><span>Layers</span><span style="color:var(--ash);font-weight:500">3</span></div>
+        <div class="lrow"><span class="sw" style="background:#e3dccd;border:1px solid #cfc6b4"></span><span style="flex:1">Calcaneus</span><span id="bop" style="color:var(--ash)">100%</span></div>
+        <div class="slider"><div class="fill" id="bfill" style="width:100%;background:var(--g);border-radius:3px"></div><div class="k" id="bknob" style="left:calc(100% - 11px)"></div></div>
+        <div class="lrow" style="margin-top:8px"><span class="sw" style="background:#5a5a5a"></span><span style="flex:1">Lateral plate</span><span style="color:var(--ash)">●</span></div>
+        <div class="lrow"><span class="sw" style="background:#ff682c"></span><span style="flex:1">Screws ×4</span><span style="color:var(--ash)">●</span></div>
+      </div>
+      <svg class="abs" id="meas" width="1200" height="820"></svg>
+      <div class="mlabel" id="mlab">0.0 mm</div>
+      <div class="abs pill" id="secpill" style="right:28px;top:92px;z-index:4"><span class="dot"></span>Section · X axis</div>
+    </div>
+    <div class="abs" style="left:1370px;top:150px;width:470px">
+      <div class="eyebrow" id="s5e"><b>03</b><i></i>Explore</div>
+      <h2 class="h" id="s5h" style="font-size:66px;margin-top:26px;margin-bottom:34px">A real 3D viewer.<br><span class="acc">In any browser.</span></h2>
+      <div id="feats"></div>
+    </div>
+  </div>
+
+  <!-- ============ S6 share ============ -->
+  <div class="scene" id="s6">
+    <div class="abs" style="left:120px;top:250px;width:620px">
+      <div class="eyebrow" id="s6e"><b>04</b><i></i>Share</div>
+      <h2 class="h" id="s6h" style="font-size:88px;margin-top:34px"><span class="w">One</span> <span class="w">QR</span> <span class="w">code.</span><br><span class="w">Print</span> <span class="w">it</span> <span class="w acc">anywhere.</span></h2>
+      <p class="sub" id="s6s" style="margin-top:34px;font-size:28px">A stable link that survives model replacements, upgrades and recolours.</p>
+      <div class="pill" id="s6url" style="margin-top:40px;font-size:24px"><span class="dot"></span>academicar.com/m/7Q2KX9</div>
+    </div>
+    <div class="abs" id="poster">
+      <div class="bar" style="width:80%;height:24px;background:#dcdcdc"></div>
+      <div class="bar" style="width:52%;height:24px;background:#dcdcdc;margin-bottom:28px"></div>
+      <div style="display:flex;gap:22px"><div style="flex:1"><div class="bar"></div><div class="bar" style="width:90%"></div><div class="bar"></div><div class="bar" style="width:76%"></div><div class="bar"></div><div class="bar" style="width:84%"></div></div>
+      <div style="flex:1;height:180px;border-radius:6px;background:linear-gradient(135deg,#f2ede4,#e2dbcd)"></div></div>
+      <div class="bar" style="margin-top:20px"></div><div class="bar" style="width:93%"></div><div class="bar" style="width:66%"></div>
+      <div style="position:absolute;left:44px;right:44px;bottom:44px;display:flex;gap:24px;align-items:center;border-top:1px solid var(--pearl);padding-top:26px">
+        <div id="qrslot" style="width:150px;height:150px;flex:0 0 150px"></div>
+        <div><div style="font:600 24px/1.2 Int">Scan to view in 3D &amp; AR</div><div style="font:400 18px/1.4 Int;color:var(--ash);margin-top:8px">Supplementary Model S1</div></div>
+      </div>
+    </div>
+    <svg class="abs" id="qrbig" width="360" height="360"></svg>
+    <svg class="abs" id="beam" width="1920" height="1080" style="left:0;top:0;z-index:4"></svg>
+    <div class="abs" id="phone">
+      <img src="assets/ar-phone-mockup.webp" alt="">
+      <div class="abs" id="pscreen">
+        <svg class="abs" width="300" height="678" style="left:0;top:0">
+          <g stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round"><path d="M70 250v-40h40M230 250v-40h-40M70 410v40h40M230 410v40h-40"/></g>
+          <rect id="scanline" x="76" y="220" width="148" height="3" fill="#ff682c"/>
+          <text x="150" y="520" fill="#fff" font-family="Int" font-size="22" text-anchor="middle" font-weight="500">Opening AR…</text>
+        </svg>
+      </div>
+    </div>
+    <div class="abs pill" id="s6cap" style="left:1310px;top:1000px;font-size:20px">No app needed · WebXR &amp; iOS Quick Look</div>
+  </div>
+
+  <!-- ============ S7 features ============ -->
+  <div class="scene" id="s7">
+    <div class="abs" style="left:0;right:0;top:140px;text-align:center">
+      <div class="eyebrow" id="s7e" style="justify-content:center"><b>+</b><i></i>And so much more</div>
+      <h2 class="h" id="s7h" style="font-size:86px;margin-top:26px">Everything a 3D figure <span class="acc">needs.</span></h2>
+    </div>
+    <div id="fgrid"></div>
+  </div>
+
+  <!-- ============ S8 use cases ============ -->
+  <div class="scene" id="s8">
+    <div class="abs" style="left:0;right:0;top:140px;text-align:center">
+      <div class="eyebrow" id="s8e" style="justify-content:center"><b>◎</b><i></i>Use cases</div>
+      <h2 class="h" id="s8h" style="font-size:80px;margin-top:26px">Built for research, teaching <span class="acc">&amp;</span> publishing.</h2>
+    </div>
+    <div id="ugrid"></div>
+  </div>
+
+  <!-- ============ S9 institutions ============ -->
+  <div class="scene" id="s9">
+    <div class="abs" style="left:130px;top:250px;width:780px">
+      <div class="eyebrow" id="s9e"><b>05</b><i></i>Institutions &amp; clinical teams</div>
+      <h2 class="h" id="s9h" style="font-size:92px;margin-top:34px"><span class="w">Scale</span> <span class="w">across</span> <span class="w">your</span><br><span class="w acc">whole</span> <span class="w acc">department.</span></h2>
+      <p class="sub" id="s9s" style="margin-top:34px;font-size:28px">Contract quotas, invite links, an admin panel and a public showcase — plus DICOM-ready medical uploads.</p>
+      <div id="s9chips" style="margin-top:36px;display:flex;flex-wrap:wrap;gap:14px"></div>
+    </div>
+    <div class="abs card" id="inst">
+      <div style="display:flex;align-items:center;gap:20px">
+        <div style="width:72px;height:72px;border-radius:16px;background:var(--ivory);display:flex;align-items:center;justify-content:center;font:600 30px/1 Mont;color:var(--gold)">DU</div>
+        <div><div style="font:600 32px/1.2 Mont;letter-spacing:-.02em">Demo University</div><div style="font:400 20px/1.3 Int;color:var(--ash);margin-top:4px">Department of Anatomy · Institutional plan</div></div>
+      </div>
+      <div class="qrow" style="margin-top:44px"><div class="lb"><span>Models</span><span><b id="qm">0</b> <span style="color:var(--ash)">/ 200</span></span></div><div class="track"><div class="fill" id="qmf"></div></div></div>
+      <div class="qrow"><div class="lb"><span>Storage</span><span><b id="qs">0.0</b> <span style="color:var(--ash)">/ 50 GB</span></span></div><div class="track"><div class="fill" id="qsf" style="background:var(--g)"></div></div></div>
+      <div style="margin-top:44px;font:500 22px/1 Int">Members</div>
+      <div id="avs" style="margin-top:18px;padding-left:14px;display:flex;align-items:center"></div>
+      <div style="margin-top:44px;padding:24px;border-radius:14px;background:var(--cloud);display:flex;justify-content:space-between;align-items:center" id="showc">
+        <div><div style="font:500 18px/1 Int;color:var(--ash);text-transform:uppercase;letter-spacing:.08em">Public showcase</div><div style="font:500 24px/1 Int;margin-top:10px">academicar.com/i/demo-university</div></div>
+        <span class="tag o">Live</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ S10 CTA ============ -->
+  <div class="scene" id="s10">
+    <svg class="abs" id="orbit" width="1920" height="1080" style="left:0;top:0"></svg>
+    <div class="abs logo" id="s10logo" style="left:0;right:0;top:230px;justify-content:center;font-size:44px"><span class="tile" style="width:72px;height:72px;font-size:44px;border-radius:16px">A</span>AcademicAR</div>
+    <h2 class="h abs" id="s10h" style="left:0;right:0;top:370px;text-align:center;font-size:120px"><span class="w">Make</span> <span class="w">every</span> <span class="w">3D</span> <span class="w">project</span><br><span class="w acc">explorable.</span></h2>
+    <div class="abs" style="left:0;right:0;top:700px;display:flex;justify-content:center"><div class="pill" id="urlpill"><span class="dot" style="width:18px;height:18px"></span>academicar.com</div></div>
+    <p class="abs sub" id="s10s" style="left:0;right:0;top:860px;text-align:center;font-size:30px">Start free · No coding required · Mobile AR ready</p>
+  </div>
+
+  <div id="hdr"><div class="logo"><span class="tile">A</span>AcademicAR</div><div class="url">academicar.com</div></div>
+  <div id="prog"></div>
+</div>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
