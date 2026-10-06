@@ -665,3 +665,59 @@ body:has(.admin-layout) .flash-stack {
 @media (max-width: 640px) {
   .admin-hide-sm { display: none; }
 }
+
+/* ================================================================
+   Page-specific admin styles. Each page owns only its own block;
+   keep shared patterns above.
+   ================================================================ */
+
+/* == page:overview == */
+/* == end page:overview == */
+
+/* == page:users == */
+/* == end page:users == */
+
+/* == page:content == */
+/* == end page:content == */
+
+/* == page:models == */
+/* == end page:models == */
+
+/* == page:jobs == */
+/* == end page:jobs == */
+
+/* == page:annotations == */
+/* == end page:annotations == */
+
+/* == page:access == */
+/* == end page:access == */
+
+/* == page:revenue == */
+/* == end page:revenue == */
+
+/* == page:pricing == */
+/* == end page:pricing == */
+
+/* == page:security == */
+/* == end page:security == */
+
+/* == page:storage == */
+/* == end page:storage == */
+
+/* == page:system == */
+/* == end page:system == */
+
+/* == page:logs == */
+/* == end page:logs == */
+
+/* == page:backups == */
+/* == end page:backups == */
+
+/* == page:blog == */
+/* == end page:blog == */
+
+/* == page:institutions == */
+/* == end page:institutions == */
+
+/* == page:analytics == */
+/* == end page:analytics == */
