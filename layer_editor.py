@@ -15,7 +15,7 @@ import os
 import re
 import shutil
 
-from flask import Blueprint, Response, abort, current_app, flash, redirect, request, url_for
+from flask import Blueprint, Response, abort, current_app, flash, jsonify, redirect, request, url_for
 from flask_login import current_user, login_required
 from pygltflib import GLTF2
 from sqlalchemy.exc import SQLAlchemyError
@@ -156,31 +156,34 @@ def update_layers(model_id):
     layers = model_layers(model)
     if len(layers) < 2:
         abort(404)
-    back = redirect(url_for("model_edit", model_id=model.id))
+    # The viewer saves layer colours with fetch and asks for JSON; the model page posts a form.
+    wants_json = request.accept_mimetypes.best == "application/json"
+
+    def reply(message, category):
+        if wants_json:
+            return jsonify({"ok": category == "success", "message": message}), 200 if category == "success" else 400
+        flash(message, category)
+        return redirect(url_for("model_edit", model_id=model.id))
+
     if (model.processing_status or "ready") not in ("ready", "replacement_failed"):
-        flash("Layers can be edited once the model finishes processing.", "warning")
-        return back
+        return reply("Layers can be edited once the model finishes processing.", "warning")
 
     names, seen, new_colors = [], set(), {}
     for index, layer in enumerate(layers):
         name = (request.form.get(f"layer_name_{index}") or "").strip()
         if not name:
-            flash("Every layer needs a name.", "danger")
-            return back
+            return reply("Every layer needs a name.", "danger")
         if len(name) > LAYER_NAME_MAX:
-            flash(f"Layer names can be at most {LAYER_NAME_MAX} characters.", "danger")
-            return back
+            return reply(f"Layer names can be at most {LAYER_NAME_MAX} characters.", "danger")
         if name.casefold() in seen:
-            flash(f"Layer names must be unique (\"{name}\" is used twice).", "danger")
-            return back
+            return reply(f"Layer names must be unique (\"{name}\" is used twice).", "danger")
         seen.add(name.casefold())
         names.append(name)
 
         submitted = (request.form.get(f"layer_color_{index}") or "").strip()
         if layer.get("color") and submitted:
             if _HEX_COLOR.fullmatch(submitted) is None:
-                flash("Colours must be hex values like #RRGGBB.", "danger")
-                return back
+                return reply("Colours must be hex values like #RRGGBB.", "danger")
             if submitted.lower() != str(layer["color"]).lower():
                 new_colors[index] = submitted.lower()
 
@@ -198,8 +201,7 @@ def update_layers(model_id):
             logger.exception("Layer colour update failed for model %s; restoring the previous GLB", model.id)
             if os.path.exists(backup_path):
                 shutil.copy2(backup_path, glb_path)
-            flash("The layer colours could not be saved. The previous version is still active.", "warning")
-            return back
+            return reply("The layer colours could not be saved. The previous version is still active.", "warning")
         finally:
             if os.path.exists(backup_path):
                 os.remove(backup_path)
@@ -229,8 +231,7 @@ def update_layers(model_id):
     except SQLAlchemyError:
         db.session.rollback()
         logger.exception("Layer update could not be saved for model %s", model.id)
-        flash("The layers could not be saved.", "danger")
-        return back
+        return reply("The layers could not be saved.", "danger")
 
     if new_colors:
         mirror_file(glb_path, f"converted/{model.id}/model.glb")
@@ -258,8 +259,7 @@ def update_layers(model_id):
         resource_id=model.id,
         details={"layers": len(updated), "recoloured": len(new_colors)},
     )
-    flash("Layers saved.", "success")
-    return back
+    return reply("Layers saved.", "success")
 
 
 def _csv_cell(value):

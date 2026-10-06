@@ -351,7 +351,7 @@ def test_viewer_hides_colour_controls_for_layered_models_and_shows_counts(client
 
     page = client.get(f"/view/{model_id}").get_data(as_text=True)
 
-    assert "Colours are set per layer." in page
+    assert "Colours are set per layer: open Layers" in page
     assert 'class="viewer-color-tools" data-color-tools' not in page and 'data-color-swatch="' not in page
     assert '"count": 12' in page or '"count":12' in page
 
@@ -363,3 +363,30 @@ def test_viewer_keeps_colour_tools_for_models_without_layers(client, app):
     page = client.get(f"/view/{mid}").get_data(as_text=True)
 
     assert 'class="viewer-color-tools" data-color-tools' in page and "Colours are set per layer." not in page
+
+
+def test_viewer_saves_layer_colours_as_json(client, app, owner):
+    layers = _layers(app, owner)
+    resp = client.post(
+        f"/models/{owner}/layers",
+        data=_form(layers, colors={0: "#00aaff"}),
+        headers={"Accept": "application/json"},
+    )
+    assert resp.status_code == 200 and resp.get_json() == {"ok": True, "message": "Layers saved."}
+    assert _layers(app, owner)[0]["color"] == "#00aaff"
+
+    bad = client.post(f"/models/{owner}/layers", data=_form(layers, colors={0: "red"}), headers={"Accept": "application/json"})
+    assert bad.status_code == 400 and bad.get_json()["ok"] is False and "hex" in bad.get_json()["message"]
+
+
+def test_viewer_offers_saving_layer_colours_to_editors_only(client, app, owner):
+    html = client.get(f"/view/{owner}").get_data(as_text=True)
+    assert "data-layers-save data-url" in html and 'type="color" class="layer-swatch"' in html
+    client.post("/auth/logout")
+    with app.app_context():
+        paper = db.session.get(Model3D, owner).paper
+        paper.visibility, paper.is_public = "public", True
+        db.session.commit()
+    visitor = client.get(f"/view/{owner}").get_data(as_text=True)
+    assert "data-layers-save data-url" not in visitor  # visitors can preview colours, not save them
+    assert 'type="color" class="layer-swatch"' in visitor
