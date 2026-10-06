@@ -282,6 +282,26 @@ def _threshold_layers(volume: np.ndarray, keys, modality=None, notes=None) -> li
             cache["body"] = _largest_component(mask)
         return cache["body"]
 
+    def patient_region():
+        """The body (grown by two voxels) when the scan is of a patient, else None.
+
+        Decided once per scan from the dense (bone-level) voxels: a patient's
+        soft-tissue body is several times larger than its bone and holds most of
+        it. Dry specimens side by side (bone ~ body) and a hand on a big table
+        (the largest piece is the table, the bone lies outside it) do not pass,
+        so nothing is cut from them. A head holder or table next to a patient
+        is cut from every layer, whatever its density."""
+        if "patient" not in cache:
+            region = None
+            if ct and body().any():
+                dense = volume >= MEDICAL_PRESETS["bone"]["threshold_hu"]
+                total = int(dense.sum())
+                grown = ndimage.binary_dilation(body(), iterations=2)
+                if total and int(body().sum()) >= 3 * total and 2 * int((dense & grown).sum()) >= total:
+                    region = grown
+            cache["patient"] = region
+        return cache["patient"]
+
     def mask_for(key):
         if key not in cache:
             info = MEDICAL_PRESETS[key]
@@ -298,23 +318,18 @@ def _threshold_layers(volume: np.ndarray, keys, modality=None, notes=None) -> li
             if key == "contrast" and "bone" in keys:
                 # Bone (plus one voxel of partial-volume rim) belongs to the Bone layer only.
                 mask &= ~ndimage.binary_dilation(mask_for("bone"))
+            region = patient_region()
+            if region is not None:
+                inside = mask & region
+                removed = int(mask.sum()) - int(inside.sum())
+                mask = inside
+                if notes is not None and removed >= 100 and _OUTSIDE_BODY_NOTE not in notes:
+                    notes.append(_OUTSIDE_BODY_NOTE)
             if ct and key == "contrast" and body().any() and int(mask.sum()) < _MIN_CONTRAST_SHARE * int(body().sum()):
                 # A few bright voxels in a scan without contrast agent are noise, not vessels.
                 mask = np.zeros_like(mask)
                 if notes is not None:
                     notes.append(_NO_CONTRAST_NOTE)
-            total = int(mask.sum())
-            # Only a patient scan has a soft-tissue body several times larger than its
-            # dense structures; dry specimens scanned side by side (bone ~ body) keep
-            # every piece. And when most of the layer lies outside the largest piece,
-            # that piece was not the patient (a hand on a big table): leave it alone.
-            if ct and total and int(body().sum()) >= 3 * total:
-                inside = mask & ndimage.binary_dilation(body(), iterations=2)
-                removed = total - int(inside.sum())
-                if removed and removed * 2 <= total:
-                    mask = inside
-                    if notes is not None and removed >= 100 and _OUTSIDE_BODY_NOTE not in notes:
-                        notes.append(_OUTSIDE_BODY_NOTE)
             cache[key] = _clean(mask)
         return cache[key]
 

@@ -1139,3 +1139,15 @@ def test_real_contrast_vessels_are_kept():
     masks, notes = _layer_masks(vol, ["bone", "contrast"])
     assert masks["Contrast vessels"].sum() > 1000
     assert not any("No contrast-filled vessels" in note for note in notes)
+
+
+def test_contrast_level_head_holder_is_not_a_vessel_layer():
+    """The holder is denser than soft tissue but below bone: before, it was most
+    of the contrast layer, so the "mostly outside" guard kept all of it."""
+    vol = _head_ct(with_holder=False)
+    vol[4:10, 18:46, 6:34] = 200  # a large curved-plate stand-in behind the head
+    masks, notes = _layer_masks(vol, ["bone", "skin", "contrast"])
+    assert not masks["Contrast vessels"][4:10, 18:46, 6:34].any()
+    assert not masks["Contrast vessels"].any()  # nothing else is contrast-filled
+    assert any("outside the body" in note for note in notes)
+    assert any("No contrast-filled vessels" in note for note in notes)
