@@ -794,17 +794,37 @@ def audit_row_views(events) -> list[dict]:
     return rows
 
 
+ADMIN_FAILED_JOBS_WINDOW_DAYS = 7
+
+
 def admin_nav_counts() -> dict[str, int]:
-    """Failed/pending conversion job counts for the admin sidebar badge. One
-    small query, memoised per request, shared by every admin render (list and
-    detail pages) and never raising into a page render."""
+    """Failed/pending job counts for the admin sidebar badge. One small query,
+    memoised per request, shared by every admin render (list and detail pages)
+    and never raising into a page render.
+
+    "Failed" means *needs action now*: a conversion job (model upload/replace,
+    the ones that leave a user without a model) that failed within the last
+    ``ADMIN_FAILED_JOBS_WINDOW_DAYS``. Counting every failure ever kept the
+    badge orange forever; optional jobs (poster, metrics, mirror retry) never
+    fail a model and are listed on the jobs page instead. The overview's
+    "Needs attention" alert uses the same number."""
     cached = getattr(g, "_admin_nav_counts", None)
     if cached is None:
         cached = {"failed_jobs": 0, "pending_jobs": 0}
+        failed_since = datetime.now(UTC) - timedelta(days=ADMIN_FAILED_JOBS_WINDOW_DAYS)
         try:
             for status, count in (
                 db.session.query(ConversionJob.status, func.count(ConversionJob.id))
-                .filter(ConversionJob.status.in_(("failed", "pending")))
+                .filter(
+                    or_(
+                        ConversionJob.status == "pending",
+                        and_(
+                            ConversionJob.status == "failed",
+                            ConversionJob.job_type.in_(("model_upload", "model_replace")),
+                            func.coalesce(ConversionJob.finished_at, ConversionJob.created_at) >= failed_since,
+                        ),
+                    )
+                )
                 .group_by(ConversionJob.status)
                 .all()
             ):
@@ -4297,6 +4317,59 @@ def process_poster_job(
             db.session.rollback()
 
 
+def process_r2_mirror_job(
+    app: Flask,
+    *,
+    model_id: str,
+    job_id: int | None = None,
+    requested_by: int | None = None,
+) -> None:
+    """Re-upload a model's converted folder to R2 (admin "Retry mirror").
+
+    Optional job: a failure is recorded on the job and keeps the model's
+    ``r2_mirror_failed_at`` flag; only a real, complete mirror clears it.
+    ``mirror_directory_sync`` reports success when R2 is off or the folder is
+    missing, so both are refused here as well as in the web request.
+    """
+    with app.app_context():
+        model = db.session.get(Model3D, model_id)
+        job = db.session.get(ConversionJob, job_id) if job_id is not None else None
+        if job is not None and job.status != "processing":
+            job.status = "processing"
+            job.started_at = datetime.now(UTC)
+            job.attempts = (job.attempts or 0) + 1
+            db.session.commit()
+        error = None
+        try:
+            local_dir = os.path.join(app.config["CONVERTED_FOLDER"], model_id)
+            if model is None:
+                error = "Model is missing."
+            elif not r2_mirror_enabled():
+                error = "R2 mirror is not enabled on this server."
+            elif not os.path.isdir(local_dir):
+                error = "The converted files for this model are missing locally."
+            elif mirror_directory_sync(local_dir, f"converted/{model_id}"):
+                model.r2_mirror_failed_at = None
+                db.session.add(AuditLog(
+                    event_type="admin_model_mirror_retried", user_id=requested_by, resource_id=model_id,
+                ))
+            else:
+                model.r2_mirror_failed_at = datetime.now(UTC)
+                error = "R2 mirror failed again. Check R2 credentials/connectivity."
+        except Exception as exc:
+            db.session.rollback()
+            logger.exception("R2 mirror job failed for model %s", model_id)
+            error = f"{type(exc).__name__}: {exc}"[:ERROR_MESSAGE_MAX_LENGTH]
+        if job is not None:
+            job.status = "failed" if error else "completed"
+            job.error = error
+            job.finished_at = datetime.now(UTC)
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+
+
 def process_layer_metrics_job(
     app: Flask,
     *,
@@ -4544,7 +4617,7 @@ def requeue_layer_metrics(app: Flask, model: Model3D) -> None:
 
 # Jobs that only add a convenience (measurements, scene AR files): when they run
 # out of attempts they are failed on their own and never fail the model.
-OPTIONAL_JOB_TYPES = ("layer_metrics", "scene_ar", "poster", "ar_doctor")
+OPTIONAL_JOB_TYPES = ("layer_metrics", "scene_ar", "poster", "ar_doctor", "r2_mirror")
 
 
 def _fail_scene_ar(job: ConversionJob) -> None:
@@ -4585,6 +4658,8 @@ def enqueue_conversion_job(
             process_layer_metrics_job(app, **job_kwargs)
         elif job_type == "poster":
             process_poster_job(app, **job_kwargs)
+        elif job_type == "r2_mirror":
+            process_r2_mirror_job(app, **job_kwargs)
         elif job_type == "ar_doctor":
             process_ar_doctor_job(app, **job_kwargs)
         elif job_type == "scene_ar":
@@ -4742,6 +4817,8 @@ def run_next_conversion_job(app: Flask) -> bool:
         process_layer_metrics_job(app, **payload)
     elif job_kind == "poster":
         process_poster_job(app, **payload)
+    elif job_kind == "r2_mirror":
+        process_r2_mirror_job(app, **payload)
     elif job_kind == "ar_doctor":
         process_ar_doctor_job(app, **payload)
     elif job_kind == "scene_ar":
@@ -7182,21 +7259,9 @@ def register_routes(app: Flask) -> None:
         }
         stats = {
             "new_users_7d": 0,
-            "new_users_30d": 0,
-            "new_papers_7d": 0,
             "new_papers_30d": 0,
-            "new_models_30d": 0,
-            "papers_with_pdf": 0,
-            "papers_without_pdf": 0,
-            "papers_with_doi": 0,
-            "papers_with_pmid": 0,
-            "private_papers": 0,
-            "public_ratio": 0,
             "total_model_storage": 0,
-            "storage_average": 0,
-            "revenue_30_days": format_money_by_currency({}),
             "average_conversion_seconds": None,
-            "failed_login_24h": 0,
             "qr_resolved_30d": 0,
             "last_qr_resolved_at": None,
             "disabled_qr_count": 0,
@@ -7214,37 +7279,29 @@ def register_routes(app: Flask) -> None:
                 func.count(User.id),
                 flag_sum(User.is_admin.is_(True)),
                 flag_sum(User.created_at >= last_7_days),
-                flag_sum(User.created_at >= last_30_days),
             ).one()
             totals["users"], totals["admins"] = int(user_row[0]), int(user_row[1])
-            stats["new_users_7d"], stats["new_users_30d"] = int(user_row[2]), int(user_row[3])
+            stats["new_users_7d"] = int(user_row[2])
             totals["qr_links"] = QRLink.query.count()
             totals["payments"] = Payment.query.count()
             totals["paid_revenue"] = format_money_by_currency(paid_revenue_by_currency())
         elif page_is("revenue"):
             totals["paid_revenue"] = format_money_by_currency(paid_revenue_by_currency())
 
-        if page_is("overview", "content"):
+        if page_is("overview"):
+            # Only the overview headline cards render these (the content page
+            # lists projects without totals).
             paper_row = (
                 db.session.query(
                     func.count(Paper.id),
                     flag_sum(Paper.is_public.is_(True)),
-                    flag_sum(and_(Paper.doi.isnot(None), Paper.doi != "")),
-                    flag_sum(and_(Paper.pmid.isnot(None), Paper.pmid != "")),
-                    flag_sum(and_(Paper.pdf_path.isnot(None), Paper.pdf_path != "")),
-                    flag_sum(Paper.created_at >= last_7_days),
                     flag_sum(Paper.created_at >= last_30_days),
                 )
                 .filter(or_(Paper.status.is_(None), Paper.status != "deleted"))
                 .one()
             )
             totals["papers"], totals["public_papers"] = int(paper_row[0]), int(paper_row[1])
-            stats["papers_with_doi"], stats["papers_with_pmid"] = int(paper_row[2]), int(paper_row[3])
-            stats["papers_with_pdf"] = int(paper_row[4])
-            stats["new_papers_7d"], stats["new_papers_30d"] = int(paper_row[5]), int(paper_row[6])
-            stats["papers_without_pdf"] = max(totals["papers"] - stats["papers_with_pdf"], 0)
-            stats["private_papers"] = max(totals["papers"] - totals["public_papers"], 0)
-            stats["public_ratio"] = round((totals["public_papers"] / totals["papers"]) * 100) if totals["papers"] else 0
+            stats["new_papers_30d"] = int(paper_row[2])
 
         if page_is("overview", "storage"):
             model_row = (
@@ -7276,12 +7333,9 @@ def register_routes(app: Flask) -> None:
             if page_is("overview", "models")
             else {}
         )
-        license_counts = {}  # no admin template renders it any more
-        source_format_counts = {}
         payment_counts = (
             grouped_counts(Payment.status, Payment.id, "pending") if page_is("revenue") else {}
         )
-        job_counts = {}
 
         if page_is("access"):
             stats["qr_resolved_30d"] = QRLink.query.filter(QRLink.last_resolved_at >= last_30_days).count()
@@ -7725,10 +7779,7 @@ def register_routes(app: Flask) -> None:
             totals=totals,
             stats=stats,
             processing_counts=processing_counts,
-            license_counts=license_counts,
-            source_format_counts=source_format_counts,
             payment_counts=payment_counts,
-            job_counts=job_counts,
             failed_format_counts=failed_format_counts,
             largest_models=largest_models,
             expiring_models=expiring_models,
@@ -8342,6 +8393,14 @@ def register_routes(app: Flask) -> None:
         member = InstitutionMember.query.filter_by(id=member_id, institution_id=institution.id).first()
         if member is None:
             abort(404)
+        if member.role == "admin" and not InstitutionMember.query.filter(
+            InstitutionMember.institution_id == institution.id,
+            InstitutionMember.role == "admin",
+            InstitutionMember.id != member.id,
+        ).first():
+            # Never leave an institution without anyone who can run its panel.
+            flash("This is the last institution admin. Assign another admin before removing them.", "danger")
+            return redirect(url_for("admin_institution_detail", institution_id=institution.id))
         removed_user_id = member.user_id
         db.session.delete(member)
         db.session.commit()
@@ -8719,17 +8778,25 @@ def register_routes(app: Flask) -> None:
         paper.status = "active"
         paper.deleted_at = None
         paper.deleted_by_user_id = None
-        # An admin delete forces the project private; bring back the
-        # visibility it had right before that delete.
-        last_delete = (
-            AuditLog.query.filter_by(event_type="admin_paper_visibility_changed", resource_id=str(paper.id))
-            .order_by(AuditLog.timestamp.desc())
+        # A delete (by the admin or the owner) forces the project private;
+        # bring back the visibility it had right before that delete.
+        last_event = (
+            AuditLog.query.filter(
+                AuditLog.resource_id == str(paper.id),
+                AuditLog.event_type.in_(("admin_paper_visibility_changed", "paper_deleted")),
+            )
+            .order_by(AuditLog.timestamp.desc(), AuditLog.id.desc())
             .first()
         )
-        details = (last_delete.details or {}) if last_delete else {}
-        before = details.get("from") or {}
-        if (details.get("to") or {}).get("status") == "deleted" and before.get("visibility") in PROJECT_VISIBILITIES:
-            paper.visibility = before["visibility"]
+        details = (last_event.details or {}) if last_event else {}
+        if last_event is not None and last_event.event_type == "paper_deleted":
+            restored_visibility = details.get("visibility")
+        elif (details.get("to") or {}).get("status") == "deleted":
+            restored_visibility = (details.get("from") or {}).get("visibility")
+        else:
+            restored_visibility = None
+        if restored_visibility in PROJECT_VISIBILITIES:
+            paper.visibility = restored_visibility
             paper.is_public = paper.visibility == "public"
             if paper.visibility == "unlisted" and not paper.share_token:
                 paper.share_token = new_project_share_token()
@@ -9676,7 +9743,8 @@ def register_routes(app: Flask) -> None:
             abort(404)
         redirect_target = redirect(url_for("admin_dashboard", admin_page="storage"))
         # mirror_directory_sync reports "success" when R2 is off or the folder
-        # is missing; neither is a real mirror, so never clear the failure flag then.
+        # is missing; neither is a real mirror, so refuse up front instead of
+        # queuing a job that could never clear the failure flag.
         local_dir = os.path.join(app.config["CONVERTED_FOLDER"], model_id)
         if not r2_mirror_enabled():
             flash("R2 mirror is not enabled on this server; nothing was retried.", "warning")
@@ -9684,19 +9752,23 @@ def register_routes(app: Flask) -> None:
         if not os.path.isdir(local_dir):
             flash("The converted files for this model are missing locally; nothing was retried.", "warning")
             return redirect_target
-        ok = mirror_directory_sync(local_dir, f"converted/{model_id}")
-        model.r2_mirror_failed_at = None if ok else datetime.now(UTC)
-        try:
-            db.session.commit()
-        except SQLAlchemyError:
-            db.session.rollback()
-            flash("Could not update the mirror status. Please try again.", "danger")
+        # The upload itself runs in the worker (process_r2_mirror_job): a whole
+        # converted folder can take minutes, far too long for a web request.
+        already_queued = ConversionJob.query.filter(
+            ConversionJob.job_type == "r2_mirror",
+            ConversionJob.model_id == model.id,
+            ConversionJob.status.in_(("pending", "processing")),
+        ).first()
+        if already_queued is not None:
+            flash("A mirror retry for this model is already queued.", "info")
             return redirect_target
-        if ok:
-            log_audit("admin_model_mirror_retried", user_id=current_user.id, resource_id=model.id)
-            flash("R2 mirror retried successfully.", "success")
-        else:
-            flash("R2 mirror retry failed again. Check R2 credentials/connectivity.", "warning")
+        enqueue_conversion_job(
+            app,
+            model=model,
+            job_kwargs={"model_id": model.id, "requested_by": current_user.id},
+            job_type="r2_mirror",
+        )
+        flash("R2 mirror retry queued; the worker uploads the files shortly (see Conversion jobs).", "success")
         return redirect_target
 
     @app.route("/admin/jobs/<int:job_id>/max-attempts", methods=["POST"])
@@ -11064,9 +11136,14 @@ def register_routes(app: Flask) -> None:
     def paper_delete(slug):
         paper = active_paper_query().filter_by(slug=slug).first_or_404()
         paper_id = paper.id
+        previous_visibility = project_visibility(paper)
         try:
             paper.status = "deleted"
+            # Deleted projects are private, like the admin delete; the previous
+            # visibility is kept in the audit trail so admin_paper_restore can
+            # bring it back.
             paper.is_public = False
+            paper.visibility = "private"
             paper.deleted_at = datetime.now(UTC)
             paper.deleted_by_user_id = current_user.id
             db.session.commit()
@@ -11074,7 +11151,7 @@ def register_routes(app: Flask) -> None:
                 "paper_deleted",
                 user_id=current_user.id,
                 resource_id=str(paper_id),
-                details={"soft_deleted": True, "title": paper.title},
+                details={"soft_deleted": True, "title": paper.title, "visibility": previous_visibility},
             )
         except SQLAlchemyError:
             db.session.rollback()
