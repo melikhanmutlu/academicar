@@ -684,6 +684,12 @@ body:has(.admin-layout) .flash-stack {
 /* == end page:models == */
 
 /* == page:jobs == */
+.jobs-error { max-width: 280px; overflow-wrap: anywhere; }
+.jobs-pre { margin: 0; font-size: 12px; white-space: pre-wrap; word-break: break-all; max-height: 220px; overflow: auto; }
+.jobs-attempts-field { max-width: 140px; }
+@media (min-width: 641px) {
+  .admin-table small.jobs-model-inline { display: none; }
+}
 /* == end page:jobs == */
 
 /* == page:annotations == */

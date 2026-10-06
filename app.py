@@ -6798,6 +6798,7 @@ def register_routes(app: Flask) -> None:
         user_role_filter = (request.args.get("user_role") or "all").strip().lower()
         model_status_filter = (request.args.get("model_status") or "all").strip().lower()
         job_status_filter = (request.args.get("job_status") or "all").strip().lower()
+        job_type_filter = (request.args.get("job_type") or "all").strip().lower()
         audit_event_filter = (request.args.get("audit_event") or "all").strip().lower()
         audit_query_text = (request.args.get("audit_q") or "").strip()
         audit_user_filter = (request.args.get("audit_user") or "").strip()
@@ -6893,6 +6894,8 @@ def register_routes(app: Flask) -> None:
         jobs_query = ConversionJob.query
         if job_status_filter != "all":
             jobs_query = jobs_query.filter(ConversionJob.status == job_status_filter)
+        if job_type_filter != "all":
+            jobs_query = jobs_query.filter(ConversionJob.job_type == job_type_filter)
 
         annotations_query = ModelAnnotation.query.options(
             selectinload(ModelAnnotation.model).selectinload(Model3D.paper)
@@ -7175,11 +7178,6 @@ def register_routes(app: Flask) -> None:
             ):
                 failed_format_counts[source_format or "unknown"] = count
         stats["average_conversion_seconds"] = average_conversion_seconds
-        failed_jobs = (
-            ConversionJob.query.filter_by(status="failed").order_by(ConversionJob.finished_at.desc()).limit(10).all()
-            if admin_page == "jobs"
-            else []
-        )
         field_counts = {}
         daily_publication_trend = []
         daily_viewer_trend = []
@@ -7520,7 +7518,6 @@ def register_routes(app: Flask) -> None:
             job_counts=job_counts,
             field_counts=field_counts,
             failed_format_counts=failed_format_counts,
-            failed_jobs=failed_jobs,
             largest_models=largest_models,
             expiring_models=expiring_models,
             near_limit_models=near_limit_models,
@@ -7558,6 +7555,7 @@ def register_routes(app: Flask) -> None:
                 "model_status": model_status_filter,
                 "model_q": model_query_text,
                 "job_status": job_status_filter,
+                "job_type": job_type_filter,
                 "audit_event": audit_event_filter,
                 "audit_q": audit_query_text,
                 "audit_user": audit_user_filter,
