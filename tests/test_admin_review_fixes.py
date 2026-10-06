@@ -329,4 +329,4 @@ def test_audit_log_csv_includes_details(client):
         db.session.commit()
     csv_text = client.get("/admin/logs/export.csv").get_data(as_text=True)
     assert "details" in csv_text.splitlines()[0]
-    assert "gone@example.com" in csv_text
+    assert "g***@example.com" in csv_text and "gone@example.com" not in csv_text
