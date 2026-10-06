@@ -7565,6 +7565,12 @@ def register_routes(app: Flask) -> None:
         backup_requested = pending_backup_request() if admin_page == "backups" else None
         backup_skipped = latest_backup_skip() if admin_page == "backups" else None
         backup_failed = latest_backup_failure() if admin_page == "backups" else None
+        backup_keep = int(app.config.get("BACKUP_RETENTION_COUNT") or 14)
+        backup_local_keep = min(backup_local_retention(app), backup_keep)
+        backup_offsite = bool(r2_mirror_enabled()) if admin_page == "backups" else False
+        backup_age_hours = (
+            int((datetime.now(UTC) - backups[0]["created_at"]).total_seconds() // 3600) if backups else None
+        )
         if admin_page == "blog":
             # Self-heal on every visit (cheap, idempotent).
             seed_builtin_blog_posts(app)
@@ -7722,7 +7728,10 @@ def register_routes(app: Flask) -> None:
             backup_requested=backup_requested,
             backup_skipped=backup_skipped,
             backup_failed=backup_failed,
-            backup_local_retention=backup_local_retention(app),
+            backup_keep=backup_keep,
+            backup_local_keep=backup_local_keep,
+            backup_offsite=backup_offsite,
+            backup_age_hours=backup_age_hours,
             blog_posts=blog_posts,
             editing_post=editing_post,
             blog_form=blog_form,
