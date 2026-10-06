@@ -634,7 +634,9 @@
     const match = /^#?([0-9a-f]{6})$/i.exec((hex || '').trim());
     if (!match) return null;
     const value = parseInt(match[1], 16);
-    return [((value >> 16) & 255) / 255, ((value >> 8) & 255) / 255, (value & 255) / 255, 1];
+    // sRGB hex -> linear factors (glTF's baseColorFactor), as the server bakes them.
+    const lin = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+    return [lin(((value >> 16) & 255) / 255), lin(((value >> 8) & 255) / 255), lin((value & 255) / 255), 1];
   }
 
   const colorChangedField = document.querySelector('[data-color-changed]');

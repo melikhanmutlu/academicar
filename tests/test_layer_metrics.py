@@ -115,7 +115,10 @@ def test_sixty_four_layers_stay_within_the_budget(tmp_path):
     assert all(p["min_distance_mm"] == pytest.approx(22, rel=0.05) for p in metrics["pairs"])
 
 
-def test_dense_arrangement_is_capped_and_marked_truncated(tmp_path):
+def test_dense_arrangement_is_capped_and_marked_truncated(tmp_path, monkeypatch):
+    # This checks the pair cap, not the time budget: a loaded CI machine (or
+    # pytest -n 8) must not stop the pairing early and leave fewer pairs.
+    monkeypatch.setattr(layer_metrics, "METRIC_TIME_BUDGET_S", 600.0)
     parts = [(f"Part {i}", _sphere((i % 8) * 10, r_mm=2, subdivisions=2)) for i in range(64)]
     for i, (_, mesh) in enumerate(parts):
         mesh.apply_translation((0, (i // 8) * 0.01, 0))

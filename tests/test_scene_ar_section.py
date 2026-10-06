@@ -112,3 +112,14 @@ def test_ar_status_endpoint_reports_the_variant_and_respects_visibility(app, cli
     private_id = _make_model(app, visibility="private", email="private@example.com")
     _add_scene(app, private_id)
     assert client.get(f"/models/{private_id}/scenes/2/ar-status").status_code == 404
+
+
+def test_older_section_only_scene_gets_its_ar_variant_queued_once(app, client):
+    model_id = _make_model(app)
+    _add_scene(app, model_id, {"v": 1, "section": CUT_X}, ar_status="none")
+    client.get(f"/view/{model_id}")
+    client.get(f"/view/{model_id}")
+    with app.app_context():
+        from models import ConversionJob
+        assert ConversionJob.query.filter_by(job_type="scene_ar").count() == 1
+        assert db.session.get(ModelScene, 1).ar_status in ("queued", "ready", "failed")

@@ -2,6 +2,8 @@
 {% set is_embed = request.args.get('embed') in ('true', '1') %}
 {# Viewer layers (STEP parts, segmented structures, multi-part meshes): one named material each. #}
 {% set viewer_layers = ((model.layer_info or {}).get('layers') or []) if model.layer_info is mapping else [] %}
+{# The USDZ URL also carries the file's own time: a default-view save rebuilds it without touching the GLB. #}
+{% set usdz_src = url_for('serve_glb', unique_id=model.id, filename='model.usdz') ~ '?v=' ~ model_asset_token(model) ~ (('-' ~ usdz_version) if usdz_version is defined and usdz_version else '') %}
 {% set is_medical_model = model.source_format in ('dicom', 'segmentation') %}
 {# Per-layer measurements (paid plans; passed by view_model already filtered for who may see them). #}
 {% set viewer_metrics = viewer_metrics|default(none) %}
@@ -1303,7 +1305,7 @@
       id="viewer"
       class="absolute inset-0 z-10"
       src="{% if demo_mode is defined and demo_mode %}{{ url_for('static', filename='models/model.compressed.glb') }}{% else %}{{ url_for('serve_glb', unique_id=model.id, filename='model.glb') }}?v={{ model_asset_token(model) }}{% endif %}"
-      {% if has_usdz %}ios-src="{{ url_for('serve_glb', unique_id=model.id, filename='model.usdz') }}?v={{ model_asset_token(model) }}"{% endif %}
+      {% if has_usdz %}ios-src="{{ usdz_src }}"{% endif %}
       {% if model.poster_path %}poster="{{ url_for('serve_poster', unique_id=model.id) }}"{% endif %}
       alt="3D model: {{ model.display_name or model.original_filename }}"
       {% set lighting = model_lighting(model) %}
@@ -1318,7 +1320,10 @@
       ar-placement="{{ model.ar_placement or 'floor' }}"
       quick-look-browsers="safari chrome"{% endif %}
       camera-controls
-      touch-action="pan-y"
+      {# Full-screen viewer: every drag orbits (pan-y gave vertical drags to the
+         non-scrolling page, so the model could not be tilted on phones). Embeds
+         keep pan-y so the host page still scrolls past them. #}
+      touch-action="{{ 'pan-y' if is_embed else 'none' }}"
       camera-orbit="0deg 90deg auto"
       field-of-view="28deg"
       min-field-of-view="10deg"
@@ -1369,7 +1374,7 @@
     <a
       id="iosQuickLookLink"
       style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none;"
-      href="{{ url_for('serve_glb', unique_id=model.id, filename='model.usdz') }}?v={{ model_asset_token(model) }}"
+      href="{{ usdz_src }}"
       rel="ar"
       aria-hidden="true"
       tabindex="-1">
@@ -1418,7 +1423,7 @@
           <span class="sm:hidden">AR</span>
         </button>
         {% if has_usdz %}
-        <a data-ios-ar-btn hidden rel="ar" class="viewer-tool-btn primary !py-1.5 !px-4 !text-xs" href="{{ url_for('serve_glb', unique_id=model.id, filename='model.usdz') }}?v={{ model_asset_token(model) }}" type="model/vnd.usdz+zip" aria-label="View in AR">
+        <a data-ios-ar-btn hidden rel="ar" class="viewer-tool-btn primary !py-1.5 !px-4 !text-xs" href="{{ usdz_src }}" type="model/vnd.usdz+zip" aria-label="View in AR">
           <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
           <span class="hidden sm:inline">View in AR</span>
           <span class="sm:hidden">AR</span>
@@ -1474,7 +1479,7 @@
           <span class="hidden sm:inline">View in AR</span>
         </button>
         {% if has_usdz %}
-        <a data-ios-ar-btn hidden rel="ar" class="viewer-tool-btn primary" href="{{ url_for('serve_glb', unique_id=model.id, filename='model.usdz') }}?v={{ model_asset_token(model) }}" type="model/vnd.usdz+zip" aria-label="View in AR">
+        <a data-ios-ar-btn hidden rel="ar" class="viewer-tool-btn primary" href="{{ usdz_src }}" type="model/vnd.usdz+zip" aria-label="View in AR">
           <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
           <svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1L14 4.5v7L8 15L2 11.5v-7z"/><path d="M8 1v6.5M8 7.5L14 4.5M8 7.5L2 4.5"/></svg>
           <span class="hidden sm:inline">View in AR</span>
@@ -2635,6 +2640,7 @@
         swatchInput.setAttribute('aria-label', `Colour of ${layer.name}`);
         swatchInput.addEventListener('input', () => { leaveScene(); setLayerColor(i, swatchInput.value); });
         row.querySelector('.layer-opacity').setAttribute('aria-label', `Opacity of ${layer.name}`);
+        row.querySelector('.layer-opacity').value = Math.round(state[i].opacity * 100);
         // A hand edit leaves the saved scene: AR then opens the full model, not
         // that scene's variant, which would no longer match what is on screen.
         const leaveScene = () => { if (window.viewerScenes && window.viewerScenes.activeId() != null) window.viewerScenes.markActive(null); };
@@ -2713,8 +2719,10 @@
               body.append(`layer_metallic_${i}`, finish.metallic);
               body.append(`layer_roughness_${i}`, finish.roughness);
             }
-            body.append(`layer_visible_${i}`, state[i].visible ? '1' : '0');
-            body.append(`layer_opacity_${i}`, Math.round(state[i].opacity * 100) / 100);
+            if (visibilityEdited) {
+              body.append(`layer_visible_${i}`, state[i].visible ? '1' : '0');
+              body.append(`layer_opacity_${i}`, Math.round(state[i].opacity * 100) / 100);
+            }
           });
           saveBtn.disabled = true;
           saveStatus.textContent = 'Saving…';
@@ -2729,7 +2737,8 @@
             pendingColors.clear();
             pendingFinishes.forEach((finish, i) => Object.assign(layerData[i], finish));
             pendingFinishes.clear();
-            layerData.forEach((layer, i) => { layer.visible = state[i].visible; layer.opacity = state[i].opacity; });
+            if (visibilityEdited) layerData.forEach((layer, i) => { layer.visible = state[i].visible; layer.opacity = state[i].opacity; });
+            visibilityEdited = false;
             saveStatus.textContent = 'Layers saved. The AR file updates in a minute.';
             return { ok: true, message: 'Colours saved to every layer. The AR file updates in a minute.' };
           } catch (error) {
@@ -2764,7 +2773,11 @@
         glass: { metallic: 0, roughness: 0.04, opacity: 0.35 },
       };
       const pendingFinishes = new Map(); // layer index -> { metallic, roughness }
-      const markDirty = () => {
+      // The default view (shown / faded layers) is saved only after a hand edit
+      // here, never because a scene or a colour change is on screen.
+      let visibilityEdited = false;
+      const markDirty = (visibility = true) => {
+        if (visibility) visibilityEdited = true;
         if (!saveBox) return;
         saveBox.hidden = false;
         saveBox.querySelector('[data-layers-save-status]').textContent = 'Saves colours, finishes and which layers show — the viewer and AR open this way.';
@@ -2792,7 +2805,7 @@
               }
             });
             finishBox.querySelectorAll('[data-finish-preset]').forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
-            markDirty();
+            markDirty(Boolean(finish.opacity));
           });
         });
       }
@@ -3099,7 +3112,7 @@
       || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
     );
     const hasUsdz = {{ 'true' if has_usdz else 'false' }};
-    const usdzUrl = {{ (url_for('serve_glb', unique_id=model.id, filename='model.usdz') + '?v=' + model_asset_token(model))|tojson }};
+    const usdzUrl = {{ usdz_src|tojson }};
     const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent)
       || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     const isIOSChrome = isIOS && /CriOS/i.test(navigator.userAgent);
@@ -4049,11 +4062,13 @@
       let capturedFor = null;   // capture once per loaded model src
       let currentHex = null;    // last previewed hex (null = showing original)
 
+      // sRGB hex -> linear factors (glTF's baseColorFactor), as the server bakes them.
       const hexToRgb = (hex) => {
         const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim());
         if (!m) return null;
         const n = parseInt(m[1], 16);
-        return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+        const lin = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+        return [lin(((n >> 16) & 255) / 255), lin(((n >> 8) & 255) / 255), lin((n & 255) / 255)];
       };
       const materials = () => (viewer.model && viewer.model.materials) || [];
       const captureOriginals = () => {
@@ -4106,7 +4121,8 @@
         if (capturedFor === viewer.src) return;   // one capture per model
         capturedFor = viewer.src;
         captureOriginals();
-        restoreOriginal();
+        // Layered models keep the colours the Layers panel applied.
+        if (!layered) restoreOriginal();
       });
 
       swatches.forEach((b) => b.addEventListener('click', () => applyLive(b.dataset.colorSwatch)));
@@ -5742,12 +5758,23 @@
         return blob.size ? blob : null;
       };
 
+      // An automatic run that could not finish is not retried for a day.
+      const triedKey = `academicar:autoMedia:${modelId}:{{ model_asset_token(model) }}`;
+      const recentlyTried = () => {
+        try { return Date.now() - Number(localStorage.getItem(triedKey) || 0) < 24 * 3600 * 1000; } catch (e) { return false; }
+      };
       const run = async (everything) => {
         if (running || document.hidden) return;
         const have = new Set(everything ? [] : autoMedia.have);
-        const views = shotViews.filter((view) => !have.has(viewLabel(view)));
-        const videos = window.MediaRecorder ? VIDEOS.filter((video) => !have.has(video.label)) : [];
+        // Only what fits under the per-model caps (regenerating replaces in place).
+        const fits = (list, room) => (everything || list.length <= room ? list : []);
+        const views = fits(shotViews.filter((view) => !have.has(viewLabel(view))), autoMedia.image_room);
+        const videos = window.MediaRecorder ? fits(VIDEOS.filter((video) => !have.has(video.label)), autoMedia.video_room) : [];
         if (!views.length && !videos.length) return;
+        if (!everything) {
+          if (recentlyTried()) return;
+          try { localStorage.setItem(triedKey, String(Date.now())); } catch (e) { /* private mode */ }
+        }
         running = true;
         const total = views.length + videos.length;
         let done = 0;
@@ -5779,9 +5806,12 @@
             if (blob && await window.viewerMedia.save(blob, { label: video.label, source: 'auto' })) autoMedia.have.push(video.label);
             done += 1; progress();
           }
-          statusEl.textContent = done === total
+          const complete = views.every((view) => autoMedia.have.includes(viewLabel(view)))
+            && videos.every((video) => autoMedia.have.includes(video.label));
+          if (complete) { try { localStorage.removeItem(triedKey); } catch (e) { /* ignore */ } }
+          statusEl.textContent = complete
             ? 'Your model’s views and showcase videos are ready below.'
-            : 'Some images or videos were not created (the tab was in the background). They will be finished on your next visit.';
+            : 'Some images or videos could not be created. Use Regenerate to try again.';
         } catch (error) {
           statusEl.textContent = 'The automatic images and videos could not be created in this browser.';
         } finally {
@@ -5797,7 +5827,15 @@
       regenerate.title = 'Create the automatic views and showcase videos again';
       regenerate.addEventListener('click', () => run(true));
       mediaTools.querySelector('.viewer-tool-heading').appendChild(regenerate);
-      const start = () => setTimeout(() => run(false), 1500);
+      // Rendering a second viewer and recording video is too heavy for phones:
+      // the automatic run happens on a computer (Regenerate works anywhere).
+      const desktop = window.matchMedia('(pointer: fine)').matches && window.innerWidth >= 1024;
+      const start = () => {
+        if (desktop) setTimeout(() => run(false), 1500);
+        else if (shotViews.some((view) => !autoMedia.have.includes(viewLabel(view)))) {
+          statusEl.textContent = 'Automatic views and videos are created when you open this model on a computer.';
+        }
+      };
       if (viewer.loaded) start(); else viewer.addEventListener('load', start, { once: true });
     })();
 

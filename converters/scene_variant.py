@@ -6,12 +6,8 @@ saved scene that hides or fades layers gets its own GLB (and USDZ) built by the
 worker. A viewer layer is one named material (see ``converters.layers``), so
 hiding a layer means dropping the mesh primitives that use its materials and
 fading one means setting ``alphaMode`` BLEND with the base colour alpha scaled.
-
-Quick Look's handling of BLEND materials is uncertain (the Blender USD export
-carries opacity, but RealityKit may render it opaque or with sorting artefacts),
-so the USDZ is built with ``round_faded=True``: a layer faded to 50% or more
-stays fully visible, below that it is dropped. Android Scene Viewer renders
-BLEND correctly and keeps the exact opacity.
+The USDZ is exported from the same file: Blender writes the faded opacity into
+the UsdPreviewSurface, which Quick Look renders, so both platforms match.
 """
 
 from __future__ import annotations
@@ -27,19 +23,6 @@ from pygltflib import GLTF2
 from .glb_optimize import _find_cli, decompress_glb, glb_has_draco, optimize_glb
 
 logger = logging.getLogger(__name__)
-
-# Faded layers at or above this opacity stay visible when rounding for USDZ.
-USDZ_FADE_ROUND_AT = 0.5
-
-
-def round_faded_layers(hidden: set, faded: dict, threshold: float = USDZ_FADE_ROUND_AT) -> tuple[set, dict]:
-    """(hidden, faded) with every faded layer resolved to visible or hidden."""
-    hidden = set(hidden)
-    for name, opacity in faded.items():
-        if opacity < threshold:
-            hidden.add(name)
-    return hidden, {}
-
 
 def _drop_hidden_primitives(gltf: GLTF2, hidden_materials: set) -> int:
     """Remove primitives using a hidden material; returns how many primitives remain.
@@ -183,7 +166,6 @@ def build_scene_variant(
     *,
     colors: dict | None = None,
     section: dict | None = None,
-    round_faded: bool = False,
     compress: bool = True,
 ) -> bool:
     """Write ``out_glb``: ``source_glb`` without ``hidden_materials``, with
@@ -191,14 +173,10 @@ def build_scene_variant(
     name -> ``#rrggbb``) applied and, given a ``section`` (the viewer's
     {axis, offset, flip}), cut by that plane (see ``section_cut``).
 
-    ``round_faded`` resolves faded layers to visible/hidden instead (see the module
-    docstring; used for USDZ). ``compress=False`` keeps the output Draco-free,
-    which Blender (USDZ export) needs. Returns False, never raises, when the
+    ``compress=False`` keeps the output Draco-free. Returns False, never raises, when the
     variant could not be built (missing/undecodable source, nothing left to show).
     """
     hidden_materials, faded = set(hidden_materials or ()), dict(faded or {})
-    if round_faded:
-        hidden_materials, faded = round_faded_layers(hidden_materials, faded)
     try:
         with tempfile.TemporaryDirectory(prefix="academicar-scene-variant-") as tmp:
             work = os.path.join(tmp, "variant.glb")

@@ -11,7 +11,7 @@ from pygltflib import GLTF2
 import app as app_module
 from converters.glb_optimize import decompress_glb, glb_has_draco, optimize_glb
 from converters.layers import normalize_layers
-from converters.scene_variant import build_scene_variant, round_faded_layers
+from converters.scene_variant import build_scene_variant
 from institutions import institution_usage
 from models import ConversionJob, Institution, Model3D, ModelScene, Paper, User, db
 from scenes import scene_ar_keys, scene_to_dict
@@ -132,18 +132,17 @@ def test_variant_keeps_only_visible_layers_and_fades_the_rest(tmp_path):
     assert out.stat().st_size < source.stat().st_size
 
 
-def test_usdz_variant_rounds_faded_layers_to_visible_or_hidden(tmp_path):
-    assert round_faded_layers({"A"}, {"B": 0.4, "C": 0.5}) == ({"A", "B"}, {})
+def test_uncompressed_variant_keeps_faded_layers(tmp_path):
     source = tmp_path / "src.glb"
     _layered_glb(source)
-    out = tmp_path / "usdz_source.glb"
+    out = tmp_path / "plain_variant.glb"
 
-    assert build_scene_variant(str(source), str(out), {"A"}, {"B": 0.4, "C": 0.8}, round_faded=True, compress=False)
+    assert build_scene_variant(str(source), str(out), {"A"}, {"B": 0.4, "C": 0.8}, compress=False)
 
-    assert not glb_has_draco(str(out))  # Blender cannot read Draco
+    assert not glb_has_draco(str(out))
     gltf = GLTF2.load(str(out))
-    assert _used_materials(gltf) == {"C"}
-    assert all(m.alphaMode != "BLEND" for m in gltf.materials)
+    assert _used_materials(gltf) == {"B", "C"}
+    assert {m.name for m in gltf.materials if m.alphaMode == "BLEND"} == {"B", "C"}
 
 
 def test_variant_fails_quietly_when_nothing_is_left_or_the_source_is_bad(tmp_path):
@@ -175,8 +174,8 @@ def test_job_builds_glb_and_usdz_and_mirrors_both(app, usdz, r2):
         job = ConversionJob.query.filter_by(job_type="scene_ar").one()
         assert job.status == "completed" and job.model_id == model_id and job.payload == {"scene_id": 1}
     assert synced == scene_ar_keys(model_id, 1)
-    # Faded layers are rounded for Quick Look: B (0.4) is hidden, A is hidden, C stays.
-    assert _used_materials(usdz[0]) == {"C"}
+    # The USDZ is exported from the scene's own GLB (faded B keeps its opacity).
+    assert len(usdz) == 1
 
 
 def _add_and_run(app, **kwargs):

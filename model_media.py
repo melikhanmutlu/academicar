@@ -92,6 +92,37 @@ def _remove(media: ModelMedia) -> None:
     mirror_delete(media_r2_key(media))
 
 
+def auto_media_state(model) -> dict:
+    """What the owner's browser needs to fill in the automatic media: the labels
+    already made and how much room each kind has left under the caps."""
+    images = sum(1 for item in model.media if item.kind == "image")
+    videos = sum(1 for item in model.media if item.kind == "video")
+    return {
+        "have": [item.label for item in model.media if item.source == "auto" and item.label],
+        "image_room": MAX_IMAGES_PER_MODEL - images,
+        "video_room": MAX_VIDEOS_PER_MODEL - videos,
+    }
+
+
+def drop_auto_media(model) -> None:
+    """Delete a model's automatic views and videos (after a replacement they
+    show the old geometry); the owner's next visit generates them again.
+    Media the owner captured is kept."""
+    stale = [item for item in model.media if item.source == "auto"]
+    if not stale:
+        return
+    try:
+        for item in stale:
+            db.session.delete(item)
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        logger.exception("Could not drop the automatic media of model %s", model.id)
+        return
+    for item in stale:
+        _remove(item)
+
+
 @model_media_bp.route("/models/<model_id>/media", methods=["GET"])
 @login_required
 @require_model_editor

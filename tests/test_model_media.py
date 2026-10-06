@@ -97,3 +97,57 @@ def test_media_shows_in_the_viewer_panel_and_on_the_project_card(app, client):
     client.post("/auth/logout")
     public = client.get(f"/view/{mid}").get_data(as_text=True)
     assert 'class="viewer-media-tools"' not in public and "Front view" not in public
+
+
+def test_replacing_the_model_drops_automatic_media_but_keeps_captures(client):
+    from models import Model3D, Paper
+    from tests.conftest import register, upload_file_bytes, valid_ascii_stl_bytes
+
+    register(client)
+    client.post("/papers/new", data={"title": "Media Replace"}, follow_redirects=True)
+    with client.application.app_context():
+        slug = Paper.query.filter_by(title="Media Replace").one().slug
+    client.post(
+        f"/papers/{slug}/upload-model",
+        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "first.stl"), "compliance_confirm": "yes", "source_unit": "cm"},
+        content_type="multipart/form-data",
+    )
+    with client.application.app_context():
+        mid = Model3D.query.one().id
+    _upload(client, mid, _png(), source="auto", label="View: Front")
+    _upload(client, mid, _png(), label="My capture")
+    client.post(
+        f"/models/{mid}/replace",
+        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "second.stl"), "compliance_confirm": "yes", "source_unit": "cm"},
+        content_type="multipart/form-data",
+    )
+    with client.application.app_context():
+        assert [(m.source, m.label) for m in ModelMedia.query.all()] == [("user", "My capture")]
+        assert len(os.listdir(os.path.join(client.application.config["CONVERTED_FOLDER"], mid, "media"))) == 1
+
+
+def test_account_deletion_removes_mirrored_files(client, monkeypatch):
+    import app as app_module
+    from models import Model3D, Paper
+    from tests.conftest import register, upload_file_bytes, valid_ascii_stl_bytes
+
+    deleted = []
+    monkeypatch.setattr(app_module, "mirror_delete", deleted.append)
+    monkeypatch.setattr("model_media.mirror_delete", deleted.append, raising=False)
+    register(client)
+    client.post("/papers/new", data={"title": "Gone"}, follow_redirects=True)
+    with client.application.app_context():
+        slug = Paper.query.filter_by(title="Gone").one().slug
+    client.post(
+        f"/papers/{slug}/upload-model",
+        data={"file": upload_file_bytes(valid_ascii_stl_bytes(), "a.stl"), "compliance_confirm": "yes", "source_unit": "cm"},
+        content_type="multipart/form-data",
+    )
+    with client.application.app_context():
+        mid = Model3D.query.one().id
+    filename = _upload(client, mid, _png()).get_json()["media"]["url"]
+    with client.application.app_context():
+        media_key = f"converted/{mid}/media/{ModelMedia.query.one().filename}"
+    client.post("/account/delete", data={"confirm": "DELETE", "current_password": "password123"})
+    assert f"converted/{mid}/model.glb" in deleted and media_key in deleted and f"converted/{mid}/ar.glb" in deleted
+    assert filename

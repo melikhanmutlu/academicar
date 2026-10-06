@@ -238,10 +238,25 @@ def scene_to_dict(scene: ModelScene, model=None) -> dict:
     return data
 
 
+def queue_missing_scene_ar(model) -> None:
+    """Scenes saved before their AR variant covered colours and the section
+    (status "none" but now with something to build) get it queued once."""
+    if not scene_ar_enabled(model):
+        return
+    for scene in model.scenes:
+        if (scene.ar_status or "none") == "none" and scene_ar_signature(scene.state):
+            try:
+                queue_scene_ar(scene, model)
+            except SQLAlchemyError:
+                db.session.rollback()
+                logger.exception("Could not queue the AR variant of scene %s", scene.id)
+
+
 def scenes_for_viewer(model) -> list[dict]:
     """The model's scenes for the viewer (empty when the plan lacks scenes)."""
     if not scenes_enabled(model):
         return []
+    queue_missing_scene_ar(model)
     return [scene_to_dict(scene, model) for scene in model.scenes]
 
 
