@@ -151,24 +151,24 @@
       </p>
     </div>
     <div class="plans-table-wrap">
-      <table class="plans-table">
-        <thead>
-          <tr>
-            <th>Feature</th>
-            <th>Free</th>
-            <th>Academic</th>
-            <th>Extended</th>
+      <table class="plans-table" role="table">
+        <thead role="rowgroup">
+          <tr role="row">
+            <th role="columnheader">Feature</th>
+            <th role="columnheader">Free</th>
+            <th role="columnheader">Academic</th>
+            <th role="columnheader">Extended</th>
           </tr>
         </thead>
-        <tbody>
-          <tr><td>Access window</td><td>{{ license_plans['free'].duration_days }} days</td><td>{{ (license_plans['academic'].duration_days / 365) | round(0, 'floor') | int }} years</td><td>{{ (license_plans['extended_archive'].duration_days / 365) | round(0, 'floor') | int }} years</td></tr>
-          <tr><td>Model storage</td><td>{{ (license_plans['free'].storage_limit_bytes / 1024 / 1024) | round(0, 'floor') | int }} MB</td><td>{{ (license_plans['academic'].storage_limit_bytes / 1024 / 1024) | round(0, 'floor') | int }} MB</td><td>{{ (license_plans['extended_archive'].storage_limit_bytes / 1024 / 1024) | round(0, 'floor') | int }} MB</td></tr>
-          <tr><td>Supported uploads</td><td>GLB, STL, OBJ, FBX, STEP, DICOM</td><td>GLB, STL, OBJ, FBX, STEP, DICOM</td><td>GLB, STL, OBJ, FBX, STEP, DICOM</td></tr>
-          <tr><td>QR resolver</td><td>Included</td><td>Persistent</td><td>Persistent</td></tr>
-          <tr><td>Viewer screenshots</td><td>Included</td><td>Included</td><td>Included</td></tr>
-          <tr><td>Mobile AR</td><td>Included</td><td>Included</td><td>Included</td></tr>
-          <tr><td>Public watermark</td><td>Visible</td><td>Removed</td><td>Removed</td></tr>
-          <tr><td>Recommended use</td><td>Preview</td><td>Publication</td><td>Archive</td></tr>
+        <tbody role="rowgroup">
+          <tr role="row"><td role="rowheader">Access window</td><td role="cell">{{ license_plans['free'].duration_days }} days</td><td role="cell">{{ (license_plans['academic'].duration_days / 365) | round(0, 'floor') | int }} years</td><td role="cell">{{ (license_plans['extended_archive'].duration_days / 365) | round(0, 'floor') | int }} years</td></tr>
+          <tr role="row"><td role="rowheader">Model storage</td><td role="cell">{{ (license_plans['free'].storage_limit_bytes / 1024 / 1024) | round(0, 'floor') | int }} MB</td><td role="cell">{{ (license_plans['academic'].storage_limit_bytes / 1024 / 1024) | round(0, 'floor') | int }} MB</td><td role="cell">{{ (license_plans['extended_archive'].storage_limit_bytes / 1024 / 1024) | round(0, 'floor') | int }} MB</td></tr>
+          <tr role="row"><td role="rowheader">Supported uploads</td><td role="cell">GLB, STL, OBJ, FBX, STEP, DICOM</td><td role="cell">GLB, STL, OBJ, FBX, STEP, DICOM</td><td role="cell">GLB, STL, OBJ, FBX, STEP, DICOM</td></tr>
+          <tr role="row"><td role="rowheader">QR resolver</td><td role="cell">Included</td><td role="cell">Persistent</td><td role="cell">Persistent</td></tr>
+          <tr role="row"><td role="rowheader">Viewer screenshots</td><td role="cell">Included</td><td role="cell">Included</td><td role="cell">Included</td></tr>
+          <tr role="row"><td role="rowheader">Mobile AR</td><td role="cell">Included</td><td role="cell">Included</td><td role="cell">Included</td></tr>
+          <tr role="row"><td role="rowheader">Public watermark</td><td role="cell">Visible</td><td role="cell">Removed</td><td role="cell">Removed</td></tr>
+          <tr role="row"><td role="rowheader">Recommended use</td><td role="cell">Preview</td><td role="cell">Publication</td><td role="cell">Archive</td></tr>
         </tbody>
       </table>
     </div>

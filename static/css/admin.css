@@ -447,6 +447,9 @@
   .admin-menu-toggle {
     display: inline-flex;
   }
+  #adminMenuToggle {
+    min-height: 40px;
+  }
   .admin-sidebar {
     top: 0;
     left: 0;

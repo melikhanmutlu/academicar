@@ -18,7 +18,7 @@
 
   <div class="project-new-layout">
     <div class="project-new-main">
-    <form method="POST" enctype="multipart/form-data" class="surface rounded-xl p-6 sm:p-8 space-y-6" data-upload-form{% if not is_edit %} data-chunked-upload='{"new_project": true}'{% endif %}>
+    <form method="POST" enctype="multipart/form-data" class="surface rounded-xl p-4 sm:p-8 space-y-6" data-upload-form{% if not is_edit %} data-chunked-upload='{"new_project": true}'{% endif %}>
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
       <div>
@@ -28,7 +28,7 @@
       </div>
 
       {% if not is_edit %}
-        <section class="rounded-xl border border-[#e8e8e8] bg-[#f8f8f8] p-5 space-y-4">
+        <section class="rounded-xl border border-[#e8e8e8] bg-[#f8f8f8] p-4 sm:p-5 space-y-4">
           <div>
             <h2 class="font-serif text-2xl font-semibold text-[#111827]">Add your 3D model</h2>
             <p class="text-sm text-[#5c6473] mt-2">Optional now — you can also create the project first and add the model later. GLB, STL, OBJ, FBX, STEP/STP, or a medical scan (DICOM series as ZIP, NIfTI, NRRD, DICOM-SEG).</p>

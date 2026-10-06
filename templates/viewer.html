@@ -730,6 +730,14 @@
     .viewer-rotate-num::-webkit-outer-spin-button,
     .viewer-rotate-num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     .viewer-rotate-num:focus { outline: none; border-color: rgba(255,255,255,0.45); }
+    @media (pointer: coarse) {
+      .viewer-rotate-num { font-size: 16px; }
+      #panelToggle { width: 40px; height: 40px; }
+    }
+    @media (max-width: 640px) {
+      .viewer-tool-heading [data-export-figure],
+      .viewer-tool-heading [data-download-zip] { letter-spacing: 0.04em; }
+    }
     /* Color swatches */
     .viewer-color-swatches {
       display: grid;
@@ -1364,7 +1372,7 @@
       </div>
     </header>
     {% else %}
-    <header class="absolute left-0 right-0 top-0 z-30 p-3 sm:p-6 flex items-center justify-between pointer-events-none">
+    <header class="absolute left-0 right-0 top-0 z-30 p-3 sm:p-6 flex items-start justify-between pointer-events-none">
       <a href="/" class="pointer-events-auto flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-2 py-1.5 sm:px-3 sm:py-2 backdrop-blur-xl">
         <span class="brand-mark !w-6 !h-6 sm:!w-7 sm:!h-7">A</span>
         <span class="font-serif font-semibold hidden sm:inline">AcademicAR</span>

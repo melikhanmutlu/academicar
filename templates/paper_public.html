@@ -151,7 +151,7 @@
                 </div>
               </div>
 
-              <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-qr" aria-label="Open viewer for {{ m.display_name or m.original_filename }}">
+              <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-qr public-qr-revisit" aria-label="Open viewer for {{ m.display_name or m.original_filename }}">
                 <img src="{{ url_for('qr_image', model_id=m.id) }}" class="w-24 h-24 rounded-sm transition group-hover:scale-105 relative" alt="QR code for {{ m.display_name or m.original_filename }}">
               </a>
             </div>

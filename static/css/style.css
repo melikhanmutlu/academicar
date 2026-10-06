@@ -1095,6 +1095,19 @@
   }
 }
 
+/* Phones: stack each feature over its three plan values. */
+@media (max-width: 640px) {
+  .plans-table-wrap { overflow-x: visible; }
+  .plans-table { min-width: 0; }
+  .plans-table thead tr,
+  .plans-table tbody tr { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 0; }
+  .plans-table th:first-child { display: none; }
+  .plans-table th,
+  .plans-table td { padding: 12px 8px 12px 0; }
+  .plans-table td:first-child { grid-column: 1 / -1; padding-bottom: 2px; }
+  .plans-table td:not(:first-child) { border-top: 0; padding-top: 0; font-size: 13px; }
+}
+
 /* Use Cases */
 .usecases-grid {
   display: grid;
@@ -4472,7 +4485,7 @@ input[type="file"]::-webkit-file-upload-button {
 @media (max-width: 1024px) {
   .project-create-strip { align-items: flex-start; flex-direction: column; }
   .latest-models-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .dashboard-upload-band {
@@ -5145,6 +5158,7 @@ input[type="file"]::-webkit-file-upload-button {
   padding: 20px !important;
   transition: border-color 160ms ease;
 }
+.model-registry-grid .model-card { padding: 0 !important; }
 .model-row:hover { border-color: var(--color-silver-ash) !important; }
 .model-row-grid {
   display: grid;
@@ -6121,7 +6135,10 @@ input[type="file"]::-webkit-file-upload-button {
     justify-content: flex-start;
   }
   .paper-actions .detail-action {
-    flex: 1 1 180px;
+    flex: 1 1 0;
+    min-height: 40px;
+    white-space: normal;
+    text-align: center;
   }
   .paper-meta { grid-template-columns: 1fr; }
   .paper-meta > div,
@@ -6803,6 +6820,31 @@ details[open] .upload-chevron { transform: rotate(45deg); }
     justify-content: center;
     text-align: center;
   }
+
+  .latest-model-card { grid-template-rows: 112px minmax(0, 1fr); }
+  .latest-model-preview { height: 112px; }
+
+  .publication-share {
+    border-top: 0;
+    padding-top: 0;
+    width: auto;
+  }
+
+  .publication-main p {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 6px;
+  }
+  .publication-year { margin-left: 0; }
+
+  .project-create-strip .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+  }
+
+  .share-panel .copy-field button { min-height: 40px; }
 }
 
 @media (max-width: 360px) {
@@ -7191,6 +7233,13 @@ label.rounded-xl input[type="checkbox"] {
   font-size: 12px;
   color: var(--color-silver-ash);
 }
+.profile-licensing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin-top: 20px;
+}
 .profile-alert {
   display: flex;
   align-items: center;
@@ -7412,6 +7461,9 @@ label.rounded-xl input[type="checkbox"] {
   font-weight: 500;
 }
 @media (max-width: 1024px) {
+  .security-card {
+    min-height: 0;
+  }
   .profile-account-card,
   .security-grid {
     grid-template-columns: 1fr;
@@ -7430,9 +7482,14 @@ label.rounded-xl input[type="checkbox"] {
   .profile-shell .dashboard-header {
     gap: 20px;
   }
-  .plan-grid,
-  .profile-stat-grid {
+  .plan-grid {
     grid-template-columns: 1fr;
+  }
+  .profile-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .profile-shell .dashboard-header .btn-secondary {
+    min-height: 40px;
   }
 }
 @media (max-width: 560px) {
@@ -7441,6 +7498,10 @@ label.rounded-xl input[type="checkbox"] {
   }
   .profile-account-card {
     padding: 22px;
+  }
+  .profile-stat-card {
+    min-height: 0;
+    padding: 16px;
   }
   .profile-identity {
     grid-template-columns: 1fr;
@@ -7944,6 +8005,7 @@ body.project-form-page {
 }
 .upload-inline-action {
   display: inline-flex;
+  flex: 0 0 32px;
   width: 32px;
   height: 32px;
   align-items: center;
@@ -8220,7 +8282,7 @@ details[open] > .upload-summary .upload-inline-action svg {
     grid-template-columns: 1fr;
   }
   .admin-metric {
-    flex-basis: 100%;
+    flex-basis: calc(50% - 6px);
   }
   .admin-header h1 {
     font-size: 36px;
@@ -8235,7 +8297,7 @@ details[open] > .upload-summary .upload-inline-action svg {
     flex-direction: column;
   }
   .admin-insight-card {
-    flex-basis: 100%;
+    flex-basis: calc(50% - 6px);
   }
   .admin-breakdown-grid,
   .admin-two-col {
@@ -8311,7 +8373,6 @@ details[open] > .upload-summary .upload-inline-action svg {
     min-width: 0;
     width: 100%;
   }
-  .admin-breakdown div,
   .admin-watch-list li {
     align-items: flex-start;
     flex-direction: column;
@@ -9741,7 +9802,12 @@ body.nav-menu-open {
   .article-collection-head .btn-secondary { width: 100%; }
   .article-entry-summary { grid-template-columns: 34px minmax(0, 1fr); }
   .article-entry-state { display: none; }
-  .article-entry-fields { margin: 0 10px 10px; padding: 13px; }
+  .article-entry-fields { grid-template-columns: minmax(0, 1fr); margin: 0 0 10px; padding: 12px; }
+  .article-pdf-field .file-picker-control { flex-wrap: wrap; min-width: 0; }
+  .article-pdf-field [data-file-name] { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .article-entry-actions { flex-direction: column; align-items: stretch; }
+  .article-entry-buttons { display: flex; justify-content: space-between; }
+  .article-collection { padding: 12px; }
   .topic-document-row,
   .inst-publication-row { grid-template-columns: 34px minmax(0, 1fr); }
   .topic-document-actions { grid-column: 2; justify-content: flex-start; }
@@ -9770,6 +9836,12 @@ body.nav-menu-open {
     width: 20px;
     height: 20px;
   }
+  .field-input,
+  .field-select,
+  .field-textarea,
+  .dashboard-search-form .field-input.dashboard-search,
+  .color-hex-input,
+  #projectShareUrl { font-size: 16px; }
 }
 
 /* Fields scrolled into view by the browser's "please fill in" check (or a
@@ -9855,6 +9927,9 @@ body.nav-menu-open {
 @media (max-width: 1099px) {
   /* Too narrow for models beside the share panel: stack like on phones. */
   .paper-detail-layout { grid-template-columns: minmax(0, 1fr); }
+  .paper-detail-layout > .share-panel { order: 2; }
+  .paper-detail-layout > #add-model,
+  .paper-detail-layout > #collaborators { order: 3; }
 }
 @media (min-width: 1100px) {
   .paper-detail-layout {
