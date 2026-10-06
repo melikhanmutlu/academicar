@@ -4689,7 +4689,8 @@
         offBtn.disabled = !on;
         posInput.disabled = !on;
         axesEl.querySelectorAll('button').forEach((button) => button.setAttribute('aria-pressed', String(on && button.dataset.axis === section.axis)));
-        if (sliceWrap) sliceWrap.hidden = !on;
+        // Skinned meshes are posed on the GPU: their cut cannot be traced here.
+        if (sliceWrap) sliceWrap.hidden = !on || sectionCtx.meshes.some((mesh) => mesh.isSkinnedMesh);
         if (!on) { readoutEl.textContent = 'Choose an axis to cut the model.'; return; }
         const [lo, hi] = axisRange(section.axis);
         posInput.value = String(hi > lo ? Math.round(((section.offset - lo) / (hi - lo)) * 1000) : 500);
@@ -4737,13 +4738,22 @@
       };
       // Hidden layers leave three.js layer 0 (see Layers) or turn invisible.
       const meshShown = (mesh) => mesh.visible && mesh.layers.isEnabled(0);
+      // A mesh's transform into model space, as a key: node animations move
+      // meshes inside the model, and their cached cut has to follow them.
+      // Leaves the matrix in placementScratch for the caller.
+      let placementScratch = null;
+      const meshPlacement = (mesh) => {
+        placementScratch = placementScratch || new sectionCtx.Mat4();
+        return placementScratch.copy(sectionCtx.root.matrixWorld).invert().multiply(mesh.matrixWorld).elements.map((value) => value.toFixed(6)).join(',');
+      };
       const sliceMeshData = (mesh) => {
-        if (sliceGeo.has(mesh)) return sliceGeo.get(mesh);
+        const placement = meshPlacement(mesh);
+        const cached = sliceGeo.get(mesh);
+        if (cached === null || (cached && cached.placement === placement)) return cached;
         let data = null;
         const position = mesh.geometry.attributes && mesh.geometry.attributes.position;
-        if (position && position.count >= 3 && !mesh.isSkinnedMesh) {
-          sectionCtx.root.updateMatrixWorld(true);
-          const e = new sectionCtx.Mat4().copy(sectionCtx.root.matrixWorld).invert().multiply(mesh.matrixWorld).elements;
+        if (position && position.count >= 3) {
+          const e = placementScratch.elements;
           const pos = new Float32Array(position.count * 3);
           for (let k = 0; k < position.count; k += 1) {
             const x = position.getX(k);
@@ -4754,7 +4764,7 @@
             pos[k * 3 + 2] = e[2] * x + e[6] * y + e[10] * z + e[14];
           }
           const index = mesh.geometry.index ? mesh.geometry.index.array : null;
-          data = { pos, index, triCount: Math.floor((index ? index.length : position.count) / 3), bins: {} };
+          data = { pos, index, placement, triCount: Math.floor((index ? index.length : position.count) / 3), bins: {} };
         }
         sliceGeo.set(mesh, data);
         return data;
@@ -4835,7 +4845,8 @@
       const computeSlice = () => {
         const i = AXIS_INDEX[section.axis];
         const frame = SLICE_FRAME[section.axis];
-        const key = `${section.axis}:${section.offset}`;
+        sectionCtx.root.updateMatrixWorld(true);
+        const key = `${section.axis}:${section.offset}:${sectionCtx.meshes.map(meshPlacement).join('|')}`;
         if (sliceCache && sliceCache.key === key) return sliceCache;
         const c = sectionCtx.centre[i] + section.offset;
         const diagonal = Math.hypot(...sectionCtx.max.map((value, k) => value - sectionCtx.min[k])) || 1;
@@ -4939,12 +4950,21 @@
           sliceWrap.hidden = true; // internals differ: keep the 3D section only
         }
       };
-      const scheduleSlice = () => {
-        if (!sliceFrame && sliceVisible()) sliceFrame = requestAnimationFrame(drawSlice);
+      // Layer visibility, colour and node animations change the cut without
+      // any viewer event, so a light watcher redraws on change while it shows.
+      let sliceWatch = 0;
+      const watchSlice = () => {
+        if (!sliceVisible()) { clearInterval(sliceWatch); sliceWatch = 0; return; }
+        const signature = sliceStateSignature();
+        if (signature !== sliceSignature) { sliceSignature = signature; scheduleSlice(); }
       };
-      // Layer visibility and colour changes go through the materials and the
-      // mesh layers; redraw when that changes rather than on every 3D frame.
+      const scheduleSlice = () => {
+        if (!sliceVisible()) return;
+        if (!sliceFrame) sliceFrame = requestAnimationFrame(drawSlice);
+        if (!sliceWatch) sliceWatch = setInterval(watchSlice, 200);
+      };
       const sliceStateSignature = () => (sliceCache ? sliceCache.meshes.map(({ mesh }) => (meshShown(mesh) ? meshColour(mesh) : '-')).join('|') : '')
+        + sectionCtx.meshes.map(meshPlacement).join('|')
         + (document.documentElement.dataset.viewerBg || '');
       if (sliceCanvas) {
         if ('ResizeObserver' in window) new ResizeObserver(scheduleSlice).observe(sliceCanvas);
@@ -5050,14 +5070,7 @@
       sectionBtn.addEventListener('click', () => setSectionOpen(sectionPanel.hidden));
       otherPanelToggles.forEach((toggle) => toggle.addEventListener('click', () => { if (!sectionPanel.hidden) setSectionOpen(false); }));
 
-      viewer.addEventListener('before-render', () => {
-        if (!section || !sectionCtx) return;
-        updatePlane();
-        if (sliceVisible()) {
-          const signature = sliceStateSignature();
-          if (signature !== sliceSignature) { sliceSignature = signature; scheduleSlice(); }
-        }
-      });
+      viewer.addEventListener('before-render', () => { if (section && sectionCtx) updatePlane(); });
       const onSectionModelLoad = () => {
         // A reload brings new meshes and materials: drop what the old ones held.
         sectionSides.clear();
