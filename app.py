@@ -1039,23 +1039,33 @@ _ADMIN_FILE_SCAN_CACHE: dict[str, tuple] = {}
 ADMIN_FILE_SCAN_CACHE_SECONDS = 300
 
 
-def count_orphan_model_files(folder: str, model_ids: set[str]) -> int:
-    """Files under ``converted/`` that belong to no existing model.
+def scan_converted_folder(folder: str, model_ids: set[str]) -> tuple[int, int, int]:
+    """One walk of ``converted/``: (total size, file count, orphan file count).
 
     A model folder ``converted/<model_id>/`` legitimately holds more than the
     GLB/USDZ (poster.png, collage.png, scenes/…), so only files outside a
     known model's folder count as orphans."""
     if not folder or not os.path.exists(folder):
-        return 0
+        return 0, 0, 0
     root_folder = os.path.abspath(folder)
-    orphan_count = 0
+    total_size = total_files = orphan_count = 0
     for root, _, files in os.walk(root_folder):
         relative = os.path.relpath(root, root_folder)
-        top = relative.split(os.sep, 1)[0]
-        if relative != "." and top in model_ids:
-            continue
-        orphan_count += len(files)
-    return orphan_count
+        is_orphan_dir = relative == "." or relative.split(os.sep, 1)[0] not in model_ids
+        for filename in files:
+            try:
+                total_size += os.path.getsize(os.path.join(root, filename))
+            except OSError:
+                continue
+            total_files += 1
+            if is_orphan_dir:
+                orphan_count += 1
+    return total_size, total_files, orphan_count
+
+
+def count_orphan_model_files(folder: str, model_ids: set[str]) -> int:
+    """Files under ``converted/`` that belong to no existing model."""
+    return scan_converted_folder(folder, model_ids)[2]
 
 
 def _describe_cli_resolution(command: list[str]) -> dict:
@@ -7292,6 +7302,7 @@ def register_routes(app: Flask) -> None:
                     func.coalesce(func.sum(Model3D.file_size), 0),
                     func.count(Model3D.id),
                 )
+                .filter(live_model)
                 .group_by(Model3D.user_id)
                 .order_by(func.coalesce(func.sum(Model3D.file_size), 0).desc())
                 .limit(10)
@@ -7327,7 +7338,6 @@ def register_routes(app: Flask) -> None:
             orphan_counts, storage_breakdown = cached_scan[1], cached_scan[2]
         elif admin_page in {"overview", "storage", "security"}:
             upload_size, upload_files = scan_folder_size(app.config["UPLOAD_FOLDER"])
-            converted_size, converted_files = scan_folder_size(app.config["CONVERTED_FOLDER"])
             qr_size, qr_files = scan_folder_size(app.config["QR_FOLDER"])
             pdf_size, pdf_files = scan_folder_size(app.config["PDF_FOLDER"])
             # Only the path columns are needed for orphan detection, so query those
@@ -7343,8 +7353,11 @@ def register_routes(app: Flask) -> None:
                 if qr_code_path
             }
             known_model_ids = {model_pk for (model_pk,) in db.session.query(Model3D.id).all()}
+            converted_size, converted_files, converted_orphans = scan_converted_folder(
+                app.config["CONVERTED_FOLDER"], known_model_ids
+            )
             orphan_counts = {
-                "converted": count_orphan_model_files(app.config["CONVERTED_FOLDER"], known_model_ids),
+                "converted": converted_orphans,
                 "pdf": count_orphan_files(app.config["PDF_FOLDER"], expected_pdf_files),
                 "qr": count_orphan_files(app.config["QR_FOLDER"], expected_qr_files),
             }
@@ -7374,12 +7387,12 @@ def register_routes(app: Flask) -> None:
                 "webhook_signature_failures": AuditLog.query.filter_by(event_type="payment_webhook_signature_invalid").count(),
             }
         mirror_failed_count = (
-            Model3D.query.filter(Model3D.r2_mirror_failed_at.isnot(None)).count()
+            Model3D.query.filter(Model3D.r2_mirror_failed_at.isnot(None), live_model).count()
             if page_is("storage", "overview", "security")
             else 0
         )
         mirror_failed_models = (
-            Model3D.query.filter(Model3D.r2_mirror_failed_at.isnot(None))
+            Model3D.query.filter(Model3D.r2_mirror_failed_at.isnot(None), live_model)
             .order_by(Model3D.r2_mirror_failed_at.desc())
             .limit(20)
             .all()
@@ -8352,7 +8365,8 @@ def register_routes(app: Flask) -> None:
         candidates = [
             model
             for model in Model3D.query.filter(
-                Model3D.processing_status == "ready", Model3D.layer_info.isnot(None)
+                Model3D.processing_status == "ready", Model3D.layer_info.isnot(None),
+                Model3D.paper.has(or_(Paper.status.is_(None), Paper.status != "deleted")),
             )
             if model_has_layers(model) and not model.layer_info.get("metrics") and model.id not in busy
         ]
@@ -8374,7 +8388,7 @@ def register_routes(app: Flask) -> None:
             f"Queued layer measurements for {queued} model{'s' if queued != 1 else ''}."
             if queued
             else "No models need layer measurements.",
-            "success",
+            "success" if queued else "info",
         )
         return redirect(url_for("admin_dashboard", admin_page="storage"))
 

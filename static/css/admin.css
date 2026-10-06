@@ -702,6 +702,28 @@ body:has(.admin-layout) .flash-stack {
 /* == end page:security == */
 
 /* == page:storage == */
+.admin-storage-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+.admin-storage-cards .admin-insight-card {
+  min-height: 0;
+  gap: 6px;
+}
+.admin-storage-maint {
+  margin-top: 16px;
+}
+@media (max-width: 640px) {
+  .admin-storage-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .admin-storage-cards .admin-insight-card {
+    padding: 12px;
+  }
+  .admin-storage-maint .admin-btn {
+    width: 100%;
+  }
+}
 /* == end page:storage == */
 
 /* == page:system == */

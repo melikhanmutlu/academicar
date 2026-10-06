@@ -439,7 +439,7 @@ def test_admin_backfill_queues_models_without_metrics(client, app):
 def test_admin_storage_page_has_the_backfill_button(client):
     _make_admin(client)
     html = client.get("/admin/storage").get_data(as_text=True)
-    assert "Compute layer measurements for existing models" in html
+    assert "Compute layer measurements" in html
     assert "/admin/layer-metrics/backfill" in html
 
 
