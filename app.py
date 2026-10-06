@@ -7010,8 +7010,6 @@ def register_routes(app: Flask) -> None:
             "average_conversion_seconds": None,
             "failed_login_24h": 0,
             "qr_resolved_30d": 0,
-            "qr_resolved_total": 0,
-            "viewer_access_total": 0,
             "last_qr_resolved_at": None,
             "disabled_qr_count": 0,
             "expired_qr_count": 0,
@@ -7110,12 +7108,7 @@ def register_routes(app: Flask) -> None:
 
         if page_is("access"):
             stats["qr_resolved_30d"] = QRLink.query.filter(QRLink.last_resolved_at >= last_30_days).count()
-            stats["qr_resolved_total"] = AuditLog.query.filter(AuditLog.event_type == "qr_resolved").count()
-            stats["viewer_access_total"] = AuditLog.query.filter(AuditLog.event_type == "public_model_viewed").count()
-            last_qr_resolved = (
-                QRLink.query.filter(QRLink.last_resolved_at.isnot(None)).order_by(QRLink.last_resolved_at.desc()).first()
-            )
-            stats["last_qr_resolved_at"] = last_qr_resolved.last_resolved_at if last_qr_resolved else None
+            stats["last_qr_resolved_at"] = db.session.query(func.max(QRLink.last_resolved_at)).scalar()
             stats["disabled_qr_count"] = QRLink.query.filter(QRLink.status != "active").count()
             # A model is "expired" only when it is not still queued/processing/failed
             # and not kept-alive as replacement_failed, and its access window has
@@ -7201,8 +7194,7 @@ def register_routes(app: Flask) -> None:
         )
         field_counts = {}
         daily_publication_trend = []
-        daily_viewer_trend = []
-        if admin_page in {"content", "access"}:
+        if admin_page in {"content"}:
             if admin_page == "content":
                 for field, count in db.session.query(Paper.field, func.count(Paper.id)).group_by(Paper.field).order_by(func.count(Paper.id).desc()).limit(8).all():
                     key = field or "Unspecified"
@@ -7225,8 +7217,6 @@ def register_routes(app: Flask) -> None:
 
             if admin_page == "content":
                 daily_publication_trend = per_day(Paper.created_at)
-            else:
-                daily_viewer_trend = per_day(AuditLog.timestamp, AuditLog.event_type == "public_model_viewed")
         monthly_revenue = []
         monthly_revenue_currency = None
         payment_providers = []
@@ -7278,22 +7268,6 @@ def register_routes(app: Flask) -> None:
             for m in monthly_revenue:
                 # Bar height in px, scaled to the busiest month; empty months stay flat.
                 m["bar_px"] = 8 + int(132 * m["amount"] / _max_month) if m["amount"] else 2
-        top_viewed_models = []
-        if admin_page == "access":
-            top_viewed_rows = (
-                db.session.query(AuditLog.resource_id, func.count(AuditLog.id))
-                .filter(AuditLog.event_type == "public_model_viewed", AuditLog.resource_id.isnot(None))
-                .group_by(AuditLog.resource_id)
-                .order_by(func.count(AuditLog.id).desc())
-                .limit(10)
-                .all()
-            )
-            viewed_model_ids = [r[0] for r in top_viewed_rows]
-            viewed_models_map = {m.id: m for m in Model3D.query.filter(Model3D.id.in_(viewed_model_ids)).all()} if viewed_model_ids else {}
-            top_viewed_models = [
-                {"model": viewed_models_map.get(model_id), "model_id": model_id, "count": count}
-                for model_id, count in top_viewed_rows
-            ]
         storage_by_user = []
         if admin_page == "storage":
             storage_rows = (
@@ -7547,11 +7521,9 @@ def register_routes(app: Flask) -> None:
             expiring_models=expiring_models,
             near_limit_models=near_limit_models,
             daily_publication_trend=daily_publication_trend,
-            daily_viewer_trend=daily_viewer_trend,
             monthly_revenue=monthly_revenue,
             monthly_revenue_currency=monthly_revenue_currency,
             payment_providers=payment_providers,
-            top_viewed_models=top_viewed_models,
             storage_by_user=storage_by_user,
             storage_breakdown=storage_breakdown,
             storage_disk=storage_disk,
@@ -8847,11 +8819,14 @@ def register_routes(app: Flask) -> None:
         qr_link = db.session.get(QRLink, qr_id)
         if not qr_link:
             abort(404)
-        new_status = (request.form.get("status") or "active").strip().lower()
+        new_status = (request.form.get("status") or "").strip().lower()
         if new_status not in {"active", "disabled"}:
             flash("Invalid QR status.", "danger")
             return redirect(admin_return_url("access"))
         previous = qr_link.status
+        if previous == new_status:
+            flash(f"QR record {qr_link.public_id} is already {new_status}.", "info")
+            return redirect(admin_return_url("access"))
         qr_link.status = new_status
         try:
             db.session.commit()
