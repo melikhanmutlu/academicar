@@ -114,7 +114,7 @@
               <td class="admin-hide-sm">{{ format_file_size(model.file_size) }}</td>
               <td>
                 <div class="admin-actions">
-                  {% if paper_is_deleted(model.paper) %}<span class="admin-btn admin-btn-secondary compact" aria-disabled="true" title="The project was deleted, so its viewer is offline.">Project deleted</span>{% else %}<a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener noreferrer" class="admin-btn admin-btn-secondary compact">Viewer</a>{% endif %}
+                  {% if paper_is_deleted(model.paper) %}<span class="status-chip models-offline" title="The project was deleted, so its viewer is offline.">Project deleted</span>{% else %}<a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener noreferrer" class="admin-btn admin-btn-secondary compact">Viewer</a>{% endif %}
                   <a href="{{ url_for('admin_model_detail', model_id=model.id) }}" class="admin-btn admin-btn-primary compact">Manage</a>
                 </div>
               </td>
