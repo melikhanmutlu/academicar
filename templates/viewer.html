@@ -37,6 +37,9 @@
         var saved = localStorage.getItem('academicar:viewerBg');
         if (saved === 'light' || saved === 'white' || saved === 'dark') m = saved;
       } catch (e) {}
+      // An embed can pick its background with ?bg=dark|light|white (not stored).
+      var asked = new URLSearchParams(window.location.search).get('bg');
+      if (asked === 'light' || asked === 'white' || asked === 'dark') m = asked;
       document.documentElement.setAttribute('data-viewer-bg', m);
     })();
   </script>
@@ -481,6 +484,7 @@
       backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
     }
     .layers-panel[hidden] { display: none; }
+    body:has(.layers-panel:not([hidden])) .viewer-inline-qr { display: none !important; }
     .layers-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px 8px; }
     .layers-head h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255, 255, 255, 0.6); }
     .layers-head-actions { display: flex; gap: 6px; }
@@ -1423,6 +1427,9 @@
         <span class="font-serif font-semibold text-white/90 hidden sm:inline">AcademicAR</span>
       </div>
       <div class="pointer-events-auto flex items-center gap-2">
+        {# Embeds get the reader tools too: Tour (scenes / labels) and Measure. #}
+        {% if has_tour %}<button id="tourBtn" class="viewer-tool-btn !py-1.5 !px-3 !text-xs" type="button" aria-label="Tour: present the {{ 'saved scenes' if viewer_scenes else 'labels' }} one by one">Tour</button>{% endif %}
+        <button id="measureBtn" class="viewer-tool-btn !py-1.5 !px-3 !text-xs" type="button" aria-label="Measure a distance" aria-pressed="false" title="Measure the distance between two points">Measure</button>
         {% if show_scenes %}<button id="scenesBtn" class="viewer-tool-btn !py-1.5 !px-3 !text-xs" type="button" aria-label="Scenes" aria-expanded="false" aria-controls="scenesPanel">Scenes</button>{% endif %}
         {% if viewer_layers|length > 1 %}<button id="layersBtn" class="viewer-tool-btn !py-1.5 !px-3 !text-xs" type="button" aria-label="Layers" aria-expanded="false" aria-controls="layersPanel">Layers</button>{% endif %}
         {% if 'section_plane' in viewer_features %}<button id="sectionBtn" class="viewer-tool-btn !py-1.5 !px-3 !text-xs" type="button" aria-label="Section plane" aria-expanded="false" aria-controls="sectionPanel" hidden>Section</button>{% endif %}
@@ -1598,6 +1605,12 @@
             </div>
             <div class="viewer-shot-grid" data-shot-gallery aria-live="polite"></div>
             <p class="viewer-shot-status" data-shot-status role="status" aria-live="polite">Screenshots will be available when the model finishes loading.</p>
+          </div>{% elif 'figure_export' in viewer_features %}<div class="viewer-shot-tools">
+            {# A plan with figure export but without screenshots still reaches it. #}
+            <div class="viewer-tool-heading">
+              <span>Figure</span>
+              <div class="flex items-center gap-2"><button type="button" data-export-figure disabled>Export figure</button></div>
+            </div>
           </div>{% endif %}
 
           {% if 'video_recording' in viewer_features %}<div class="viewer-video-tools" data-video-tools>
@@ -2374,10 +2387,28 @@
           return null;
         }
       };
-      const dataUrlToBlob = async (url) => (await fetch(url)).blob();
+      // Decoded by hand: the CSP's connect-src does not allow fetch(data:).
+      const dataUrlToBlob = (url) => {
+        const comma = url.indexOf(',');
+        const type = (url.slice(0, comma).match(/^data:([^;,]+)/) || [])[1] || 'image/png';
+        const bin = atob(url.slice(comma + 1));
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+        return new Blob([bytes], { type });
+      };
       window.viewerMedia = {
         save,
-        saveDataUrl: async (url, options) => save(await dataUrlToBlob(url), options),
+        saveDataUrl: async (url, options) => {
+          let blob;
+          try {
+            blob = dataUrlToBlob(url);
+          } catch (error) {
+            lastError = 'The image could not be read.';
+            statusEl.textContent = lastError;
+            return null;
+          }
+          return save(blob, options);
+        },
         list: () => items.slice(),
         // Why the last save failed (for example the per-model limit), so the
         // control that captured the file can say it next to itself.
@@ -2743,6 +2774,7 @@
         const swatchInput = row.querySelector('.layer-swatch');
         swatchInput.value = /^#[0-9a-f]{6}$/i.test(layer.color || '') ? layer.color.toLowerCase() : '#cccccc';
         swatchInput.setAttribute('aria-label', `Colour of ${layer.name}`);
+        if (!layer.color) swatchInput.title = 'Preview only: this layer has no colour that can be saved';
         swatchInput.addEventListener('input', () => { leaveScene(); setLayerColor(i, swatchInput.value); });
         row.querySelector('.layer-opacity').setAttribute('aria-label', `Opacity of ${layer.name}`);
         row.querySelector('.layer-opacity').value = Math.round(state[i].opacity * 100);
@@ -4238,10 +4270,17 @@
           headers: { 'X-CSRFToken': csrfToken },
           body: formData,
         });
-        if (!resp.ok) throw new Error('save failed');
-        setCollageStatus('Saved — it now shows on your project page.', 'is-success');
+        if (!resp.ok) {
+          const data = await resp.json().catch(() => ({}));
+          throw new Error(data.error || data.message || 'Could not save the combined figure. Please try again.');
+        }
+        // Also kept under Saved media (one "Combined view", replaced on each save).
+        const kept = window.viewerMedia ? await window.viewerMedia.save(blob, { label: 'Combined view', replace: true }) : true;
+        setCollageStatus(kept
+          ? 'Saved — it now shows on your project page and under Saved media.'
+          : `Saved to the project page, but not kept under Saved media: ${window.viewerMedia.lastError()}`, kept ? 'is-success' : 'is-error');
       } catch (error) {
-        setCollageStatus('Could not save the combined figure. Please try again.', 'is-error');
+        setCollageStatus(error.message === 'empty blob' ? 'Could not save the combined figure. Please try again.' : error.message, 'is-error');
       } finally {
         collageSaveButton.disabled = false;
         collageSaveButton.textContent = 'Save to project';
@@ -4614,7 +4653,7 @@
       });
     }
     // Sync the buttons with the theme already applied by the head script.
-    applyViewerBg(document.documentElement.getAttribute('data-viewer-bg') || 'dark');
+    applyViewerBg(document.documentElement.getAttribute('data-viewer-bg') || 'dark', false);
     window.viewerView.register('background', {
       get: () => document.documentElement.getAttribute('data-viewer-bg') || 'dark',
       apply: (mode) => { if (mode) applyViewerBg(mode, false); },
@@ -5467,6 +5506,10 @@
         const scenesToggle = document.getElementById('scenesBtn');
         const saveView = document.querySelector('#scenesPanel [data-scene-save-view]');
         if (!scenesToggle || !saveView) return;
+        if (saveView.disabled) {
+          sectionPanel.querySelector('[data-section-readout]').textContent = saveView.title || 'No more scenes can be saved for this model.';
+          return;
+        }
         if (scenesToggle.getAttribute('aria-expanded') !== 'true') scenesToggle.click();
         saveView.click();
       });
