@@ -1,27 +1,22 @@
 {% extends "admin/base.html" %}
 {% from "admin/_pagination.html" import render_pagination %}
 {% block admin_title %}Models{% endblock %}
-{% block admin_subtitle %}Processing state, licenses, access windows, and file-limit warnings.{% endblock %}
+{% block admin_subtitle %}Conversion health and every model's license and access.{% endblock %}
 
 {% block admin_body %}
   <section id="model-health" class="admin-section">
     <div class="admin-section-head">
-      <div>
-        <h2>Model and conversion health</h2>
-        <p>Processing state, failed formats, conversion timing, error messages, and file-limit warnings.</p>
-      </div>
-      <span>Pipeline health</span>
+      <h2>Conversion health</h2>
     </div>
     <div class="admin-insight-grid">
       <div class="admin-insight-card">
         <span>Ready</span>
         <strong>{{ processing_counts.get("ready", 0) }}</strong>
-        <small>viewer-ready models</small>
       </div>
       <div class="admin-insight-card">
         <span>Queued / processing</span>
         <strong>{{ processing_counts.get("queued", 0) }} / {{ processing_counts.get("processing", 0) }}</strong>
-        <small>models waiting or converting</small>
+        <small>queued / processing</small>
       </div>
       <div class="admin-insight-card">
         <span>Failed</span>
@@ -31,24 +26,24 @@
       <div class="admin-insight-card">
         <span>Avg conversion</span>
         <strong>{{ '—' if stats.average_conversion_seconds is none else stats.average_conversion_seconds ~ 's' }}</strong>
-        <small>completed job average</small>
+        <small>last 200 conversions</small>
       </div>
     </div>
     <div class="admin-two-col">
       <div class="admin-breakdown">
-        <h3>Failed formats</h3>
+        <h3>Failed by format</h3>
         {% for format, count in failed_format_counts.items() %}
           <div><span>{{ format|upper }}</span><strong>{{ count }}</strong></div>
         {% else %}
-          <div><span>No failed formats</span><strong>0</strong></div>
+          <div><span>None</span></div>
         {% endfor %}
       </div>
       <div class="admin-breakdown">
-        <h3>Near file limits</h3>
+        <h3>Near plan limit</h3>
         {% for model in near_limit_models %}
           <div><span>{{ model.display_name or model.original_filename or model.id }}</span><strong>{{ format_file_size(model.file_size) }} / {{ format_file_size(model.storage_limit_bytes) }}</strong></div>
         {% else %}
-          <div><span>No large-file warnings</span><strong>-</strong></div>
+          <div><span>None</span></div>
         {% endfor %}
       </div>
     </div>
@@ -56,21 +51,19 @@
 
   <section id="models" class="admin-section">
     <div class="admin-section-head">
-      <div>
-        <h2>Models and licenses</h2>
-        <p>Inspect model access, license tier, file size, QR id, and processing state.</p>
-      </div>
-      <span>{% if models_pagination %}{{ models_pagination.total }} total{% else %}{{ models|length }} shown{% endif %}</span>
+      <h2>All models</h2>
+      {% set model_total = models_pagination.total if models_pagination else models|length %}
+      <span>{{ model_total }} {{ "model" if model_total == 1 else "models" }}</span>
     </div>
     <form method="GET" action="{{ url_for('admin_dashboard', admin_page='models') }}" class="admin-filter-bar">
-      <input name="model_q" class="field-input" value="{{ filters.model_q or '' }}" placeholder="Search name, id, public id, or owner email">
+      <input name="model_q" class="field-input" value="{{ filters.model_q or '' }}" placeholder="Name, id, public id, or owner email">
       <select name="model_status" class="field-select compact-select">
-        <option value="all" {% if filters.model_status == "all" %}selected{% endif %}>All model states</option>
+        <option value="all" {% if filters.model_status == "all" %}selected{% endif %}>All states</option>
         {% for status in ["queued", "processing", "ready", "failed", "replacement_failed"] %}
-          <option value="{{ status }}" {% if filters.model_status == status %}selected{% endif %}>{{ status|replace("_", " ")|title }}</option>
+          <option value="{{ status }}" {% if filters.model_status == status %}selected{% endif %}>{{ status|replace("_", " ")|capitalize }}</option>
         {% endfor %}
       </select>
-      <button type="submit" class="admin-btn admin-btn-secondary compact">Filter models</button>
+      <button type="submit" class="admin-btn admin-btn-secondary compact">Filter</button>
       <a href="{{ url_for('admin_dashboard', admin_page='models') }}" class="admin-btn admin-btn-secondary compact">Clear</a>
     </form>
     <div class="admin-actions admin-bulk-action">
@@ -79,11 +72,11 @@
         <input type="hidden" name="next" value="{{ request.full_path }}">
         <button type="submit" class="admin-btn admin-btn-secondary compact">Generate missing previews</button>
       </form>
-      <form method="POST" action="{{ url_for('admin_generate_missing_posters') }}" onsubmit="return confirm('Queue preview re-renders for up to 100 models (overwrites existing posters)?');">
+      <form method="POST" action="{{ url_for('admin_generate_missing_posters') }}" onsubmit="return confirm('Queue preview re-renders for up to 100 models not rendered in the last 24 hours (overwrites existing posters)?');">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="next" value="{{ request.full_path }}">
         <input type="hidden" name="force" value="1">
-        <button type="submit" class="admin-btn admin-btn-secondary compact">Rebuild all previews (force)</button>
+        <button type="submit" class="admin-btn admin-btn-secondary compact">Rebuild previews</button>
       </form>
     </div>
     <div class="table-wrap">
@@ -91,11 +84,10 @@
         <thead>
           <tr>
             <th>Model</th>
-            <th>User</th>
-            <th>License</th>
-            <th>Access</th>
-            <th>Processing</th>
-            <th>Size</th>
+            <th class="admin-hide-sm">User</th>
+            <th class="admin-hide-sm">License</th>
+            <th>Status</th>
+            <th class="admin-hide-sm">Size</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -106,20 +98,20 @@
                 <strong>{{ model.display_name or model.original_filename or model.id }}</strong>
                 <small>{{ model.public_id or "No public id" }}</small>
               </td>
-              <td>
+              <td class="admin-hide-sm">
                 {% if model.paper and model.paper.author %}
                   <a href="{{ url_for('admin_user_detail', user_id=model.paper.author.id) }}">{{ model.paper.author.email }}</a>
                 {% else %}
                   {{ model.user_id }}
                 {% endif %}
               </td>
-              <td>{{ get_license_plan(model.license_type).label }}</td>
-              <td><span class="status-chip {{ admin_chip_class(model_access_status(model)) }}">{{ model_access_status(model)|title }}</span></td>
+              <td class="admin-hide-sm">{{ get_license_plan(model.license_type).label }}</td>
               <td>
-                <span class="status-chip {{ admin_chip_class(model.processing_status or 'ready') }}">{{ (model.processing_status or "ready")|replace("_", " ")|title }}</span>
+                <span class="status-chip {{ admin_chip_class(model.processing_status or 'ready') }}">{{ (model.processing_status or "ready")|replace("_", " ")|capitalize }}</span>
+                {% if model_access_status(model) == "expired" %}<span class="status-chip {{ admin_chip_class('expired') }}">Expired</span>{% endif %}
                 {% if model.processing_error or model.replacement_error %}<small title="{{ model.processing_error or model.replacement_error }}">{{ (model.processing_error or model.replacement_error)|truncate(90) }}</small>{% endif %}
               </td>
-              <td>{{ format_file_size(model.file_size) }}</td>
+              <td class="admin-hide-sm">{{ format_file_size(model.file_size) }}</td>
               <td>
                 <div class="admin-actions">
                   {% if paper_is_deleted(model.paper) %}<span class="admin-btn admin-btn-secondary compact" aria-disabled="true" title="The project was deleted, so its viewer is offline.">Project deleted</span>{% else %}<a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener noreferrer" class="admin-btn admin-btn-secondary compact">Viewer</a>{% endif %}
@@ -128,7 +120,7 @@
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="7">{{ "No models match these filters." if (filters.model_q or filters.model_status != "all") else "No models yet." }}</td></tr>
+            <tr><td colspan="6">{{ "No models match these filters." if (filters.model_q or filters.model_status != "all") else "No models yet." }}</td></tr>
           {% endfor %}
         </tbody>
       </table>
