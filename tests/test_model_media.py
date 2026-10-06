@@ -151,3 +151,17 @@ def test_account_deletion_removes_mirrored_files(client, monkeypatch):
     client.post("/account/delete", data={"confirm": "DELETE", "current_password": "password123"})
     assert f"converted/{mid}/model.glb" in deleted and media_key in deleted and f"converted/{mid}/ar.glb" in deleted
     assert filename
+
+
+def test_rename_and_replace_a_regenerated_set(app, client):
+    mid, _ = _make_model(app)
+    _login(client)
+    first = _upload(client, mid, _png(), label="My view: Front", replace="1").get_json()["media"]
+    second = _upload(client, mid, _png((9, 9, 9)), label="My view: Front", replace="1").get_json()["media"]
+    other = _upload(client, mid, _png(), label="My view: Front").get_json()["media"]  # no replace: kept
+    with app.app_context():
+        assert sorted(m.id for m in ModelMedia.query.all()) == sorted([second["id"], other["id"]])
+    assert first["id"] not in (second["id"], other["id"])
+    renamed = client.post(f"/models/{mid}/media/{other['id']}/rename", json={"label": "  Poster shot "}).get_json()
+    assert renamed["ok"] and renamed["media"]["label"] == "Poster shot"
+    assert client.post(f"/models/{mid}/media/{other['id']}/rename", json={"label": " "}).status_code == 400

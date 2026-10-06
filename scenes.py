@@ -46,6 +46,7 @@ _CAMERA_LIMITS = {"orbit": (_CAMERA_VALUE, 96), "target": (_CAMERA_VALUE, 96), "
 _BACKGROUNDS = ("dark", "light", "white")
 _SECTION_OFFSET_LIMIT = 1000.0
 _HEX_COLOR = re.compile(r"#[0-9a-f]{6}")
+_ORIENTATION = re.compile(r"-?\d{1,3}(?:\.\d+)?deg -?\d{1,3}(?:\.\d+)?deg -?\d{1,3}(?:\.\d+)?deg")
 
 
 def _number(value):
@@ -103,6 +104,20 @@ def clean_scene_state(state, model) -> dict:
 
     if state.get("background") in _BACKGROUNDS:
         cleaned["background"] = state["background"]
+
+    # Model pose from the "Preview rotation" sliders (model-viewer orientation).
+    orientation = state.get("orientation")
+    if isinstance(orientation, str) and _ORIENTATION.fullmatch(orientation.strip()):
+        cleaned["orientation"] = orientation.strip()
+
+    lighting = state.get("lighting")
+    if isinstance(lighting, dict):
+        from viewer_lighting import clean_lighting
+
+        try:
+            cleaned["lighting"] = clean_lighting(lighting)
+        except ValueError:
+            pass
 
     section = state.get("section")
     if isinstance(section, dict) and section.get("axis") in ("x", "y", "z"):

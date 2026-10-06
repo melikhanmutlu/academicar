@@ -186,7 +186,7 @@
     }
     .viewer-bg-tools [data-bg-options] { flex-wrap: wrap; }
     .viewer-light-tools [data-light-presets] { flex-wrap: wrap; justify-content: flex-end; }
-    .viewer-media-tools { border-top: 1px solid rgba(255,255,255,0.10); padding-top: 0.85rem; }
+    .viewer-media-tools, .viewer-color-tools, .viewer-video-tools { border-top: 1px solid rgba(255,255,255,0.10); padding-top: 0.85rem; }
     .viewer-media-count { font-weight: 500; letter-spacing: 0; }
     .viewer-media-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 0.6rem; }
     .viewer-media-grid:empty { display: none; }
@@ -198,14 +198,17 @@
     .viewer-media-item .viewer-media-badge { position: absolute; left: 4px; bottom: 4px; padding: 1px 5px; border-radius: 4px; font-size: 9px; font-weight: 700; color: #fff; background: rgba(0,0,0,0.6); }
     .viewer-media-item .viewer-media-actions { position: absolute; inset: auto 0 0 auto; display: none; gap: 3px; padding: 3px; }
     .viewer-media-item:hover .viewer-media-actions, .viewer-media-item:focus-within .viewer-media-actions { display: flex; }
+    @media (hover: none) { .viewer-media-item .viewer-media-actions { display: flex; } }
     .viewer-media-actions a, .viewer-media-actions button { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; font-size: 12px; color: #fff; background: rgba(0,0,0,0.65); border: 0; }
     .viewer-media-status { margin-top: 0.5rem; font-size: 0.72rem; color: rgba(255,255,255,0.55); }
-    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-media-tools { border-color: rgba(15,23,42,0.10); }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) :is(.viewer-media-tools, .viewer-color-tools, .viewer-video-tools) { border-color: rgba(15,23,42,0.10); }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-media-item { border-color: rgba(15,23,42,0.14); background: rgba(15,23,42,0.04); }
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-media-status { color: #6b6b6b; }
     .viewer-light-sliders { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem; margin-top: 0.6rem; }
     .viewer-light-sliders label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.7rem; color: rgba(255,255,255,0.6); }
     .viewer-light-sliders input { width: 100%; accent-color: #ff682c; }
-    .viewer-light-save { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.6rem; font-size: 0.72rem; color: rgba(255,255,255,0.6); }
+    .viewer-light-save { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin-top: 0.6rem; font-size: 0.72rem; color: rgba(255,255,255,0.6); }
+    .viewer-light-save button:disabled { opacity: 0.45; cursor: default; }
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-light-sliders label,
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-light-save { color: #6b6b6b; }
     .viewer-bg-tools button[aria-pressed="true"] {
@@ -1555,7 +1558,7 @@
           </div>
           <div class="rounded-lg bg-white/[0.06] p-3">
           <p class="text-white/40">AR</p>
-            <p class="font-bold mt-1">Ready</p>
+            <p class="font-bold mt-1">{{ 'Ready' if 'ar' in viewer_features else 'Not in plan' }}</p>
           </div>
         </div>
         {% if dimensions_cm and dimensions_cm != 'Not measured' %}
@@ -1622,7 +1625,9 @@
               </div>
             </div>
             <div class="viewer-color-swatches" data-color-swatches>
-              {% for hex, name in [('#E8D5B7', 'Bone'), ('#D62828', 'Artery'), ('#4A6FA5', 'Vein'), ('#A4133C', 'Blood'), ('#8B3A3A', 'Muscle'), ('#FFCBA4', 'Skin'), ('#D4E4E4', 'Cartilage'), ('#F4D35E', 'Nerve'), ('#F6E7B0', 'Adipose tissue'), ('#B56576', 'Soft tissue / organ'), ('#7B2CBF', 'Tumour'), ('#C0C0C0', 'Implant / steel')] %}
+              {# Anatomical names for scans; plain colour names for other models (same palette). #}
+              {% set swatch_names = ['Bone', 'Artery', 'Vein', 'Blood', 'Muscle', 'Skin', 'Cartilage', 'Nerve', 'Adipose tissue', 'Soft tissue / organ', 'Tumour', 'Implant / steel'] if is_medical_model else ['Ivory', 'Red', 'Blue', 'Crimson', 'Brick', 'Peach', 'Mist', 'Yellow', 'Cream', 'Rose', 'Purple', 'Silver'] %}
+              {% for hex in ['#E8D5B7', '#D62828', '#4A6FA5', '#A4133C', '#8B3A3A', '#FFCBA4', '#D4E4E4', '#F4D35E', '#F6E7B0', '#B56576', '#7B2CBF', '#C0C0C0'] %}{% set name = swatch_names[loop.index0] %}
                 <button type="button" class="viewer-color-swatch" data-color-swatch="{{ hex }}" data-color-name="{{ name }}" title="{{ name }}" aria-label="Apply {{ name }} color"><i style="background: {{ hex }}" aria-hidden="true"></i><span>{{ name }}</span></button>
               {% endfor %}
               <label class="viewer-color-custom" title="Custom color" aria-label="Custom color">
@@ -1662,7 +1667,11 @@
               <label>Shadow <input type="range" min="0" max="3" step="0.05" value="{{ lighting.shadow_intensity }}" data-light-input="shadow_intensity"></label>
               <label>Softness <input type="range" min="0" max="1" step="0.05" value="{{ lighting.shadow_softness }}" data-light-input="shadow_softness"></label>
             </div>
-            {% if is_owner and not is_embed %}<div class="viewer-light-save"><button type="button" data-light-save>Save lighting</button><span data-light-status role="status" aria-live="polite"></span></div>{% endif %}
+            <div class="viewer-light-save">
+              <button type="button" data-light-reset disabled title="Back to the lighting this model opens with">Reset</button>
+              {% if is_owner and not is_embed %}<button type="button" data-light-save disabled>Save lighting</button>{% endif %}
+              <span data-light-status role="status" aria-live="polite">{% if not (is_owner and not is_embed) %}Preview only — the owner sets the saved lighting.{% endif %}</span>
+            </div>
           </div>
 
           <div class="viewer-rotation-tools" data-rotation-tools>
@@ -1696,7 +1705,7 @@
       <div class="rounded-lg bg-white p-2">
         <img src="{{ url_for('demo_mitochondria_qr') if demo_mode is defined and demo_mode else url_for('qr_image', model_id=model.id) }}" class="h-24 w-24" alt="QR code for mobile AR">
       </div>
-      <p class="mt-2 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">Scan for AR</p>
+      <p class="mt-2 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">{{ 'Scan for AR' if 'ar' in viewer_features else 'Scan to open' }}</p>
     </aside>
     {% endif %}
 
@@ -1760,7 +1769,7 @@
       </div>
     </div>
 
-    <div id="shotModal" class="hidden fixed inset-0 z-50 bg-black/70 p-4 backdrop-blur-md" data-shot-modal>
+    <div id="shotModal" class="hidden fixed inset-0 z-50 bg-black/70 p-4 backdrop-blur-md" data-shot-modal role="dialog" aria-modal="true" aria-labelledby="shotModalTitle">
       <div class="viewer-shot-modal-card mx-auto w-full max-w-6xl rounded-xl border border-white/10 bg-[#111111] p-4 text-white shadow-2xl">
         <div class="mb-4 flex items-center justify-between gap-4">
           <div>
@@ -1778,12 +1787,12 @@
       </div>
     </div>
 
-    <div id="collageModal" class="hidden fixed inset-0 z-50 bg-black/70 p-4 backdrop-blur-md" data-collage-modal>
+    <div id="collageModal" class="hidden fixed inset-0 z-50 bg-black/70 p-4 backdrop-blur-md" data-collage-modal role="dialog" aria-modal="true" aria-labelledby="collageModalTitle">
       <div class="viewer-collage-modal-card mx-auto w-full max-w-5xl rounded-xl border border-white/10 bg-[#111111] p-4 text-white shadow-2xl">
         <div class="mb-3 flex items-center justify-between gap-4">
           <div>
             <p class="text-xs uppercase tracking-[0.18em] text-white/45">Combine screenshots</p>
-            <h2 class="mt-1 text-xl font-bold">Build a combined figure</h2>
+            <h2 id="collageModalTitle" class="mt-1 text-xl font-bold">Build a combined figure</h2>
           </div>
           <button id="closeCollageModal" type="button" class="rounded border border-white/10 px-3 py-2 text-sm text-white/70 hover:bg-white/10">Close</button>
         </div>
@@ -2201,6 +2210,24 @@
       });
     }
 
+    // --- Dialog / panel focus: move focus into what opens and give it back to
+    // the control that opened it when it closes. ---
+    const dialogOpeners = new WeakMap();
+    const openDialogFocus = (container, first) => {
+      if (!container) return;
+      dialogOpeners.set(container, document.activeElement);
+      const target = first || container.querySelector('button, [href], input, select, textarea');
+      // Unless something inside already took focus (a form field opened with it).
+      if (target && typeof target.focus === 'function') setTimeout(() => {
+        if (!container.contains(document.activeElement)) target.focus({ preventScroll: true });
+      }, 0);
+    };
+    const closeDialogFocus = (container) => {
+      const opener = container && dialogOpeners.get(container);
+      if (opener && typeof opener.focus === 'function' && document.contains(opener)) opener.focus({ preventScroll: true });
+      if (container) dialogOpeners.delete(container);
+    };
+
     // --- Shared viewer plumbing. model-viewer keeps its three.js scene and
     // renderer private; reach them through the Symbols it exports and return
     // null when the internals differ, so a feature built on them can hide. ---
@@ -2266,18 +2293,42 @@
           download.href = item.download_url;
           download.textContent = '↓';
           download.setAttribute('aria-label', `Download ${open.title}`);
+          const rename = document.createElement('button');
+          rename.type = 'button';
+          rename.textContent = '✎';
+          rename.setAttribute('aria-label', `Rename ${open.title}`);
+          rename.addEventListener('click', async () => {
+            const label = window.prompt('Name this file', item.label || '');
+            if (label == null || !label.trim() || label.trim() === item.label) return;
+            try {
+              const response = await fetch(`${mediaTools.dataset.url}/${item.id}/rename`, {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({ label: label.trim() }),
+              });
+              const data = await response.json().catch(() => ({}));
+              if (!response.ok || !data.ok) throw new Error(data.error || 'The name could not be saved.');
+              items = items.map((other) => (other.id === item.id ? data.media : other));
+              render();
+            } catch (error) { statusEl.textContent = error.message || 'The name could not be saved.'; }
+          });
           const remove = document.createElement('button');
           remove.type = 'button';
           remove.textContent = '×';
           remove.setAttribute('aria-label', `Delete ${open.title}`);
           remove.addEventListener('click', async () => {
             if (!window.confirm('Delete this saved file?')) return;
-            const response = await fetch(`${mediaTools.dataset.url}/${item.id}/delete`, {
-              method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': csrfToken },
-            });
-            if (response.ok) { items = items.filter((other) => other.id !== item.id); render(); }
+            try {
+              const response = await fetch(`${mediaTools.dataset.url}/${item.id}/delete`, {
+                method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': csrfToken },
+              });
+              if (!response.ok) throw new Error();
+              items = items.filter((other) => other.id !== item.id);
+              render();
+              statusEl.textContent = 'File deleted.';
+            } catch (error) { statusEl.textContent = 'The file could not be deleted. Please try again.'; }
           });
-          actions.append(download, remove);
+          actions.append(rename, download, remove);
           cell.appendChild(actions);
           (item.kind === 'video' ? videoGrid : grid).appendChild(cell);
         });
@@ -2295,7 +2346,8 @@
         ctx.drawImage(bitmap, 0, 0);
         return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
       };
-      const save = async (blob, { label = '', source = 'user' } = {}) => {
+      let lastError = '';
+      const save = async (blob, { label = '', source = 'user', replace = false } = {}) => {
         try {
           const file = await fitImage(blob);
           const type = (file.type || '').split(';')[0];
@@ -2304,17 +2356,21 @@
           body.append('file', new File([file], `media.${ext}`, { type }));
           body.append('label', label);
           body.append('source', source);
+          if (replace) body.append('replace', '1');
           const response = await fetch(mediaTools.dataset.url, {
             method: 'POST', body, credentials: 'same-origin', headers: { 'X-CSRFToken': csrfToken },
           });
           const data = await response.json().catch(() => ({}));
           if (!response.ok || !data.ok) throw new Error(data.error || 'The file could not be saved.');
-          items = [data.media, ...items.filter((other) => !(source === 'auto' && other.source === 'auto' && other.kind === data.media.kind && other.label === label))];
+          const replaced = (other) => (source === 'auto' || replace) && other.source === source && other.kind === data.media.kind && other.label === label;
+          items = [data.media, ...items.filter((other) => !replaced(other))];
           render();
           statusEl.textContent = `Saved “${label || data.media.kind}” to this model.`;
+          lastError = '';
           return data.media;
         } catch (error) {
-          statusEl.textContent = error.message || 'The file could not be saved.';
+          lastError = error.message || 'The file could not be saved.';
+          statusEl.textContent = lastError;
           return null;
         }
       };
@@ -2323,6 +2379,9 @@
         save,
         saveDataUrl: async (url, options) => save(await dataUrlToBlob(url), options),
         list: () => items.slice(),
+        // Why the last save failed (for example the per-model limit), so the
+        // control that captured the file can say it next to itself.
+        lastError: () => lastError,
       };
       render();
     })();
@@ -2754,18 +2813,20 @@
       if (saveBox) {
         const saveBtn = saveBox.querySelector('[data-layers-save-btn]');
         const saveStatus = saveBox.querySelector('[data-layers-save-status]');
-        saveLayers = async () => {
+        // colorsOnly: the left Color panel saves its colour and nothing else
+        // pending in Layers (finishes, the default view stay unsaved there).
+        saveLayers = async ({ colorsOnly = false } = {}) => {
           const body = new FormData();
           body.append('csrf_token', csrfToken);
           layerData.forEach((layer, i) => {
             body.append(`layer_name_${i}`, layer.name);
             if (layer.color) body.append(`layer_color_${i}`, pendingColors.get(i) || layer.color);
-            const finish = pendingFinishes.get(i);
+            const finish = colorsOnly ? null : pendingFinishes.get(i);
             if (finish) {
               body.append(`layer_metallic_${i}`, finish.metallic);
               body.append(`layer_roughness_${i}`, finish.roughness);
             }
-            if (visibilityEdited) {
+            if (visibilityEdited && !colorsOnly) {
               body.append(`layer_visible_${i}`, state[i].visible ? '1' : '0');
               body.append(`layer_opacity_${i}`, Math.round(state[i].opacity * 100) / 100);
             }
@@ -2781,6 +2842,11 @@
             if (!response.ok || !result.ok) throw new Error(result.message || 'The layers could not be saved.');
             pendingColors.forEach((hex, i) => { layerData[i].color = hex; viewColors[i] = null; });
             pendingColors.clear();
+            if (colorsOnly) {
+              saveStatus.textContent = 'Colours saved. The AR file updates in a minute.';
+              if (!pendingFinishes.size && !visibilityEdited) saveBox.hidden = true;
+              return { ok: true, message: 'Colours saved to every layer. The AR file updates in a minute.' };
+            }
             pendingFinishes.forEach((finish, i) => {
               Object.assign(layerData[i], finish);
               (resolveMaterials()?.[i] || []).forEach((entry) => Object.assign(entry, finish));
@@ -2809,7 +2875,7 @@
           layerData.forEach((layer, i) => { if (layer.color) { pendingColors.delete(i); paintLayer(i, layer.color); } });
           if (saveBox && !pendingColors.size) saveBox.hidden = true;
         },
-        saveColors: () => saveLayers(),
+        saveColors: () => saveLayers({ colorsOnly: true }),
       };
       // --- Finish presets (metallic / roughness, like web_ar's material
       // presets): preview on one layer or all, saved with "Save layers" into
@@ -2925,9 +2991,12 @@
       });
       const setOpen = (open) => {
         if (open) refreshSwatches();
+        const wasOpen = !layersPanel.hidden;
         layersPanel.hidden = !open;
         layersBtn.setAttribute('aria-expanded', String(open));
         layersBtn.classList.toggle('is-active', open);
+        if (open && !wasOpen) openDialogFocus(layersPanel, layersPanel.querySelector('[data-layers-close]'));
+        if (!open && wasOpen) closeDialogFocus(layersPanel);
       };
       layersBtn.addEventListener('click', () => setOpen(layersPanel.hidden));
       layersPanel.querySelector('[data-layers-close]').addEventListener('click', () => setOpen(false));
@@ -3757,11 +3826,13 @@
       shotModalDownload.href = shot.dataUrl;
       shotModalDownload.download = `${safeName(modelBaseName)}-${shot.key || 'current-view'}${shot.qr ? '-qr' : ''}.png`;
       shotModal.classList.remove('hidden');
+      openDialogFocus(shotModal, closeShotModal);
     };
     const closeShotPreview = () => {
-      if (!shotModal || !shotModalImg) return;
+      if (!shotModal || !shotModalImg || shotModal.classList.contains('hidden')) return;
       shotModal.classList.add('hidden');
       shotModalImg.src = '';
+      closeDialogFocus(shotModal);
     };
     const downloadCurrentShot = async () => {
       // Suspend auto-rotate around the capture: otherwise the azimuth advances
@@ -3785,7 +3856,10 @@
         // Preview the current view in the modal (with a Download button) rather than
         // pushing the file straight to the browser's downloads.
         openShotModal({ key: 'current-view', label: 'Current view', rawDataUrl: raw, dataUrl: out, qr: qrEnabled() });
-        window.viewerMedia?.saveDataUrl(out, { label: 'Current view' });
+        if (window.viewerMedia && !(await window.viewerMedia.saveDataUrl(out, { label: 'Current view' })) && shotStatusEl) {
+          shotStatusEl.textContent = `Not kept under Saved media: ${window.viewerMedia.lastError()}`;
+          shotStatusEl.classList.add('is-error');
+        }
       } finally {
         if (wasAuto) setAutoRotateState(true);
       }
@@ -3824,12 +3898,19 @@
           }
         }
         await restoreCamera(state);
-        // The set is kept as the model's views; generating it again replaces them.
+        // Kept as "My view" files, apart from the automatic views (they show
+        // the QR / background chosen here); generating again replaces this set.
+        let keptError = '';
         if (window.viewerMedia) {
-          for (const shot of shotGallery) await window.viewerMedia.saveDataUrl(shot.dataUrl, { label: `View: ${shot.label}`, source: 'auto' });
+          for (const shot of shotGallery) {
+            if (!(await window.viewerMedia.saveDataUrl(shot.dataUrl, { label: `My view: ${shot.label}`, replace: true }))) keptError = window.viewerMedia.lastError();
+          }
         }
         if (shotStatusEl) {
-          if (shotGallery.length === shotViews.length) {
+          if (shotGallery.length === shotViews.length && keptError) {
+            shotStatusEl.textContent = `8 views ready, but not all kept under Saved media: ${keptError}`;
+            shotStatusEl.classList.add('is-error');
+          } else if (shotGallery.length === shotViews.length) {
             shotStatusEl.textContent = '8 views ready.';
             shotStatusEl.classList.remove('is-error');
           } else {
@@ -4173,9 +4254,15 @@
       renderCollageFrame();
       setCollageStatus('');
       collageModal?.classList.remove('hidden');
+      openDialogFocus(collageModal, closeCollageModal);
     });
-    closeCollageModal?.addEventListener('click', () => collageModal?.classList.add('hidden'));
-    collageModal?.addEventListener('click', (e) => { if (e.target === collageModal) collageModal.classList.add('hidden'); });
+    const hideCollageModal = () => {
+      if (!collageModal || collageModal.classList.contains('hidden')) return;
+      collageModal.classList.add('hidden');
+      closeDialogFocus(collageModal);
+    };
+    closeCollageModal?.addEventListener('click', hideCollageModal);
+    collageModal?.addEventListener('click', (e) => { if (e.target === collageModal) hideCollageModal(); });
     collageQrToggle?.addEventListener('change', () => setCollageQrTile(collageQrToggle.checked));
     collageDownloadButton?.addEventListener('click', downloadCollageImage);
     collageSaveButton?.addEventListener('click', saveCollageToPublication);
@@ -4343,6 +4430,23 @@
       num.addEventListener('change', sync);
       num.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sync(); } });
     });
+    // Saved views keep the model's pose (the X/Y/Z sliders) as "Xdeg Ydeg Zdeg".
+    if (rotateInputs.length) {
+      window.viewerView.register('orientation', {
+        get: () => {
+          const values = {};
+          rotateInputs.forEach((item) => { values[item.dataset.rotateAxis] = Number(item.value || 0); });
+          return values.x || values.y || values.z ? `${values.x || 0}deg ${values.y || 0}deg ${values.z || 0}deg` : undefined;
+        },
+        apply: async (saved) => {
+          const parts = typeof saved === 'string' ? saved.split(' ').map((part) => parseFloat(part)) : [0, 0, 0];
+          const values = { x: parts[0] || 0, y: parts[1] || 0, z: parts[2] || 0 };
+          rotateInputs.forEach((input) => { input.value = values[input.dataset.rotateAxis]; });
+          rotateNums.forEach((num) => { num.value = values[num.dataset.rotateNum]; });
+          await applyModelOrientation(values);
+        },
+      });
+    }
     resetRotation?.addEventListener('click', async () => {
       // Stop auto-rotate first — otherwise model-viewer keeps spinning the camera
       // (auto-rotate-delay=0) right after we set it, so "reset" never sticks.
@@ -4394,17 +4498,27 @@
       const lightState = {{ model_lighting(model)|tojson }};
       const lightInputs = lightTools.querySelectorAll('[data-light-input]');
       const lightStatus = lightTools.querySelector('[data-light-status]');
+      // The lighting the model opens with: Reset returns to it, Save replaces it.
+      let savedLighting = { ...lightState };
+      const lightSave = lightTools.querySelector('[data-light-save]');
+      const lightReset = lightTools.querySelector('[data-light-reset]');
+      const sameLighting = (a, b) => ['environment', 'exposure', 'shadow_intensity', 'shadow_softness']
+        .every((key) => (typeof a[key] === 'number' ? Math.abs(a[key] - b[key]) < 0.001 : a[key] === b[key]));
       const applyLighting = () => {
         viewer.exposure = lightState.exposure;
         viewer.shadowIntensity = lightState.shadow_intensity;
         viewer.shadowSoftness = lightState.shadow_softness;
         const env = lightState.environment === 'studio' ? studioEnv : lightState.environment;
         if (viewer.getAttribute('environment-image') !== env) viewer.setAttribute('environment-image', env);
+        // A preset shows pressed only while the values are still the preset's own.
         lightTools.querySelectorAll('[data-light-preset]').forEach((button) => {
-          button.setAttribute('aria-pressed', String(button.dataset.lightPreset === lightState.preset));
+          const preset = LIGHT_PRESETS[button.dataset.lightPreset];
+          button.setAttribute('aria-pressed', String(button.dataset.lightPreset === lightState.preset && sameLighting(lightState, preset)));
         });
         lightInputs.forEach((input) => { input.value = lightState[input.dataset.lightInput]; });
-        if (lightStatus) lightStatus.textContent = '';
+        const changed = !sameLighting(lightState, savedLighting);
+        if (lightSave) { lightSave.disabled = !changed; if (changed) lightStatus.textContent = ''; }
+        if (lightReset) lightReset.disabled = !changed;
       };
       lightTools.querySelectorAll('[data-light-preset]').forEach((button) => {
         button.addEventListener('click', () => {
@@ -4419,7 +4533,7 @@
         lightState[input.dataset.lightInput] = Number(input.value);
         applyLighting();
       }));
-      const lightSave = lightTools.querySelector('[data-light-save]');
+      lightReset?.addEventListener('click', () => { Object.assign(lightState, savedLighting); applyLighting(); });
       lightSave?.addEventListener('click', async () => {
         lightSave.disabled = true;
         lightStatus.textContent = 'Saving…';
@@ -4431,11 +4545,27 @@
           });
           const data = await response.json().catch(() => ({}));
           if (!response.ok || !data.ok) throw new Error(data.error || 'The lighting could not be saved.');
+          savedLighting = { ...lightState };
+          applyLighting();
           lightStatus.textContent = 'Saved. The viewer opens with this lighting.';
         } catch (error) {
+          lightSave.disabled = false;
           lightStatus.textContent = error.message;
-        } finally { lightSave.disabled = false; }
+        }
       });
+      // Saved views keep the lighting; a view without it uses the model's own.
+      window.viewerView.register('lighting', {
+        get: () => ({ preset: lightState.preset, exposure: lightState.exposure, shadow_intensity: lightState.shadow_intensity, shadow_softness: lightState.shadow_softness }),
+        apply: (saved) => {
+          const preset = saved && LIGHT_PRESETS[saved.preset];
+          if (!preset) { Object.assign(lightState, savedLighting); applyLighting(); return; }
+          Object.assign(lightState, { preset: saved.preset, environment: preset.environment, exposure: preset.exposure,
+            shadow_intensity: preset.shadow_intensity, shadow_softness: preset.shadow_softness });
+          ['exposure', 'shadow_intensity', 'shadow_softness'].forEach((key) => { if (typeof saved[key] === 'number') lightState[key] = saved[key]; });
+          applyLighting();
+        },
+      });
+      applyLighting();
     }
 
     // --- Texture sharpness: anisotropic filtering keeps textures crisp at
@@ -4466,7 +4596,9 @@
     // --- Viewer background theme (dark / light / white) ---
     const VIEWER_BG_KEY = 'academicar:viewerBg';
     const bgOptions = document.querySelector('[data-bg-options]');
-    const applyViewerBg = (mode) => {
+    // persist=false: a saved scene shows its background without changing the
+    // visitor's own preference for every other model.
+    const applyViewerBg = (mode, persist = true) => {
       const m = ['dark', 'light', 'white'].includes(mode) ? mode : 'dark';
       document.documentElement.setAttribute('data-viewer-bg', m);
       if (bgOptions) {
@@ -4474,7 +4606,7 @@
           b.setAttribute('aria-pressed', b.dataset.bg === m ? 'true' : 'false');
         });
       }
-      try { localStorage.setItem(VIEWER_BG_KEY, m); } catch (e) {}
+      if (persist) { try { localStorage.setItem(VIEWER_BG_KEY, m); } catch (e) {} }
     };
     if (bgOptions) {
       bgOptions.querySelectorAll('button').forEach((b) => {
@@ -4485,7 +4617,7 @@
     applyViewerBg(document.documentElement.getAttribute('data-viewer-bg') || 'dark');
     window.viewerView.register('background', {
       get: () => document.documentElement.getAttribute('data-viewer-bg') || 'dark',
-      apply: (mode) => { if (mode) applyViewerBg(mode); },
+      apply: (mode) => { if (mode) applyViewerBg(mode, false); },
     });
 
     const setVideoStatus = (message, error = false) => {
@@ -4607,8 +4739,9 @@
         link.click();
         setTimeout(() => URL.revokeObjectURL(link.href), 1500);
         setVideoStatus('Recording downloaded.');
-        if (window.viewerMedia && await window.viewerMedia.save(blob, { label: 'Recording' })) {
-          setVideoStatus('Recording downloaded and kept under Saved media.');
+        if (window.viewerMedia) {
+          if (await window.viewerMedia.save(blob, { label: 'Recording' })) setVideoStatus('Recording downloaded and kept under Saved media.');
+          else setVideoStatus(`Recording downloaded, but not kept under Saved media: ${window.viewerMedia.lastError()}`, true);
         }
       }, { once: true });
       videoRecorder.start(250);
@@ -4658,9 +4791,6 @@
     closeShotModal?.addEventListener('click', closeShotPreview);
     shotModal?.addEventListener('click', (event) => {
       if (event.target === shotModal) closeShotPreview();
-    });
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') closeShotPreview();
     });
 
     // --- Scenes: saved views of the model. A scene is a state captured with
@@ -4887,9 +5017,12 @@
           const layersToggle = document.getElementById('layersBtn');
           if (layersToggle && layersToggle.getAttribute('aria-expanded') === 'true') layersToggle.click();
         }
+        const wasOpen = !scenesPanel.hidden;
         scenesPanel.hidden = !open;
         scenesBtn.setAttribute('aria-expanded', String(open));
         scenesBtn.classList.toggle('is-active', open);
+        if (open && !wasOpen) openDialogFocus(scenesPanel, scenesPanel.querySelector('[data-scenes-close]'));
+        if (!open && wasOpen) closeDialogFocus(scenesPanel);
       };
       scenesBtn.addEventListener('click', () => setScenesOpen(scenesPanel.hidden));
       scenesPanel.querySelector('[data-scenes-close]').addEventListener('click', () => setScenesOpen(false));
@@ -5342,8 +5475,11 @@
       const otherPanelToggles = ['scenesBtn', 'layersBtn'].map((id) => document.getElementById(id)).filter(Boolean);
       const setSectionOpen = (open) => {
         if (open) otherPanelToggles.forEach((toggle) => { if (toggle.getAttribute('aria-expanded') === 'true') toggle.click(); });
+        const wasOpen = !sectionPanel.hidden;
         sectionPanel.hidden = !open;
         sectionBtn.setAttribute('aria-expanded', String(open));
+        if (open && !wasOpen) openDialogFocus(sectionPanel, sectionPanel.querySelector('[data-section-close]'));
+        if (!open && wasOpen) closeDialogFocus(sectionPanel);
         onSectionChanged();
       };
       sectionBtn.addEventListener('click', () => setSectionOpen(sectionPanel.hidden));
@@ -6153,7 +6289,13 @@
       regenerate.type = 'button';
       regenerate.textContent = 'Regenerate';
       regenerate.title = 'Create the automatic views and showcase videos again';
-      regenerate.addEventListener('click', () => run(true));
+      regenerate.addEventListener('click', async () => {
+        if (running) return;
+        if (!window.confirm('Create the 8 views and 3 showcase videos again? The current automatic ones are replaced.')) return;
+        regenerate.disabled = true;
+        regenerate.textContent = 'Working…';
+        try { await run(true); } finally { regenerate.disabled = false; regenerate.textContent = 'Regenerate'; }
+      });
       mediaTools.querySelector('.viewer-tool-heading').appendChild(regenerate);
       // Rendering a second viewer and recording video is too heavy for phones:
       // the automatic run happens on a computer (Regenerate works anywhere).
@@ -6482,7 +6624,11 @@
           link.href = figPreviewUrl;
           link.download = `${safeName(modelBaseName)}-figure.png`;
           link.click();
-          window.viewerMedia?.save(blob, { label: 'Figure' });
+          if (window.viewerMedia) {
+            window.viewerMedia.save(blob, { label: 'Figure' }).then((kept) => {
+              if (!kept) setFigStatus(`Figure downloaded, but not kept under Saved media: ${window.viewerMedia.lastError()}`, true);
+            });
+          }
           setFigStatus(`Downloaded ${canvas.width} × ${canvas.height} px${scale ? ` · scale bar ${scale.text}` : ''}.`);
         } catch (error) {
           setFigStatus('The figure could not be created at this size on this device. Try a smaller width.', true);
@@ -6506,6 +6652,34 @@
     // but they prevent the obvious right-click / drag / save shortcuts.
     viewer.addEventListener('contextmenu', (e) => e.preventDefault());
     viewer.addEventListener('dragstart', (e) => e.preventDefault());
+
+    // --- One Escape closes one thing: the top-most dialog, then a side panel,
+    // then Measure. Runs in the capture phase so the other Escape handlers
+    // (each owning one of these) do not also fire for the same key press.
+    // Tour and Annotate keep their own step-back handling. ---
+    window.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      if (document.body.classList.contains('tour-mode')) return;
+      const visible = (el) => el && !el.hidden && !el.classList.contains('hidden');
+      const figure = document.getElementById('figureModal');
+      const steps = [
+        [() => visible(figure), () => figure.querySelector('[data-figure-close]')?.click()],
+        [() => visible(shotModal), closeShotPreview],
+        [() => visible(collageModal), hideCollageModal],
+        [() => openOverlayName(), () => closeOverlay(openOverlayName())],
+        [() => visible(document.getElementById('sectionPanel')), () => document.querySelector('#sectionPanel [data-section-close]')?.click()],
+        [() => visible(document.getElementById('layersPanel')), () => document.querySelector('#layersPanel [data-layers-close]')?.click()],
+        [() => visible(document.getElementById('scenesPanel')), () => document.querySelector('#scenesPanel [data-scenes-close]')?.click()],
+        [() => document.getElementById('measureBtn')?.getAttribute('aria-pressed') === 'true', () => document.getElementById('measureHintDone')?.click()],
+      ];
+      const step = steps.find(([isOpen]) => isOpen());
+      if (!step) return;
+      // Annotate's label form steps back on its own first.
+      if (document.getElementById('annotateBtn')?.classList.contains('is-active') && step !== steps[3]) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      step[1]();
+    }, true);
     document.addEventListener('keydown', (e) => {
       const k = e.key.toLowerCase();
       if ((e.ctrlKey || e.metaKey) && (k === 's' || k === 'p' || k === 'u')) {

@@ -153,9 +153,10 @@ def upload_media(model_id):
     label = (request.form.get("label") or "").strip()[:LABEL_MAX] or None
 
     replaced = []
-    if source == "auto" and label:
-        # Generated media: a new run replaces the previous file of the same name.
-        replaced = ModelMedia.query.filter_by(model_id=model.id, source="auto", kind=kind, label=label).all()
+    if label and (source == "auto" or request.form.get("replace") == "1"):
+        # Generated media (and a re-generated set of views) replaces the
+        # previous file of the same name and source.
+        replaced = ModelMedia.query.filter_by(model_id=model.id, source=source, kind=kind, label=label).all()
     count = ModelMedia.query.filter_by(model_id=model.id, kind=kind).count() - len(replaced)
     cap = MAX_IMAGES_PER_MODEL if kind == "image" else MAX_VIDEOS_PER_MODEL
     if count >= cap:
@@ -202,6 +203,25 @@ def delete_media(model_id, media_id):
         return jsonify({"ok": False, "error": "The file could not be deleted."}), 500
     _remove(media)
     return jsonify({"ok": True})
+
+
+@model_media_bp.route("/models/<model_id>/media/<int:media_id>/rename", methods=["POST"])
+@login_required
+@require_model_editor
+def rename_media(model_id, media_id):
+    media = db.session.get(ModelMedia, media_id)
+    if not media or media.model_id != model_id:
+        abort(404)
+    label = ((request.get_json(silent=True) or {}).get("label") or "").strip()[:LABEL_MAX]
+    if not label:
+        return jsonify({"ok": False, "error": "Give the file a name."}), 400
+    media.label = label
+    try:
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        return jsonify({"ok": False, "error": "The name could not be saved."}), 500
+    return jsonify({"ok": True, "media": media_to_dict(media)})
 
 
 @model_media_bp.route("/files/<model_id>/media/<int:media_id>")

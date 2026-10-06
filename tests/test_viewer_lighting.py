@@ -33,7 +33,7 @@ def test_owner_saves_lighting_and_viewer_opens_with_it(app, client):
     html = client.get(f"/view/{mid}").get_data(as_text=True)
     assert 'exposure="0.9"' in html and 'environment-image="neutral"' in html
     assert f'shadow-intensity="{LIGHTING_PRESETS["dramatic"]["shadow_intensity"]}"' in html
-    assert "<button type=\"button\" data-light-save>" in html
+    assert '<button type="button" data-light-save disabled>' in html  # enabled once something changes
     assert client.post(f"/models/{mid}/lighting", json={"preset": "nope"}).status_code == 400
 
 
@@ -42,4 +42,6 @@ def test_other_users_cannot_save_lighting(app, client):
     _make_model(app, email="other@example.com")
     _login(client, "other@example.com")
     assert client.post(f"/models/{mid}/lighting", json={"preset": "dim"}).status_code in (403, 404)
-    assert "<button type=\"button\" data-light-save>" not in client.get(f"/view/{mid}").get_data(as_text=True)
+    page = client.get(f"/view/{mid}").get_data(as_text=True)
+    assert '<button type="button" data-light-save' not in page
+    assert "Preview only — the owner sets the saved lighting." in page

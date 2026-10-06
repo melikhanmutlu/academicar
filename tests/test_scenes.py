@@ -315,3 +315,17 @@ def test_model_edit_scenes_section(app, client):
     _login(free_client, "free@example.com")
     free_html = free_client.get(f"/models/{free_id}/edit").get_data(as_text=True)
     assert "available on paid plans" in free_html
+
+
+def test_scene_state_keeps_orientation_and_lighting(app):
+    mid, _ = _make_model(app)
+    with app.app_context():
+        model = db.session.get(Model3D, mid)
+        cleaned = clean_scene_state({
+            "orientation": "90deg 0deg -45.5deg",
+            "lighting": {"preset": "dim", "exposure": 0.7},
+        }, model)
+        assert cleaned["orientation"] == "90deg 0deg -45.5deg"
+        assert cleaned["lighting"] == {"preset": "dim", "exposure": 0.7}
+        bad = clean_scene_state({"orientation": "rotate(1)", "lighting": {"preset": "disco"}}, model)
+        assert "orientation" not in bad and "lighting" not in bad
