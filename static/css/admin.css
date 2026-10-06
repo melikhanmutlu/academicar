@@ -681,6 +681,11 @@ body:has(.admin-layout) .flash-stack {
 /* == end page:content == */
 
 /* == page:models == */
+.admin-editor-field.is-wide { grid-column: 1 / -1; }
+.admin-editor-field input[type="color"] { width: 56px; padding: 2px; }
+.admin-breakdown.is-flat { border: none; padding: 0; }
+.admin-metric small { overflow-wrap: anywhere; }
+.admin-breakdown .admin-actions form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 /* == end page:models == */
 
 /* == page:jobs == */

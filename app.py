@@ -7148,7 +7148,7 @@ def register_routes(app: Flask) -> None:
             .order_by(Model3D.file_size.desc())
             .limit(10)
             .all()
-            if page_is("overview", "models", "security")
+            if page_is("overview", "security")
             else []
         )
         largest_models = (
@@ -7172,9 +7172,11 @@ def register_routes(app: Flask) -> None:
         failed_format_counts: dict[str, int] = {}
         if admin_page == "models":
             # Recent window only: averaging every job ever loaded the whole table.
+            conversion_job_types = ("model_upload", "model_replace")
             completed_jobs = (
                 ConversionJob.query.filter(
                     ConversionJob.status == "completed",
+                    ConversionJob.job_type.in_(conversion_job_types),
                     ConversionJob.started_at.isnot(None),
                     ConversionJob.finished_at.isnot(None),
                 )
@@ -7188,14 +7190,25 @@ def register_routes(app: Flask) -> None:
                 if job.finished_at and job.started_at and job.finished_at >= job.started_at
             ]
             average_conversion_seconds = int(sum(conversion_durations) / len(conversion_durations)) if conversion_durations else None
+            # Count models (not jobs) whose conversion currently failed.
             for source_format, count in (
-                db.session.query(Model3D.source_format, func.count(ConversionJob.id))
-                .join(Model3D, ConversionJob.model_id == Model3D.id)
-                .filter(ConversionJob.status == "failed")
+                db.session.query(Model3D.source_format, func.count(Model3D.id))
+                .filter(live_model, Model3D.processing_status.in_(("failed", "replacement_failed")))
                 .group_by(Model3D.source_format)
                 .all()
             ):
                 failed_format_counts[source_format or "unknown"] = count
+            near_limit_models = (
+                Model3D.query.filter(
+                    live_model,
+                    Model3D.file_size.isnot(None),
+                    Model3D.storage_limit_bytes.isnot(None),
+                    Model3D.file_size >= Model3D.storage_limit_bytes * 0.8,
+                )
+                .order_by(Model3D.file_size.desc())
+                .limit(10)
+                .all()
+            )
         stats["average_conversion_seconds"] = average_conversion_seconds
         failed_jobs = (
             ConversionJob.query.filter_by(status="failed").order_by(ConversionJob.finished_at.desc()).limit(10).all()
@@ -8557,8 +8570,13 @@ def register_routes(app: Flask) -> None:
         if not model:
             abort(404)
         next_hint = (request.form.get("next") or "").strip()
-        new_license = normalize_license_type(request.form.get("license_type"))
+        new_license = (request.form.get("license_type") or "").strip().lower()
+        if new_license not in get_license_plans():
+            flash("Unknown license plan; nothing was changed.", "danger")
+            return _admin_model_redirect(next_hint, model)
         previous = model.license_type
+        # Saving a plan recomputes the access window from the plan duration,
+        # replacing any manual window set under "Access window".
         apply_model_license_defaults(model, new_license)
         try:
             db.session.commit()
@@ -8572,7 +8590,11 @@ def register_routes(app: Flask) -> None:
             resource_id=model.id,
             details={"from": previous, "to": new_license},
         )
-        flash(f"Model license updated to {get_license_plan(new_license).label}.", "success")
+        window_end = model.access_expires_at.strftime("%Y-%m-%d %H:%M UTC") if model.access_expires_at else "never"
+        flash(
+            f"Model license updated to {get_license_plan(new_license).label}. Access window reset: expires {window_end}.",
+            "success",
+        )
         return _admin_model_redirect(next_hint, model)
 
     @app.route("/admin/pricing/<plan_key>", methods=["POST"])
@@ -9387,10 +9409,19 @@ def register_routes(app: Flask) -> None:
         require_admin()
         force = bool((request.form.get("force") or "").strip())
         query = Model3D.query.filter(
-            Model3D.processing_status.in_(("ready", "replacement_failed"))
+            Model3D.processing_status.in_(("ready", "replacement_failed")),
+            Model3D.paper.has(or_(Paper.status.is_(None), Paper.status != "deleted")),
         )
         if not force:
             query = query.filter(or_(Model3D.poster_path.is_(None), Model3D.poster_path == ""))
+        else:
+            # Repeated rebuilds walk through the library: skip models whose
+            # poster job was queued recently instead of re-picking the oldest 100.
+            recent_poster = db.session.query(ConversionJob.model_id).filter(
+                ConversionJob.job_type == "poster",
+                ConversionJob.created_at >= datetime.now(UTC) - timedelta(hours=24),
+            )
+            query = query.filter(~Model3D.id.in_(recent_poster))
         models = query.order_by(Model3D.created_at.asc()).limit(100).all()
         queued = _queue_poster_jobs(models)
         log_audit(
