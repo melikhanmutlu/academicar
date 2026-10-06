@@ -2,7 +2,7 @@
 the section plane to every plan
 
 Revision ID: c7d8e9f0a1b2
-Revises: e8f9a0b1c2d3
+Revises: a1d2e3f4b5c6
 Create Date: 2026-10-06
 
 seed_license_plans never touches a row that already exists, so existing
@@ -17,7 +17,7 @@ from sqlalchemy import inspect
 
 
 revision = "c7d8e9f0a1b2"
-down_revision = "e8f9a0b1c2d3"
+down_revision = "a1d2e3f4b5c6"
 branch_labels = None
 depends_on = None
 

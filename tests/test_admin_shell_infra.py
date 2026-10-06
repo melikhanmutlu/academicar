@@ -180,7 +180,8 @@ def test_migrations_single_head_and_index_migration_is_head():
     script = ScriptDirectory(MIGRATIONS_DIR)
     heads = script.get_heads()
     assert len(heads) == 1
-    assert heads[0] == "a1d2e3f4b5c6"
+    # The index migration is on the single chain (later data migrations may follow it).
+    assert "a1d2e3f4b5c6" in {rev.revision for rev in script.iterate_revisions(heads[0], "base")}
 
 
 def test_create_all_declares_admin_indexes(app):
