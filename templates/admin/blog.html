@@ -1,49 +1,43 @@
 {% extends "admin/base.html" %}
 {% block admin_title %}Blog{% endblock %}
-{% block admin_subtitle %}Create and manage Markdown blog posts.{% endblock %}
+{% block admin_subtitle %}Articles shown on /blog. Built-in posts can be edited like any other.{% endblock %}
 
 {% block admin_body %}
   <section id="blog" class="admin-section">
-    <div class="admin-section-head">
-      <div>
-        <h2>Blog</h2>
-        <p>Create and manage blog posts. The body supports Markdown. The built-in launch articles are seeded into the database automatically and can be edited here like any other post.</p>
-      </div>
-      <span>{{ blog_posts|length }} posts</span>
-    </div>
-
+    <details id="blog-new" class="admin-blog-new"{% if blog_form_open %} open{% endif %}>
+      <summary class="admin-btn admin-btn-primary compact">{{ "Edit post" if editing_post else "New post" }}</summary>
     <form method="POST"
           action="{{ url_for('admin_blog_update', post_id=editing_post.id) if editing_post else url_for('admin_blog_create') }}"
           class="admin-blog-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <label class="admin-blog-field" style="max-width:520px">
+      <label class="admin-blog-field">
         <span>Title</span>
-        <input name="title" required maxlength="300" value="{{ editing_post.title if editing_post else '' }}">
+        <input name="title" required maxlength="300" value="{{ blog_form.title }}">
       </label>
-      <label class="admin-blog-field" style="max-width:520px">
-        <span>Description (used as the meta description &amp; list summary)</span>
-        <input name="description" maxlength="500" value="{{ editing_post.description if editing_post else '' }}">
+      <label class="admin-blog-field">
+        <span>Summary</span>
+        <input name="description" maxlength="500" placeholder="Shown in the list and as meta description" value="{{ blog_form.description }}">
       </label>
       <div class="admin-blog-row">
         <label class="admin-blog-field">
-          <span>Tags (comma-separated)</span>
-          <input name="tags" maxlength="300" value="{{ editing_post.tags if editing_post else '' }}">
+          <span>Tags</span>
+          <input name="tags" maxlength="300" placeholder="comma, separated" value="{{ blog_form.tags }}">
         </label>
         <label class="admin-blog-field">
           <span>Persona</span>
-          <input name="persona" maxlength="120" value="{{ editing_post.persona if editing_post else '' }}">
+          <input name="persona" maxlength="120" value="{{ blog_form.persona }}">
         </label>
         <label class="admin-blog-field">
-          <span>Read minutes</span>
-          <input name="read_minutes" type="number" min="1" max="120" value="{{ editing_post.read_minutes if editing_post else 5 }}">
+          <span>Author</span>
+          <input name="author" maxlength="120" value="{{ blog_form.author }}">
+        </label>
+        <label class="admin-blog-field">
+          <span>Read time (min)</span>
+          <input name="read_minutes" type="number" min="1" max="120" placeholder="4" value="{{ blog_form.read_minutes }}">
         </label>
       </div>
-      <label class="admin-blog-field" style="max-width:520px">
-        <span>Author</span>
-        <input name="author" maxlength="120" value="{{ editing_post.author if editing_post else 'AcademicAR Team' }}">
-      </label>
       <div class="admin-blog-field">
-        <span>Insert image (uploads, then pastes the Markdown at your cursor)</span>
+        <span title="Uploads, then inserts the Markdown at your cursor">Image</span>
         <div class="admin-blog-uploader">
           <input type="file" id="blog-image-file" accept="image/png,image/jpeg,image/webp,image/gif">
           <button type="button" class="admin-btn admin-btn-secondary compact" id="blog-image-upload-btn">Upload &amp; insert</button>
@@ -51,11 +45,11 @@
         </div>
       </div>
       <label class="admin-blog-field">
-        <span>Body (Markdown — supports headings, lists, links, images, and tables)</span>
-        <textarea name="body" id="blog-body-input" rows="14" required>{{ editing_post.body if editing_post else '' }}</textarea>
+        <span>Body (Markdown)</span>
+        <textarea name="body" id="blog-body-input" rows="14" required>{{ blog_form.body }}</textarea>
       </label>
       <details class="admin-blog-help">
-        <summary>Markdown formatting help (images, tables, headings…)</summary>
+        <summary>Markdown help</summary>
         <div class="admin-blog-help-body">
 <pre>## Heading    ### Smaller heading
 **bold**  *italic*  [link text](https://example.com)
@@ -74,50 +68,52 @@
         </div>
       </details>
       <label class="admin-blog-checkbox">
-        <input type="checkbox" name="is_published" {% if (not editing_post) or editing_post.is_published %}checked{% endif %}>
-        <span>Published (uncheck to keep as a draft)</span>
+        <input type="checkbox" name="is_published" {% if blog_form.is_published %}checked{% endif %}>
+        <span>Published</span>
       </label>
       <div class="admin-blog-actions">
         <button type="submit" class="admin-btn admin-btn-primary compact">{{ "Update post" if editing_post else "Create post" }}</button>
         {% if editing_post %}
-          <a href="{{ url_for('admin_dashboard', admin_page='blog') }}" class="admin-btn admin-btn-secondary compact">Cancel edit</a>
+          <a href="{{ url_for('admin_dashboard', admin_page='blog') }}" class="admin-btn admin-btn-secondary compact">Cancel</a>
         {% endif %}
       </div>
     </form>
+    </details>
 
+    <p class="admin-muted admin-mt">{{ blog_posts|length }} post{{ "" if blog_posts|length == 1 else "s" }}</p>
+    {% if blog_posts %}
     <div class="table-wrap">
       <table class="data-table admin-table">
         <thead>
-          <tr><th>Title</th><th>Slug</th><th>Status</th><th>Created</th><th>Actions</th></tr>
+          <tr><th>Title</th><th>Status</th><th>Actions</th></tr>
         </thead>
         <tbody>
           {% for p in blog_posts %}
             <tr>
-              <td>{{ p.title }}</td>
-              <td>{{ p.slug }}</td>
-              <td><span class="status-chip {{ 'is-ready' if p.is_published else 'is-queued' }}">{{ "Published" if p.is_published else "Draft" }}</span></td>
-              <td style="white-space:nowrap">{{ p.created_at.strftime("%Y-%m-%d") if p.created_at else "" }}</td>
+              <td>{{ p.title }}<br><small class="admin-muted">{{ p.slug }}</small></td>
+              <td><span class="status-chip {{ 'is-ready' if p.is_published else 'is-queued' }}">{{ "Published" if p.is_published else "Draft" }}</span><br><small class="admin-muted">{{ p.created_at.strftime("%Y-%m-%d") if p.created_at else "" }}</small></td>
               <td>
                 <div class="admin-blog-row-actions">
-                <a href="{{ url_for('blog_post', slug=p.slug) }}" class="admin-btn admin-btn-secondary compact" target="_blank" rel="noopener">View</a>
+                <a href="{{ url_for('blog_post', slug=p.slug) }}" class="admin-btn admin-btn-secondary compact" target="_blank" rel="noopener">{{ "View" if p.is_published else "Preview" }}</a>
                 <a href="{{ url_for('admin_dashboard', admin_page='blog', edit=p.id) }}" class="admin-btn admin-btn-secondary compact">Edit</a>
-                <form method="POST" action="{{ url_for('admin_blog_publish', post_id=p.id) }}" style="display:inline">
+                <form method="POST" action="{{ url_for('admin_blog_publish', post_id=p.id) }}" class="admin-inline">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button type="submit" class="admin-btn admin-btn-secondary compact">{{ "Unpublish" if p.is_published else "Publish" }}</button>
                 </form>
-                <form method="POST" action="{{ url_for('admin_blog_delete', post_id=p.id) }}" style="display:inline" onsubmit="return confirm('Delete this post permanently?')">
+                <form method="POST" action="{{ url_for('admin_blog_delete', post_id=p.id) }}" class="admin-inline" onsubmit='return confirm({{ ("Delete \"" ~ p.title ~ "\" permanently? Built-in posts will not come back.")|tojson }})'>
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button type="submit" class="admin-btn admin-btn-danger compact">Delete</button>
                 </form>
                 </div>
               </td>
             </tr>
-          {% else %}
-            <tr><td colspan="5">No blog posts yet. Create one above.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+    {% else %}
+      <p class="admin-empty">No blog posts yet.</p>
+    {% endif %}
   </section>
 {% endblock %}
 

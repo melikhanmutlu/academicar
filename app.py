@@ -25,7 +25,7 @@ from flask_wtf.csrf import CSRFError
 from slugify import slugify
 from sqlalchemy import and_, case, extract, func, or_, text
 from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import defer, selectinload
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
@@ -7421,13 +7421,46 @@ def register_routes(app: Flask) -> None:
             # Self-heal on every visit (cheap, idempotent).
             seed_builtin_blog_posts(app)
         blog_posts = (
-            BlogPost.query.order_by(BlogPost.created_at.desc()).all() if admin_page == "blog" else []
+            BlogPost.query.options(defer(BlogPost.body)).order_by(BlogPost.created_at.desc()).all()
+            if admin_page == "blog"
+            else []
         )
         editing_post = None
+        blog_form = None
+        blog_form_open = False
         if admin_page == "blog":
-            edit_id = (request.args.get("edit") or "").strip()
-            if edit_id.isdigit():
-                editing_post = db.session.get(BlogPost, int(edit_id))
+            stashed = getattr(g, "blog_form", None)  # set by create/update on a validation error
+            edit_id = str(getattr(g, "blog_edit_id", None) or request.args.get("edit") or "").strip()
+            if edit_id:
+                editing_post = db.session.get(BlogPost, int(edit_id)) if edit_id.isdigit() else None
+                if editing_post is None:
+                    flash("Post not found.", "warning")
+                    return redirect(url_for("admin_dashboard", admin_page="blog"))
+            source = stashed or (
+                {
+                    "title": editing_post.title,
+                    "description": editing_post.description,
+                    "tags": editing_post.tags,
+                    "persona": editing_post.persona,
+                    "author": editing_post.author,
+                    "read_minutes": editing_post.read_minutes,
+                    "body": editing_post.body,
+                    "is_published": editing_post.is_published,
+                }
+                if editing_post
+                else {"is_published": True}
+            )
+            blog_form = {
+                "title": source.get("title") or "",
+                "description": source.get("description") or "",
+                "tags": source.get("tags") or "",
+                "persona": source.get("persona") or "",
+                "author": source.get("author") or "AcademicAR Team",
+                "read_minutes": source.get("read_minutes") or "",
+                "body": source.get("body") or "",
+                "is_published": bool(source.get("is_published")),
+            }
+            blog_form_open = bool(editing_post or stashed)
         institutions_rows = []
         institutions_pagination = None
         institution_member_counts = {}
@@ -7546,6 +7579,8 @@ def register_routes(app: Flask) -> None:
             backup_local_retention=backup_local_retention(app),
             blog_posts=blog_posts,
             editing_post=editing_post,
+            blog_form=blog_form,
+            blog_form_open=blog_form_open,
             institutions=institutions_rows,
             institutions_pagination=institutions_pagination,
             institution_member_counts=institution_member_counts,
@@ -9734,7 +9769,8 @@ def register_routes(app: Flask) -> None:
         data = _read_blog_form()
         if not data["title"] or not data["body"]:
             flash("Title and body are required.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="blog"))
+            g.blog_form = data  # re-render with what was typed instead of redirecting
+            return admin_dashboard(admin_page="blog")
         post = BlogPost(
             slug=make_blog_slug(data["title"]),
             title=data["title"][:300],
@@ -9767,7 +9803,9 @@ def register_routes(app: Flask) -> None:
         data = _read_blog_form()
         if not data["title"] or not data["body"]:
             flash("Title and body are required.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="blog", edit=post_id))
+            g.blog_form = data
+            g.blog_edit_id = post_id
+            return admin_dashboard(admin_page="blog")
         # Slug stays stable so existing links don't break.
         post.title = data["title"][:300]
         post.description = (data["description"] or None) and data["description"][:500]

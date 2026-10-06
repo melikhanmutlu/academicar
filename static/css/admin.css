@@ -714,6 +714,16 @@ body:has(.admin-layout) .flash-stack {
 /* == end page:backups == */
 
 /* == page:blog == */
+.admin-blog-new > summary { display: inline-flex; list-style: none; cursor: pointer; }
+.admin-blog-new > summary::-webkit-details-marker { display: none; }
+.admin-blog-new .admin-blog-form { max-width: none; }
+.admin-blog-new .admin-blog-field input[type="file"] { width: auto; max-width: 100%; border: 0; padding: 0; }
+.admin-blog-row .admin-blog-field { min-width: 140px; }
+.admin-muted { margin: 0; color: var(--color-silver-ash); font-size: 12px; }
+.admin-blog-row-actions { flex-wrap: wrap; }
+@media (max-width: 640px) {
+  .admin-blog-row-actions .admin-btn { padding-left: 8px; padding-right: 8px; }
+}
 /* == end page:blog == */
 
 /* == page:institutions == */
