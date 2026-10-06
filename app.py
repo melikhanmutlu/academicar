@@ -22,7 +22,7 @@ from flask_login import LoginManager, current_user, login_required
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFError
 from slugify import slugify
-from sqlalchemy import and_, func, or_, text
+from sqlalchemy import and_, case, extract, func, or_, text
 from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 from sqlalchemy.orm import selectinload
 from werkzeug.exceptions import RequestEntityTooLarge
@@ -290,6 +290,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             "project_model_capacity": project_model_capacity,
             "project_supports_feature": request_project_supports_feature,
             "admin_chip_class": admin_chip_class,
+            "admin_nav_counts": admin_nav_counts,
             "format_duration": format_duration,
             "user_is_configured_admin": user_is_configured_admin,
         }
@@ -594,6 +595,35 @@ def admin_return_url(admin_page: str, **kwargs) -> str:
     if target.startswith("/admin") and "//" not in target and "\\" not in target:
         return target
     return url_for("admin_dashboard", admin_page=admin_page, **kwargs)
+
+
+def admin_like_pattern(text: str) -> str:
+    """Lower-cased ``%text%`` LIKE pattern with ``%``, ``_`` and the escape
+    character itself escaped, so admin searches match them literally. Pair with
+    ``.like(pattern, escape="\\")``."""
+    escaped = (text or "").lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
+def admin_nav_counts() -> dict[str, int]:
+    """Failed/pending conversion job counts for the admin sidebar badge. One
+    small query, memoised per request, shared by every admin render (list and
+    detail pages) and never raising into a page render."""
+    cached = getattr(g, "_admin_nav_counts", None)
+    if cached is None:
+        cached = {"failed_jobs": 0, "pending_jobs": 0}
+        try:
+            for status, count in (
+                db.session.query(ConversionJob.status, func.count(ConversionJob.id))
+                .filter(ConversionJob.status.in_(("failed", "pending")))
+                .group_by(ConversionJob.status)
+                .all()
+            ):
+                cached[f"{status}_jobs"] = int(count or 0)
+        except SQLAlchemyError:
+            db.session.rollback()
+        g._admin_nav_counts = cached
+    return cached
 
 
 def admin_chip_class(value) -> str:
@@ -6732,11 +6762,11 @@ def register_routes(app: Flask) -> None:
 
         users_query = User.query
         if user_query_text:
-            pattern = f"%{user_query_text.lower()}%"
+            pattern = admin_like_pattern(user_query_text)
             users_query = users_query.filter(
                 or_(
-                    func.lower(User.email).like(pattern),
-                    func.lower(User.username).like(pattern),
+                    func.lower(User.email).like(pattern, escape="\\"),
+                    func.lower(User.username).like(pattern, escape="\\"),
                 )
             )
         if user_role_filter == "admin":
@@ -6747,12 +6777,12 @@ def register_routes(app: Flask) -> None:
         # Projects list (admin sees deleted rows too, so it can restore them).
         papers_query = Paper.query.options(selectinload(Paper.author))
         if paper_query_text:
-            paper_pattern = f"%{paper_query_text.lower()}%"
+            paper_pattern = admin_like_pattern(paper_query_text)
             papers_query = papers_query.outerjoin(User, Paper.user_id == User.id).filter(
                 or_(
-                    func.lower(Paper.title).like(paper_pattern),
-                    func.lower(Paper.slug).like(paper_pattern),
-                    func.lower(User.email).like(paper_pattern),
+                    func.lower(Paper.title).like(paper_pattern, escape="\\"),
+                    func.lower(Paper.slug).like(paper_pattern, escape="\\"),
+                    func.lower(User.email).like(paper_pattern, escape="\\"),
                 )
             )
         if paper_visibility_filter in PROJECT_VISIBILITIES:
@@ -6767,14 +6797,14 @@ def register_routes(app: Flask) -> None:
             models_query = models_query.filter(Model3D.processing_status == model_status_filter)
         model_query_text = (request.args.get("model_q") or "").strip()
         if model_query_text:
-            model_pattern = f"%{model_query_text.lower()}%"
+            model_pattern = admin_like_pattern(model_query_text)
             models_query = models_query.outerjoin(User, Model3D.user_id == User.id).filter(
                 or_(
-                    func.lower(Model3D.id).like(model_pattern),
-                    func.lower(Model3D.public_id).like(model_pattern),
-                    func.lower(Model3D.display_name).like(model_pattern),
-                    func.lower(Model3D.original_filename).like(model_pattern),
-                    func.lower(User.email).like(model_pattern),
+                    func.lower(Model3D.id).like(model_pattern, escape="\\"),
+                    func.lower(Model3D.public_id).like(model_pattern, escape="\\"),
+                    func.lower(Model3D.display_name).like(model_pattern, escape="\\"),
+                    func.lower(Model3D.original_filename).like(model_pattern, escape="\\"),
+                    func.lower(User.email).like(model_pattern, escape="\\"),
                 )
             )
 
@@ -6784,16 +6814,16 @@ def register_routes(app: Flask) -> None:
         if pay_provider_filter in {"manual", "paytr"}:
             payments_query = payments_query.filter(Payment.provider == pay_provider_filter)
         if pay_query_text:
-            pay_pattern = f"%{pay_query_text.lower()}%"
+            pay_pattern = admin_like_pattern(pay_query_text)
             payments_query = (
                 payments_query.outerjoin(User, Payment.user_id == User.id)
                 .outerjoin(Institution, Payment.institution_id == Institution.id)
                 .filter(
                     or_(
-                        func.lower(Payment.invoice_number).like(pay_pattern),
-                        func.lower(Payment.provider_reference).like(pay_pattern),
-                        func.lower(User.email).like(pay_pattern),
-                        func.lower(Institution.name).like(pay_pattern),
+                        func.lower(Payment.invoice_number).like(pay_pattern, escape="\\"),
+                        func.lower(Payment.provider_reference).like(pay_pattern, escape="\\"),
+                        func.lower(User.email).like(pay_pattern, escape="\\"),
+                        func.lower(Institution.name).like(pay_pattern, escape="\\"),
                     )
                 )
             )
@@ -6802,11 +6832,11 @@ def register_routes(app: Flask) -> None:
         if qr_status_filter in {"active", "disabled"}:
             qr_query = qr_query.filter(QRLink.status == qr_status_filter)
         if qr_query_text:
-            qr_pattern = f"%{qr_query_text.lower()}%"
+            qr_pattern = admin_like_pattern(qr_query_text)
             qr_query = qr_query.filter(
                 or_(
-                    func.lower(QRLink.public_id).like(qr_pattern),
-                    func.lower(QRLink.model_id).like(qr_pattern),
+                    func.lower(QRLink.public_id).like(qr_pattern, escape="\\"),
+                    func.lower(QRLink.model_id).like(qr_pattern, escape="\\"),
                 )
             )
 
@@ -6824,12 +6854,12 @@ def register_routes(app: Flask) -> None:
         if audit_user_filter.isdigit():
             audit_query = audit_query.filter(AuditLog.user_id == int(audit_user_filter))
         if audit_query_text:
-            audit_pattern = f"%{audit_query_text.lower()}%"
+            audit_pattern = admin_like_pattern(audit_query_text)
             audit_query = audit_query.filter(
                 or_(
-                    func.lower(AuditLog.event_type).like(audit_pattern),
-                    func.lower(AuditLog.resource_id).like(audit_pattern),
-                    func.lower(AuditLog.ip_address).like(audit_pattern),
+                    func.lower(AuditLog.event_type).like(audit_pattern, escape="\\"),
+                    func.lower(AuditLog.resource_id).like(audit_pattern, escape="\\"),
+                    func.lower(AuditLog.ip_address).like(audit_pattern, escape="\\"),
                 )
             )
 
@@ -6871,80 +6901,172 @@ def register_routes(app: Flask) -> None:
         now = datetime.now(UTC)
         last_7_days = now - timedelta(days=7)
         last_30_days = now - timedelta(days=30)
-        paid_revenue = format_money_by_currency(paid_revenue_by_currency())
+
+        def page_is(*names):
+            return admin_page in names
+
+        # Each page computes only what its template renders. Everything else
+        # keeps an empty default so template variable names stay stable.
+        # The failed/pending job counts feed the sidebar badge on every admin
+        # page, so they come from the shared (cached) nav helper.
+        nav_counts = admin_nav_counts()
         totals = {
-            "users": User.query.count(),
-            "admins": User.query.filter_by(is_admin=True).count(),
-            # Exclude soft-deleted papers (and their models) from headline counts
-            # so the dashboard reflects live content, consistent with
-            # active_paper_query() used elsewhere.
-            "papers": active_paper_query().count(),
-            "public_papers": active_paper_query().filter_by(is_public=True).count(),
-            "models": Model3D.query.filter(
-                Model3D.paper.has(or_(Paper.status.is_(None), Paper.status != "deleted"))
-            ).count(),
-            "active_models": Model3D.query.filter(
-                Model3D.paper.has(or_(Paper.status.is_(None), Paper.status != "deleted")),
-                Model3D.processing_status.notin_(["queued", "processing", "failed"]),
-                or_(Model3D.access_expires_at.is_(None), Model3D.access_expires_at >= now),
-            ).count(),
-            "qr_links": QRLink.query.count(),
-            "payments": Payment.query.count(),
-            "paid_revenue": paid_revenue,
-            "pending_jobs": ConversionJob.query.filter_by(status="pending").count(),
-            "failed_jobs": ConversionJob.query.filter_by(status="failed").count(),
+            "users": 0,
+            "admins": 0,
+            "papers": 0,
+            "public_papers": 0,
+            "models": 0,
+            "active_models": 0,
+            "qr_links": 0,
+            "payments": 0,
+            "paid_revenue": format_money_by_currency({}),
+            "pending_jobs": nav_counts["pending_jobs"],
+            "failed_jobs": nav_counts["failed_jobs"],
         }
-        # Breakdowns use the same live-project scope as totals["models"], so
-        # they add up to the headline count.
+        stats = {
+            "new_users_7d": 0,
+            "new_users_30d": 0,
+            "new_papers_7d": 0,
+            "new_papers_30d": 0,
+            "new_models_30d": 0,
+            "papers_with_pdf": 0,
+            "papers_without_pdf": 0,
+            "papers_with_doi": 0,
+            "papers_with_pmid": 0,
+            "private_papers": 0,
+            "public_ratio": 0,
+            "total_model_storage": 0,
+            "storage_average": 0,
+            "revenue_30_days": format_money_by_currency({}),
+            "average_conversion_seconds": None,
+            "failed_login_24h": 0,
+            "qr_resolved_30d": 0,
+            "qr_resolved_total": 0,
+            "viewer_access_total": 0,
+            "last_qr_resolved_at": None,
+            "disabled_qr_count": 0,
+            "expired_qr_count": 0,
+        }
+        # Live-project scope: exclude soft-deleted papers (and their models) so
+        # headline counts and breakdowns add up and match active_paper_query().
         live_model = Model3D.paper.has(or_(Paper.status.is_(None), Paper.status != "deleted"))
-        processing_counts = {}
-        for status, count in db.session.query(Model3D.processing_status, func.count(Model3D.id)).filter(live_model).group_by(Model3D.processing_status).all():
-            key = status or "ready"
-            processing_counts[key] = processing_counts.get(key, 0) + count
 
-        license_counts = {}
-        for license_type, count in db.session.query(Model3D.license_type, func.count(Model3D.id)).filter(live_model).group_by(Model3D.license_type).all():
-            key = license_type or "free"
-            license_counts[key] = license_counts.get(key, 0) + count
+        def flag_sum(condition):
+            return func.coalesce(func.sum(case((condition, 1), else_=0)), 0)
 
-        source_format_counts = {}
-        for source_format, count in db.session.query(Model3D.source_format, func.count(Model3D.id)).filter(live_model).group_by(Model3D.source_format).all():
-            key = source_format or "unknown"
-            source_format_counts[key] = source_format_counts.get(key, 0) + count
+        if page_is("overview"):
+            user_row = db.session.query(
+                func.count(User.id),
+                flag_sum(User.is_admin.is_(True)),
+                flag_sum(User.created_at >= last_7_days),
+                flag_sum(User.created_at >= last_30_days),
+            ).one()
+            totals["users"], totals["admins"] = int(user_row[0]), int(user_row[1])
+            stats["new_users_7d"], stats["new_users_30d"] = int(user_row[2]), int(user_row[3])
+            totals["qr_links"] = QRLink.query.count()
+            totals["payments"] = Payment.query.count()
+            totals["paid_revenue"] = format_money_by_currency(paid_revenue_by_currency())
+            stats["revenue_30_days"] = format_money_by_currency(paid_revenue_by_currency(Payment.paid_at >= last_30_days))
+            stats["qr_resolved_30d"] = QRLink.query.filter(QRLink.last_resolved_at >= last_30_days).count()
+        elif page_is("revenue"):
+            totals["paid_revenue"] = format_money_by_currency(paid_revenue_by_currency())
 
-        payment_counts = {}
-        for status, count in db.session.query(Payment.status, func.count(Payment.id)).group_by(Payment.status).all():
-            key = status or "pending"
-            payment_counts[key] = payment_counts.get(key, 0) + count
-
-        job_counts = {}
-        for status, count in db.session.query(ConversionJob.status, func.count(ConversionJob.id)).group_by(ConversionJob.status).all():
-            key = status or "pending"
-            job_counts[key] = job_counts.get(key, 0) + count
-        total_model_storage = db.session.query(func.coalesce(func.sum(Model3D.file_size), 0)).filter(live_model).scalar() or 0
-        revenue_30_days = format_money_by_currency(paid_revenue_by_currency(Payment.paid_at >= last_30_days))
-        papers_with_doi = active_paper_query().filter(Paper.doi.isnot(None), Paper.doi != "").count()
-        papers_with_pmid = active_paper_query().filter(Paper.pmid.isnot(None), Paper.pmid != "").count()
-        private_papers = max(totals["papers"] - totals["public_papers"], 0)
-        papers_with_pdf = active_paper_query().filter(Paper.pdf_path.isnot(None), Paper.pdf_path != "").count()
-        papers_without_pdf = max(totals["papers"] - papers_with_pdf, 0)
-        resolved_qr_total = AuditLog.query.filter(AuditLog.event_type == "qr_resolved").count()
-        viewer_access_total = AuditLog.query.filter(AuditLog.event_type == "public_model_viewed").count()
-        last_qr_resolved = QRLink.query.filter(QRLink.last_resolved_at.isnot(None)).order_by(QRLink.last_resolved_at.desc()).first()
-        disabled_qr_count = QRLink.query.filter(QRLink.status != "active").count()
-        # A model is "expired" only when it is not still queued/processing/failed
-        # and not kept-alive as replacement_failed, and its access window has
-        # lapsed (mirrors licensing.model_access_status, but in SQL).
-        expired_qr_count = (
-            db.session.query(func.count(QRLink.id))
-            .join(Model3D, QRLink.model_id == Model3D.id)
-            .filter(
-                Model3D.processing_status.notin_(["queued", "processing", "failed", "replacement_failed"]),
-                Model3D.access_expires_at.isnot(None),
-                Model3D.access_expires_at < now,
+        if page_is("overview", "content"):
+            paper_row = (
+                db.session.query(
+                    func.count(Paper.id),
+                    flag_sum(Paper.is_public.is_(True)),
+                    flag_sum(and_(Paper.doi.isnot(None), Paper.doi != "")),
+                    flag_sum(and_(Paper.pmid.isnot(None), Paper.pmid != "")),
+                    flag_sum(and_(Paper.pdf_path.isnot(None), Paper.pdf_path != "")),
+                    flag_sum(Paper.created_at >= last_7_days),
+                    flag_sum(Paper.created_at >= last_30_days),
+                )
+                .filter(or_(Paper.status.is_(None), Paper.status != "deleted"))
+                .one()
             )
-            .scalar()
-        ) or 0
+            totals["papers"], totals["public_papers"] = int(paper_row[0]), int(paper_row[1])
+            stats["papers_with_doi"], stats["papers_with_pmid"] = int(paper_row[2]), int(paper_row[3])
+            stats["papers_with_pdf"] = int(paper_row[4])
+            stats["new_papers_7d"], stats["new_papers_30d"] = int(paper_row[5]), int(paper_row[6])
+            stats["papers_without_pdf"] = max(totals["papers"] - stats["papers_with_pdf"], 0)
+            stats["private_papers"] = max(totals["papers"] - totals["public_papers"], 0)
+            stats["public_ratio"] = round((totals["public_papers"] / totals["papers"]) * 100) if totals["papers"] else 0
+
+        if page_is("overview", "storage"):
+            model_row = (
+                db.session.query(
+                    func.count(Model3D.id),
+                    flag_sum(
+                        and_(
+                            Model3D.processing_status.notin_(["queued", "processing", "failed"]),
+                            or_(Model3D.access_expires_at.is_(None), Model3D.access_expires_at >= now),
+                        )
+                    ),
+                    flag_sum(Model3D.created_at >= last_30_days),
+                    func.coalesce(func.sum(Model3D.file_size), 0),
+                )
+                .filter(live_model)
+                .one()
+            )
+            totals["models"], totals["active_models"] = int(model_row[0]), int(model_row[1])
+            stats["new_models_30d"] = int(model_row[2])
+            stats["total_model_storage"] = int(model_row[3] or 0)
+            stats["storage_average"] = int(stats["total_model_storage"] / totals["models"]) if totals["models"] else 0
+
+        def grouped_counts(column, id_column, default_key, *filters):
+            counts = {}
+            for value, count in db.session.query(column, func.count(id_column)).filter(*filters).group_by(column).all():
+                key = value or default_key
+                counts[key] = counts.get(key, 0) + count
+            return counts
+
+        processing_counts = (
+            grouped_counts(Model3D.processing_status, Model3D.id, "ready", live_model)
+            if page_is("overview", "models")
+            else {}
+        )
+        license_counts = (
+            grouped_counts(Model3D.license_type, Model3D.id, "free", live_model)
+            if page_is("overview", "revenue")
+            else {}
+        )
+        source_format_counts = (
+            grouped_counts(Model3D.source_format, Model3D.id, "unknown", live_model) if page_is("overview") else {}
+        )
+        payment_counts = (
+            grouped_counts(Payment.status, Payment.id, "pending") if page_is("overview", "revenue") else {}
+        )
+        job_counts = grouped_counts(ConversionJob.status, ConversionJob.id, "pending") if page_is("overview") else {}
+
+        if page_is("access"):
+            stats["qr_resolved_30d"] = QRLink.query.filter(QRLink.last_resolved_at >= last_30_days).count()
+            stats["qr_resolved_total"] = AuditLog.query.filter(AuditLog.event_type == "qr_resolved").count()
+            stats["viewer_access_total"] = AuditLog.query.filter(AuditLog.event_type == "public_model_viewed").count()
+            last_qr_resolved = (
+                QRLink.query.filter(QRLink.last_resolved_at.isnot(None)).order_by(QRLink.last_resolved_at.desc()).first()
+            )
+            stats["last_qr_resolved_at"] = last_qr_resolved.last_resolved_at if last_qr_resolved else None
+            stats["disabled_qr_count"] = QRLink.query.filter(QRLink.status != "active").count()
+            # A model is "expired" only when it is not still queued/processing/failed
+            # and not kept-alive as replacement_failed, and its access window has
+            # lapsed (mirrors licensing.model_access_status, but in SQL).
+            stats["expired_qr_count"] = (
+                db.session.query(func.count(QRLink.id))
+                .join(Model3D, QRLink.model_id == Model3D.id)
+                .filter(
+                    Model3D.processing_status.notin_(["queued", "processing", "failed", "replacement_failed"]),
+                    Model3D.access_expires_at.isnot(None),
+                    Model3D.access_expires_at < now,
+                )
+                .scalar()
+            ) or 0
+        if page_is("overview", "security"):
+            stats["failed_login_24h"] = AuditLog.query.filter(
+                AuditLog.event_type == "user_login_failed",
+                AuditLog.timestamp >= now - timedelta(hours=24),
+            ).count()
+
         near_limit_models = (
             Model3D.query.filter(
                 Model3D.file_size.isnot(None),
@@ -6954,6 +7076,25 @@ def register_routes(app: Flask) -> None:
             .order_by(Model3D.file_size.desc())
             .limit(10)
             .all()
+            if page_is("overview", "models", "security")
+            else []
+        )
+        largest_models = (
+            Model3D.query.filter(Model3D.file_size.isnot(None)).order_by(Model3D.file_size.desc()).limit(5).all()
+            if page_is("overview")
+            else []
+        )
+        expiring_models = (
+            Model3D.query.filter(
+                Model3D.access_expires_at.isnot(None),
+                Model3D.access_expires_at >= now,
+                Model3D.access_expires_at <= now + timedelta(days=30),
+            )
+            .order_by(Model3D.access_expires_at.asc())
+            .limit(10)
+            .all()
+            if page_is("overview", "revenue")
+            else []
         )
         average_conversion_seconds = None
         failed_format_counts: dict[str, int] = {}
@@ -6983,6 +7124,7 @@ def register_routes(app: Flask) -> None:
                 .all()
             ):
                 failed_format_counts[source_format or "unknown"] = count
+        stats["average_conversion_seconds"] = average_conversion_seconds
         failed_jobs = (
             ConversionJob.query.filter_by(status="failed").order_by(ConversionJob.finished_at.desc()).limit(10).all()
             if admin_page == "jobs"
@@ -6992,9 +7134,10 @@ def register_routes(app: Flask) -> None:
         daily_publication_trend = []
         daily_viewer_trend = []
         if admin_page in {"content", "access"}:
-            for field, count in db.session.query(Paper.field, func.count(Paper.id)).group_by(Paper.field).order_by(func.count(Paper.id).desc()).limit(8).all():
-                key = field or "Unspecified"
-                field_counts[key] = field_counts.get(key, 0) + count
+            if admin_page == "content":
+                for field, count in db.session.query(Paper.field, func.count(Paper.id)).group_by(Paper.field).order_by(func.count(Paper.id).desc()).limit(8).all():
+                    key = field or "Unspecified"
+                    field_counts[key] = field_counts.get(key, 0) + count
             trend_start = (now - timedelta(days=29)).replace(hour=0, minute=0, second=0, microsecond=0)
             trend_days = [trend_start + timedelta(days=offset) for offset in range(30)]
 
@@ -7018,9 +7161,24 @@ def register_routes(app: Flask) -> None:
         monthly_revenue = []
         monthly_revenue_currency = None
         if admin_page == "revenue":
-            for month_seed in last_n_month_starts(now, 12):
-                next_month = (month_seed.replace(day=28) + timedelta(days=4)).replace(day=1)
-                by_currency = paid_revenue_by_currency(Payment.paid_at >= month_seed, Payment.paid_at < next_month)
+            month_starts = last_n_month_starts(now, 12)
+            window_end = (month_starts[-1].replace(day=28) + timedelta(days=4)).replace(day=1)
+            paid_year, paid_month = extract("year", Payment.paid_at), extract("month", Payment.paid_at)
+            # One grouped query for the whole year instead of one per month.
+            month_totals: dict[tuple[int, int], dict[str, int]] = {}
+            for currency, year, month, amount in (
+                db.session.query(
+                    Payment.currency, paid_year, paid_month, func.coalesce(func.sum(Payment.amount_kurus), 0)
+                )
+                .filter(Payment.status == "paid", Payment.paid_at >= month_starts[0], Payment.paid_at < window_end)
+                .group_by(Payment.currency, paid_year, paid_month)
+                .all()
+            ):
+                key = (currency or current_app.config.get("PAYMENT_CURRENCY") or "USD").upper()
+                bucket = month_totals.setdefault((int(year), int(month)), {})
+                bucket[key] = bucket.get(key, 0) + int(amount or 0)
+            for month_seed in month_starts:
+                by_currency = month_totals.get((month_seed.year, month_seed.month), {})
                 monthly_revenue.append({
                     "label": month_label(month_seed),
                     "by_currency": by_currency,
@@ -7149,7 +7307,11 @@ def register_routes(app: Flask) -> None:
                 "rate_limit_hits": AuditLog.query.filter_by(event_type="rate_limit_exceeded").count(),
                 "webhook_signature_failures": AuditLog.query.filter_by(event_type="payment_webhook_signature_invalid").count(),
             }
-        mirror_failed_count = Model3D.query.filter(Model3D.r2_mirror_failed_at.isnot(None)).count()
+        mirror_failed_count = (
+            Model3D.query.filter(Model3D.r2_mirror_failed_at.isnot(None)).count()
+            if page_is("storage", "overview", "security")
+            else 0
+        )
         mirror_failed_models = (
             Model3D.query.filter(Model3D.r2_mirror_failed_at.isnot(None))
             .order_by(Model3D.r2_mirror_failed_at.desc())
@@ -7158,9 +7320,8 @@ def register_routes(app: Flask) -> None:
             if admin_page == "storage"
             else []
         )
-        # statvfs is cheap, so the volume status is read on every admin page
-        # (the overview shows a warning); the folder scans stay storage-only.
-        storage_disk = storage_disk_status(app)
+        # statvfs is cheap, but only the storage page and the alert lists use it.
+        storage_disk = storage_disk_status(app) if page_is("overview", "security", "storage") else None
         storage_extra = {"backups": 0, "medical_staging": 0}
         if admin_page == "storage":
             storage_extra = {
@@ -7168,74 +7329,32 @@ def register_routes(app: Flask) -> None:
                 "medical_staging": scan_folder_size(app.config["MEDICAL_STAGING_FOLDER"])[0],
             }
         critical_alerts = []
-        if storage_disk and storage_disk["low"]:
-            critical_alerts.append({
-                "text": f"Storage volume is nearly full ({format_file_size(storage_disk['free'])} free)",
-                "url": url_for("admin_dashboard", admin_page="storage"),
-            })
-        if totals["failed_jobs"]:
-            critical_alerts.append({
-                "text": f"{totals['failed_jobs']} failed conversion job(s)",
-                "url": url_for("admin_dashboard", admin_page="jobs", job_status="failed"),
-            })
-        if near_limit_models:
-            critical_alerts.append({
-                "text": f"{len(near_limit_models)} model(s) near storage limit",
-                "url": url_for("admin_dashboard", admin_page="models"),
-            })
-        if sum(orphan_counts.values()):
-            critical_alerts.append({
-                "text": f"{sum(orphan_counts.values())} orphan file(s) detected",
-                "url": url_for("admin_dashboard", admin_page="storage"),
-            })
-        if mirror_failed_count:
-            critical_alerts.append({
-                "text": f"{mirror_failed_count} model(s) failed to mirror to R2",
-                "url": url_for("admin_dashboard", admin_page="storage"),
-            })
-        stats = {
-            "new_users_7d": User.query.filter(User.created_at >= last_7_days).count(),
-            "new_users_30d": User.query.filter(User.created_at >= last_30_days).count(),
-            "new_papers_7d": active_paper_query().filter(Paper.created_at >= last_7_days).count(),
-            "new_papers_30d": active_paper_query().filter(Paper.created_at >= last_30_days).count(),
-            "new_models_30d": Model3D.query.filter(live_model, Model3D.created_at >= last_30_days).count(),
-            "papers_with_pdf": papers_with_pdf,
-            "papers_without_pdf": papers_without_pdf,
-            "papers_with_doi": papers_with_doi,
-            "papers_with_pmid": papers_with_pmid,
-            "private_papers": private_papers,
-            "public_ratio": round((totals["public_papers"] / totals["papers"]) * 100) if totals["papers"] else 0,
-            "total_model_storage": total_model_storage,
-            "storage_average": int(total_model_storage / totals["models"]) if totals["models"] else 0,
-            "revenue_30_days": revenue_30_days,
-            "average_conversion_seconds": average_conversion_seconds,
-            "failed_login_24h": AuditLog.query.filter(
-                AuditLog.event_type == "user_login_failed",
-                AuditLog.timestamp >= now - timedelta(hours=24),
-            ).count(),
-            "qr_resolved_30d": QRLink.query.filter(QRLink.last_resolved_at >= last_30_days).count(),
-            "qr_resolved_total": resolved_qr_total,
-            "viewer_access_total": viewer_access_total,
-            "last_qr_resolved_at": last_qr_resolved.last_resolved_at if last_qr_resolved else None,
-            "disabled_qr_count": disabled_qr_count,
-            "expired_qr_count": expired_qr_count,
-        }
-        largest_models = (
-            Model3D.query.filter(Model3D.file_size.isnot(None))
-            .order_by(Model3D.file_size.desc())
-            .limit(5)
-            .all()
-        )
-        expiring_models = (
-            Model3D.query.filter(
-                Model3D.access_expires_at.isnot(None),
-                Model3D.access_expires_at >= now,
-                Model3D.access_expires_at <= now + timedelta(days=30),
-            )
-            .order_by(Model3D.access_expires_at.asc())
-            .limit(10)
-            .all()
-        )
+        if page_is("overview", "security"):
+            if storage_disk and storage_disk["low"]:
+                critical_alerts.append({
+                    "text": f"Storage volume is nearly full ({format_file_size(storage_disk['free'])} free)",
+                    "url": url_for("admin_dashboard", admin_page="storage"),
+                })
+            if totals["failed_jobs"]:
+                critical_alerts.append({
+                    "text": f"{totals['failed_jobs']} failed conversion job(s)",
+                    "url": url_for("admin_dashboard", admin_page="jobs", job_status="failed"),
+                })
+            if near_limit_models:
+                critical_alerts.append({
+                    "text": f"{len(near_limit_models)} model(s) near storage limit",
+                    "url": url_for("admin_dashboard", admin_page="models"),
+                })
+            if sum(orphan_counts.values()):
+                critical_alerts.append({
+                    "text": f"{sum(orphan_counts.values())} orphan file(s) detected",
+                    "url": url_for("admin_dashboard", admin_page="storage"),
+                })
+            if mirror_failed_count:
+                critical_alerts.append({
+                    "text": f"{mirror_failed_count} model(s) failed to mirror to R2",
+                    "url": url_for("admin_dashboard", admin_page="storage"),
+                })
         # Daily archives are made by the worker (run_scheduled_backups).
         backups = list_backup_archives(app) if admin_page == "backups" else []
         backup_requested = pending_backup_request() if admin_page == "backups" else None
@@ -7403,8 +7522,8 @@ def register_routes(app: Flask) -> None:
         user_role_filter = (request.args.get("user_role") or "all").strip().lower()
         query = User.query
         if user_query_text:
-            pattern = f"%{user_query_text.lower()}%"
-            query = query.filter(or_(func.lower(User.email).like(pattern), func.lower(User.username).like(pattern)))
+            pattern = admin_like_pattern(user_query_text)
+            query = query.filter(or_(func.lower(User.email).like(pattern, escape="\\"), func.lower(User.username).like(pattern, escape="\\")))
         if user_role_filter == "admin":
             query = query.filter(User.is_admin.is_(True))
         elif user_role_filter == "member":
@@ -7430,9 +7549,9 @@ def register_routes(app: Flask) -> None:
         paper_status_filter = (request.args.get("paper_status") or "all").strip().lower()
         query = Paper.query.options(selectinload(Paper.author))
         if paper_query_text:
-            pattern = f"%{paper_query_text.lower()}%"
+            pattern = admin_like_pattern(paper_query_text)
             query = query.outerjoin(User, Paper.user_id == User.id).filter(
-                or_(func.lower(Paper.title).like(pattern), func.lower(Paper.slug).like(pattern), func.lower(User.email).like(pattern))
+                or_(func.lower(Paper.title).like(pattern, escape="\\"), func.lower(Paper.slug).like(pattern, escape="\\"), func.lower(User.email).like(pattern, escape="\\"))
             )
         # Same filter as the Projects page (Paper.visibility: private /
         # unlisted "review link" / public), so the CSV matches the table.
@@ -7467,16 +7586,16 @@ def register_routes(app: Flask) -> None:
         if pay_provider_filter in {"manual", "paytr"}:
             query = query.filter(Payment.provider == pay_provider_filter)
         if pay_query_text:
-            pattern = f"%{pay_query_text.lower()}%"
+            pattern = admin_like_pattern(pay_query_text)
             query = (
                 query.outerjoin(User, Payment.user_id == User.id)
                 .outerjoin(Institution, Payment.institution_id == Institution.id)
                 .filter(
                     or_(
-                        func.lower(Payment.invoice_number).like(pattern),
-                        func.lower(Payment.provider_reference).like(pattern),
-                        func.lower(User.email).like(pattern),
-                        func.lower(Institution.name).like(pattern),
+                        func.lower(Payment.invoice_number).like(pattern, escape="\\"),
+                        func.lower(Payment.provider_reference).like(pattern, escape="\\"),
+                        func.lower(User.email).like(pattern, escape="\\"),
+                        func.lower(Institution.name).like(pattern, escape="\\"),
                     )
                 )
             )
@@ -7535,9 +7654,9 @@ def register_routes(app: Flask) -> None:
         if audit_user_filter.isdigit():
             query = query.filter(AuditLog.user_id == int(audit_user_filter))
         if audit_query_text:
-            pattern = f"%{audit_query_text.lower()}%"
+            pattern = admin_like_pattern(audit_query_text)
             query = query.filter(
-                or_(func.lower(AuditLog.event_type).like(pattern), func.lower(AuditLog.resource_id).like(pattern), func.lower(AuditLog.ip_address).like(pattern))
+                or_(func.lower(AuditLog.event_type).like(pattern, escape="\\"), func.lower(AuditLog.resource_id).like(pattern, escape="\\"), func.lower(AuditLog.ip_address).like(pattern, escape="\\"))
             )
         rows = [
             {

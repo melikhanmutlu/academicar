@@ -7588,37 +7588,6 @@ label.rounded-xl input[type="checkbox"] {
 }
 
 /* Admin dashboard */
-.admin-shell {
-  padding-top: 48px;
-  padding-bottom: 88px;
-}
-
-.admin-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 32px;
-}
-
-.admin-header h1 {
-  font-family: var(--font-polysans);
-  font-size: 48px;
-  font-weight: 400;
-  letter-spacing: -0.96px;
-  color: var(--color-midnight-graphite);
-  margin: 12px 0 8px;
-}
-
-.admin-header p {
-  font-family: var(--font-inter);
-  font-size: 15px;
-  color: var(--color-dark-shale);
-  margin: 0;
-  max-width: 620px;
-}
-
-.admin-header-actions,
 .admin-actions,
 .admin-inline-form {
   display: flex;
@@ -7869,6 +7838,16 @@ label.rounded-xl input[type="checkbox"] {
   max-height: 112px;
   border-radius: 4px 4px 0 0;
   background: var(--color-midnight-graphite);
+}
+
+/* A sparkline inside .admin-breakdown must not inherit the breakdown row
+   rules (.admin-breakdown div: centred, space-between, top border). */
+.admin-breakdown .admin-sparkline {
+  align-items: flex-end;
+  justify-content: flex-start;
+  gap: 4px;
+  padding: 12px 0 0;
+  border-top: 0;
 }
 
 .admin-bar-chart {
@@ -8276,7 +8255,6 @@ details[open] > .upload-summary .upload-inline-action svg {
   .stats-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .admin-header,
   .admin-section-head {
     align-items: flex-start;
     flex-direction: column;
@@ -8292,9 +8270,6 @@ details[open] > .upload-summary .upload-inline-action svg {
   }
   .admin-metric {
     flex-basis: calc(50% - 6px);
-  }
-  .admin-header h1 {
-    font-size: 36px;
   }
   .admin-section {
     padding: 18px;
@@ -8567,29 +8542,6 @@ body.nav-menu-open {
   
   .site-nav-actions a[title="Profile"]:hover {
     background: var(--color-cloud-whisper) !important;
-  }
-
-  /* Admin tabs responsive horizontal scrolling */
-  .admin-tabs {
-    flex-wrap: nowrap !important;
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch !important;
-    white-space: nowrap !important;
-    padding-bottom: 12px !important;
-  }
-  
-  .admin-tabs a {
-    display: inline-block !important;
-    flex-shrink: 0 !important;
-  }
-  
-  .admin-tabs::-webkit-scrollbar {
-    height: 4px;
-  }
-  
-  .admin-tabs::-webkit-scrollbar-thumb {
-    background: var(--color-light-pearl);
-    border-radius: 4px;
   }
 }
 
