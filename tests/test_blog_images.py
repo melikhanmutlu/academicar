@@ -16,7 +16,18 @@ def _login_admin(client, app, email="imgadmin@example.com"):
     return login(client, email=email, password="password123")
 
 
-def _upload(client, filename="photo.png", data=b"\x89PNG\r\n\x1a\nfake-image-bytes"):
+def _png_bytes():
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (4, 4), (255, 104, 44)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+PNG_BYTES = _png_bytes()
+
+
+def _upload(client, filename="photo.png", data=PNG_BYTES):
     return client.post(
         "/admin/blog/upload-image",
         data={"image": (io.BytesIO(data), filename)},
@@ -34,7 +45,14 @@ def test_admin_can_upload_image_and_serve_it(client, app):
 
     served = client.get(payload["url"])
     assert served.status_code == 200
-    assert served.data == b"\x89PNG\r\n\x1a\nfake-image-bytes"
+    assert served.data == PNG_BYTES
+
+
+def test_image_upload_rejects_non_image_with_image_extension(client, app):
+    _login_admin(client, app)
+    resp = _upload(client, filename="x.png", data=b"<html><script>alert(1)</script></html>")
+    assert resp.status_code == 400
+    assert "not a valid image" in resp.get_json()["error"]
 
 
 def test_image_upload_requires_admin(client, app):

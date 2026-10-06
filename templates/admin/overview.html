@@ -40,7 +40,7 @@
       <small>{{ totals.paid_revenue }} paid</small>
     </div>
     <div class="admin-metric">
-      <span>Jobs</span>
+      <span>Queued jobs</span>
       <strong>{{ totals.pending_jobs }}</strong>
       <small>{{ totals.failed_jobs }} failed</small>
     </div>
@@ -126,7 +126,7 @@
       </div>
       <div class="admin-breakdown">
         <h3>Job queue</h3>
-        {% for status in ["pending", "processing", "completed", "failed"] %}
+        {% for status in ["pending", "processing", "completed", "failed", "cancelled"] %}
           <div><span>{{ status|title }}</span><strong>{{ job_counts.get(status, 0) }}</strong></div>
         {% endfor %}
       </div>

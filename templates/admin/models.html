@@ -30,7 +30,7 @@
       </div>
       <div class="admin-insight-card">
         <span>Avg conversion</span>
-        <strong>{{ stats.average_conversion_seconds }}s</strong>
+        <strong>{{ '—' if stats.average_conversion_seconds is none else stats.average_conversion_seconds ~ 's' }}</strong>
         <small>completed job average</small>
       </div>
     </div>
@@ -63,6 +63,7 @@
       <span>{% if models_pagination %}{{ models_pagination.total }} total{% else %}{{ models|length }} shown{% endif %}</span>
     </div>
     <form method="GET" action="{{ url_for('admin_dashboard', admin_page='models') }}" class="admin-filter-bar">
+      <input name="model_q" class="field-input" value="{{ filters.model_q or '' }}" placeholder="Search name, id, public id, or owner email">
       <select name="model_status" class="field-select compact-select">
         <option value="all" {% if filters.model_status == "all" %}selected{% endif %}>All model states</option>
         {% for status in ["queued", "processing", "ready", "failed", "replacement_failed"] %}
@@ -72,15 +73,19 @@
       <button type="submit" class="admin-btn admin-btn-secondary compact">Filter models</button>
       <a href="{{ url_for('admin_dashboard', admin_page='models') }}" class="admin-btn admin-btn-secondary compact">Clear</a>
     </form>
-    <form method="POST" action="{{ url_for('admin_generate_missing_posters') }}" class="admin-filter-bar" onsubmit="return confirm('Generate previews for up to 100 legacy models without a poster?');">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <button type="submit" class="admin-btn admin-btn-secondary compact">Generate missing previews</button>
-    </form>
-    <form method="POST" action="{{ url_for('admin_generate_missing_posters') }}" class="admin-filter-bar" onsubmit="return confirm('Rebuild previews for up to 100 models (overwrites existing posters)? The result message reports which render backend was used.');">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="hidden" name="force" value="1">
-      <button type="submit" class="admin-btn admin-btn-secondary compact">Rebuild all previews (force)</button>
-    </form>
+    <div class="admin-actions admin-bulk-action">
+      <form method="POST" action="{{ url_for('admin_generate_missing_posters') }}" onsubmit="return confirm('Queue preview renders for up to 100 legacy models without a poster?');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="next" value="{{ request.full_path }}">
+        <button type="submit" class="admin-btn admin-btn-secondary compact">Generate missing previews</button>
+      </form>
+      <form method="POST" action="{{ url_for('admin_generate_missing_posters') }}" onsubmit="return confirm('Queue preview re-renders for up to 100 models (overwrites existing posters)?');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="next" value="{{ request.full_path }}">
+        <input type="hidden" name="force" value="1">
+        <button type="submit" class="admin-btn admin-btn-secondary compact">Rebuild all previews (force)</button>
+      </form>
+    </div>
     <div class="table-wrap">
       <table class="data-table admin-table">
         <thead>
@@ -110,7 +115,10 @@
               </td>
               <td>{{ get_license_plan(model.license_type).label }}</td>
               <td><span class="status-chip {{ admin_chip_class(model_access_status(model)) }}">{{ model_access_status(model)|title }}</span></td>
-              <td><span class="status-chip {{ admin_chip_class(model.processing_status or 'ready') }}">{{ (model.processing_status or "ready")|title }}</span></td>
+              <td>
+                <span class="status-chip {{ admin_chip_class(model.processing_status or 'ready') }}">{{ (model.processing_status or "ready")|replace("_", " ")|title }}</span>
+                {% if model.processing_error or model.replacement_error %}<small title="{{ model.processing_error or model.replacement_error }}">{{ (model.processing_error or model.replacement_error)|truncate(90) }}</small>{% endif %}
+              </td>
               <td>{{ format_file_size(model.file_size) }}</td>
               <td>
                 <div class="admin-actions">
@@ -120,7 +128,7 @@
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="7">No models yet.</td></tr>
+            <tr><td colspan="7">{{ "No models match these filters." if (filters.model_q or filters.model_status != "all") else "No models yet." }}</td></tr>
           {% endfor %}
         </tbody>
       </table>

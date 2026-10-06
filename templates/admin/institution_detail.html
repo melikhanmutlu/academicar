@@ -78,7 +78,7 @@
         </label>
         <label class="admin-editor-field">
           <span>Storage quota MB (blank = unlimited)</span>
-          <input type="number" name="quota_storage_mb" min="0" step="1" value="{{ (institution.quota_storage_bytes / (1024 * 1024))|round|int if institution.quota_storage_bytes is not none else '' }}">
+          <input type="number" name="quota_storage_mb" min="0" step="any" value="{{ ('%.2f'|format(institution.quota_storage_bytes / (1024 * 1024)))|replace('.00', '') if institution.quota_storage_bytes is not none else '' }}">
         </label>
         <label class="admin-editor-field" style="flex:1;min-width:220px">
           <span>Notes (internal)</span>

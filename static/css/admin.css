@@ -570,7 +570,7 @@
   font-weight: 600;
 }
 
-.admin-plan-card { margin-bottom:10px; padding:0; overflow:hidden; }
+.admin-plan-card { margin-bottom:10px; padding:0; overflow:hidden; border:1px solid var(--color-light-pearl); border-radius:8px; background:var(--color-canvas-white); }
 .admin-plan-summary { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:13px 15px; cursor:pointer; list-style:none; background:var(--color-canvas-white); }
 .admin-plan-summary::-webkit-details-marker { display:none; }
 .admin-plan-summary:hover { background:var(--color-cloud-whisper); }
@@ -582,9 +582,24 @@
 .admin-plan-summary-state b { font-size:16px; font-weight:400; transition:transform 150ms ease; }
 .admin-plan-card[open] .admin-plan-summary-state b { transform:rotate(180deg); }
 .admin-plan-card > form { padding:14px 15px 15px; border-top:1px solid var(--color-light-pearl); background:var(--color-cloud-whisper); }
-.admin-coupon-create { padding:15px; }
+.admin-coupon-create { padding:15px; border:1px solid var(--color-light-pearl); border-radius:8px; background:var(--color-canvas-white); }
+.admin-plan-card .admin-editor-grid,
+.admin-coupon-create .admin-editor-grid { grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); }
 .admin-feature-matrix { margin-top:12px; padding:12px; border:1px solid var(--color-light-pearl); border-radius:8px; background:var(--color-canvas-white); }
 .admin-feature-matrix legend { padding:0 6px; color:var(--color-midnight-graphite); font-size:12px; font-weight:700; }
 .admin-feature-options { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:7px 12px; }
 .admin-feature-options label { display:flex; align-items:center; gap:8px; color:var(--color-dark-shale); font-size:12px; }
 .admin-feature-options input { accent-color:var(--color-sunset-orange); }
+
+/* Label/value rows (analytics lists) and muted empty states. */
+.admin-data-list > div { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:9px 0; border-top:1px solid var(--color-light-pearl); font-family:var(--font-inter); font-size:13px; color:var(--color-dark-shale); }
+.admin-data-list > div:first-child { border-top:0; }
+.admin-data-list span { min-width:0; overflow-wrap:anywhere; }
+.admin-data-list strong { color:var(--color-midnight-graphite); font-weight:600; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.admin-empty { margin:0; color:var(--color-silver-ash); font-family:var(--font-inter); font-size:13px; }
+
+/* Native file pickers styled like the secondary admin button. */
+.admin-main input[type="file"] { font-family:var(--font-inter); font-size:12px; color:var(--color-dark-shale); }
+.admin-main input[type="file"]::file-selector-button { margin-right:10px; padding:7px 11px; border:1px solid var(--color-light-pearl); border-radius:8px; background:var(--color-canvas-white); color:var(--color-midnight-graphite); font-family:var(--font-inter); font-size:12px; font-weight:500; cursor:pointer; }
+.admin-main input[type="file"]::file-selector-button:hover { background:var(--color-cloud-whisper); }
+.admin-main input[type="checkbox"] { accent-color:var(--color-sunset-orange); }

@@ -95,9 +95,10 @@
             <tr>
               <td>{{ p.title }}</td>
               <td>{{ p.slug }}</td>
-              <td>{{ "Published" if p.is_published else "Draft" }}</td>
-              <td>{{ p.created_at.strftime("%Y-%m-%d") if p.created_at else "" }}</td>
-              <td class="admin-blog-row-actions">
+              <td><span class="status-chip {{ 'is-ready' if p.is_published else 'is-queued' }}">{{ "Published" if p.is_published else "Draft" }}</span></td>
+              <td style="white-space:nowrap">{{ p.created_at.strftime("%Y-%m-%d") if p.created_at else "" }}</td>
+              <td>
+                <div class="admin-blog-row-actions">
                 <a href="{{ url_for('blog_post', slug=p.slug) }}" class="admin-btn admin-btn-secondary compact" target="_blank" rel="noopener">View</a>
                 <a href="{{ url_for('admin_dashboard', admin_page='blog', edit=p.id) }}" class="admin-btn admin-btn-secondary compact">Edit</a>
                 <form method="POST" action="{{ url_for('admin_blog_publish', post_id=p.id) }}" style="display:inline">
@@ -108,6 +109,7 @@
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button type="submit" class="admin-btn admin-btn-danger compact">Delete</button>
                 </form>
+                </div>
               </td>
             </tr>
           {% else %}

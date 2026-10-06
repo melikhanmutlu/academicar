@@ -22,7 +22,7 @@ from flask_login import LoginManager, current_user, login_required
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFError
 from slugify import slugify
-from sqlalchemy import func, or_, text
+from sqlalchemy import and_, func, or_, text
 from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 from sqlalchemy.orm import selectinload
 from werkzeug.exceptions import RequestEntityTooLarge
@@ -94,6 +94,7 @@ from collaborators import (
     shared_projects_for,
 )
 from institutions import (
+    _funded_models_query,
     apply_institutional_license,
     end_institution_access_now,
     get_active_membership,
@@ -289,6 +290,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             "project_model_capacity": project_model_capacity,
             "project_supports_feature": request_project_supports_feature,
             "admin_chip_class": admin_chip_class,
+            "format_duration": format_duration,
             "user_is_configured_admin": user_is_configured_admin,
         }
 
@@ -565,6 +567,33 @@ _ADMIN_CHIP_GOOD = {"ready", "active", "public", "paid", "completed", "admin"}
 _ADMIN_CHIP_WARN = {"queued", "pending", "processing"}
 # "private" is a normal choice, not an error: it gets the neutral chip.
 _ADMIN_CHIP_BAD = {"failed", "replacement_failed", "expired", "cancelled", "refunded", "deleted", "disabled", "suspended", "revoked", "exhausted"}
+
+
+def format_duration(seconds) -> str:
+    """Compact admin-facing duration: "42s", "7m 5s", "3h 12m", "2d 4h"; "-" for None."""
+    if seconds is None:
+        return "-"
+    seconds = max(int(seconds), 0)
+    if seconds < 60:
+        return f"{seconds}s"
+    minutes, secs = divmod(seconds, 60)
+    if minutes < 60:
+        return f"{minutes}m {secs}s"
+    hours, minutes = divmod(minutes, 60)
+    if hours < 24:
+        return f"{hours}h {minutes}m"
+    days, hours = divmod(hours, 24)
+    return f"{days}d {hours}h"
+
+
+def admin_return_url(admin_page: str, **kwargs) -> str:
+    """Where an admin POST action redirects: the page the form was posted from
+    (its ``next`` hidden field, so filters and pagination survive) when that is
+    a local admin URL, else the given admin page."""
+    target = (request.form.get("next") or "").strip()
+    if target.startswith("/admin") and "//" not in target and "\\" not in target:
+        return target
+    return url_for("admin_dashboard", admin_page=admin_page, **kwargs)
 
 
 def admin_chip_class(value) -> str:
@@ -929,6 +958,30 @@ def count_orphan_files(folder: str, expected_filenames: set[str]) -> int:
     return orphan_count
 
 
+# converted folder -> (time.monotonic(), orphan_counts, storage_breakdown)
+_ADMIN_FILE_SCAN_CACHE: dict[str, tuple] = {}
+ADMIN_FILE_SCAN_CACHE_SECONDS = 300
+
+
+def count_orphan_model_files(folder: str, model_ids: set[str]) -> int:
+    """Files under ``converted/`` that belong to no existing model.
+
+    A model folder ``converted/<model_id>/`` legitimately holds more than the
+    GLB/USDZ (poster.png, collage.png, scenes/…), so only files outside a
+    known model's folder count as orphans."""
+    if not folder or not os.path.exists(folder):
+        return 0
+    root_folder = os.path.abspath(folder)
+    orphan_count = 0
+    for root, _, files in os.walk(root_folder):
+        relative = os.path.relpath(root, root_folder)
+        top = relative.split(os.sep, 1)[0]
+        if relative != "." and top in model_ids:
+            continue
+        orphan_count += len(files)
+    return orphan_count
+
+
 def _describe_cli_resolution(command: list[str]) -> dict:
     """Side-effect-free presence check for a converter CLI: does the resolved
     command point at a local file, or would it fall through to an on-demand
@@ -965,7 +1018,9 @@ def _admin_system_health() -> dict:
         )
     completed_recent = (
         ConversionJob.query.filter(
-            ConversionJob.started_at.isnot(None), ConversionJob.finished_at.isnot(None)
+            ConversionJob.status == "completed",
+            ConversionJob.started_at.isnot(None),
+            ConversionJob.finished_at.isnot(None),
         )
         .order_by(ConversionJob.finished_at.desc())
         .limit(20)
@@ -976,7 +1031,7 @@ def _admin_system_health() -> dict:
         for job in completed_recent
         if job.finished_at and job.started_at and job.finished_at >= job.started_at
     ]
-    avg_recent_seconds = int(sum(durations) / len(durations)) if durations else 0
+    avg_recent_seconds = int(sum(durations) / len(durations)) if durations else None
     return {
         "blender": {"available": bool(blender_path), "detail": blender_path or "not on PATH"},
         "gltf_transform": _describe_cli_resolution(find_gltf_transform_cli()),
@@ -985,6 +1040,11 @@ def _admin_system_health() -> dict:
         "oldest_pending_age_seconds": oldest_pending_age_seconds,
         "avg_recent_job_seconds": avg_recent_seconds,
         "pending_job_count": ConversionJob.query.filter_by(status="pending").count(),
+        # Same threshold /health/worker uses to report a stalled worker.
+        "worker_stalled": (
+            oldest_pending_age_seconds is not None
+            and oldest_pending_age_seconds > int(os.environ.get("WORKER_STALL_MINUTES", "30")) * 60
+        ),
     }
 
 
@@ -1127,6 +1187,15 @@ def create_backup_archive(app: Flask, created_by_user_id: int | None = None, rea
     timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     filename = f"academic_ar_backup_{timestamp}.zip"
     archive_path = os.path.join(folder, filename)
+    # Written under a temporary name and renamed when complete, so the admin
+    # backups page (which lists *.zip) never offers a half-written archive.
+    partial_path = archive_path + ".partial"
+    for leftover in os.listdir(folder):
+        if leftover.endswith(".zip.partial"):  # from a worker killed mid-backup
+            try:
+                os.remove(os.path.join(folder, leftover))
+            except OSError:
+                pass
     manifest_lines = [
         "format_version=1",
         f"created_at={datetime.now(UTC).isoformat()}",
@@ -1140,7 +1209,7 @@ def create_backup_archive(app: Flask, created_by_user_id: int | None = None, rea
             f"{qr.public_id}\t{qr.status}\t{model_resolver_url(qr.model)}\t{qr.model_id}\t{qr.target_type}"
         )
     try:
-        with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        with zipfile.ZipFile(partial_path, "w", zipfile.ZIP_DEFLATED) as zip_file:
             db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
             if db_uri.startswith("sqlite:///"):
                 db_path = db_uri.replace("sqlite:///", "", 1)
@@ -1157,10 +1226,11 @@ def create_backup_archive(app: Flask, created_by_user_id: int | None = None, rea
             manifest_lines.append(f"pdf_files={add_folder_to_zip(zip_file, app.config['PDF_FOLDER'], 'pdfs')}")
             zip_file.writestr("manifest.txt", "\n".join(manifest_lines) + "\n")
             zip_file.writestr("qr_links.tsv", "public_id\tstatus\tresolver_url\tmodel_id\ttarget_type\n" + "\n".join(qr_manifest) + "\n")
+        os.replace(partial_path, archive_path)
     except Exception:
         # A half-written archive (typically ENOSPC) would only eat more disk.
         try:
-            os.remove(archive_path)
+            os.remove(partial_path)
         except OSError:
             pass
         raise
@@ -1317,6 +1387,17 @@ def latest_backup_skip() -> AuditLog | None:
         AuditLog.event_type == "admin_backup_created", AuditLog.timestamp >= skipped.timestamp
     ).first()
     return None if made is not None else skipped
+
+
+def latest_backup_failure() -> AuditLog | None:
+    """The newest failed backup attempt, unless a later archive was created."""
+    failed = AuditLog.query.filter_by(event_type="admin_backup_failed").order_by(AuditLog.timestamp.desc()).first()
+    if failed is None:
+        return None
+    made = AuditLog.query.filter(
+        AuditLog.event_type == "admin_backup_created", AuditLog.timestamp >= failed.timestamp
+    ).first()
+    return None if made is not None else failed
 
 
 def run_scheduled_backups(app: Flask) -> str | None:
@@ -3753,6 +3834,197 @@ def process_usdz_regen_job(
                 db.session.rollback()
 
 
+def build_ar_doctor_report(app: Flask, model: Model3D | None) -> dict:
+    """Diagnose iOS USDZ generation: is Blender on PATH and can it convert?
+
+    Reports whether the `blender` binary is present, its version, the Python
+    environment Blender uses, and the result of a live GLB->USDZ conversion on
+    ``model``. Runs Blender (minutes of CPU), so it is only ever called from
+    the worker (``ar_doctor`` job), never from a web request.
+    """
+    import shutil as _shutil
+    import subprocess as _subprocess
+    import tempfile as _tempfile
+
+    report = {
+        "blender_on_path": _shutil.which("blender"),
+        "blender_version": None,
+        "blender_python": None,
+        "test_model_id": None,
+        "glb_found": False,
+        "conversion_ok": None,
+        "conversion_stderr": None,
+    }
+
+    if report["blender_on_path"]:
+        try:
+            vproc = _subprocess.run(
+                ["blender", "--version"],
+                stdout=_subprocess.PIPE, stderr=_subprocess.PIPE,
+                text=True, timeout=60,
+            )
+            report["blender_version"] = (vproc.stdout or vproc.stderr or "").strip().splitlines()[:2]
+        except Exception as exc:  # noqa: BLE001
+            report["blender_version"] = f"error running blender --version: {exc}"
+
+        # Probe the python environment Blender actually uses, so we know
+        # exactly where numpy must live (Blender's bundled python vs system).
+        probe = (
+            "import sys,os\n"
+            "print('PREFIX', sys.prefix)\n"
+            "print('PYVER', '%d.%d' % sys.version_info[:2])\n"
+            "print('EXEC', sys.executable)\n"
+            "bindir = os.path.join(sys.prefix, 'bin')\n"
+            "print('BINDIR_EXISTS', os.path.isdir(bindir))\n"
+            "print('BIN', sorted(f for f in (os.listdir(bindir) if os.path.isdir(bindir) else []) if f.startswith('python')))\n"
+            "try:\n"
+            "    import numpy; print('NUMPY_OK', numpy.__version__, numpy.__file__)\n"
+            "except Exception as e:\n"
+            "    print('NUMPY_FAIL', repr(e))\n"
+        )
+        try:
+            pproc = _subprocess.run(
+                ["blender", "--background", "--factory-startup", "--python-expr", probe],
+                stdout=_subprocess.PIPE, stderr=_subprocess.PIPE,
+                text=True, timeout=120,
+            )
+            combined = (pproc.stdout or "") + "\n" + (pproc.stderr or "")
+            report["blender_python"] = [
+                ln for ln in combined.splitlines()
+                if ln.startswith(("PREFIX", "PYVER", "EXEC", "BINDIR_EXISTS", "BIN", "NUMPY_"))
+            ]
+        except Exception as exc:  # noqa: BLE001
+            report["blender_python"] = f"probe error: {exc}"
+
+    if model is not None:
+        report["test_model_id"] = model.id
+        glb_path = os.path.join(app.config["CONVERTED_FOLDER"], model.id, "model.glb")
+        if not os.path.exists(glb_path):
+            ensure_local(glb_path, f"converted/{model.id}/model.glb")
+        report["glb_found"] = os.path.exists(glb_path)
+        if report["glb_found"] and report["blender_on_path"]:
+            blender_script = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "tools", "blender_usdz_export.py",
+            )
+            with _tempfile.TemporaryDirectory() as tmp:
+                out_usdz = os.path.join(tmp, "test.usdz")
+                # Mirror convert_glb_to_usdz: feed Blender a Draco-free copy,
+                # since stored GLBs are Draco-compressed and Debian's Blender
+                # importer cannot decode Draco.
+                from converters.glb_optimize import decompress_glb
+                input_glb = glb_path
+                plain = os.path.join(tmp, "plain.glb")
+                report["decompressed"] = bool(decompress_glb(glb_path, plain))
+                if report["decompressed"]:
+                    input_glb = plain
+                try:
+                    cproc = _subprocess.run(
+                        ["blender", "--background", "--python", blender_script,
+                         "--", input_glb, out_usdz],
+                        stdout=_subprocess.PIPE, stderr=_subprocess.PIPE,
+                        text=True, timeout=300,
+                    )
+                    produced = os.path.exists(out_usdz) and os.path.getsize(out_usdz) > 0
+                    report["conversion_ok"] = bool(cproc.returncode == 0 and produced)
+                    report["conversion_stderr"] = (cproc.stderr or cproc.stdout or "")[-1500:]
+                except Exception as exc:  # noqa: BLE001
+                    report["conversion_ok"] = False
+                    report["conversion_stderr"] = f"exception: {exc}"
+
+    return report
+
+
+def process_ar_doctor_job(
+    app: Flask,
+    *,
+    model_id: str,
+    job_id: int | None = None,
+) -> None:
+    """Worker side of the admin "AR doctor": store the report on the job."""
+    with app.app_context():
+        model = db.session.get(Model3D, model_id)
+        job = db.session.get(ConversionJob, job_id) if job_id is not None else None
+        if job is not None and job.status != "processing":
+            job.status = "processing"
+            job.started_at = datetime.now(UTC)
+            job.attempts = (job.attempts or 0) + 1
+            db.session.commit()
+        error = None
+        try:
+            report = build_ar_doctor_report(app, model)
+        except Exception as exc:
+            logger.exception("AR doctor job failed")
+            report = None
+            error = f"{type(exc).__name__}: {exc}"[:ERROR_MESSAGE_MAX_LENGTH]
+        if job is not None:
+            job.status = "failed" if error else "completed"
+            job.error = error
+            job.finished_at = datetime.now(UTC)
+            job.payload = {**(job.payload or {}), "report": report}
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+
+
+def process_poster_job(
+    app: Flask,
+    *,
+    model_id: str,
+    job_id: int | None = None,
+) -> None:
+    """Render (or re-render) a model's poster.png preview in the worker.
+
+    Optional job: a failure is recorded on the job only, never on the model.
+    The render backend used ("pyrender", or the flat "rasterize" fallback when
+    OSMesa is unavailable) is kept on the job payload for the admin.
+    """
+    from converters.poster import generate_poster_backend
+
+    with app.app_context():
+        model = db.session.get(Model3D, model_id)
+        job = db.session.get(ConversionJob, job_id) if job_id is not None else None
+        if job is not None and job.status != "processing":
+            job.status = "processing"
+            job.started_at = datetime.now(UTC)
+            job.attempts = (job.attempts or 0) + 1
+            db.session.commit()
+        backend = None
+        error = None
+        try:
+            if model is None or not model.glb_path:
+                error = "Model or its GLB path is missing."
+            else:
+                glb_path = model.glb_path
+                ensure_local(glb_path, f"converted/{model_id}/model.glb")
+                if not os.path.exists(glb_path):
+                    error = "The converted GLB file is missing."
+                else:
+                    poster_png = os.path.join(os.path.dirname(glb_path), "poster.png")
+                    backend = generate_poster_backend(glb_path, poster_png)
+                    if backend:
+                        model.poster_path = poster_png
+                        db.session.commit()
+                        mirror_file(poster_png, f"converted/{model_id}/poster.png")
+                    else:
+                        error = "No poster render backend could render this GLB."
+        except Exception as exc:
+            db.session.rollback()
+            logger.exception("Poster job failed for model %s", model_id)
+            error = f"{type(exc).__name__}: {exc}"[:ERROR_MESSAGE_MAX_LENGTH]
+        if job is not None:
+            job.status = "failed" if error else "completed"
+            job.error = error
+            job.finished_at = datetime.now(UTC)
+            if backend:
+                job.payload = {**(job.payload or {}), "backend": backend}
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+
+
 def process_layer_metrics_job(
     app: Flask,
     *,
@@ -3992,7 +4264,7 @@ def requeue_layer_metrics(app: Flask, model: Model3D) -> None:
 
 # Jobs that only add a convenience (measurements, scene AR files): when they run
 # out of attempts they are failed on their own and never fail the model.
-OPTIONAL_JOB_TYPES = ("layer_metrics", "scene_ar")
+OPTIONAL_JOB_TYPES = ("layer_metrics", "scene_ar", "poster", "ar_doctor")
 
 
 def _fail_scene_ar(job: ConversionJob) -> None:
@@ -4031,6 +4303,10 @@ def enqueue_conversion_job(
             process_usdz_regen_job(app, **job_kwargs)
         elif job_type == "layer_metrics":
             process_layer_metrics_job(app, **job_kwargs)
+        elif job_type == "poster":
+            process_poster_job(app, **job_kwargs)
+        elif job_type == "ar_doctor":
+            process_ar_doctor_job(app, **job_kwargs)
         elif job_type == "scene_ar":
             process_scene_ar_job(app, **job_kwargs)
         else:
@@ -4184,6 +4460,10 @@ def run_next_conversion_job(app: Flask) -> bool:
         process_usdz_regen_job(app, **payload)
     elif job_kind == "layer_metrics":
         process_layer_metrics_job(app, **payload)
+    elif job_kind == "poster":
+        process_poster_job(app, **payload)
+    elif job_kind == "ar_doctor":
+        process_ar_doctor_job(app, **payload)
     elif job_kind == "scene_ar":
         process_scene_ar_job(app, **payload)
     else:
@@ -5744,17 +6024,18 @@ def register_routes(app: Flask) -> None:
         if not os.path.exists(usdz_path):
             ensure_local(usdz_path, f"converted/{model.id}/model.usdz")
         has_usdz = os.path.exists(usdz_path)
-        log_audit(
-            "public_model_viewed",
-            user_id=current_user.id if current_user.is_authenticated else None,
-            resource_id=model.id,
-            details={"paper_id": model.paper_id, "public_id": model.public_id},
-        )
         annotations = ModelAnnotation.query.filter_by(model_id=model.id).order_by(ModelAnnotation.order_index).all()
         # Owners and project editors manage the model from the viewer
-        # (labels, colour); their visits and admin previews are not reader views.
+        # (labels, colour); their visits and admin previews are not reader views
+        # (neither for analytics nor for the admin viewer statistics).
         can_edit = can_edit_project(model.paper)
         if not can_edit and not _is_admin_preview(model.user_id):
+            log_audit(
+                "public_model_viewed",
+                user_id=current_user.id if current_user.is_authenticated else None,
+                resource_id=model.id,
+                details={"paper_id": model.paper_id, "public_id": model.public_id},
+            )
             track_event("model_viewed", owner_user_id=model.user_id, project_id=model.paper_id, model_id=model.id)
         scale_ref = human_scale_reference(format_model_dimensions_cm(model))
         # Saved scenes (paid plans); ?scene=<id> opens the viewer on one of them.
@@ -6484,6 +6765,18 @@ def register_routes(app: Flask) -> None:
         models_query = Model3D.query
         if model_status_filter != "all":
             models_query = models_query.filter(Model3D.processing_status == model_status_filter)
+        model_query_text = (request.args.get("model_q") or "").strip()
+        if model_query_text:
+            model_pattern = f"%{model_query_text.lower()}%"
+            models_query = models_query.outerjoin(User, Model3D.user_id == User.id).filter(
+                or_(
+                    func.lower(Model3D.id).like(model_pattern),
+                    func.lower(Model3D.public_id).like(model_pattern),
+                    func.lower(Model3D.display_name).like(model_pattern),
+                    func.lower(Model3D.original_filename).like(model_pattern),
+                    func.lower(User.email).like(model_pattern),
+                )
+            )
 
         payments_query = Payment.query.options(selectinload(Payment.user), selectinload(Payment.institution))
         if pay_status_filter in {"pending", "paid", "failed", "refunded"}:
@@ -6492,11 +6785,16 @@ def register_routes(app: Flask) -> None:
             payments_query = payments_query.filter(Payment.provider == pay_provider_filter)
         if pay_query_text:
             pay_pattern = f"%{pay_query_text.lower()}%"
-            payments_query = payments_query.outerjoin(User, Payment.user_id == User.id).filter(
-                or_(
-                    func.lower(Payment.invoice_number).like(pay_pattern),
-                    func.lower(Payment.provider_reference).like(pay_pattern),
-                    func.lower(User.email).like(pay_pattern),
+            payments_query = (
+                payments_query.outerjoin(User, Payment.user_id == User.id)
+                .outerjoin(Institution, Payment.institution_id == Institution.id)
+                .filter(
+                    or_(
+                        func.lower(Payment.invoice_number).like(pay_pattern),
+                        func.lower(Payment.provider_reference).like(pay_pattern),
+                        func.lower(User.email).like(pay_pattern),
+                        func.lower(Institution.name).like(pay_pattern),
+                    )
                 )
             )
 
@@ -6537,42 +6835,39 @@ def register_routes(app: Flask) -> None:
 
         # Paginated lists (50 rows/page). Each page passes both the items (as the
         # existing template variable) and the Pagination object for the controls.
-        users_pagination = users_query.order_by(User.created_at.desc()).paginate(
-            page=page, per_page=ADMIN_PER_PAGE, error_out=False
-        )
-        users = users_pagination.items
+        # Only the list the current page renders is queried; the others stay empty.
+        def admin_list(name, query, order):
+            if admin_page != name:
+                return [], None
+            pagination = query.order_by(order).paginate(page=page, per_page=ADMIN_PER_PAGE, error_out=False)
+            if pagination.pages and page > pagination.pages:
+                # A stale ?page= past the end (e.g. after deleting rows) shows
+                # the last page instead of an empty table.
+                pagination = query.order_by(order).paginate(
+                    page=pagination.pages, per_page=ADMIN_PER_PAGE, error_out=False
+                )
+            return pagination.items, pagination
+
+        users, users_pagination = admin_list("users", users_query, User.created_at.desc())
         # Eager-load relationships the admin templates touch per row, to avoid an
         # N+1 query storm (each model row reads paper+author; each QR row reads model).
-        papers_pagination = papers_query.order_by(Paper.created_at.desc()).paginate(
-            page=page, per_page=ADMIN_PER_PAGE, error_out=False
+        papers, papers_pagination = admin_list(
+            "content", papers_query.options(selectinload(Paper.models)), Paper.created_at.desc()
         )
-        papers = papers_pagination.items
-        models_pagination = (
-            models_query.options(selectinload(Model3D.paper).selectinload(Paper.author))
-            .order_by(Model3D.created_at.desc())
-            .paginate(page=page, per_page=ADMIN_PER_PAGE, error_out=False)
+        models, models_pagination = admin_list(
+            "models",
+            models_query.options(selectinload(Model3D.paper).selectinload(Paper.author)),
+            Model3D.created_at.desc(),
         )
-        models = models_pagination.items
-        payments_pagination = payments_query.order_by(Payment.created_at.desc()).paginate(
-            page=page, per_page=ADMIN_PER_PAGE, error_out=False
+        payments, payments_pagination = admin_list("revenue", payments_query, Payment.created_at.desc())
+        qr_links, qr_pagination = admin_list("access", qr_query, QRLink.created_at.desc())
+        audit_logs, audit_pagination = admin_list("logs", audit_query, AuditLog.timestamp.desc())
+        jobs, jobs_pagination = admin_list(
+            "jobs", jobs_query.options(selectinload(ConversionJob.model)), ConversionJob.created_at.desc()
         )
-        payments = payments_pagination.items
-        qr_pagination = qr_query.order_by(QRLink.created_at.desc()).paginate(
-            page=page, per_page=ADMIN_PER_PAGE, error_out=False
+        annotations, annotations_pagination = admin_list(
+            "annotations", annotations_query, ModelAnnotation.created_at.desc()
         )
-        qr_links = qr_pagination.items
-        audit_pagination = audit_query.order_by(AuditLog.timestamp.desc()).paginate(
-            page=page, per_page=ADMIN_PER_PAGE, error_out=False
-        )
-        audit_logs = audit_pagination.items
-        jobs_pagination = jobs_query.order_by(ConversionJob.created_at.desc()).paginate(
-            page=page, per_page=ADMIN_PER_PAGE, error_out=False
-        )
-        jobs = jobs_pagination.items
-        annotations_pagination = annotations_query.order_by(ModelAnnotation.created_at.desc()).paginate(
-            page=page, per_page=ADMIN_PER_PAGE, error_out=False
-        )
-        annotations = annotations_pagination.items
         now = datetime.now(UTC)
         last_7_days = now - timedelta(days=7)
         last_30_days = now - timedelta(days=30)
@@ -6599,18 +6894,21 @@ def register_routes(app: Flask) -> None:
             "pending_jobs": ConversionJob.query.filter_by(status="pending").count(),
             "failed_jobs": ConversionJob.query.filter_by(status="failed").count(),
         }
+        # Breakdowns use the same live-project scope as totals["models"], so
+        # they add up to the headline count.
+        live_model = Model3D.paper.has(or_(Paper.status.is_(None), Paper.status != "deleted"))
         processing_counts = {}
-        for status, count in db.session.query(Model3D.processing_status, func.count(Model3D.id)).group_by(Model3D.processing_status).all():
+        for status, count in db.session.query(Model3D.processing_status, func.count(Model3D.id)).filter(live_model).group_by(Model3D.processing_status).all():
             key = status or "ready"
             processing_counts[key] = processing_counts.get(key, 0) + count
 
         license_counts = {}
-        for license_type, count in db.session.query(Model3D.license_type, func.count(Model3D.id)).group_by(Model3D.license_type).all():
+        for license_type, count in db.session.query(Model3D.license_type, func.count(Model3D.id)).filter(live_model).group_by(Model3D.license_type).all():
             key = license_type or "free"
             license_counts[key] = license_counts.get(key, 0) + count
 
         source_format_counts = {}
-        for source_format, count in db.session.query(Model3D.source_format, func.count(Model3D.id)).group_by(Model3D.source_format).all():
+        for source_format, count in db.session.query(Model3D.source_format, func.count(Model3D.id)).filter(live_model).group_by(Model3D.source_format).all():
             key = source_format or "unknown"
             source_format_counts[key] = source_format_counts.get(key, 0) + count
 
@@ -6623,7 +6921,7 @@ def register_routes(app: Flask) -> None:
         for status, count in db.session.query(ConversionJob.status, func.count(ConversionJob.id)).group_by(ConversionJob.status).all():
             key = status or "pending"
             job_counts[key] = job_counts.get(key, 0) + count
-        total_model_storage = db.session.query(func.coalesce(func.sum(Model3D.file_size), 0)).scalar() or 0
+        total_model_storage = db.session.query(func.coalesce(func.sum(Model3D.file_size), 0)).filter(live_model).scalar() or 0
         revenue_30_days = format_money_by_currency(paid_revenue_by_currency(Payment.paid_at >= last_30_days))
         papers_with_doi = active_paper_query().filter(Paper.doi.isnot(None), Paper.doi != "").count()
         papers_with_pmid = active_paper_query().filter(Paper.pmid.isnot(None), Paper.pmid != "").count()
@@ -6657,96 +6955,130 @@ def register_routes(app: Flask) -> None:
             .limit(10)
             .all()
         )
-        completed_jobs = ConversionJob.query.filter(
-            ConversionJob.started_at.isnot(None),
-            ConversionJob.finished_at.isnot(None),
-        ).all()
-        conversion_durations = [
-            (job.finished_at - job.started_at).total_seconds()
-            for job in completed_jobs
-            if job.finished_at and job.started_at and job.finished_at >= job.started_at
-        ]
-        average_conversion_seconds = int(sum(conversion_durations) / len(conversion_durations)) if conversion_durations else 0
-        failed_jobs = ConversionJob.query.filter_by(status="failed").order_by(ConversionJob.finished_at.desc()).limit(10).all()
+        average_conversion_seconds = None
         failed_format_counts: dict[str, int] = {}
-        for source_format, count in (
-            db.session.query(Model3D.source_format, func.count(ConversionJob.id))
-            .join(Model3D, ConversionJob.model_id == Model3D.id)
-            .filter(ConversionJob.status == "failed")
-            .group_by(Model3D.source_format)
-            .all()
-        ):
-            failed_format_counts[source_format or "unknown"] = count
+        if admin_page == "models":
+            # Recent window only: averaging every job ever loaded the whole table.
+            completed_jobs = (
+                ConversionJob.query.filter(
+                    ConversionJob.status == "completed",
+                    ConversionJob.started_at.isnot(None),
+                    ConversionJob.finished_at.isnot(None),
+                )
+                .order_by(ConversionJob.finished_at.desc())
+                .limit(200)
+                .all()
+            )
+            conversion_durations = [
+                (job.finished_at - job.started_at).total_seconds()
+                for job in completed_jobs
+                if job.finished_at and job.started_at and job.finished_at >= job.started_at
+            ]
+            average_conversion_seconds = int(sum(conversion_durations) / len(conversion_durations)) if conversion_durations else None
+            for source_format, count in (
+                db.session.query(Model3D.source_format, func.count(ConversionJob.id))
+                .join(Model3D, ConversionJob.model_id == Model3D.id)
+                .filter(ConversionJob.status == "failed")
+                .group_by(Model3D.source_format)
+                .all()
+            ):
+                failed_format_counts[source_format or "unknown"] = count
+        failed_jobs = (
+            ConversionJob.query.filter_by(status="failed").order_by(ConversionJob.finished_at.desc()).limit(10).all()
+            if admin_page == "jobs"
+            else []
+        )
         field_counts = {}
-        for field, count in db.session.query(Paper.field, func.count(Paper.id)).group_by(Paper.field).order_by(func.count(Paper.id).desc()).limit(8).all():
-            key = field or "Unspecified"
-            field_counts[key] = field_counts.get(key, 0) + count
         daily_publication_trend = []
         daily_viewer_trend = []
-        for offset in range(29, -1, -1):
-            day_start = (now - timedelta(days=offset)).replace(hour=0, minute=0, second=0, microsecond=0)
-            day_end = day_start + timedelta(days=1)
-            daily_publication_trend.append(
-                {
-                    "label": day_label(day_start),
-                    "count": Paper.query.filter(Paper.created_at >= day_start, Paper.created_at < day_end).count(),
+        if admin_page in {"content", "access"}:
+            for field, count in db.session.query(Paper.field, func.count(Paper.id)).group_by(Paper.field).order_by(func.count(Paper.id).desc()).limit(8).all():
+                key = field or "Unspecified"
+                field_counts[key] = field_counts.get(key, 0) + count
+            trend_start = (now - timedelta(days=29)).replace(hour=0, minute=0, second=0, microsecond=0)
+            trend_days = [trend_start + timedelta(days=offset) for offset in range(30)]
+
+            def per_day(column, *filters):
+                day = func.date(column)
+                # SQLite returns "YYYY-MM-DD" strings, PostgreSQL date objects; str() unifies.
+                counts = {
+                    str(key)[:10]: count
+                    for key, count in db.session.query(day, func.count())
+                    .filter(column >= trend_start, *filters)
+                    .group_by(day)
+                    .all()
+                    if key
                 }
-            )
-            daily_viewer_trend.append(
-                {
-                    "label": day_label(day_start),
-                    "count": AuditLog.query.filter(
-                        AuditLog.event_type == "public_model_viewed",
-                        AuditLog.timestamp >= day_start,
-                        AuditLog.timestamp < day_end,
-                    ).count(),
-                }
-            )
+                return [{"label": day_label(day), "count": counts.get(day.strftime("%Y-%m-%d"), 0)} for day in trend_days]
+
+            if admin_page == "content":
+                daily_publication_trend = per_day(Paper.created_at)
+            else:
+                daily_viewer_trend = per_day(AuditLog.timestamp, AuditLog.event_type == "public_model_viewed")
         monthly_revenue = []
-        site_currency = (current_app.config.get("PAYMENT_CURRENCY") or "USD").upper()
-        for month_seed in last_n_month_starts(now, 12):
-            next_month = (month_seed.replace(day=28) + timedelta(days=4)).replace(day=1)
-            by_currency = paid_revenue_by_currency(Payment.paid_at >= month_seed, Payment.paid_at < next_month)
-            monthly_revenue.append({
-                "label": month_label(month_seed),
-                "amount": by_currency.get(site_currency, 0),
-                "summary": format_money_by_currency(by_currency),
-            })
-        _max_month = max((m["amount"] for m in monthly_revenue), default=0) or 1
-        for m in monthly_revenue:
-            # Bar height in px, scaled to the busiest month (site currency).
-            m["bar_px"] = 8 + int(132 * m["amount"] / _max_month)
-        top_viewed_rows = (
-            db.session.query(AuditLog.resource_id, func.count(AuditLog.id))
-            .filter(AuditLog.event_type == "public_model_viewed", AuditLog.resource_id.isnot(None))
-            .group_by(AuditLog.resource_id)
-            .order_by(func.count(AuditLog.id).desc())
-            .limit(10)
-            .all()
-        )
-        viewed_model_ids = [r[0] for r in top_viewed_rows]
-        viewed_models_map = {m.id: m for m in Model3D.query.filter(Model3D.id.in_(viewed_model_ids)).all()} if viewed_model_ids else {}
-        top_viewed_models = [
-            {"model": viewed_models_map.get(model_id), "model_id": model_id, "count": count}
-            for model_id, count in top_viewed_rows
-        ]
-        storage_rows = (
-            db.session.query(
-                Model3D.user_id,
-                func.coalesce(func.sum(Model3D.file_size), 0),
-                func.count(Model3D.id),
+        monthly_revenue_currency = None
+        if admin_page == "revenue":
+            for month_seed in last_n_month_starts(now, 12):
+                next_month = (month_seed.replace(day=28) + timedelta(days=4)).replace(day=1)
+                by_currency = paid_revenue_by_currency(Payment.paid_at >= month_seed, Payment.paid_at < next_month)
+                monthly_revenue.append({
+                    "label": month_label(month_seed),
+                    "by_currency": by_currency,
+                    "summary": format_money_by_currency(by_currency),
+                })
+            # Bars are drawn in one currency: the one that earned the most over
+            # the year (amounts in different currencies are never added), so a
+            # TRY-only year is not an empty USD chart.
+            year_totals: dict[str, int] = {}
+            for m in monthly_revenue:
+                for currency, amount in m["by_currency"].items():
+                    year_totals[currency] = year_totals.get(currency, 0) + amount
+            monthly_revenue_currency = (
+                max(year_totals, key=year_totals.get)
+                if year_totals and any(year_totals.values())
+                else (current_app.config.get("PAYMENT_CURRENCY") or "USD").upper()
             )
-            .group_by(Model3D.user_id)
-            .order_by(func.coalesce(func.sum(Model3D.file_size), 0).desc())
-            .limit(10)
-            .all()
-        )
-        storage_user_ids = [r[0] for r in storage_rows]
-        storage_users_map = {u.id: u for u in User.query.filter(User.id.in_(storage_user_ids)).all()} if storage_user_ids else {}
-        storage_by_user = [
-            {"user": storage_users_map.get(user_id), "user_id": user_id, "size": total_size or 0, "models": model_count}
-            for user_id, total_size, model_count in storage_rows
-        ]
+            for m in monthly_revenue:
+                m["amount"] = m["by_currency"].get(monthly_revenue_currency, 0)
+            _max_month = max((m["amount"] for m in monthly_revenue), default=0) or 1
+            for m in monthly_revenue:
+                # Bar height in px, scaled to the busiest month; empty months stay flat.
+                m["bar_px"] = 8 + int(132 * m["amount"] / _max_month) if m["amount"] else 2
+        top_viewed_models = []
+        if admin_page == "access":
+            top_viewed_rows = (
+                db.session.query(AuditLog.resource_id, func.count(AuditLog.id))
+                .filter(AuditLog.event_type == "public_model_viewed", AuditLog.resource_id.isnot(None))
+                .group_by(AuditLog.resource_id)
+                .order_by(func.count(AuditLog.id).desc())
+                .limit(10)
+                .all()
+            )
+            viewed_model_ids = [r[0] for r in top_viewed_rows]
+            viewed_models_map = {m.id: m for m in Model3D.query.filter(Model3D.id.in_(viewed_model_ids)).all()} if viewed_model_ids else {}
+            top_viewed_models = [
+                {"model": viewed_models_map.get(model_id), "model_id": model_id, "count": count}
+                for model_id, count in top_viewed_rows
+            ]
+        storage_by_user = []
+        if admin_page == "storage":
+            storage_rows = (
+                db.session.query(
+                    Model3D.user_id,
+                    func.coalesce(func.sum(Model3D.file_size), 0),
+                    func.count(Model3D.id),
+                )
+                .group_by(Model3D.user_id)
+                .order_by(func.coalesce(func.sum(Model3D.file_size), 0).desc())
+                .limit(10)
+                .all()
+            )
+            storage_user_ids = [r[0] for r in storage_rows]
+            storage_users_map = {u.id: u for u in User.query.filter(User.id.in_(storage_user_ids)).all()} if storage_user_ids else {}
+            storage_by_user = [
+                {"user": storage_users_map.get(user_id), "user_id": user_id, "size": total_size or 0, "models": model_count}
+                for user_id, total_size, model_count in storage_rows
+            ]
         # Filesystem scanning (os.walk over four folders) and orphan detection
         # are expensive, so only run them on the pages that actually display the
         # results: "overview" and "security" need the orphan count for critical
@@ -6759,7 +7091,17 @@ def register_routes(app: Flask) -> None:
             "pdfs": {"size": 0, "files": 0},
             "qr": {"size": 0, "files": 0},
         }
-        if admin_page in {"overview", "storage", "security"}:
+        scan_cache_key = app.config["CONVERTED_FOLDER"]
+        cached_scan = _ADMIN_FILE_SCAN_CACHE.get(scan_cache_key)
+        if (
+            admin_page in {"overview", "security"}
+            and cached_scan is not None
+            and time.monotonic() - cached_scan[0] < ADMIN_FILE_SCAN_CACHE_SECONDS
+        ):
+            # The landing page must not walk the whole volume on every load;
+            # the Storage page always rescans (and refreshes this cache).
+            orphan_counts, storage_breakdown = cached_scan[1], cached_scan[2]
+        elif admin_page in {"overview", "storage", "security"}:
             upload_size, upload_files = scan_folder_size(app.config["UPLOAD_FOLDER"])
             converted_size, converted_files = scan_folder_size(app.config["CONVERTED_FOLDER"])
             qr_size, qr_files = scan_folder_size(app.config["QR_FOLDER"])
@@ -6776,13 +7118,9 @@ def register_routes(app: Flask) -> None:
                 for (qr_code_path,) in db.session.query(Model3D.qr_code_path).filter(Model3D.qr_code_path.isnot(None)).all()
                 if qr_code_path
             }
-            expected_model_files = set()
-            for (model_pk,) in db.session.query(Model3D.id).all():
-                model_folder = os.path.abspath(os.path.join(app.config["CONVERTED_FOLDER"], model_pk))
-                expected_model_files.add(os.path.join(model_folder, "model.glb"))
-                expected_model_files.add(os.path.join(model_folder, "model.usdz"))
+            known_model_ids = {model_pk for (model_pk,) in db.session.query(Model3D.id).all()}
             orphan_counts = {
-                "converted": count_orphan_files(app.config["CONVERTED_FOLDER"], expected_model_files),
+                "converted": count_orphan_model_files(app.config["CONVERTED_FOLDER"], known_model_ids),
                 "pdf": count_orphan_files(app.config["PDF_FOLDER"], expected_pdf_files),
                 "qr": count_orphan_files(app.config["QR_FOLDER"], expected_qr_files),
             }
@@ -6792,15 +7130,25 @@ def register_routes(app: Flask) -> None:
                 "pdfs": {"size": pdf_size, "files": pdf_files},
                 "qr": {"size": qr_size, "files": qr_files},
             }
-        security_events = {
-            "admin_actions": AuditLog.query.filter(AuditLog.event_type.like("admin_%")).count(),
-            "account_deleted": AuditLog.query.filter_by(event_type="account_deleted").count(),
-            "email_changed": AuditLog.query.filter_by(event_type="email_changed").count(),
-            "password_changed": AuditLog.query.filter_by(event_type="password_changed").count(),
-            "failed_logins": AuditLog.query.filter_by(event_type="user_login_failed").count(),
-            "rate_limit_hits": AuditLog.query.filter_by(event_type="rate_limit_exceeded").count(),
-            "webhook_signature_failures": AuditLog.query.filter_by(event_type="payment_webhook_signature_invalid").count(),
-        }
+            _ADMIN_FILE_SCAN_CACHE[scan_cache_key] = (time.monotonic(), orphan_counts, storage_breakdown)
+        security_events = {}
+        if admin_page == "security":
+            security_events = {
+                # Changes only: page views and downloads are logged as admin_* too.
+                "admin_actions": AuditLog.query.filter(
+                    AuditLog.event_type.like("admin_%"),
+                    AuditLog.event_type.notlike("%_viewed"),
+                    AuditLog.event_type != "admin_backup_downloaded",
+                ).count(),
+                "account_deleted": AuditLog.query.filter(
+                    AuditLog.event_type.in_(["account_deleted", "admin_user_deleted"])
+                ).count(),
+                "email_changed": AuditLog.query.filter_by(event_type="email_changed").count(),
+                "password_changed": AuditLog.query.filter_by(event_type="password_changed").count(),
+                "failed_logins": AuditLog.query.filter_by(event_type="user_login_failed").count(),
+                "rate_limit_hits": AuditLog.query.filter_by(event_type="rate_limit_exceeded").count(),
+                "webhook_signature_failures": AuditLog.query.filter_by(event_type="payment_webhook_signature_invalid").count(),
+            }
         mirror_failed_count = Model3D.query.filter(Model3D.r2_mirror_failed_at.isnot(None)).count()
         mirror_failed_models = (
             Model3D.query.filter(Model3D.r2_mirror_failed_at.isnot(None))
@@ -6848,9 +7196,9 @@ def register_routes(app: Flask) -> None:
         stats = {
             "new_users_7d": User.query.filter(User.created_at >= last_7_days).count(),
             "new_users_30d": User.query.filter(User.created_at >= last_30_days).count(),
-            "new_papers_7d": Paper.query.filter(Paper.created_at >= last_7_days).count(),
-            "new_papers_30d": Paper.query.filter(Paper.created_at >= last_30_days).count(),
-            "new_models_30d": Model3D.query.filter(Model3D.created_at >= last_30_days).count(),
+            "new_papers_7d": active_paper_query().filter(Paper.created_at >= last_7_days).count(),
+            "new_papers_30d": active_paper_query().filter(Paper.created_at >= last_30_days).count(),
+            "new_models_30d": Model3D.query.filter(live_model, Model3D.created_at >= last_30_days).count(),
             "papers_with_pdf": papers_with_pdf,
             "papers_without_pdf": papers_without_pdf,
             "papers_with_doi": papers_with_doi,
@@ -6892,6 +7240,7 @@ def register_routes(app: Flask) -> None:
         backups = list_backup_archives(app) if admin_page == "backups" else []
         backup_requested = pending_backup_request() if admin_page == "backups" else None
         backup_skipped = latest_backup_skip() if admin_page == "backups" else None
+        backup_failed = latest_backup_failure() if admin_page == "backups" else None
         if admin_page == "blog":
             # Self-heal on every visit (cheap, idempotent).
             seed_builtin_blog_posts(app)
@@ -6940,7 +7289,17 @@ def register_routes(app: Flask) -> None:
                     row[0]: {"models": int(row[1] or 0), "bytes": int(row[2] or 0) + scene_ar_bytes.get(row[0], 0)}
                     for row in usage_rows
                 }
+        audit_event_types = (
+            [row[0] for row in db.session.query(AuditLog.event_type).distinct().order_by(AuditLog.event_type).all()]
+            if admin_page == "logs"
+            else []
+        )
         system_health = _admin_system_health() if admin_page == "system" else {}
+        ar_doctor_job = (
+            ConversionJob.query.filter_by(job_type="ar_doctor").order_by(ConversionJob.created_at.desc()).first()
+            if admin_page == "system"
+            else None
+        )
         analytics = analytics_snapshot(days=30) if admin_page == "analytics" else None
         funnel = funnel_snapshot(days=30) if admin_page == "analytics" else None
         pricing_rows = []
@@ -6959,10 +7318,12 @@ def register_routes(app: Flask) -> None:
             payments=payments,
             qr_links=qr_links,
             audit_logs=audit_logs,
+            audit_event_types=audit_event_types,
             jobs=jobs,
             annotations=annotations,
             annotations_pagination=annotations_pagination,
             system_health=system_health,
+            ar_doctor_job=ar_doctor_job,
             funnel=funnel,
             pricing_rows=pricing_rows,
             plan_features=PLAN_FEATURES,
@@ -6990,6 +7351,7 @@ def register_routes(app: Flask) -> None:
             daily_publication_trend=daily_publication_trend,
             daily_viewer_trend=daily_viewer_trend,
             monthly_revenue=monthly_revenue,
+            monthly_revenue_currency=monthly_revenue_currency,
             top_viewed_models=top_viewed_models,
             storage_by_user=storage_by_user,
             storage_breakdown=storage_breakdown,
@@ -7003,6 +7365,7 @@ def register_routes(app: Flask) -> None:
             backups=backups,
             backup_requested=backup_requested,
             backup_skipped=backup_skipped,
+            backup_failed=backup_failed,
             backup_local_retention=backup_local_retention(app),
             blog_posts=blog_posts,
             editing_post=editing_post,
@@ -7016,6 +7379,7 @@ def register_routes(app: Flask) -> None:
                 "user_q": user_query_text,
                 "user_role": user_role_filter,
                 "model_status": model_status_filter,
+                "model_q": model_query_text,
                 "job_status": job_status_filter,
                 "audit_event": audit_event_filter,
                 "audit_q": audit_query_text,
@@ -7097,20 +7461,33 @@ def register_routes(app: Flask) -> None:
         pay_status_filter = (request.args.get("pay_status") or "all").strip().lower()
         pay_provider_filter = (request.args.get("provider") or "all").strip().lower()
         pay_query_text = (request.args.get("pay_q") or "").strip()
-        query = Payment.query.options(selectinload(Payment.user))
+        query = Payment.query.options(selectinload(Payment.user), selectinload(Payment.institution))
         if pay_status_filter in {"pending", "paid", "failed", "refunded"}:
             query = query.filter(Payment.status == pay_status_filter)
         if pay_provider_filter in {"manual", "paytr"}:
             query = query.filter(Payment.provider == pay_provider_filter)
         if pay_query_text:
             pattern = f"%{pay_query_text.lower()}%"
-            query = query.outerjoin(User, Payment.user_id == User.id).filter(
-                or_(func.lower(Payment.invoice_number).like(pattern), func.lower(Payment.provider_reference).like(pattern), func.lower(User.email).like(pattern))
+            query = (
+                query.outerjoin(User, Payment.user_id == User.id)
+                .outerjoin(Institution, Payment.institution_id == Institution.id)
+                .filter(
+                    or_(
+                        func.lower(Payment.invoice_number).like(pattern),
+                        func.lower(Payment.provider_reference).like(pattern),
+                        func.lower(User.email).like(pattern),
+                        func.lower(Institution.name).like(pattern),
+                    )
+                )
             )
         rows = [
             {
                 "id": p.id, "invoice_number": p.invoice_number, "user_email": (p.user.email if p.user else None),
-                "amount_major": p.amount_kurus / 100.0, "currency": p.currency, "status": p.status,
+                "institution": (p.institution.name if p.institution else None),
+                "plan_key": p.plan_key, "model_id": p.model_id,
+                "amount_major": p.amount_kurus / 100.0, "currency": p.currency,
+                "discount_major": (p.discount_amount or 0) / 100.0, "coupon_code": p.coupon_code,
+                "status": p.status,
                 "provider": p.provider, "provider_reference": p.provider_reference,
                 "created_at": p.created_at, "paid_at": p.paid_at,
             }
@@ -7120,7 +7497,8 @@ def register_routes(app: Flask) -> None:
             flash(f"Export truncated to the first {ADMIN_CSV_EXPORT_ROW_LIMIT} matching rows.", "warning")
         return _csv_response(
             rows,
-            ["id", "invoice_number", "user_email", "amount_major", "currency", "status", "provider", "provider_reference", "created_at", "paid_at"],
+            ["id", "invoice_number", "user_email", "institution", "plan_key", "model_id", "amount_major", "currency",
+             "discount_major", "coupon_code", "status", "provider", "provider_reference", "created_at", "paid_at"],
             "payments.csv",
         )
 
@@ -7165,12 +7543,16 @@ def register_routes(app: Flask) -> None:
             {
                 "id": a.id, "event_type": a.event_type, "user_id": a.user_id, "resource_id": a.resource_id,
                 "ip_address": a.ip_address, "timestamp": a.timestamp,
+                # e.g. a deleted account's email lives only here (user_id is nulled).
+                "details": json.dumps(a.details, default=str, sort_keys=True) if a.details else "",
             }
             for a in query.order_by(AuditLog.timestamp.desc()).limit(ADMIN_CSV_EXPORT_ROW_LIMIT).all()
         ]
         if len(rows) >= ADMIN_CSV_EXPORT_ROW_LIMIT:
             flash(f"Export truncated to the first {ADMIN_CSV_EXPORT_ROW_LIMIT} matching rows.", "warning")
-        return _csv_response(rows, ["id", "event_type", "user_id", "resource_id", "ip_address", "timestamp"], "audit_log.csv")
+        return _csv_response(
+            rows, ["id", "event_type", "user_id", "resource_id", "ip_address", "timestamp", "details"], "audit_log.csv"
+        )
 
     @app.route("/admin/users/<int:user_id>")
     @login_required
@@ -7179,20 +7561,35 @@ def register_routes(app: Flask) -> None:
         user = db.session.get(User, user_id)
         if not user:
             abort(404)
-        papers = active_paper_query().filter_by(user_id=user.id).order_by(Paper.created_at.desc()).all()
-        latest_models = (
-            Model3D.query
-            .join(Paper)
+        papers = active_paper_query().options(selectinload(Paper.models)).filter_by(user_id=user.id).order_by(Paper.created_at.desc()).all()
+        # Same live-project scope as the Projects list, so the counters agree.
+        models = (
+            Model3D.query.join(Paper, Model3D.paper_id == Paper.id)
             .options(selectinload(Model3D.paper))
-            .filter(Model3D.user_id == user.id, Paper.deleted_at.is_(None))
+            .filter(Model3D.user_id == user.id, or_(Paper.status.is_(None), Paper.status != "deleted"))
             .order_by(Model3D.created_at.desc())
-            .limit(6)
             .all()
         )
-        models = Model3D.query.filter_by(user_id=user.id).order_by(Model3D.created_at.desc()).all()
-        payments = Payment.query.filter_by(user_id=user.id).order_by(Payment.created_at.desc()).all()
-        audit_events = AuditLog.query.filter_by(user_id=user.id).order_by(AuditLog.timestamp.desc()).limit(50).all()
-        total_spent = sum(payment.amount_kurus for payment in payments if payment.status == "paid")
+        payments = Payment.query.filter_by(user_id=user.id).order_by(Payment.created_at.desc()).limit(100).all()
+        # The user's own events plus admin actions taken on this account (those
+        # are logged under the acting admin, with the target in resource_id).
+        audit_events = (
+            AuditLog.query.filter(
+                or_(
+                    AuditLog.user_id == user.id,
+                    and_(
+                        AuditLog.event_type.like("admin_user_%"),
+                        AuditLog.event_type.notlike("%_viewed"),
+                        AuditLog.resource_id == str(user.id),
+                    ),
+                )
+            )
+            .order_by(AuditLog.timestamp.desc())
+            .limit(50)
+            .all()
+        )
+        # Never add amounts in different currencies together.
+        total_spent = format_money_by_currency(paid_revenue_by_currency(Payment.user_id == user.id))
         log_audit("admin_user_detail_viewed", user_id=current_user.id, resource_id=str(user.id))
         return render_template(
             "admin/user_detail.html",
@@ -7334,9 +7731,10 @@ def register_routes(app: Flask) -> None:
         )
         model_count, bytes_used = institution_usage(institution.id)
         page = max(request.args.get("page", type=int) or 1, 1)
+        # Same rows the Usage metric counts (institutional license, live project).
         funded_models_pagination = (
-            Model3D.query.options(selectinload(Model3D.paper))
-            .filter(Model3D.institution_id == institution.id)
+            _funded_models_query(institution.id)
+            .options(selectinload(Model3D.paper))
             .order_by(Model3D.created_at.desc())
             .paginate(page=page, per_page=ADMIN_PER_PAGE, error_out=False)
         )
@@ -7406,6 +7804,15 @@ def register_routes(app: Flask) -> None:
             # Same calendar day (e.g. a row stored at 00:00 before end dates
             # became inclusive): not a renewal, keep the stored value.
             new_end = previous_end
+        mib = 1024 * 1024
+        if (
+            institution.quota_storage_bytes is not None
+            and values["quota_storage_bytes"] is not None
+            and round(institution.quota_storage_bytes / mib, 2) == round(values["quota_storage_bytes"] / mib, 2)
+        ):
+            # The form shows the quota in MB with two decimals; an unchanged
+            # field must not shift a byte-exact contract quota.
+            values["quota_storage_bytes"] = institution.quota_storage_bytes
         for field, value in values.items():
             setattr(institution, field, value)
         if not institution.slug:
@@ -7671,110 +8078,32 @@ def register_routes(app: Flask) -> None:
     @app.route("/admin/ar-doctor")
     @login_required
     def admin_ar_doctor():
-        """Diagnose iOS USDZ generation: is Blender on PATH and can it convert?
-
-        Visit /admin/ar-doctor as an admin. Reports whether the `blender` binary
-        is present, its version, and the result of a live GLB->USDZ conversion on
-        the most recent ready model. This is how we tell, without shell access,
-        whether the production container can produce the `.usdz` iOS AR needs.
-        """
+        """The AR doctor report lives on the System health page."""
         require_admin()
-        import shutil as _shutil
-        import subprocess as _subprocess
-        import tempfile as _tempfile
+        return redirect(url_for("admin_dashboard", admin_page="system", _anchor="ar-doctor"))
 
-        report = {
-            "blender_on_path": _shutil.which("blender"),
-            "blender_version": None,
-            "blender_python": None,
-            "test_model_id": None,
-            "glb_found": False,
-            "conversion_ok": None,
-            "conversion_stderr": None,
-        }
-
-        if report["blender_on_path"]:
-            try:
-                vproc = _subprocess.run(
-                    ["blender", "--version"],
-                    stdout=_subprocess.PIPE, stderr=_subprocess.PIPE,
-                    text=True, timeout=60,
-                )
-                report["blender_version"] = (vproc.stdout or vproc.stderr or "").strip().splitlines()[:2]
-            except Exception as exc:  # noqa: BLE001
-                report["blender_version"] = f"error running blender --version: {exc}"
-
-            # Probe the python environment Blender actually uses, so we know
-            # exactly where numpy must live (Blender's bundled python vs system).
-            probe = (
-                "import sys,os\n"
-                "print('PREFIX', sys.prefix)\n"
-                "print('PYVER', '%d.%d' % sys.version_info[:2])\n"
-                "print('EXEC', sys.executable)\n"
-                "bindir = os.path.join(sys.prefix, 'bin')\n"
-                "print('BINDIR_EXISTS', os.path.isdir(bindir))\n"
-                "print('BIN', sorted(f for f in (os.listdir(bindir) if os.path.isdir(bindir) else []) if f.startswith('python')))\n"
-                "try:\n"
-                "    import numpy; print('NUMPY_OK', numpy.__version__, numpy.__file__)\n"
-                "except Exception as e:\n"
-                "    print('NUMPY_FAIL', repr(e))\n"
-            )
-            try:
-                pproc = _subprocess.run(
-                    ["blender", "--background", "--factory-startup", "--python-expr", probe],
-                    stdout=_subprocess.PIPE, stderr=_subprocess.PIPE,
-                    text=True, timeout=120,
-                )
-                combined = (pproc.stdout or "") + "\n" + (pproc.stderr or "")
-                report["blender_python"] = [
-                    ln for ln in combined.splitlines()
-                    if ln.startswith(("PREFIX", "PYVER", "EXEC", "BINDIR_EXISTS", "BIN", "NUMPY_"))
-                ]
-            except Exception as exc:  # noqa: BLE001
-                report["blender_python"] = f"probe error: {exc}"
-
+    @app.route("/admin/ar-doctor/run", methods=["POST"])
+    @login_required
+    def admin_ar_doctor_run():
+        """Queue a live GLB->USDZ diagnostic for the worker (it runs Blender)."""
+        require_admin()
+        if ConversionJob.query.filter(
+            ConversionJob.job_type == "ar_doctor", ConversionJob.status.in_(("pending", "processing"))
+        ).first():
+            flash("An AR doctor run is already queued.", "info")
+            return redirect(url_for("admin_dashboard", admin_page="system", _anchor="ar-doctor"))
         model = (
             Model3D.query.filter(Model3D.processing_status == "ready")
             .order_by(Model3D.created_at.desc())
             .first()
         )
-        if model is not None:
-            report["test_model_id"] = model.id
-            glb_path = os.path.join(app.config["CONVERTED_FOLDER"], model.id, "model.glb")
-            if not os.path.exists(glb_path):
-                ensure_local(glb_path, f"converted/{model.id}/model.glb")
-            report["glb_found"] = os.path.exists(glb_path)
-            if report["glb_found"] and report["blender_on_path"]:
-                blender_script = os.path.join(
-                    os.path.dirname(os.path.abspath(__file__)),
-                    "tools", "blender_usdz_export.py",
-                )
-                with _tempfile.TemporaryDirectory() as tmp:
-                    out_usdz = os.path.join(tmp, "test.usdz")
-                    # Mirror convert_glb_to_usdz: feed Blender a Draco-free copy,
-                    # since stored GLBs are Draco-compressed and Debian's Blender
-                    # importer cannot decode Draco.
-                    from converters.glb_optimize import decompress_glb
-                    input_glb = glb_path
-                    plain = os.path.join(tmp, "plain.glb")
-                    report["decompressed"] = bool(decompress_glb(glb_path, plain))
-                    if report["decompressed"]:
-                        input_glb = plain
-                    try:
-                        cproc = _subprocess.run(
-                            ["blender", "--background", "--python", blender_script,
-                             "--", input_glb, out_usdz],
-                            stdout=_subprocess.PIPE, stderr=_subprocess.PIPE,
-                            text=True, timeout=300,
-                        )
-                        produced = os.path.exists(out_usdz) and os.path.getsize(out_usdz) > 0
-                        report["conversion_ok"] = bool(cproc.returncode == 0 and produced)
-                        report["conversion_stderr"] = (cproc.stderr or cproc.stdout or "")[-1500:]
-                    except Exception as exc:  # noqa: BLE001
-                        report["conversion_ok"] = False
-                        report["conversion_stderr"] = f"exception: {exc}"
-
-        return jsonify(report)
+        if model is None:
+            flash("The AR doctor needs at least one ready model to test a conversion on.", "warning")
+            return redirect(url_for("admin_dashboard", admin_page="system", _anchor="ar-doctor"))
+        enqueue_conversion_job(app, model=model, job_kwargs={"model_id": model.id}, job_type="ar_doctor")
+        log_audit("admin_ar_doctor_run", user_id=current_user.id, resource_id=model.id)
+        flash("AR doctor queued; the worker runs it shortly. Refresh this page for the report.", "success")
+        return redirect(url_for("admin_dashboard", admin_page="system", _anchor="ar-doctor"))
 
     @app.route("/admin/backups/create", methods=["POST"])
     @login_required
@@ -7840,6 +8169,13 @@ def register_routes(app: Flask) -> None:
     def admin_backup_download(filename):
         require_admin()
         safe_name = os.path.basename(filename)
+        # Archives only (not backup_index.json), and log only real downloads.
+        if (
+            safe_name != filename
+            or not safe_name.endswith(".zip")
+            or not os.path.isfile(os.path.join(backup_folder(app), safe_name))
+        ):
+            abort(404)
         log_audit("admin_backup_downloaded", user_id=current_user.id, resource_id=safe_name)
         return send_from_directory(backup_folder(app), safe_name, as_attachment=True)
 
@@ -7874,15 +8210,23 @@ def register_routes(app: Flask) -> None:
         make_admin = request.form.get("is_admin") == "1"
         if user.id == current_user.id and not make_admin:
             flash("You cannot remove your own admin access.", "warning")
-            return redirect(url_for("admin_dashboard", admin_page="users"))
+            return redirect(admin_return_url("users"))
+        if not make_admin and user_is_configured_admin(user):
+            # ADMIN_EMAILS re-promotes this account on its next request/login,
+            # so a demotion here would silently not stick.
+            flash(f"{user.email} is a configured admin (ADMIN_EMAILS); remove it there to revoke admin access.", "warning")
+            return redirect(admin_return_url("users"))
         previous = user.is_admin
+        if previous == make_admin:
+            flash("Admin access is unchanged.", "info")
+            return redirect(admin_return_url("users"))
         user.is_admin = make_admin
         try:
             db.session.commit()
         except SQLAlchemyError:
             db.session.rollback()
             flash("Could not update. Please try again.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="users"))
+            return redirect(admin_return_url("users"))
         log_audit(
             "admin_user_role_changed",
             user_id=current_user.id,
@@ -7890,7 +8234,7 @@ def register_routes(app: Flask) -> None:
             details={"from": previous, "to": make_admin},
         )
         flash(f"Admin access updated for {user.email}.", "success")
-        return redirect(url_for("admin_dashboard", admin_page="users"))
+        return redirect(admin_return_url("users"))
 
     @app.route("/admin/papers/<int:paper_id>/visibility", methods=["POST"])
     @login_required
@@ -7907,7 +8251,7 @@ def register_routes(app: Flask) -> None:
         )).strip().lower()
         if visibility not in PROJECT_VISIBILITIES:
             flash("Invalid visibility value.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="content"))
+            return redirect(admin_return_url("content"))
         paper.visibility = visibility
         paper.is_public = visibility == "public"
         if visibility != previous["visibility"]:
@@ -7917,7 +8261,7 @@ def register_routes(app: Flask) -> None:
         new_status = (request.form.get("status") or "active").strip().lower()
         if new_status not in {"active", "deleted"}:
             flash("Invalid status value.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="content"))
+            return redirect(admin_return_url("content"))
         paper.status = new_status
         if paper.status == "deleted":
             paper.is_public = False
@@ -7925,12 +8269,17 @@ def register_routes(app: Flask) -> None:
             if previous["status"] != "deleted":
                 paper.deleted_at = datetime.now(UTC)
                 paper.deleted_by_user_id = current_user.id
+        elif previous["status"] == "deleted":
+            # Un-deleting through this form must clear the deletion stamp too
+            # (dashboards and Insights filter on deleted_at), like Restore does.
+            paper.deleted_at = None
+            paper.deleted_by_user_id = None
         try:
             db.session.commit()
         except SQLAlchemyError:
             db.session.rollback()
             flash("Could not update. Please try again.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="content"))
+            return redirect(admin_return_url("content"))
         log_audit(
             "admin_paper_visibility_changed",
             user_id=current_user.id,
@@ -7938,7 +8287,7 @@ def register_routes(app: Flask) -> None:
             details={"from": previous, "to": {"visibility": project_visibility(paper), "status": paper.status}},
         )
         flash(f"Project updated: {paper.title}.", "success")
-        return redirect(url_for("admin_dashboard", admin_page="content"))
+        return redirect(admin_return_url("content"))
 
     @app.route("/admin/papers/<int:paper_id>/restore", methods=["POST"])
     @login_required
@@ -7970,7 +8319,7 @@ def register_routes(app: Flask) -> None:
         except SQLAlchemyError:
             db.session.rollback()
             flash("Could not update. Please try again.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="content"))
+            return redirect(admin_return_url("content"))
         log_audit(
             "admin_paper_restored",
             user_id=current_user.id,
@@ -7978,7 +8327,7 @@ def register_routes(app: Flask) -> None:
             details={"from": previous, "to": {"status": paper.status}},
         )
         flash(f"Project restored: {paper.title} ({visibility_label(paper)}).", "success")
-        return redirect(url_for("admin_dashboard", admin_page="content"))
+        return redirect(admin_return_url("content"))
 
     def _admin_model_redirect(next_hint, model, default_page="models"):
         """Redirect back to the models list, a model's consolidated detail
@@ -7988,7 +8337,7 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("admin_user_detail", user_id=model.user_id))
         if next_hint == "model_detail":
             return redirect(url_for("admin_model_detail", model_id=model.id))
-        return redirect(url_for("admin_dashboard", admin_page=default_page))
+        return redirect(admin_return_url(default_page))
 
     @app.route("/admin/models/<model_id>/license", methods=["POST"])
     @login_required
@@ -8205,9 +8554,16 @@ def register_routes(app: Flask) -> None:
         if not model:
             abort(404)
         next_hint = (request.form.get("next") or "").strip()
-        new_status = (request.form.get("processing_status") or "ready").strip().lower()
-        if new_status not in {"queued", "processing", "ready", "failed", "replacement_failed"}:
+        new_status = (request.form.get("processing_status") or "").strip().lower()
+        # queued/processing are worker states: set by hand with no job behind
+        # them, the model would wait for a converter forever.
+        if new_status not in {"ready", "failed", "replacement_failed"}:
             flash("Invalid model processing status.", "danger")
+            return _admin_model_redirect(next_hint, model)
+        if new_status == "ready" and not (
+            model.glb_path and ensure_local(model.glb_path, f"converted/{model.id}/model.glb")
+        ):
+            flash("This model has no converted GLB file, so it cannot be marked ready. Retry its conversion job instead.", "danger")
             return _admin_model_redirect(next_hint, model)
         previous = model.processing_status
         model.processing_status = new_status
@@ -8238,7 +8594,7 @@ def register_routes(app: Flask) -> None:
         new_status = (request.form.get("status") or "active").strip().lower()
         if new_status not in {"active", "disabled"}:
             flash("Invalid QR status.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="access"))
+            return redirect(admin_return_url("access"))
         previous = qr_link.status
         qr_link.status = new_status
         try:
@@ -8246,7 +8602,7 @@ def register_routes(app: Flask) -> None:
         except SQLAlchemyError:
             db.session.rollback()
             flash("Could not update. Please try again.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="access"))
+            return redirect(admin_return_url("access"))
         log_audit(
             "admin_qr_status_changed",
             user_id=current_user.id,
@@ -8254,7 +8610,7 @@ def register_routes(app: Flask) -> None:
             details={"from": previous, "to": new_status},
         )
         flash(f"QR record {qr_link.public_id} updated.", "success")
-        return redirect(url_for("admin_dashboard", admin_page="access"))
+        return redirect(admin_return_url("access"))
 
     def _apply_payment_license_effects(payment, previous, new_status):
         """Reconcile a payment's model license state with its money state.
@@ -8267,12 +8623,32 @@ def register_routes(app: Flask) -> None:
             # their license effects are managed via the institution's contract
             # dates, never through payment status flips.
             return
-        if new_status == "paid" and payment.model is not None and (payment.plan_key or "") in PAID_PLAN_KEYS:
+        if payment.model is None:
+            return
+        if new_status == "paid" and previous != "paid" and (payment.plan_key or "") in PAID_PLAN_KEYS:
+            # Grant only on the transition into "paid": re-saving an already
+            # paid row must not hand out a fresh access window.
             payment.model.access_starts_at = datetime.now(UTC)
             apply_model_license_defaults(payment.model, payment.plan_key)
-        elif previous == "paid" and new_status in {"refunded", "failed"} and payment.model is not None:
-            apply_model_license_defaults(payment.model, "free")
-            payment.model.access_expires_at = datetime.now(UTC)  # revoke access now
+        elif previous == "paid" and new_status != "paid":
+            # Another paid payment for the same model still covers it: fall back
+            # to the newest one instead of cutting the model off.
+            covering = (
+                Payment.query.filter(
+                    Payment.model_id == payment.model_id,
+                    Payment.id != payment.id,
+                    Payment.status == "paid",
+                    Payment.plan_key.in_(list(PAID_PLAN_KEYS)),
+                )
+                .order_by(Payment.paid_at.desc(), Payment.id.desc())
+                .first()
+            )
+            if covering is not None:
+                payment.model.access_starts_at = covering.paid_at or datetime.now(UTC)
+                apply_model_license_defaults(payment.model, covering.plan_key)
+            else:
+                apply_model_license_defaults(payment.model, "free")
+                payment.model.access_expires_at = datetime.now(UTC)  # revoke access now
 
     @app.route("/admin/payments/<int:payment_id>/status", methods=["POST"])
     @login_required
@@ -8286,16 +8662,31 @@ def register_routes(app: Flask) -> None:
             flash("Invalid payment status.", "danger")
             return redirect(url_for("admin_dashboard", admin_page="revenue"))
         previous = payment.status
+        if new_status == previous:
+            flash("Payment status unchanged.", "info")
+            return redirect(admin_return_url("revenue"))
         payment.status = new_status
-        if new_status == "paid" and not payment.paid_at:
-            payment.paid_at = datetime.now(UTC)
+        if new_status == "paid":
+            if not payment.paid_at:
+                payment.paid_at = datetime.now(UTC)
+            if not payment.invoice_number:
+                payment.invoice_number = build_invoice_number(payment.id)
+        if previous == "pending" or new_status == "paid":
+            # Keep coupon counters in step with the money state, like the
+            # provider webhook does: release the checkout reservation and count
+            # the redemption once the payment is paid (not again after a refund).
+            settle_coupon_reservation(
+                payment,
+                redeemed=new_status == "paid",
+                count_unreserved=new_status == "paid" and previous != "refunded",
+            )
         _apply_payment_license_effects(payment, previous, new_status)
         try:
             db.session.commit()
         except SQLAlchemyError:
             db.session.rollback()
             flash("Could not update. Please try again.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="revenue"))
+            return redirect(admin_return_url("revenue"))
         log_audit(
             "admin_payment_status_changed",
             user_id=current_user.id,
@@ -8303,7 +8694,7 @@ def register_routes(app: Flask) -> None:
             details={"from": previous, "to": new_status},
         )
         flash("Payment status updated.", "success")
-        return redirect(url_for("admin_dashboard", admin_page="revenue"))
+        return redirect(admin_return_url("revenue"))
 
     @app.route("/admin/payments/<int:payment_id>/delete", methods=["POST"])
     @login_required
@@ -8321,15 +8712,16 @@ def register_routes(app: Flask) -> None:
             abort(404)
         invoice = payment.invoice_number or str(payment.id)
         try:
+            settle_coupon_reservation(payment, redeemed=False)
             db.session.delete(payment)
             db.session.commit()
         except SQLAlchemyError:
             db.session.rollback()
             flash("Could not delete the payment. Please try again.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="revenue"))
+            return redirect(admin_return_url("revenue"))
         log_audit("admin_payment_deleted", user_id=current_user.id, resource_id=str(payment_id), details={"invoice": invoice})
         flash(f"Payment record deleted: {invoice}.", "success")
-        return redirect(url_for("admin_dashboard", admin_page="revenue"))
+        return redirect(admin_return_url("revenue"))
 
     @app.route("/admin/payments/delete-pending", methods=["POST"])
     @login_required
@@ -8343,7 +8735,13 @@ def register_routes(app: Flask) -> None:
         """
         require_admin()
         try:
-            deleted = Payment.query.filter_by(status="pending").delete(synchronize_session=False)
+            pending = Payment.query.filter_by(status="pending").all()
+            for payment in pending:
+                # Release coupon checkout slots before the rows (and with them
+                # any trace of the reservation) disappear.
+                settle_coupon_reservation(payment, redeemed=False)
+                db.session.delete(payment)
+            deleted = len(pending)
             db.session.commit()
         except SQLAlchemyError:
             db.session.rollback()
@@ -8362,7 +8760,33 @@ def register_routes(app: Flask) -> None:
             abort(404)
         if job.status not in {"failed", "cancelled"}:
             flash("Only failed or cancelled jobs can be retried.", "warning")
-            return redirect(url_for("admin_dashboard", admin_page="jobs"))
+            return redirect(admin_return_url("jobs"))
+        payload = job.payload or {}
+        if job.job_type in ("model_upload", "model_replace"):
+            # Two conversions for one model would race on the same GLB, and
+            # re-running an old attempt after a newer one would swap stale
+            # output over the live model.
+            busy_or_newer = ConversionJob.query.filter(
+                ConversionJob.model_id == job.model_id,
+                ConversionJob.id != job.id,
+                ConversionJob.job_type.in_(("model_upload", "model_replace")),
+                or_(
+                    ConversionJob.status.in_(("pending", "processing")),
+                    and_(ConversionJob.id > job.id, ConversionJob.status == "completed"),
+                ),
+            ).first()
+            if busy_or_newer is not None:
+                flash(
+                    f"Not retried: job #{busy_or_newer.id} for this model is "
+                    f"{'newer' if busy_or_newer.status == 'completed' else busy_or_newer.status}.",
+                    "warning",
+                )
+                return redirect(admin_return_url("jobs"))
+        if payload.get("source_format") in MEDICAL_SOURCE_FORMATS and not (
+            payload.get("upload_dir") and os.path.isdir(payload["upload_dir"])
+        ):
+            flash("Not retried: the raw scan was deleted after the failure (by design). Ask the owner to upload it again.", "warning")
+            return redirect(admin_return_url("jobs"))
         attempts_before = job.attempts
         # Reset the row so the isolated worker re-claims it. attempts MUST return
         # to 0, otherwise the worker's attempts>=max_attempts guard fails it again
@@ -8373,7 +8797,8 @@ def register_routes(app: Flask) -> None:
         job.finished_at = None
         job.attempts = 0
         is_replacement = bool((job.payload or {}).get("is_replacement"))
-        if not is_replacement and job.model is not None and job.model.processing_status == "failed":
+        is_conversion = job.job_type in ("model_upload", "model_replace")
+        if is_conversion and not is_replacement and job.model is not None and job.model.processing_status == "failed":
             job.model.processing_status = "queued"
             job.model.processing_error = None
         try:
@@ -8381,7 +8806,7 @@ def register_routes(app: Flask) -> None:
         except SQLAlchemyError:
             db.session.rollback()
             flash("Could not retry the job. Please try again.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="jobs"))
+            return redirect(admin_return_url("jobs"))
         log_audit(
             "admin_job_retried",
             user_id=current_user.id,
@@ -8389,7 +8814,7 @@ def register_routes(app: Flask) -> None:
             details={"job_type": job.job_type, "attempts_before": attempts_before},
         )
         flash("Conversion job re-queued.", "success")
-        return redirect(url_for("admin_dashboard", admin_page="jobs"))
+        return redirect(admin_return_url("jobs"))
 
     @app.route("/admin/jobs/<int:job_id>/cancel", methods=["POST"])
     @login_required
@@ -8402,20 +8827,35 @@ def register_routes(app: Flask) -> None:
         # live worker and cancelling it would race the worker's own writes.
         if job.status != "pending":
             flash("Only pending (queued) jobs can be cancelled.", "warning")
-            return redirect(url_for("admin_dashboard", admin_page="jobs"))
+            return redirect(admin_return_url("jobs"))
         job.status = "cancelled"
         job.finished_at = datetime.now(UTC)
         job.error = "Cancelled by administrator."
-        is_replacement = bool((job.payload or {}).get("is_replacement"))
-        if not is_replacement and job.model is not None and job.model.processing_status == "queued":
+        payload = job.payload or {}
+        is_replacement = bool(payload.get("is_replacement"))
+        is_conversion = job.job_type in ("model_upload", "model_replace")
+        if is_conversion and not is_replacement and job.model is not None and job.model.processing_status == "queued":
             job.model.processing_status = "failed"
             job.model.processing_error = "Conversion cancelled by an administrator."
+        if is_replacement and job.model is not None and job.model.replacement_status == "replacement_processing":
+            # Otherwise the owner sees "Replacement processing" forever; the
+            # previous GLB keeps being served.
+            job.model.replacement_status = "replacement_failed"
+            job.model.replacement_error = "Replacement cancelled by an administrator."
+        if payload.get("version_id"):
+            version = db.session.get(ModelVersion, payload["version_id"])
+            if version is not None and version.status not in ("ready", "failed"):
+                version.status = "failed"
+                version.error = "Cancelled by administrator."
         try:
             db.session.commit()
         except SQLAlchemyError:
             db.session.rollback()
             flash("Could not cancel the job. Please try again.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="jobs"))
+            return redirect(admin_return_url("jobs"))
+        if payload.get("source_format") in MEDICAL_SOURCE_FORMATS and payload.get("upload_dir"):
+            # A raw medical scan must not outlive its job.
+            cleanup_dir(payload["upload_dir"])
         log_audit(
             "admin_job_cancelled",
             user_id=current_user.id,
@@ -8423,14 +8863,14 @@ def register_routes(app: Flask) -> None:
             details={"job_type": job.job_type},
         )
         flash("Conversion job cancelled.", "success")
-        return redirect(url_for("admin_dashboard", admin_page="jobs"))
+        return redirect(admin_return_url("jobs"))
 
     def _admin_paper_redirect(next_hint, paper):
         """Redirect back to content list or the owner's detail page after a
         paper edit, restricted to a known-safe set of targets."""
         if next_hint == "user_detail" and paper is not None:
             return redirect(url_for("admin_user_detail", user_id=paper.user_id))
-        return redirect(url_for("admin_dashboard", admin_page="content"))
+        return redirect(admin_return_url("content"))
 
     @app.route("/admin/papers/<int:paper_id>/metadata", methods=["POST"])
     @login_required
@@ -8567,6 +9007,12 @@ def register_routes(app: Flask) -> None:
             abort(404)
         next_hint = (request.form.get("next") or "").strip()
         redirect_target = _admin_model_redirect(next_hint, model)
+        form_tracks_changes = "color_changed" in request.form or "finish_changed" in request.form
+        if model_has_layers(model) and (not form_tracks_changes or request.form.get("color_changed") == "1"):
+            # Same guard as the owner route: one colour on every material would
+            # wipe the per-layer colours irreversibly.
+            flash("Colours are set per layer for this model. Use the Layers panel in the model editor.", "danger")
+            return redirect_target
         ok, message, category, changes = _apply_model_appearance_change(model, request.form)
         if ok:
             log_audit("admin_model_appearance_changed", user_id=current_user.id, resource_id=model.id, details=changes)
@@ -8617,7 +9063,20 @@ def register_routes(app: Flask) -> None:
             .order_by(ModelVersion.version_number.desc())
             .all()
         )
-        return render_template("admin/model_detail.html", model=model, versions=versions, active_page="models")
+        jobs = (
+            ConversionJob.query.filter_by(model_id=model.id)
+            .order_by(ConversionJob.created_at.desc())
+            .limit(10)
+            .all()
+        )
+        return render_template(
+            "admin/model_detail.html",
+            model=model,
+            versions=versions,
+            jobs=jobs,
+            has_layers=model_has_layers(model),
+            active_page="models",
+        )
 
     @app.route("/admin/models/<model_id>/versions")
     @login_required
@@ -8640,25 +9099,34 @@ def register_routes(app: Flask) -> None:
             abort(404)
         next_hint = (request.form.get("next") or "").strip()
         redirect_target = _admin_model_redirect(next_hint, model)
-        glb_path = model.glb_path
-        ensure_local(glb_path, f"converted/{model_id}/model.glb")
-        poster_png = os.path.join(os.path.dirname(glb_path), "poster.png")
-        from converters.poster import generate_poster
-
-        if not generate_poster(glb_path, poster_png):
-            flash("Could not regenerate the poster from this model's GLB.", "danger")
+        if _queue_poster_jobs([model]) == 0:
+            flash("A preview job for this model is already queued.", "info")
             return redirect_target
-        model.poster_path = poster_png
-        try:
-            db.session.commit()
-        except SQLAlchemyError:
-            db.session.rollback()
-            flash("Could not save the regenerated poster. Please try again.", "danger")
-            return redirect_target
-        mirror_file(poster_png, f"converted/{model_id}/poster.png")
         log_audit("admin_model_poster_regenerated", user_id=current_user.id, resource_id=model.id)
-        flash("Poster regenerated.", "success")
+        flash("Poster regeneration queued; the worker renders it shortly (see Conversion jobs).", "success")
         return redirect_target
+
+    def _queue_poster_jobs(models) -> int:
+        """Enqueue a ``poster`` worker job per model, skipping models that
+        already have one waiting. Rendering never runs in the web request."""
+        ids = [model.id for model in models]
+        if not ids:
+            return 0
+        busy = {
+            row[0]
+            for row in db.session.query(ConversionJob.model_id).filter(
+                ConversionJob.job_type == "poster",
+                ConversionJob.status.in_(("pending", "processing")),
+                ConversionJob.model_id.in_(ids),
+            )
+        }
+        queued = 0
+        for model in models:
+            if model.id in busy:
+                continue
+            enqueue_conversion_job(app, model=model, job_kwargs={"model_id": model.id}, job_type="poster")
+            queued += 1
+        return queued
 
     @app.route("/admin/models/posters/generate-missing", methods=["POST"])
     @login_required
@@ -8668,13 +9136,11 @@ def register_routes(app: Flask) -> None:
         With ``force`` set, regenerate posters for ALL ready models (not only the
         ones missing a poster) — needed after a poster-render change, since
         serve_poster keeps serving the stale cached poster.png otherwise. The
-        per-backend tally in the flash reveals whether the rebuilt posters came
-        from the rich "pyrender" render or the flat-grey "rasterize" fallback
-        (i.e. OSMesa/pyrender unavailable on the host).
+        renders run in the worker (``poster`` jobs); each job's payload records
+        whether the rich "pyrender" render or the flat-grey "rasterize"
+        fallback was used (i.e. OSMesa/pyrender unavailable on the host).
         """
         require_admin()
-        from converters.poster import generate_poster_backend
-
         force = bool((request.form.get("force") or "").strip())
         query = Model3D.query.filter(
             Model3D.processing_status.in_(("ready", "replacement_failed"))
@@ -8682,44 +9148,18 @@ def register_routes(app: Flask) -> None:
         if not force:
             query = query.filter(or_(Model3D.poster_path.is_(None), Model3D.poster_path == ""))
         models = query.order_by(Model3D.created_at.asc()).limit(100).all()
-        generated = 0
-        failed = 0
-        backends: dict[str, int] = {}
-        for model in models:
-            try:
-                directory = os.path.join(app.config["CONVERTED_FOLDER"], model.id)
-                glb_path = os.path.join(directory, "model.glb")
-                if not os.path.exists(glb_path):
-                    ensure_local(glb_path, f"converted/{model.id}/model.glb")
-                poster_png = os.path.join(directory, "poster.png")
-                backend = generate_poster_backend(glb_path, poster_png) if os.path.exists(glb_path) else None
-                if not backend:
-                    failed += 1
-                    continue
-                model.poster_path = poster_png
-                generated += 1
-                backends[backend] = backends.get(backend, 0) + 1
-                mirror_file(poster_png, f"converted/{model.id}/poster.png")
-            except Exception:
-                logger.exception("Poster backfill failed for model %s", model.id)
-                failed += 1
-        try:
-            db.session.commit()
-        except SQLAlchemyError:
-            db.session.rollback()
-            flash("Could not save generated preview records.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="models"))
+        queued = _queue_poster_jobs(models)
         log_audit(
             "admin_model_posters_backfilled",
             user_id=current_user.id,
-            details={"generated": generated, "failed": failed, "checked": len(models), "force": force, "backends": backends},
+            details={"queued": queued, "checked": len(models), "force": force},
         )
-        backend_note = (" via " + ", ".join(f"{n}×{c}" for n, c in backends.items())) if backends else ""
         flash(
-            f"Regenerated {generated} preview(s){backend_note}." + (f" {failed} could not be generated." if failed else ""),
-            "success" if generated else "warning",
+            f"Queued {queued} preview job(s) for the worker."
+            + (" Each job records the render backend it used (Conversion jobs → Details)." if queued else ""),
+            "success" if queued else "info",
         )
-        return redirect(url_for("admin_dashboard", admin_page="models"))
+        return redirect(admin_return_url("models"))
 
     @app.route("/admin/models/<model_id>/mirror/retry", methods=["POST"])
     @login_required
@@ -8759,10 +9199,10 @@ def register_routes(app: Flask) -> None:
             new_max = int(raw)
         except ValueError:
             flash("Max attempts must be a whole number.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="jobs"))
+            return redirect(admin_return_url("jobs"))
         if new_max < 1 or new_max > 20:
             flash("Max attempts must be between 1 and 20.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="jobs"))
+            return redirect(admin_return_url("jobs"))
         previous = job.max_attempts
         job.max_attempts = new_max
         try:
@@ -8770,7 +9210,7 @@ def register_routes(app: Flask) -> None:
         except SQLAlchemyError:
             db.session.rollback()
             flash("Could not update max attempts. Please try again.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="jobs"))
+            return redirect(admin_return_url("jobs"))
         log_audit(
             "admin_job_max_attempts_changed",
             user_id=current_user.id,
@@ -8778,7 +9218,7 @@ def register_routes(app: Flask) -> None:
             details={"from": previous, "to": new_max},
         )
         flash("Max attempts updated.", "success")
-        return redirect(url_for("admin_dashboard", admin_page="jobs"))
+        return redirect(admin_return_url("jobs"))
 
     @app.route("/admin/annotations/<int:annotation_id>/delete", methods=["POST"])
     @login_required
@@ -8798,7 +9238,7 @@ def register_routes(app: Flask) -> None:
         except SQLAlchemyError:
             db.session.rollback()
             flash("Could not delete the annotation. Please try again.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="annotations"))
+            return redirect(admin_return_url("annotations"))
         log_audit(
             "admin_annotation_deleted",
             user_id=current_user.id,
@@ -8806,7 +9246,7 @@ def register_routes(app: Flask) -> None:
             details=details,
         )
         flash("Annotation deleted.", "success")
-        return redirect(url_for("admin_dashboard", admin_page="annotations"))
+        return redirect(admin_return_url("annotations"))
 
     @app.route("/admin/payments/create", methods=["POST"])
     @login_required
@@ -8897,6 +9337,10 @@ def register_routes(app: Flask) -> None:
             flash("Email is unchanged.", "info")
             return redirect(url_for("admin_user_detail", user_id=user.id))
         user.email = new_email
+        # The new address has not been confirmed by its owner; a verified flag
+        # carried over would let it pass domain-restricted invites and Google
+        # account linking.
+        user.email_verified_at = None
         try:
             db.session.commit()
         except SQLAlchemyError:
@@ -8909,7 +9353,15 @@ def register_routes(app: Flask) -> None:
             resource_id=str(user.id),
             details={"from": previous, "to": new_email},
         )
-        flash("Email updated. Note: configured-admin promotion is matched by email.", "success")
+        from auth import send_verification_email
+
+        sent = send_verification_email(user)
+        flash(
+            "Email updated. The account must confirm the new address"
+            + (" (a confirmation link was sent)." if sent else "; mail is not configured, so no link was sent.")
+            + " Note: configured-admin promotion is matched by email.",
+            "success",
+        )
         return redirect(url_for("admin_user_detail", user_id=user.id))
 
     @app.route("/admin/users/<int:user_id>/deactivate", methods=["POST"])
@@ -8991,7 +9443,6 @@ def register_routes(app: Flask) -> None:
         uid = user.id
         user_email = user.email
         try:
-            log_audit("admin_user_deleted", user_id=current_user.id, resource_id=str(uid), details={"email": user_email})
             # Preserve the financial + audit trail: detach these rows (nullable
             # user_id) instead of deleting them, so revenue/audit history survives.
             ConversionJob.query.filter_by(user_id=uid).update({"user_id": None})
@@ -9016,9 +9467,11 @@ def register_routes(app: Flask) -> None:
             flash("Could not delete the account. Please try again.", "danger")
             return redirect(url_for("admin_user_detail", user_id=uid))
 
+        # Logged only once the deletion has actually committed.
+        log_audit("admin_user_deleted", user_id=current_user.id, resource_id=str(uid), details={"email": user_email})
         cleanup_paths(files_to_remove)
         flash(f"Account permanently deleted: {user_email}.", "success")
-        return redirect(url_for("admin_dashboard", admin_page="users"))
+        return redirect(admin_return_url("users"))
 
     def _read_blog_form() -> dict:
         rm = (request.form.get("read_minutes") or "").strip()
@@ -9139,6 +9592,9 @@ def register_routes(app: Flask) -> None:
         ext = os.path.splitext(file.filename)[1].lower().lstrip(".")
         if ext not in ALLOWED_BLOG_IMAGE_EXTENSIONS:
             return jsonify({"error": "Unsupported type. Use PNG, JPG, WEBP, or GIF."}), 400
+        if request.content_length and request.content_length > MAX_BLOG_IMAGE_BYTES + 64 * 1024:
+            # Refuse before writing a huge body to disk.
+            return jsonify({"error": "Image is too large (max 10 MB)."}), 400
         safe = secure_filename(file.filename) or f"image.{ext}"
         filename = f"{uuid.uuid4().hex[:12]}_{safe}"
         dest = os.path.join(app.config["BLOG_IMAGE_FOLDER"], filename)
@@ -9152,6 +9608,15 @@ def register_routes(app: Flask) -> None:
                 return jsonify({"error": "Image is too large (max 10 MB)."}), 400
         except OSError:
             pass
+        # The extension alone proves nothing: make sure it really is an image.
+        try:
+            from PIL import Image
+
+            with Image.open(dest) as img:
+                img.verify()
+        except Exception:
+            cleanup_file(dest)
+            return jsonify({"error": "That file is not a valid image."}), 400
         mirror_file(dest, f"blog_images/{filename}")
         url = url_for("serve_blog_image", filename=filename)
         log_audit("blog_image_uploaded", user_id=current_user.id, details={"filename": filename})

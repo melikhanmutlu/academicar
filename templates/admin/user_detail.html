@@ -25,8 +25,8 @@
     </div>
     <div class="admin-metric">
       <span>Spent</span>
-      <strong>{{ "%.2f"|format(total_spent / 100) }}</strong>
-      <small>{{ config.PAYMENT_CURRENCY }} paid</small>
+      <strong class="is-text">{{ total_spent }}</strong>
+      <small>paid in total</small>
     </div>
   </section>
 
@@ -39,11 +39,14 @@
       {% if user.deactivated_at %}<span>Deactivated</span>{% else %}<span>Active</span>{% endif %}
     </div>
     <div class="admin-actions">
+      {% if user.id != current_user.id and not (user.is_admin and user_is_configured_admin(user)) %}
       <form method="POST" action="{{ url_for('admin_user_role_update', user_id=user.id) }}"{% if not user.is_admin %} onsubmit="return window.confirm('Give this user full admin access to every account, payment and setting?');"{% endif %}>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="next" value="{{ request.full_path }}">
         <input type="hidden" name="is_admin" value="{{ '0' if user.is_admin else '1' }}">
         <button type="submit" class="admin-btn admin-btn-secondary compact">{{ "Remove admin" if user.is_admin else "Make admin" }}</button>
       </form>
+      {% endif %}
       {% if user.deactivated_at %}
         <form method="POST" action="{{ url_for('admin_user_reactivate', user_id=user.id) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -233,7 +236,7 @@
       <div class="admin-breakdown">
         <h3>Recent audit events</h3>
         {% for event in audit_events %}
-          <div><span>{{ event.event_type }}</span><strong>{{ event.timestamp.strftime("%m-%d %H:%M") if event.timestamp else "-" }}</strong></div>
+          <div><span>{{ event.event_type }}</span><strong>{{ event.timestamp.strftime("%Y-%m-%d %H:%M") if event.timestamp else "-" }}</strong></div>
         {% else %}
           <div><span>No audit events</span><strong>-</strong></div>
         {% endfor %}
