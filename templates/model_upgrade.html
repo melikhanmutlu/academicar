@@ -36,7 +36,7 @@
                 </span>
                 <span class="upgrade-plan-price">${{ '%.2f'|format(o.plan.price_usd) }}</span>
               </span>
-              <span class="upgrade-plan-meta">{{ (o.plan.duration_days // 365) }}-year AR &amp; QR access · up to {{ format_file_size(o.plan.storage_limit_bytes) }}</span>
+              <span class="upgrade-plan-meta">{{ (o.plan.duration_days // 365) ~ '-year' if o.plan.duration_days is not none else 'Unlimited' }} AR &amp; QR access · up to {{ format_file_size(o.plan.storage_limit_bytes) }}</span>
               <span class="upgrade-plan-features">
                 {% for feat in o.plan.feature_summary[:4] %}<span>{{ feat }}</span>{% endfor %}
               </span>

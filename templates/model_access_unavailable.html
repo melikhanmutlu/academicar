@@ -133,7 +133,7 @@
           {% if upgrade_options %}
             <div class="model-unavail-plans">
               {% for o in upgrade_options %}
-                <a href="{{ url_for('model_upgrade_page', model_id=model.id, plan=o.key) }}" class="lp-btn {{ 'lp-btn-dark' if loop.first else 'lp-btn-ghost' }}" title="{{ (o.plan.duration_days // 365) }}-year AR &amp; QR access">
+                <a href="{{ url_for('model_upgrade_page', model_id=model.id, plan=o.key) }}" class="lp-btn {{ 'lp-btn-dark' if loop.first else 'lp-btn-ghost' }}" title="{{ (o.plan.duration_days // 365) ~ '-year' if o.plan.duration_days is not none else 'Unlimited' }} AR &amp; QR access">
                   {{ 'Upgrade license · ' if o.kind == 'upgrade' else 'Renew · ' }}{{ o.plan.label }} ${{ '%.2f'|format(o.plan.price_usd) }}
                 </a>
               {% endfor %}
