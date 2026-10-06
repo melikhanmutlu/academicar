@@ -69,8 +69,9 @@
       </select>
       <select name="provider" class="field-select compact-select">
         <option value="all" {% if (filters.provider or 'all') == "all" %}selected{% endif %}>All providers</option>
-        <option value="manual" {% if filters.provider == "manual" %}selected{% endif %}>Manual</option>
-        <option value="paytr" {% if filters.provider == "paytr" %}selected{% endif %}>PayTR</option>
+        {% for provider in payment_providers %}
+          <option value="{{ provider }}" {% if filters.provider == provider %}selected{% endif %}>{{ provider }}</option>
+        {% endfor %}
       </select>
       <button type="submit" class="admin-btn admin-btn-secondary compact">Filter</button>
       <a href="{{ url_for('admin_dashboard', admin_page='revenue') }}" class="admin-btn admin-btn-secondary compact">Clear</a>

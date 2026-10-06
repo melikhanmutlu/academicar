@@ -2,6 +2,7 @@
 import hashlib
 import json
 import logging
+import math
 import os
 import re
 import secrets
@@ -292,6 +293,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             "admin_chip_class": admin_chip_class,
             "admin_nav_counts": admin_nav_counts,
             "format_duration": format_duration,
+            "access_window_label": access_window_label,
             "user_is_configured_admin": user_is_configured_admin,
         }
 
@@ -478,6 +480,17 @@ COLOR_COMMAND_PATTERN = re.compile(
 )
 LIGHT_DARK_PATTERN = re.compile(r"\b(very\s+)?(light|dark)\b", re.IGNORECASE)
 HEX_COLOR_PATTERN = re.compile(r"#[0-9A-Fa-f]{6}\b")
+
+# Upper bounds for admin-entered numbers: the matching columns are 32-bit
+# Integers (cents, bytes) so anything larger overflows or is plainly a typo.
+MAX_PLAN_PRICE_USD = 10_000
+MAX_PLAN_DURATION_DAYS = 36_500
+MAX_PLAN_STORAGE_MB = 2_047  # LicensePlanConfig.storage_limit_bytes is an Integer
+MAX_PLAN_MODELS_PER_PROJECT = 100_000
+MAX_COUPON_REDEMPTIONS = 1_000_000
+MAX_INSTITUTION_AMOUNT = 10_000_000  # major units; cents must fit an Integer
+MAX_INSTITUTION_MODEL_QUOTA = 1_000_000
+MAX_INSTITUTION_STORAGE_MB = 10_000_000
 NAMED_COLORS = {
     "black": "#000000", "white": "#ffffff", "red": "#cc0000", "green": "#0a7a3a",
     "blue": "#1e44ad", "yellow": "#f5c61b", "orange": "#e07b14", "purple": "#7a3fa9",
@@ -568,6 +581,39 @@ _ADMIN_CHIP_GOOD = {"ready", "active", "public", "paid", "completed", "admin"}
 _ADMIN_CHIP_WARN = {"queued", "pending", "processing"}
 # "private" is a normal choice, not an error: it gets the neutral chip.
 _ADMIN_CHIP_BAD = {"failed", "replacement_failed", "expired", "cancelled", "refunded", "deleted", "disabled", "suspended", "revoked", "exhausted"}
+
+
+def parse_finite_number(raw) -> float | None:
+    """float(raw), or None when it is garbage, nan, inf or overflows (``1e400``)."""
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    return value if math.isfinite(value) else None
+
+
+def worker_stall_minutes() -> int:
+    """WORKER_STALL_MINUTES with a safe default: a bad value must not 500 /health/worker or /admin/system."""
+    try:
+        minutes = int(os.environ.get("WORKER_STALL_MINUTES", "30"))
+    except ValueError:
+        return 30
+    return minutes if minutes > 0 else 30
+
+
+def normalize_currency_code(raw, default: str) -> str | None:
+    """Upper-cased 3-letter currency code (``default`` when blank), or None when invalid."""
+    code = (raw or "").strip().upper() or default
+    return code if len(code) == 3 and code.isascii() and code.isalpha() else None
+
+
+def access_window_label(days) -> str:
+    """Public wording for a plan's access window; ``None`` days means unlimited."""
+    if days is None:
+        return "Unlimited"
+    if days < 365:
+        return f"{days} days"
+    return f"{days // 365} years"
 
 
 def format_duration(seconds) -> str:
@@ -1073,7 +1119,7 @@ def _admin_system_health() -> dict:
         # Same threshold /health/worker uses to report a stalled worker.
         "worker_stalled": (
             oldest_pending_age_seconds is not None
-            and oldest_pending_age_seconds > int(os.environ.get("WORKER_STALL_MINUTES", "30")) * 60
+            and oldest_pending_age_seconds > worker_stall_minutes() * 60
         ),
     }
 
@@ -2859,17 +2905,30 @@ def _apply_model_appearance_change(model, form):
     of fields actually applied, for the caller's own audit log entry (the two
     callers use different event names) — or None on failure.
     """
-    color_command = form.get("color_command")
-    color_input = (form.get("color") or "").strip() or None
-    # text command takes precedence so users can type "make it light gray".
-    parsed = color_from_command(color_command) if color_command else None
-    new_color = parsed or color_input
-    if not new_color or HEX_COLOR_PATTERN.fullmatch(new_color) is None:
-        return False, "Provide a valid hex color (#RRGGBB) or a known color name.", "danger", None
+    # The edit pages send color_changed / finish_changed so saving only the
+    # name or note never rewrites the GLB (which would flatten a multi-colour
+    # model to the pre-filled swatch). Callers without the flags (the inline
+    # registry colour form) keep the old always-apply behaviour.
+    tracks_changes = "color_changed" in form or "finish_changed" in form
+    color_changed = not tracks_changes or form.get("color_changed") == "1"
+    finish_changed = not tracks_changes or form.get("finish_changed") == "1"
 
-    rgba = hex_to_rgba(new_color)
-    if rgba is None:
-        return False, "Invalid color value.", "danger", None
+    new_color = model.appearance_color
+    rgba = None
+    if color_changed:
+        # Only validate the colour when it is being changed: layered models
+        # have no colour input, yet still save their name/description/placement.
+        color_command = form.get("color_command")
+        color_input = (form.get("color") or "").strip() or None
+        # text command takes precedence so users can type "make it light gray".
+        parsed = color_from_command(color_command) if color_command else None
+        new_color = parsed or color_input
+        if not new_color or HEX_COLOR_PATTERN.fullmatch(new_color) is None:
+            return False, "Provide a valid hex color (#RRGGBB) or a known color name.", "danger", None
+
+        rgba = hex_to_rgba(new_color)
+        if rgba is None:
+            return False, "Invalid color value.", "danger", None
 
     roughness_raw = form.get("roughness")
     metallic_raw = form.get("metallic")
@@ -2881,15 +2940,6 @@ def _apply_model_appearance_change(model, form):
     except (ValueError, TypeError):
         return False, "Provide valid roughness and metallic values (0–1).", "danger", None
 
-    # The edit pages send color_changed / finish_changed so saving only the
-    # name or note never rewrites the GLB (which would flatten a multi-colour
-    # model to the pre-filled swatch). Callers without the flags (the inline
-    # registry colour form) keep the old always-apply behaviour.
-    tracks_changes = "color_changed" in form or "finish_changed" in form
-    color_changed = not tracks_changes or form.get("color_changed") == "1"
-    finish_changed = not tracks_changes or form.get("finish_changed") == "1"
-    if not color_changed:
-        new_color = model.appearance_color
     if not finish_changed:
         roughness, metallic = stored_roughness, stored_metallic
 
@@ -4963,7 +5013,7 @@ def register_routes(app: Flask) -> None:
         has waited longer than WORKER_STALL_MINUTES (the worker process is
         down or stuck). Kept separate from /health so a busy queue never makes
         the platform restart the web process."""
-        stall_minutes = int(os.environ.get("WORKER_STALL_MINUTES", "30"))
+        stall_minutes = worker_stall_minutes()
         try:
             oldest = (
                 db.session.query(func.min(ConversionJob.created_at))
@@ -6811,7 +6861,7 @@ def register_routes(app: Flask) -> None:
         payments_query = Payment.query.options(selectinload(Payment.user), selectinload(Payment.institution))
         if pay_status_filter in {"pending", "paid", "failed", "refunded"}:
             payments_query = payments_query.filter(Payment.status == pay_status_filter)
-        if pay_provider_filter in {"manual", "paytr"}:
+        if pay_provider_filter != "all":
             payments_query = payments_query.filter(Payment.provider == pay_provider_filter)
         if pay_query_text:
             pay_pattern = admin_like_pattern(pay_query_text)
@@ -7160,7 +7210,14 @@ def register_routes(app: Flask) -> None:
                 daily_viewer_trend = per_day(AuditLog.timestamp, AuditLog.event_type == "public_model_viewed")
         monthly_revenue = []
         monthly_revenue_currency = None
+        payment_providers = []
         if admin_page == "revenue":
+            # Real providers in use (manual, paytr, lemonsqueezy, development...),
+            # plus the selected one so a stale ?provider= link still shows.
+            payment_providers = sorted(
+                {row[0] for row in db.session.query(Payment.provider).distinct() if row[0]}
+                | ({pay_provider_filter} - {"all"})
+            )
             month_starts = last_n_month_starts(now, 12)
             window_end = (month_starts[-1].replace(day=28) + timedelta(days=4)).replace(day=1)
             paid_year, paid_month = extract("year", Payment.paid_at), extract("month", Payment.paid_at)
@@ -7471,6 +7528,7 @@ def register_routes(app: Flask) -> None:
             daily_viewer_trend=daily_viewer_trend,
             monthly_revenue=monthly_revenue,
             monthly_revenue_currency=monthly_revenue_currency,
+            payment_providers=payment_providers,
             top_viewed_models=top_viewed_models,
             storage_by_user=storage_by_user,
             storage_breakdown=storage_breakdown,
@@ -7583,7 +7641,7 @@ def register_routes(app: Flask) -> None:
         query = Payment.query.options(selectinload(Payment.user), selectinload(Payment.institution))
         if pay_status_filter in {"pending", "paid", "failed", "refunded"}:
             query = query.filter(Payment.status == pay_status_filter)
-        if pay_provider_filter in {"manual", "paytr"}:
+        if pay_provider_filter != "all":
             query = query.filter(Payment.provider == pay_provider_filter)
         if pay_query_text:
             pattern = admin_like_pattern(pay_query_text)
@@ -7790,29 +7848,35 @@ def register_routes(app: Flask) -> None:
         price_raw = (request.form.get("annual_price") or "").strip()
         annual_price_cents = None
         if price_raw:
-            try:
-                annual_price_major = float(price_raw)
-            except ValueError:
+            annual_price_major = parse_finite_number(price_raw)
+            if annual_price_major is None:
                 return None, "Annual price must be a number."
             if annual_price_major < 0:
                 return None, "Annual price cannot be negative."
+            if annual_price_major > MAX_INSTITUTION_AMOUNT:
+                return None, f"Annual price cannot exceed {MAX_INSTITUTION_AMOUNT:,}."
             annual_price_cents = int(round(annual_price_major * 100))
-        currency = (request.form.get("currency") or "TRY").strip().upper()[:3] or "TRY"
+        currency = normalize_currency_code(request.form.get("currency"), "TRY")
+        if currency is None:
+            return None, "Currency must be a 3-letter code (e.g. TRY)."
         quota_models_raw = (request.form.get("quota_model_count") or "").strip()
         quota_model_count = None
         if quota_models_raw:
-            if not quota_models_raw.isdigit():
+            if not (quota_models_raw.isascii() and quota_models_raw.isdigit()):
                 return None, "Model quota must be a whole number."
             quota_model_count = int(quota_models_raw)
+            if quota_model_count > MAX_INSTITUTION_MODEL_QUOTA:
+                return None, f"Model quota cannot exceed {MAX_INSTITUTION_MODEL_QUOTA:,}."
         quota_storage_raw = (request.form.get("quota_storage_mb") or "").strip()
         quota_storage_bytes = None
         if quota_storage_raw:
-            try:
-                quota_storage_mb = float(quota_storage_raw)
-            except ValueError:
+            quota_storage_mb = parse_finite_number(quota_storage_raw)
+            if quota_storage_mb is None:
                 return None, "Storage quota must be a number of MB."
             if quota_storage_mb < 0:
                 return None, "Storage quota cannot be negative."
+            if quota_storage_mb > MAX_INSTITUTION_STORAGE_MB:
+                return None, f"Storage quota cannot exceed {MAX_INSTITUTION_STORAGE_MB:,} MB."
             quota_storage_bytes = int(quota_storage_mb * 1024 * 1024)
         return {
             "name": name,
@@ -7962,6 +8026,14 @@ def register_routes(app: Flask) -> None:
             flash(f"Institution updated. Access window refreshed on {models_updated} model(s).", "success")
         else:
             flash("Institution updated.", "success")
+            if institution.status == "suspended":
+                flash(
+                    "The contract end date is unchanged, so funded models were not restored. "
+                    "Reactivate the institution to restore access.",
+                    "info",
+                )
+        if new_end is not None and (new_end if new_end.tzinfo else new_end.replace(tzinfo=UTC)) < datetime.now(UTC):
+            flash("Contract end is in the past: funded models are offline.", "warning")
         return redirect(url_for("admin_institution_detail", institution_id=institution.id))
 
     @app.route("/admin/institutions/<int:institution_id>/status", methods=["POST"])
@@ -7975,14 +8047,22 @@ def register_routes(app: Flask) -> None:
             return redirect(url_for("admin_institution_detail", institution_id=institution.id))
         previous = institution.status
         institution.status = new_status
+        restored = None
+        if new_status == "active" and previous != "active" and institution.contract_is_current():
+            # "End access now" expired the funded models while the contract end
+            # stayed put; a current contract must bring them back on reactivate.
+            restored = renew_institution_contract(institution, institution.contract_ends_at)
         db.session.commit()
         log_audit(
             "institution_status_changed",
             user_id=current_user.id,
             resource_id=str(institution.id),
-            details={"from": previous, "to": new_status},
+            details={"from": previous, "to": new_status, "models_restored": restored},
         )
-        flash(f"Institution {new_status}.", "success")
+        if restored is not None:
+            flash(f"Institution active. Access restored on {restored} model(s).", "success")
+        else:
+            flash(f"Institution {new_status}.", "success")
         return redirect(url_for("admin_institution_detail", institution_id=institution.id))
 
     @app.route("/admin/institutions/<int:institution_id>/end-access", methods=["POST"])
@@ -8004,7 +8084,7 @@ def register_routes(app: Flask) -> None:
         )
         flash(
             f"Access ended now on {expired} model(s) and the institution is suspended, so new uploads "
-            "are not covered. To restore: set a new contract end date, then reactivate.",
+            "are not covered. To restore: reactivate the institution (or set a later contract end date).",
             "success",
         )
         return redirect(url_for("admin_institution_detail", institution_id=institution.id))
@@ -8070,16 +8150,21 @@ def register_routes(app: Flask) -> None:
         require_admin()
         institution = _institution_or_404(institution_id)
         amount_raw = (request.form.get("amount") or "").strip()
-        try:
-            amount_major = float(amount_raw)
-        except ValueError:
+        amount_major = parse_finite_number(amount_raw)
+        if amount_major is None:
             flash("Amount must be a number.", "danger")
             return redirect(url_for("admin_institution_detail", institution_id=institution.id))
         if amount_major <= 0:
             flash("Amount must be greater than zero.", "danger")
             return redirect(url_for("admin_institution_detail", institution_id=institution.id))
+        if amount_major > MAX_INSTITUTION_AMOUNT:
+            flash(f"Amount cannot exceed {MAX_INSTITUTION_AMOUNT:,}.", "danger")
+            return redirect(url_for("admin_institution_detail", institution_id=institution.id))
         amount_minor = int(round(amount_major * 100))
-        currency = (request.form.get("currency") or institution.currency or "TRY").strip().upper()[:3]
+        currency = normalize_currency_code(request.form.get("currency"), institution.currency or "TRY")
+        if currency is None:
+            flash("Currency must be a 3-letter code (e.g. TRY).", "danger")
+            return redirect(url_for("admin_institution_detail", institution_id=institution.id))
         status_value = (request.form.get("status") or "pending").strip().lower()
         if status_value not in {"pending", "paid"}:
             flash("Institution payments can only be created as pending or paid.", "danger")
@@ -8495,25 +8580,41 @@ def register_routes(app: Flask) -> None:
         if not label:
             flash("Label is required.", "danger")
             return redirect(url_for("admin_dashboard", admin_page="pricing"))
-        try:
-            price_major = float((request.form.get("price_usd") or "").strip())
-        except ValueError:
-            flash("Price must be a number.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="pricing"))
-        if price_major < 0:
-            flash("Price cannot be negative.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="pricing"))
+        # Free is never sold (price stays 0, offers stay visible) and
+        # Institutional is an offline contract (price/purchasable are not its
+        # business and its window follows contract_ends_at), so those fields
+        # are never taken from the form for them. Free's duration IS its real
+        # access window (apply_model_license_defaults), so it stays editable.
+        price_locked = plan_key in {"free", "institutional"}
+        duration_locked = plan_key == "institutional"
+        price_major = plan_row.price_usd_cents / 100.0
+        if not price_locked:
+            price_major = parse_finite_number((request.form.get("price_usd") or "").strip())
+            if price_major is None:
+                flash("Price must be a number.", "danger")
+                return redirect(url_for("admin_dashboard", admin_page="pricing"))
+            if price_major < 0:
+                flash("Price cannot be negative.", "danger")
+                return redirect(url_for("admin_dashboard", admin_page="pricing"))
+            if price_major > MAX_PLAN_PRICE_USD:
+                flash(f"Price cannot exceed ${MAX_PLAN_PRICE_USD:,}.", "danger")
+                return redirect(url_for("admin_dashboard", admin_page="pricing"))
         duration_raw = (request.form.get("duration_days") or "").strip()
-        duration_days = None
-        if duration_raw:
-            try:
-                duration_days = int(duration_raw)
-            except ValueError:
-                flash("Duration must be a whole number of days, or blank for unlimited.", "danger")
-                return redirect(url_for("admin_dashboard", admin_page="pricing"))
-            if duration_days <= 0:
-                flash("Duration must be positive, or blank for unlimited.", "danger")
-                return redirect(url_for("admin_dashboard", admin_page="pricing"))
+        duration_days = plan_row.duration_days
+        if not duration_locked:
+            duration_days = None
+            if duration_raw:
+                try:
+                    duration_days = int(duration_raw)
+                except ValueError:
+                    flash("Duration must be a whole number of days, or blank for unlimited.", "danger")
+                    return redirect(url_for("admin_dashboard", admin_page="pricing"))
+                if duration_days <= 0:
+                    flash("Duration must be positive, or blank for unlimited.", "danger")
+                    return redirect(url_for("admin_dashboard", admin_page="pricing"))
+                if duration_days > MAX_PLAN_DURATION_DAYS:
+                    flash(f"Duration cannot exceed {MAX_PLAN_DURATION_DAYS} days.", "danger")
+                    return redirect(url_for("admin_dashboard", admin_page="pricing"))
         try:
             storage_mb = int((request.form.get("storage_limit_mb") or "").strip())
         except ValueError:
@@ -8522,7 +8623,10 @@ def register_routes(app: Flask) -> None:
         if storage_mb <= 0:
             flash("Storage limit must be positive.", "danger")
             return redirect(url_for("admin_dashboard", admin_page="pricing"))
-        is_purchasable = request.form.get("is_purchasable") == "1"
+        if storage_mb > MAX_PLAN_STORAGE_MB:
+            flash(f"Storage limit cannot exceed {MAX_PLAN_STORAGE_MB} MB.", "danger")
+            return redirect(url_for("admin_dashboard", admin_page="pricing"))
+        is_purchasable = plan_row.is_purchasable if price_locked else request.form.get("is_purchasable") == "1"
         model_limit_supplied = "max_models_per_project" in request.form
         model_limit_raw = (request.form.get("max_models_per_project") or "").strip()
         max_models_per_project = plan_row.max_models_per_project
@@ -8536,6 +8640,9 @@ def register_routes(app: Flask) -> None:
                 return redirect(url_for("admin_dashboard", admin_page="pricing"))
             if max_models_per_project <= 0:
                 flash("Model limit must be positive, or blank for unlimited.", "danger")
+                return redirect(url_for("admin_dashboard", admin_page="pricing"))
+            if max_models_per_project > MAX_PLAN_MODELS_PER_PROJECT:
+                flash(f"Model limit cannot exceed {MAX_PLAN_MODELS_PER_PROJECT}.", "danger")
                 return redirect(url_for("admin_dashboard", admin_page="pricing"))
         enabled_features = plan_row.features or []
         if request.form.get("features_present") == "1":
@@ -8553,7 +8660,8 @@ def register_routes(app: Flask) -> None:
             "features": plan_row.features or [],
         }
         plan_row.label = label
-        plan_row.price_usd_cents = int(round(price_major * 100))
+        if not price_locked:
+            plan_row.price_usd_cents = int(round(price_major * 100))
         plan_row.duration_days = duration_days
         plan_row.storage_limit_bytes = storage_mb * 1024 * 1024
         plan_row.is_purchasable = is_purchasable
@@ -8597,9 +8705,8 @@ def register_routes(app: Flask) -> None:
             flash("Coupon code must contain at least 3 letters or numbers.", "danger")
             return redirect(url_for("admin_dashboard", admin_page="pricing"))
         discount_type = (request.form.get("discount_type") or "percent").strip()
-        try:
-            discount_value = float((request.form.get("discount_value") or "").strip())
-        except ValueError:
+        discount_value = parse_finite_number((request.form.get("discount_value") or "").strip())
+        if discount_value is None:
             flash("Coupon discount must be a number.", "danger")
             return redirect(url_for("admin_dashboard", admin_page="pricing"))
         percent_off, fixed_discount_usd_cents = None, None
@@ -8612,6 +8719,9 @@ def register_routes(app: Flask) -> None:
             if discount_value <= 0:
                 flash("Fixed USD discount must be positive.", "danger")
                 return redirect(url_for("admin_dashboard", admin_page="pricing"))
+            if discount_value > MAX_PLAN_PRICE_USD:
+                flash(f"Fixed USD discount cannot exceed ${MAX_PLAN_PRICE_USD:,}.", "danger")
+                return redirect(url_for("admin_dashboard", admin_page="pricing"))
             fixed_discount_usd_cents = int(round(discount_value * 100))
         else:
             flash("Invalid coupon discount type.", "danger")
@@ -8619,8 +8729,11 @@ def register_routes(app: Flask) -> None:
         max_redemptions_raw = (request.form.get("max_redemptions") or "").strip()
         max_redemptions = None
         if max_redemptions_raw:
-            if not max_redemptions_raw.isdigit() or int(max_redemptions_raw) <= 0:
-                flash("Maximum redemptions must be positive or blank.", "danger")
+            if (
+                not (max_redemptions_raw.isascii() and max_redemptions_raw.isdigit())
+                or not 0 < int(max_redemptions_raw) <= MAX_COUPON_REDEMPTIONS
+            ):
+                flash(f"Maximum redemptions must be between 1 and {MAX_COUPON_REDEMPTIONS:,}, or blank.", "danger")
                 return redirect(url_for("admin_dashboard", admin_page="pricing"))
             max_redemptions = int(max_redemptions_raw)
         expires_raw = (request.form.get("expires_at") or "").strip()
@@ -8784,6 +8897,9 @@ def register_routes(app: Flask) -> None:
         if new_status == previous:
             flash("Payment status unchanged.", "info")
             return redirect(admin_return_url("revenue"))
+        # A payment counts at most one coupon redemption over its lifetime:
+        # paid_at survives paid -> failed/pending, so it marks "was paid before".
+        was_paid_before = payment.paid_at is not None
         payment.status = new_status
         if new_status == "paid":
             if not payment.paid_at:
@@ -8797,7 +8913,7 @@ def register_routes(app: Flask) -> None:
             settle_coupon_reservation(
                 payment,
                 redeemed=new_status == "paid",
-                count_unreserved=new_status == "paid" and previous != "refunded",
+                count_unreserved=new_status == "paid" and previous != "refunded" and not was_paid_before,
             )
         _apply_payment_license_effects(payment, previous, new_status)
         try:
@@ -9288,10 +9404,16 @@ def register_routes(app: Flask) -> None:
         if not model:
             abort(404)
         redirect_target = redirect(url_for("admin_dashboard", admin_page="storage"))
-        ok = mirror_directory_sync(
-            os.path.join(app.config["CONVERTED_FOLDER"], model_id),
-            f"converted/{model_id}",
-        )
+        # mirror_directory_sync reports "success" when R2 is off or the folder
+        # is missing; neither is a real mirror, so never clear the failure flag then.
+        local_dir = os.path.join(app.config["CONVERTED_FOLDER"], model_id)
+        if not r2_mirror_enabled():
+            flash("R2 mirror is not enabled on this server; nothing was retried.", "warning")
+            return redirect_target
+        if not os.path.isdir(local_dir):
+            flash("The converted files for this model are missing locally; nothing was retried.", "warning")
+            return redirect_target
+        ok = mirror_directory_sync(local_dir, f"converted/{model_id}")
         model.r2_mirror_failed_at = None if ok else datetime.now(UTC)
         try:
             db.session.commit()

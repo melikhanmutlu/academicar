@@ -3,6 +3,7 @@ rate-limit audit logging, model version history, poster regeneration, job
 payload/max_attempts editing, the publication field allowlist, annotation
 moderation, appearance overrides, system health, R2 mirror retry, and CSV
 export."""
+import os
 from datetime import UTC, datetime
 from unittest.mock import patch
 
@@ -323,7 +324,8 @@ def test_storage_page_shows_mirror_failures_and_retry_succeeds(client):
     text = client.get("/admin/storage").get_data(as_text=True)
     assert "R2 mirror failures" in text
 
-    with patch("app.mirror_directory_sync", return_value=True) as mock_mirror:
+    os.makedirs(os.path.join(client.application.config["CONVERTED_FOLDER"], model_id), exist_ok=True)
+    with patch("app.r2_mirror_enabled", return_value=True), patch("app.mirror_directory_sync", return_value=True) as mock_mirror:
         response = client.post(f"/admin/models/{model_id}/mirror/retry", follow_redirects=True)
     assert response.status_code == 200
     assert mock_mirror.called
