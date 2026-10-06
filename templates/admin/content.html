@@ -1,68 +1,15 @@
 {% extends "admin/base.html" %}
 {% from "admin/_pagination.html" import render_pagination %}
 {% block admin_title %}Projects{% endblock %}
-{% block admin_subtitle %}Project context, optional identifiers, model coverage, and sharing control.{% endblock %}
+{% block admin_subtitle %}Visibility, status and metadata of all projects.{% endblock %}
 
 {% block admin_body %}
-  <!-- Content and publication statistics: legacy integration marker. -->
-  <section id="content-stats" class="admin-section">
-    <div class="admin-section-head">
-      <div>
-        <h2>Project and model statistics</h2>
-        <p>Project coverage, optional identifiers, field distribution, and 7/30 day activity trend.</p>
-      </div>
-      <span>Editorial analytics</span>
-    </div>
-    <div class="admin-insight-grid">
-      <div class="admin-insight-card">
-        <span>Public / private</span>
-        <strong>{{ totals.public_papers }} / {{ stats.private_papers }}</strong>
-        <small>{{ stats.public_ratio }}% public visibility</small>
-      </div>
-      <div class="admin-insight-card">
-        <span>PDF coverage</span>
-        <strong>{{ stats.papers_with_pdf }} / {{ stats.papers_without_pdf }}</strong>
-        <small>attached / missing supporting PDFs</small>
-      </div>
-      <div class="admin-insight-card">
-        <span>DOI / PMID</span>
-        <strong>{{ stats.papers_with_doi }} / {{ stats.papers_with_pmid }}</strong>
-        <small>identifier usage across records</small>
-      </div>
-      <div class="admin-insight-card">
-        <span>Publishing trend</span>
-        <strong>{{ stats.new_papers_7d }} / {{ stats.new_papers_30d }}</strong>
-        <small>new projects in 7 / 30 days</small>
-      </div>
-    </div>
-    <div class="admin-two-col">
-      <div class="admin-breakdown">
-        <h3>Fields</h3>
-        {% for field, count in field_counts.items() %}
-          <div><span>{{ field }}</span><strong>{{ count }}</strong></div>
-        {% else %}
-          <div><span>No field data</span><strong>0</strong></div>
-        {% endfor %}
-      </div>
-      <div class="admin-breakdown">
-        <h3>30-day project trend</h3>
-        <div class="admin-sparkline" aria-label="Project trend">
-          {% set peak = (daily_publication_trend|map(attribute="count")|max) if daily_publication_trend else 0 %}
-          {% for point in daily_publication_trend %}
-            <span title="{{ point.label }}: {{ point.count }}" style="height: {{ (6 + (point.count / peak * 100))|int if peak else 6 }}px"></span>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
-  </section>
-
+  {% set export_args = request.args.to_dict() %}
+  {% set _ = export_args.pop('page', None) %}
   <section id="papers" class="admin-section">
     <div class="admin-section-head">
-      <div>
-        <h2>Projects</h2>
-        <p>Control project visibility, context, and optional publication references.</p>
-      </div>
-      <span>{% if papers_pagination %}{{ papers_pagination.total }} total{% else %}{{ papers|length }} shown{% endif %}</span>
+      {% set paper_count = papers_pagination.total if papers_pagination else papers|length %}
+      <span>{{ paper_count }} project{{ "" if paper_count == 1 else "s" }}</span>
     </div>
     <form method="GET" action="{{ url_for('admin_dashboard', admin_page='content') }}" class="admin-filter-bar">
       <input name="paper_q" class="field-input" value="{{ filters.paper_q or '' }}" placeholder="Search title, slug, or owner email">
@@ -79,59 +26,46 @@
       </select>
       <button type="submit" class="admin-btn admin-btn-secondary compact">Filter</button>
       <a href="{{ url_for('admin_dashboard', admin_page='content') }}" class="admin-btn admin-btn-secondary compact">Clear</a>
-      <a href="{{ url_for('admin_content_export', **request.args) }}" class="admin-btn admin-btn-secondary compact">Download CSV</a>
+      <a href="{{ url_for('admin_content_export', **export_args) }}" class="admin-btn admin-btn-secondary compact">Download CSV</a>
     </form>
     <div class="table-wrap">
-      <table class="data-table admin-table">
+      <table class="data-table admin-table content-table">
         <thead>
           <tr>
             <th>Project</th>
-            <th>Owner</th>
-            <th>Visibility</th>
-            <th>Status</th>
-            <th>Models</th>
+            <th class="admin-hide-sm">Owner</th>
+            <th class="admin-hide-sm">Visibility</th>
+            <th class="admin-hide-sm">Models</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           {% for paper in papers %}
+            {% set paper_state = "deleted" if paper.status == "deleted" else project_visibility(paper) %}
+            {% set paper_state_label = ("Review link" if paper_state == "unlisted" else paper_state)|replace("_", " ")|capitalize %}
             <tr>
               <td>
                 {% if paper.status == "deleted" %}
                   <strong>{{ paper.title }}</strong>
-                  <small>Deleted{% if paper.deleted_at %} on {{ paper.deleted_at.strftime("%b %d, %Y") }}{% endif %}</small>
+                  <small>Deleted{% if paper.deleted_at %} on {{ paper.deleted_at.strftime("%Y-%m-%d") }}{% endif %}</small>
                 {% else %}
                   {# The link a visitor would use (review link for unlisted projects). #}
                   <strong><a href="{{ project_landing_url(paper) }}" target="_blank" rel="noopener noreferrer">{{ paper.title }}</a></strong>
-                  <small><a href="{{ project_landing_url(paper) }}" target="_blank" rel="noopener noreferrer">{{ project_landing_url(paper, absolute=True) }}</a></small>
+                  <small class="content-url"><a href="{{ project_landing_url(paper) }}" target="_blank" rel="noopener noreferrer">{{ project_landing_url(paper, absolute=True) }}</a></small>
                 {% endif %}
+                <span class="status-chip content-chip-sm {{ admin_chip_class(paper_state) }}">{{ paper_state_label }}</span>
               </td>
-              <td>
+              <td class="admin-hide-sm">
                 {% if paper.author %}
                   <a href="{{ url_for('admin_user_detail', user_id=paper.author.id) }}">{{ paper.author.email }}</a>
                 {% else %}
                   {{ paper.user_id }}
                 {% endif %}
               </td>
-              <td><span class="status-chip {{ admin_chip_class(project_visibility(paper)) }}">{{ project_visibility(paper)|title }}</span></td>
-              <td>{{ paper.status|title }}</td>
-              <td>{{ paper.models|length }}</td>
+              <td class="admin-hide-sm"><span class="status-chip {{ admin_chip_class(paper_state) }}">{{ paper_state_label }}</span></td>
+              <td class="admin-hide-sm">{{ paper.models|length }}</td>
               <td>
                 <div class="admin-actions">
-                  <form method="POST" action="{{ url_for('admin_paper_visibility_update', paper_id=paper.id) }}" onsubmit="return this.elements.status.value !== 'deleted' || window.confirm('Mark this project deleted? Its pages, models and QR codes go offline for visitors.');">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <input type="hidden" name="next" value="{{ request.full_path }}">
-                    <select name="visibility" class="field-select compact-select">
-                      <option value="private" {% if project_visibility(paper) == 'private' %}selected{% endif %}>Private</option>
-                      <option value="unlisted" {% if project_visibility(paper) == 'unlisted' %}selected{% endif %}>Review link</option>
-                      <option value="public" {% if project_visibility(paper) == 'public' %}selected{% endif %}>Public</option>
-                    </select>
-                    <select name="status" class="field-select compact-select" aria-label="Project status">
-                      <option value="active" {% if (paper.status or 'active') == 'active' %}selected{% endif %}>Active</option>
-                      <option value="deleted" {% if paper.status == 'deleted' %}selected{% endif %}>Deleted</option>
-                    </select>
-                    <button type="submit" class="admin-btn admin-btn-secondary compact">Update</button>
-                  </form>
                   {% if paper.status == "deleted" %}
                     <form method="POST" action="{{ url_for('admin_paper_restore', paper_id=paper.id) }}">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -139,6 +73,20 @@
                       <button type="submit" class="admin-btn admin-btn-secondary compact">Restore</button>
                     </form>
                   {% else %}
+                    <form method="POST" action="{{ url_for('admin_paper_visibility_update', paper_id=paper.id) }}" onsubmit="return this.elements.status.value !== 'deleted' || window.confirm('Mark this project deleted? Its pages, models and QR codes go offline for visitors.');">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <input type="hidden" name="next" value="{{ request.full_path }}">
+                      <select name="visibility" class="field-select compact-select">
+                        <option value="private" {% if project_visibility(paper) == 'private' %}selected{% endif %}>Private</option>
+                        <option value="unlisted" {% if project_visibility(paper) == 'unlisted' %}selected{% endif %}>Review link</option>
+                        <option value="public" {% if project_visibility(paper) == 'public' %}selected{% endif %}>Public</option>
+                      </select>
+                      <select name="status" class="field-select compact-select" aria-label="Project status">
+                        <option value="active" {% if (paper.status or 'active') == 'active' %}selected{% endif %}>Active</option>
+                        <option value="deleted" {% if paper.status == 'deleted' %}selected{% endif %}>Deleted</option>
+                      </select>
+                      <button type="submit" class="admin-btn admin-btn-secondary compact">Update</button>
+                    </form>
                     <a href="{{ url_for('project_detail', slug=paper.slug) }}" class="admin-btn admin-btn-secondary compact">Open</a>
                   {% endif %}
                 </div>
@@ -159,7 +107,6 @@
                         <label class="admin-editor-field"><span>PMID</span><input name="pmid" value="{{ paper.pmid or '' }}" maxlength="100"></label>
                         <label class="admin-editor-field"><span>Institution</span><input name="institution" value="{{ paper.institution or '' }}" maxlength="300"></label>
                       </div>
-                      <p class="admin-editor-note">Projects never expire; access windows live on each model's license.</p>
                       <div class="admin-editor-actions">
                         <button type="submit" class="admin-btn admin-btn-primary compact">Save metadata</button>
                       </div>
@@ -169,7 +116,7 @@
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="6">{{ "No projects match these filters." if (filters.paper_q or filters.paper_visibility != "all" or filters.paper_status != "all") else "No projects yet." }}</td></tr>
+            <tr><td colspan="5" class="admin-empty">{{ "No projects match these filters." if (filters.paper_q or filters.paper_visibility != "all" or filters.paper_status != "all") else "No projects yet." }}</td></tr>
           {% endfor %}
         </tbody>
       </table>
