@@ -525,11 +525,15 @@ class AuditLog(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     event_type = db.Column(db.String(50), nullable=False, index=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     resource_id = db.Column(db.String(255), nullable=True, index=True)
     details = db.Column(db.JSON, nullable=True)
     ip_address = db.Column(db.String(45), nullable=True)
     timestamp = db.Column(db.DateTime, default=utc_now, index=True)
+
+    # Admin log/security pages filter by (event_type, timestamp) and user_id;
+    # migration a1d2e3f4b5c6 backfills these on existing databases.
+    __table_args__ = (db.Index("ix_audit_logs_event_type_timestamp", "event_type", "timestamp"),)
 
     def __repr__(self) -> str:
         return f"<AuditLog {self.event_type} @ {self.timestamp}>"
@@ -560,6 +564,8 @@ class AnalyticsEvent(db.Model):
     utm_campaign = db.Column(db.String(120), nullable=True)
     properties = db.Column(db.JSON, nullable=True)
     occurred_at = db.Column(db.DateTime, default=utc_now, nullable=False, index=True)
+
+    __table_args__ = (db.Index("ix_analytics_events_event_name_occurred_at", "event_name", "occurred_at"),)
 
 
 class BlogPost(db.Model):

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "partials/_insights_macros.html" import kpi, chart, breakdown, period, engagement_sub, periods, secondary_line, headline, pct, partial_note, chart_script %}
+{% from "partials/_insights_macros.html" import kpi, chart, changes_caption, breakdown, period, engagement_sub, periods, secondary_line, headline, pct, partial_note, chart_script %}
 {% block title %}Model insights - AcademicAR{% endblock %}
 {% block content %}
 {% set a = analytics %}
@@ -18,11 +18,12 @@
   {{ headline(a) }}
   <p class="insights-print-note">AcademicAR model report &middot; {{ name }} &middot; last {{ period(a.days) }} &middot; generated {{ generated_on }}</p>
 
+  {{ changes_caption(a) }}
   <section class="ins-kpis">
     {{ kpi('Views', a.views, none, a.changes.views, a.views, a.days) }}
     {{ kpi('Unique visitors', a.unique_visitors, none, a.changes.unique_visitors, a.unique_visitors, a.days) }}
     {{ kpi('QR scans', a.qr_scans, (pct(a.qr_share) ~ ' of views from QR') if a.qr_scans and a.qr_share is not none else none, a.changes.qr_scans, a.qr_scans, a.days, hint=('Add the QR code to your poster or slides' if not a.qr_scans else none), hint_url=(qr_url if not a.qr_scans else none)) }}
-    {{ kpi('Engagement', pct(a.engagement_rate), engagement_sub(a), a.changes.engaged_visitors, a.engaged_visitors, a.days, note=partial_note(a)) }}
+    {{ kpi('Engagement', pct(a.engagement_rate), engagement_sub(a), a.changes.engaged_visitors, a.engaged_visitors, a.days, sub_title='Visitors who rotated, went fullscreen, started AR or shared') }}
   </section>
   {{ secondary_line(a) }}
 

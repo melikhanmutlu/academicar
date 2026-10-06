@@ -1025,12 +1025,12 @@ def test_admin_dashboard_requires_admin_user(client):
     assert "Operations overview" in response.get_data(as_text=True)
 
     expected_pages = {
-        "/admin/content": "Content and publication statistics",
-        "/admin/models": "Model and conversion health",
+        "/admin/content": "Search title, slug, or owner email",
+        "/admin/models": "Conversion health",
         "/admin/jobs": "Conversion jobs",
-        "/admin/access": "QR and viewer analytics",
-        "/admin/revenue": "License and revenue",
-        "/admin/security": "Operations and security",
+        "/admin/access": "QR &amp; viewer",
+        "/admin/revenue": "Payment states",
+        "/admin/security": "Failed logins",
         "/admin/storage": "Storage",
         "/admin/users": "Users",
         "/admin/logs": "Audit log",

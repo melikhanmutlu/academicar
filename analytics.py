@@ -173,21 +173,21 @@ def funnel_snapshot(days: int = 30) -> dict:
     event is fired server-side without an actor, e.g. a payment webhook), so the
     numbers read as "how many people reached this step", not raw event volume.
     """
-    now = datetime.now(UTC)
-    start = now - timedelta(days=days)
-    base = AnalyticsEvent.query.filter(AnalyticsEvent.occurred_at >= start)
+    start = _windows(days)[1]
     user_expr = func.coalesce(AnalyticsEvent.actor_user_id, AnalyticsEvent.owner_user_id)
+    counts = {
+        name: int(total or 0)
+        for name, total in AnalyticsEvent.query.filter(
+            AnalyticsEvent.occurred_at >= start,
+            AnalyticsEvent.event_name.in_([name for name, _ in FUNNEL_STAGES]),
+        ).with_entities(AnalyticsEvent.event_name, func.count(func.distinct(user_expr))).group_by(AnalyticsEvent.event_name)
+    }
 
     stages = []
     top_count: int | None = None
     prev_count: int | None = None
     for event_name, label in FUNNEL_STAGES:
-        count = int(
-            base.filter(AnalyticsEvent.event_name == event_name)
-            .with_entities(func.count(func.distinct(user_expr)))
-            .scalar()
-            or 0
-        )
+        count = counts.get(event_name, 0)
         if top_count is None:
             top_count = count
         stages.append({
@@ -228,7 +228,7 @@ def _windows(days: int, now: datetime | None = None):
     return first_day, start, start - timedelta(days=days)
 
 
-def _totals(query) -> dict:
+def _totals(query, with_engagement: bool = True) -> dict:
     by_event = {
         name: (int(total or 0), int(unique or 0))
         for name, total, unique in query.with_entities(
@@ -242,7 +242,7 @@ def _totals(query) -> dict:
         .with_entities(func.count(func.distinct(AnalyticsEvent.visitor_hash)))
         .scalar()
         or 0
-    )
+    ) if with_engagement else 0
     unique_visitors = by_event.get("model_viewed", (0, 0))[1]
     return {
         "views": by_event.get("model_viewed", (0, 0))[0],
@@ -254,6 +254,11 @@ def _totals(query) -> dict:
         "fullscreen_opens": by_event.get("viewer_fullscreen_opened", (0, 0))[0],
         "rotations": by_event.get("viewer_model_rotated", (0, 0))[0],
         "review_visits": by_event.get("review_link_opened", (0, 0))[0],
+        "project_views": by_event.get("project_viewed", (0, 0))[0],
+        "projects_created": by_event.get("project_created", (0, 0))[0],
+        "models_uploaded": by_event.get("model_uploaded", (0, 0))[0],
+        "conversion_completed": by_event.get("model_conversion_completed", (0, 0))[0],
+        "conversion_failed": by_event.get("model_conversion_failed", (0, 0))[0],
         "engaged_visitors": engaged,
         "engagement_rate": _rate(engaged, unique_visitors),
     }
@@ -354,15 +359,26 @@ def _breakdowns(views_query, total_views: int, limit: int = 5) -> dict:
     }
 
 
-def _period_summary(base_query, days: int) -> dict:
+def _period_summary(base_query, days: int, include_trend: bool = True) -> dict:
     """Totals, change vs the previous period, trend and audience for one
     pre-filtered event query (a whole account, a project or a single model)."""
     first_day, start, previous_start = _windows(days)
     query = base_query.filter(AnalyticsEvent.occurred_at >= start)
+    totals = _totals(query, with_engagement=include_trend)
+    if not include_trend:
+        views_query = query.filter(AnalyticsEvent.event_name == "model_viewed")
+        return {
+            "days": days,
+            **totals,
+            "changes": {},
+            "trend": [],
+            "trend_peak": None,
+            **_breakdowns(views_query, totals["views"]),
+            "_query": query,
+        }
     previous_query = base_query.filter(
         AnalyticsEvent.occurred_at >= previous_start, AnalyticsEvent.occurred_at < start
     )
-    totals = _totals(query)
     previous = _totals(previous_query)
     granularity, trend = _trend(query, first_day, days)
     _, previous_trend = _trend(previous_query, first_day - timedelta(days=days), days)
@@ -420,22 +436,22 @@ def _headline(summary: dict, top_model=None) -> list[str]:
     return lines
 
 
-def analytics_snapshot(owner_user_id: int | None = None, days: int = 30, project_id: int | None = None) -> dict:
+def analytics_snapshot(
+    owner_user_id: int | None = None, days: int = 30, project_id: int | None = None, include_trend: bool = True
+) -> dict:
     """Return a compact, role-safe dashboard payload from first-party events.
 
     With ``owner_user_id`` the owner's own activity is excluded, so the numbers
-    describe readers only.
+    describe readers only. ``include_trend=False`` skips the previous-period,
+    trend and headline work (the admin page only needs totals and audience).
     """
     base = AnalyticsEvent.query
     if owner_user_id is not None:
         base = _own_activity_excluded(base.filter(AnalyticsEvent.owner_user_id == owner_user_id), owner_user_id)
     if project_id is not None:
         base = base.filter(AnalyticsEvent.project_id == project_id)
-    summary = _period_summary(base, days)
+    summary = _period_summary(base, days, include_trend)
     query = summary.pop("_query")
-
-    def count(name: str) -> int:
-        return query.filter(AnalyticsEvent.event_name == name).count()
 
     top_rows = (
         query.filter(AnalyticsEvent.event_name == "model_viewed", AnalyticsEvent.model_id.isnot(None))
@@ -467,15 +483,15 @@ def analytics_snapshot(owner_user_id: int | None = None, days: int = 30, project
     )
     return {
         **summary,
-        "headline": _headline(summary, top_model),
+        "headline": _headline(summary, top_model) if include_trend else [],
         "project_id": project_id,
         "projects": projects,
-        "project_views": count("project_viewed"),
-        "projects_created": count("project_created"),
-        "models_uploaded": count("model_uploaded"),
-        "conversion_completed": count("model_conversion_completed"),
-        "conversion_failed": count("model_conversion_failed"),
-        "active_creators": query.filter(AnalyticsEvent.event_name.in_(("project_created", "model_uploaded"))).with_entities(AnalyticsEvent.actor_user_id).distinct().count(),
+        "active_creators": int(
+            query.filter(AnalyticsEvent.event_name.in_(("project_created", "model_uploaded")))
+            .with_entities(func.count(func.distinct(func.coalesce(AnalyticsEvent.actor_user_id, AnalyticsEvent.owner_user_id))))
+            .scalar()
+            or 0
+        ),
         "top_models": [{"model": models.get(model_id), "count": count_value} for model_id, count_value in top_rows],
         "model_metrics": model_metrics,
     }

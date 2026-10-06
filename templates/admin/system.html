@@ -1,65 +1,93 @@
 {% extends "admin/base.html" %}
 {% block admin_title %}System health{% endblock %}
-{% block admin_subtitle %}External conversion tools and conversion queue liveness.{% endblock %}
 {% block admin_actions %}
-  <a href="{{ url_for('admin_ar_doctor') }}" target="_blank" rel="noopener noreferrer" class="admin-btn admin-btn-secondary compact">Run live GLB → USDZ test</a>
+  <form method="POST" action="{{ url_for('admin_ar_doctor_run') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="admin-btn admin-btn-secondary compact">Run AR test</button>
+  </form>
 {% endblock %}
 
 {% block admin_body %}
+  {% macro dep_card(label, dep) %}
+    <div class="admin-insight-card">
+      <span>{{ label }}</span>
+      <strong class="is-text">
+        {% if dep.mode == "local" %}Ready{% elif dep.mode == "npx" %}Via npx{% else %}<span class="status-chip is-failed">Missing</span>{% endif %}
+      </strong>
+      <small>{{ dep.detail }}</small>
+    </div>
+  {% endmacro %}
   <section class="admin-section">
     <div class="admin-section-head">
-      <div>
-        <h2>Conversion dependencies</h2>
-        <p>Presence checks only — no conversion is run here. Use "Run live GLB → USDZ test" for a real Blender conversion.</p>
-      </div>
+      <h2>Conversion tools</h2>
     </div>
     <div class="admin-insight-grid">
-      <div class="admin-insight-card">
-        <span>Blender</span>
-        <strong>{{ "OK" if system_health.blender.available else "Missing" }}</strong>
-        <small>{{ system_health.blender.detail }}</small>
-      </div>
-      <div class="admin-insight-card">
-        <span>gltf-transform</span>
-        <strong>{{ "OK" if system_health.gltf_transform.available else "Missing" }}</strong>
-        <small>{{ system_health.gltf_transform.detail }}</small>
-      </div>
-      <div class="admin-insight-card">
-        <span>obj2gltf</span>
-        <strong>{{ "OK" if system_health.obj2gltf.available else "Missing" }}</strong>
-        <small>{{ system_health.obj2gltf.detail }}</small>
-      </div>
-      <div class="admin-insight-card">
-        <span>fbx2gltf</span>
-        <strong>{{ "OK" if system_health.fbx2gltf.available else "Missing" }}</strong>
-        <small>{{ system_health.fbx2gltf.detail }}</small>
-      </div>
+      {{ dep_card("Blender", system_health.blender) }}
+      {{ dep_card("gltf-transform", system_health.gltf_transform) }}
+      {{ dep_card("obj2gltf", system_health.obj2gltf) }}
+      {{ dep_card("fbx2gltf", system_health.fbx2gltf) }}
     </div>
   </section>
 
   <section class="admin-section">
     <div class="admin-section-head">
-      <div>
-        <h2>Conversion queue liveness</h2>
-        <p>A large "oldest pending job" age with no matching drop in the pending count suggests the worker process is not picking up jobs.</p>
-      </div>
+      <h2>Queue and disk</h2>
+      {% if system_health.worker_stalled %}<span class="status-chip is-failed">Worker stalled</span>{% endif %}
     </div>
     <div class="admin-insight-grid">
       <div class="admin-insight-card">
         <span>Pending jobs</span>
-        <strong>{{ system_health.pending_job_count }}</strong>
-        <small>currently queued</small>
+        <strong class="is-text">{{ system_health.pending_job_count }}</strong>
+        <small>queued</small>
+      </div>
+      <div class="admin-insight-card{% if system_health.worker_stalled %} is-alert{% endif %}">
+        <span>Oldest pending job</span>
+        <strong class="is-text">{{ format_duration(system_health.oldest_pending_age_seconds) }}</strong>
+        <small>{% if system_health.worker_stalled %}Worker stalled{% else %}waiting{% endif %}</small>
       </div>
       <div class="admin-insight-card">
-        <span>Oldest pending job age</span>
-        <strong>{{ (system_health.oldest_pending_age_seconds ~ "s") if system_health.oldest_pending_age_seconds is not none else "-" }}</strong>
-        <small>time since the oldest queued job was created</small>
+        <span>Avg. conversion time</span>
+        <strong class="is-text">{{ format_duration(system_health.avg_recent_job_seconds) }}</strong>
+        <small>last 20 jobs</small>
       </div>
-      <div class="admin-insight-card">
-        <span>Recent avg. conversion time</span>
-        <strong>{{ system_health.avg_recent_job_seconds }}s</strong>
-        <small>average of the last 20 completed jobs</small>
+      {% if system_health.disk %}
+      <div class="admin-insight-card{% if system_health.disk.low %} is-alert{% endif %}">
+        <span>Disk free</span>
+        <strong class="is-text">{{ format_file_size(system_health.disk.free) }}{% if system_health.disk.low %} <span class="status-chip is-failed">Low</span>{% endif %}</strong>
+        <small>{{ system_health.disk.free_percent }}% of {{ format_file_size(system_health.disk.total) }}</small>
       </div>
+      {% endif %}
     </div>
+  </section>
+
+  <section id="ar-doctor" class="admin-section">
+    <div class="admin-section-head">
+      <h2>AR doctor</h2>
+      {% if ar_doctor_job %}<span class="status-chip {{ admin_chip_class(ar_doctor_job.status) }}">{{ ar_doctor_job.status|replace("_", " ")|capitalize }}</span>{% endif %}
+    </div>
+    {% if not ar_doctor_job %}
+      <p class="admin-empty">No runs yet.</p>
+    {% else %}
+      {% set report = (ar_doctor_job.payload or {}).get("report") %}
+      <div class="admin-breakdown">
+        <div><span>Requested</span><strong>{{ ar_doctor_job.created_at.strftime("%Y-%m-%d %H:%M") if ar_doctor_job.created_at else "-" }}</strong></div>
+        {% if ar_doctor_job.error %}<div><span>Error</span><strong>{{ ar_doctor_job.error }}</strong></div>{% endif %}
+        {% if report %}
+          <div><span>Blender on PATH</span><strong>{{ report.blender_on_path or "No" }}</strong></div>
+          <div><span>Blender version</span><strong>{{ report.blender_version|join(" · ") if report.blender_version is iterable and report.blender_version is not string else (report.blender_version or "-") }}</strong></div>
+          <div><span>Test model</span><strong>{% if report.test_model_id %}<a href="{{ url_for('admin_model_detail', model_id=report.test_model_id) }}">{{ report.test_model_id }}</a>{% else %}-{% endif %}</strong></div>
+          <div><span>GLB found</span><strong>{{ "Yes" if report.glb_found else "No" }}</strong></div>
+          <div><span>Conversion</span><strong>{% if report.conversion_ok %}<span class="status-chip is-ready">OK</span>{% elif report.conversion_ok is sameas false %}<span class="status-chip is-failed">Failed</span>{% else %}Not run{% endif %}</strong></div>
+        {% endif %}
+      </div>
+      {% if report and report.conversion_stderr %}
+        <details class="admin-editor admin-mt">
+          <summary>Details</summary>
+          <div class="admin-editor-body">
+            <pre class="system-pre">{{ report.conversion_stderr }}</pre>
+          </div>
+        </details>
+      {% endif %}
+    {% endif %}
   </section>
 {% endblock %}

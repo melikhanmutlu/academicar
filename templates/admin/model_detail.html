@@ -1,6 +1,6 @@
 {% extends "admin/base.html" %}
 {% block admin_title %}{{ model.display_name or model.original_filename or model.id }}{% endblock %}
-{% block admin_subtitle %}Model {{ model.id }} — license, processing, appearance, access, and compliance in one place.{% endblock %}
+{% block admin_subtitle %}{{ model.id }}{% endblock %}
 {% block admin_actions %}
   {% if paper_is_deleted(model.paper) %}<span class="admin-btn admin-btn-secondary compact" aria-disabled="true" title="The project was deleted, so its viewer is offline.">Project deleted</span>{% else %}<a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener noreferrer" class="admin-btn admin-btn-secondary compact">Viewer</a>{% endif %}
   <a href="{{ url_for('admin_model_download', model_id=model.id, kind='glb') }}" class="admin-btn admin-btn-secondary compact" title="Download the converted GLB (logged)">Download GLB</a>
@@ -25,32 +25,29 @@
     <div class="admin-metric">
       <span>License</span>
       <strong>{{ get_license_plan(model.license_type).label }}</strong>
-      <small><span class="status-chip {{ admin_chip_class(model_access_status(model)) }}">{{ model_access_status(model)|title }}</span></small>
+      <small>{% if model.access_expires_at %}Expires {{ model.access_expires_at.strftime("%Y-%m-%d %H:%M") }} UTC{% else %}No expiry{% endif %}</small>
     </div>
     <div class="admin-metric">
       <span>Processing</span>
-      <strong><span class="status-chip {{ admin_chip_class(model.processing_status or 'ready') }}">{{ (model.processing_status or "ready")|title }}</span></strong>
-      <small>{{ format_file_size(model.file_size) }}</small>
+      <strong><span class="status-chip {{ admin_chip_class(model.processing_status or 'ready') }}">{{ (model.processing_status or "ready")|replace("_", " ")|capitalize }}</span>{% if model_access_status(model) == "expired" %} <span class="status-chip {{ admin_chip_class('expired') }}">Expired</span>{% endif %}</strong>
+      <small>{{ format_file_size(model.file_size) }}{% if model.processing_error %} · <span title="{{ model.processing_error }}">{{ model.processing_error|truncate(120) }}</span>{% endif %}{% if model.replacement_error %} · Replacement: {{ model.replacement_error|truncate(120) }}{% endif %}</small>
     </div>
     <div class="admin-metric">
       <span>Public ID</span>
-      <strong>{{ model.public_id or "None" }}</strong>
+      <strong class="is-text">{{ model.public_id or "None" }}</strong>
       <small>{{ model_resolver_url(model) if model.public_id else "No QR link yet" }}</small>
     </div>
   </section>
 
   <section class="admin-section">
     <div class="admin-section-head">
-      <div>
-        <h2>License, processing, poster &amp; QR</h2>
-        <p>Change the plan tier or processing state, or regenerate the poster/QR image. The public id never changes.</p>
-      </div>
+      <h2>Actions</h2>
     </div>
     <div class="admin-two-col">
       <div class="admin-breakdown">
         <h3>License &amp; processing</h3>
         <div class="admin-actions">
-          <form method="POST" action="{{ url_for('admin_model_license_update', model_id=model.id) }}">
+          <form method="POST" action="{{ url_for('admin_model_license_update', model_id=model.id) }}" onsubmit="return confirm('Saving a license resets the access window to the plan duration. Continue?');">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="next" value="model_detail">
             <select name="license_type" class="field-select compact-select">
@@ -64,8 +61,11 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="next" value="model_detail">
             <select name="processing_status" class="field-select compact-select">
-              {% for status in ["queued", "processing", "ready", "failed", "replacement_failed"] %}
-                <option value="{{ status }}" {% if (model.processing_status or "ready") == status %}selected{% endif %}>{{ status|replace("_", " ")|title }}</option>
+              {% if (model.processing_status or "ready") in ["queued", "processing"] %}
+                <option value="" selected disabled>{{ model.processing_status|capitalize }} (worker)</option>
+              {% endif %}
+              {% for status in ["ready", "failed", "replacement_failed"] %}
+                <option value="{{ status }}" {% if (model.processing_status or "ready") == status %}selected{% endif %}>{{ status|replace("_", " ")|capitalize }}</option>
               {% endfor %}
             </select>
             <button type="submit" class="admin-btn admin-btn-secondary compact">Save status</button>
@@ -92,10 +92,7 @@
 
   <section class="admin-section">
     <div class="admin-section-head">
-      <div>
-        <h2>Appearance, description &amp; access window</h2>
-        <p>Override material appearance, the public description, or the access schedule.</p>
-      </div>
+      <h2>Edit</h2>
     </div>
     <details class="admin-editor" open>
       <summary>Appearance &amp; description</summary>
@@ -107,7 +104,11 @@
           <input type="hidden" name="color_changed" value="0">
           <input type="hidden" name="finish_changed" value="0">
           <div class="admin-editor-grid">
+            {% if has_layers %}
+            <div class="admin-editor-field"><span>Color</span><small class="admin-editor-note">Set per layer — use the Layers panel in the model editor.</small></div>
+            {% else %}
             <label class="admin-editor-field"><span>Color</span><input type="color" name="color" value="{{ model.appearance_color or '#cccccc' }}" oninput="this.form.elements.color_changed.value='1'"></label>
+            {% endif %}
             <label class="admin-editor-field"><span>AR placement</span>
               <select name="ar_placement">
                 <option value="floor" {% if (model.ar_placement or 'floor') == 'floor' %}selected{% endif %}>Floor</option>
@@ -116,7 +117,7 @@
             </label>
             <label class="admin-editor-field"><span>Roughness (0-1)</span><input type="number" name="roughness" min="0" max="1" step="0.05" value="{{ '%.2f'|format(model.appearance_roughness if model.appearance_roughness is not none else 0.35) }}" oninput="this.form.elements.finish_changed.value='1'"></label>
             <label class="admin-editor-field"><span>Metallic (0-1)</span><input type="number" name="metallic" min="0" max="1" step="0.05" value="{{ '%.2f'|format(model.appearance_metallic if model.appearance_metallic is not none else 0.05) }}" oninput="this.form.elements.finish_changed.value='1'"></label>
-            <label class="admin-editor-field" style="grid-column:1/-1"><span>Display name</span><input name="display_name" value="{{ model.display_name or '' }}" maxlength="255"></label>
+            <label class="admin-editor-field is-wide"><span>Display name</span><input name="display_name" value="{{ model.display_name or '' }}" maxlength="255"></label>
           </div>
           <label class="admin-editor-field"><span>Description</span><input name="description" value="{{ model.description or '' }}" maxlength="5000"></label>
           <div class="admin-editor-actions">
@@ -132,10 +133,10 @@
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="next" value="model_detail">
           <div class="admin-editor-grid">
-            <label class="admin-editor-field"><span>Access starts</span><input type="datetime-local" name="access_starts_at" value="{{ model.access_starts_at.strftime('%Y-%m-%dT%H:%M') if model.access_starts_at else '' }}" required></label>
-            <label class="admin-editor-field"><span>Access expires (blank = never)</span><input type="datetime-local" name="access_expires_at" value="{{ model.access_expires_at.strftime('%Y-%m-%dT%H:%M') if model.access_expires_at else '' }}"></label>
+            <label class="admin-editor-field"><span>Access starts (UTC)</span><input type="datetime-local" name="access_starts_at" value="{{ model.access_starts_at.strftime('%Y-%m-%dT%H:%M') if model.access_starts_at else '' }}" required></label>
+            <label class="admin-editor-field"><span>Access expires (UTC, blank = never)</span><input type="datetime-local" name="access_expires_at" value="{{ model.access_expires_at.strftime('%Y-%m-%dT%H:%M') if model.access_expires_at else '' }}"></label>
           </div>
-          <p class="admin-editor-note">Explicit override — the license tier and storage limit are left unchanged.</p>
+          <p class="admin-editor-note">Overrides the dates only; license and limits stay.</p>
           <div class="admin-editor-actions">
             <button type="submit" class="admin-btn admin-btn-primary compact">Save access window</button>
           </div>
@@ -146,28 +147,50 @@
 
   <section class="admin-section">
     <div class="admin-section-head">
-      <div>
-        <h2>Compliance record</h2>
-        <p>Read-only. Captured at upload time.</p>
-      </div>
+      <h2>Compliance record</h2>
     </div>
-    <div class="admin-breakdown" style="border:none;padding:0">
+    <div class="admin-breakdown is-flat">
       <div><span>Anonymization confirmed</span><strong>{{ "Yes" if model.anonymization_confirmed else "No" }}</strong></div>
       <div><span>Rights confirmed</span><strong>{{ "Yes" if model.rights_confirmed else "No" }}</strong></div>
-      <div><span>Ethics responsibility confirmed</span><strong>{{ "Yes" if model.ethics_responsibility_confirmed else "No" }}</strong></div>
+      <div><span>Ethics confirmed</span><strong>{{ "Yes" if model.ethics_responsibility_confirmed else "No" }}</strong></div>
       <div><span>Confirmed at</span><strong>{{ model.consent_confirmed_at.strftime("%Y-%m-%d %H:%M") if model.consent_confirmed_at else "-" }}</strong></div>
       <div><span>Consent IP</span><strong>{{ model.consent_ip or "-" }}</strong></div>
       <div><span>Terms version</span><strong>{{ model.terms_version }}</strong></div>
     </div>
   </section>
 
+  <section id="jobs" class="admin-section">
+    <div class="admin-section-head">
+      <h2>Conversion jobs</h2>
+      <span>Latest 10</span>
+      <a href="{{ url_for('admin_dashboard', admin_page='jobs') }}" class="admin-btn admin-btn-secondary compact">All jobs</a>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table admin-table">
+        <thead>
+          <tr><th>Job</th><th>Status</th><th class="admin-hide-sm">Attempts</th><th>Created</th><th>Error</th></tr>
+        </thead>
+        <tbody>
+          {% for job in jobs %}
+            <tr>
+              <td>#{{ job.id }} {{ job.job_type|replace("_", " ")|title }}</td>
+              <td><span class="status-chip {{ admin_chip_class(job.status) }}">{{ job.status|replace("_", " ")|capitalize }}</span></td>
+              <td class="admin-hide-sm">{{ job.attempts }} / {{ job.max_attempts }}</td>
+              <td>{{ job.created_at.strftime("%Y-%m-%d %H:%M") if job.created_at else "-" }}</td>
+              <td>{{ job.error|truncate(160) if job.error else "-" }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5">No conversion jobs recorded for this model.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
   <section id="versions" class="admin-section">
     <div class="admin-section-head">
-      <div>
-        <h2>Version history</h2>
-        <p>Read-only. Each row is one upload or replace attempt, including failed conversions.</p>
-      </div>
-      <span>{{ versions|length }} versions</span>
+      <h2>Version history</h2>
+      <span>{{ versions|length }} {{ "version" if versions|length == 1 else "versions" }}</span>
     </div>
     <div class="table-wrap">
       <table class="data-table admin-table">
@@ -175,9 +198,8 @@
           <tr>
             <th>Version</th>
             <th>Status</th>
-            <th>Format</th>
-            <th>Size</th>
-            <th>Color</th>
+            <th class="admin-hide-sm">Format</th>
+            <th class="admin-hide-sm">Size</th>
             <th>Created</th>
             <th>Error</th>
           </tr>
@@ -186,15 +208,14 @@
           {% for version in versions %}
             <tr>
               <td>v{{ version.version_number }}</td>
-              <td><span class="status-chip {{ admin_chip_class(version.status) }}">{{ version.status|title }}</span></td>
-              <td>{{ (version.source_format or "-")|upper }}</td>
-              <td>{{ format_file_size(version.file_size) }}</td>
-              <td>{{ version.material_color or "-" }}</td>
+              <td><span class="status-chip {{ admin_chip_class(version.status) }}">{{ version.status|replace("_", " ")|capitalize }}</span></td>
+              <td class="admin-hide-sm">{{ (version.source_format or "-")|upper }}</td>
+              <td class="admin-hide-sm">{{ format_file_size(version.file_size) }}</td>
               <td>{{ version.created_at.strftime("%Y-%m-%d %H:%M") if version.created_at else "-" }}</td>
               <td>{{ version.error or "-" }}</td>
             </tr>
           {% else %}
-            <tr><td colspan="7">No version history recorded yet.</td></tr>
+            <tr><td colspan="6">No version history recorded yet.</td></tr>
           {% endfor %}
         </tbody>
       </table>

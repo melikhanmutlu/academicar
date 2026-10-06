@@ -80,8 +80,6 @@ _DEFAULT_LICENSE_PLANS: dict[str, LicensePlan] = {
         duration_days=3,
         storage_limit_bytes=100 * MB,
         feature_summary=(
-            "3-day AR and QR access",
-            "1 interactive model",
             "Screenshot export",
             "Video recording",
             "Watermarked viewer",
@@ -96,8 +94,6 @@ _DEFAULT_LICENSE_PLANS: dict[str, LicensePlan] = {
         duration_days=365 * 3,
         storage_limit_bytes=200 * MB,
         feature_summary=(
-            "3-year AR and QR access",
-            "1 interactive model",
             "Screenshot export",
             "Video recording",
             "No watermark",
@@ -113,7 +109,6 @@ _DEFAULT_LICENSE_PLANS: dict[str, LicensePlan] = {
         duration_days=365 * 10,
         storage_limit_bytes=200 * MB,
         feature_summary=(
-            "10-year AR and QR access",
             "Priority archival storage",
             "Guided viewing",
             "Saved camera views",

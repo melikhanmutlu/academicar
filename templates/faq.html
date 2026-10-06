@@ -28,12 +28,12 @@
     Still stuck? <a href="{{ url_for('contact') if config.CONTACT_ENABLED else url_for('contact_info') }}" class="underline">Get in touch</a>.
   </p>
 
-  <div class="space-y-6">
+  <div class="space-y-3">
     {% for faq in faqs %}
-    <section class="border border-[#e8e8e8] rounded-lg p-6">
-      <h2 class="text-xl font-semibold text-[#202020] mb-2">{{ faq.q }}</h2>
-      <p class="text-[#4d4d4d] leading-relaxed">{{ faq.a }}</p>
-    </section>
+    <details class="form-optional-section"{% if loop.first %} open{% endif %}>
+      <summary><strong>{{ faq.q }}</strong></summary>
+      <div class="form-optional-body"><p class="text-[#4d4d4d] leading-relaxed">{{ faq.a }}</p></div>
+    </details>
     {% endfor %}
   </div>
 

@@ -1,0 +1,53 @@
+{# Shared by the create (list page) and update (detail page) institution forms.
+   `v` maps field name -> current string value; `with_description` adds the showcase text. #}
+{% macro institution_fields(v, with_description=False, slug=None) %}
+  <div class="admin-wrap-row">
+    <label class="admin-editor-field admin-grow">
+      <span>Name</span>
+      <input type="text" name="name" required maxlength="200" placeholder="Example University" value="{{ v.get('name', '') }}">
+    </label>
+    <label class="admin-editor-field admin-grow">
+      <span>Email domains</span>
+      <input type="text" name="email_domains" placeholder="example.edu, alumni.example.edu" value="{{ v.get('email_domains', '') }}">
+    </label>
+  </div>
+  <div class="admin-wrap-row">
+    <label class="admin-editor-field">
+      <span>Contract starts</span>
+      <input type="date" name="contract_starts_at" value="{{ v.get('contract_starts_at', '') }}">
+    </label>
+    <label class="admin-editor-field">
+      <span>Contract ends</span>
+      <input type="date" name="contract_ends_at" title="Blank = open-ended" value="{{ v.get('contract_ends_at', '') }}">
+    </label>
+    <label class="admin-editor-field">
+      <span>Annual price</span>
+      <input type="number" name="annual_price" step="0.01" min="0" placeholder="25000" value="{{ v.get('annual_price', '') }}">
+    </label>
+    <label class="admin-editor-field">
+      <span>Currency</span>
+      <input type="text" name="currency" value="{{ v.get('currency', 'TRY') }}" maxlength="3" class="admin-currency">
+    </label>
+  </div>
+  <div class="admin-wrap-row">
+    <label class="admin-editor-field">
+      <span>Model quota</span>
+      <input type="number" name="quota_model_count" min="0" step="1" placeholder="Unlimited" title="Blank = unlimited" value="{{ v.get('quota_model_count', '') }}">
+    </label>
+    <label class="admin-editor-field">
+      <span>Storage quota (MB)</span>
+      <input type="number" name="quota_storage_mb" min="0" step="any" placeholder="Unlimited" title="Blank = unlimited" value="{{ v.get('quota_storage_mb', '') }}">
+    </label>
+    <label class="admin-editor-field admin-grow">
+      <span>Internal notes</span>
+      <input type="text" name="notes" maxlength="5000" placeholder="Contact, procurement reference..." value="{{ v.get('notes', '') }}">
+    </label>
+  </div>
+  {% if with_description %}
+    <label class="admin-editor-field">
+      <span>Showcase description</span>
+      <textarea name="public_description" rows="2" maxlength="1000" title="Shown on /i/{{ slug or '...' }}">{{ v.get('public_description', '') }}</textarea>
+    </label>
+  {% endif %}
+  <p class="admin-empty">Leave the end date and quotas blank for open-ended / unlimited.</p>
+{% endmacro %}

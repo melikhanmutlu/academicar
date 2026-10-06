@@ -41,6 +41,21 @@
   border-right: 1px solid var(--color-light-pearl);
   background: var(--color-canvas-white);
   z-index: 20;
+  /* Brand and footer stay in view; only the nav list scrolls, so Log out is
+     reachable on short viewports. */
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-sidebar > nav {
+  flex: 1 1 auto;
+  min-height: 96px;
+  overflow-y: auto;
+}
+
+.admin-sidebar-brand,
+.admin-sidebar-foot {
+  flex: 0 0 auto;
 }
 
 .admin-sidebar-brand {
@@ -429,12 +444,6 @@
   margin: 0 0 16px;
 }
 
-/* Wide tables scroll inside their card instead of widening the page. */
-.admin-table-wrap {
-  max-width: 100%;
-  overflow-x: auto;
-}
-
 /* ---- Off-canvas sidebar on smaller screens -----------------------------
    Below 1024px the sidebar becomes a full-viewport overlay drawer (ignores
    the header offset, sits above everything including it) instead of the
@@ -447,6 +456,9 @@
   .admin-menu-toggle {
     display: inline-flex;
   }
+  #adminMenuToggle {
+    min-height: 40px;
+  }
   .admin-sidebar {
     top: 0;
     left: 0;
@@ -455,11 +467,20 @@
     width: 264px;
     padding: 20px 16px;
     transform: translateX(-100%);
-    transition: transform 0.25s ease;
+    /* A closed drawer is hidden from Tab and assistive tech; visibility flips
+       only after the slide-out finishes. */
+    visibility: hidden;
+    transition: transform 0.25s ease, visibility 0s linear 0.25s;
   }
   .admin-sidebar.is-open {
     transform: translateX(0);
+    visibility: visible;
+    transition-delay: 0s;
     box-shadow: 0 0 0 100vw rgba(32, 32, 32, 0.28);
+  }
+  /* Page behind the open drawer must not scroll. */
+  body.admin-drawer-open {
+    overflow: hidden;
   }
 }
 
@@ -570,7 +591,7 @@
   font-weight: 600;
 }
 
-.admin-plan-card { margin-bottom:10px; padding:0; overflow:hidden; }
+.admin-plan-card { margin-bottom:10px; padding:0; overflow:hidden; border:1px solid var(--color-light-pearl); border-radius:8px; background:var(--color-canvas-white); }
 .admin-plan-summary { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:13px 15px; cursor:pointer; list-style:none; background:var(--color-canvas-white); }
 .admin-plan-summary::-webkit-details-marker { display:none; }
 .admin-plan-summary:hover { background:var(--color-cloud-whisper); }
@@ -582,9 +603,250 @@
 .admin-plan-summary-state b { font-size:16px; font-weight:400; transition:transform 150ms ease; }
 .admin-plan-card[open] .admin-plan-summary-state b { transform:rotate(180deg); }
 .admin-plan-card > form { padding:14px 15px 15px; border-top:1px solid var(--color-light-pearl); background:var(--color-cloud-whisper); }
-.admin-coupon-create { padding:15px; }
+.admin-coupon-create { padding:15px; border:1px solid var(--color-light-pearl); border-radius:8px; background:var(--color-canvas-white); }
+.admin-plan-card .admin-editor-grid,
+.admin-coupon-create .admin-editor-grid { grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); }
 .admin-feature-matrix { margin-top:12px; padding:12px; border:1px solid var(--color-light-pearl); border-radius:8px; background:var(--color-canvas-white); }
 .admin-feature-matrix legend { padding:0 6px; color:var(--color-midnight-graphite); font-size:12px; font-weight:700; }
 .admin-feature-options { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:7px 12px; }
 .admin-feature-options label { display:flex; align-items:center; gap:8px; color:var(--color-dark-shale); font-size:12px; }
 .admin-feature-options input { accent-color:var(--color-sunset-orange); }
+
+/* Label/value rows (analytics lists) and muted empty states. */
+.admin-data-list > div { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:9px 0; border-top:1px solid var(--color-light-pearl); font-family:var(--font-inter); font-size:13px; color:var(--color-dark-shale); }
+.admin-data-list > div:first-child { border-top:0; }
+.admin-data-list span { min-width:0; overflow-wrap:anywhere; }
+.admin-data-list strong { color:var(--color-midnight-graphite); font-weight:600; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.admin-empty { margin:0; color:var(--color-silver-ash); font-family:var(--font-inter); font-size:13px; }
+
+/* Native file pickers styled like the secondary admin button. */
+.admin-main input[type="file"] { font-family:var(--font-inter); font-size:12px; color:var(--color-dark-shale); }
+.admin-main input[type="file"]::file-selector-button { margin-right:10px; padding:7px 11px; border:1px solid var(--color-light-pearl); border-radius:8px; background:var(--color-canvas-white); color:var(--color-midnight-graphite); font-family:var(--font-inter); font-size:12px; font-weight:500; cursor:pointer; }
+.admin-main input[type="file"]::file-selector-button:hover { background:var(--color-cloud-whisper); }
+.admin-main input[type="checkbox"] { accent-color:var(--color-sunset-orange); }
+
+/* ---- Flash messages inside the admin shell ---------------------------------
+   The shared .flash-stack sits above <main> in a flex column; inside the admin
+   shell it must line up with the content column (right of the fixed sidebar,
+   same side padding as .admin-main) instead of shrinking to a centred box. */
+body:has(.admin-layout) .flash-stack {
+  max-width: none;
+  margin: 24px 0 -8px 268px;
+  padding: 0 40px 0 32px;
+}
+
+@media (max-width: 1024px) {
+  body:has(.admin-layout) .flash-stack {
+    margin-left: 0;
+    padding: 0 20px;
+  }
+}
+
+/* ---- Conversion funnel (Analytics) ------------------------------------------ */
+.admin-funnel { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.admin-funnel-row { display: grid; grid-template-columns: 150px 1fr 64px 110px; align-items: center; gap: 12px; font-size: 13px; }
+.admin-funnel-label { color: var(--color-midnight-graphite); font-weight: 500; }
+.admin-funnel-track { background: var(--color-slate-mist); border-radius: 999px; height: 12px; overflow: hidden; }
+.admin-funnel-bar { background: var(--color-sunset-orange); height: 100%; border-radius: 999px; min-width: 2px; transition: width 0.3s ease; }
+.admin-funnel-count { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--color-midnight-graphite); }
+.admin-funnel-step { text-align: right; color: var(--color-silver-ash); font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+  .admin-funnel-row { grid-template-columns: 110px 1fr 48px; }
+  .admin-funnel-step { display: none; }
+}
+
+/* ---- Small layout utilities (use instead of inline style="") ---------------- */
+.admin-grow { flex: 1; min-width: 220px; }
+.admin-wrap-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.admin-mt { margin-top: 12px; }
+.admin-inline { display: inline; }
+.admin-field-narrow { max-width: 520px; }
+/* Secondary table columns drop out on phones. */
+@media (max-width: 640px) {
+  .admin-hide-sm { display: none; }
+}
+
+/* ================================================================
+   Page-specific admin styles. Each page owns only its own block;
+   keep shared patterns above.
+   ================================================================ */
+
+/* == page:overview == */
+.admin-attention { margin-bottom: 16px; border-left: 3px solid var(--color-sunset-orange); }
+.admin-attention span { white-space: normal; }
+.admin-attention .admin-empty { padding-top: 9px; border-top: 1px solid var(--color-light-pearl); }
+a.admin-metric { color: inherit; text-decoration: none; transition: border-color 0.15s ease; }
+a.admin-metric:hover, a.admin-metric:focus-visible { border-color: var(--color-sunset-orange); }
+/* == end page:overview == */
+
+/* == page:users == */
+/* Row actions stay in one wrapping row on phones instead of a tall stack. */
+.admin-users-table .admin-actions { flex-direction: row; flex-wrap: wrap; align-items: center; }
+.admin-users-table .admin-actions .admin-btn { width: auto; }
+.admin-users-table td, .admin-users-table th { padding-left: 8px; padding-right: 8px; }
+.admin-users-table td small, .admin-users-table td a { overflow-wrap: anywhere; }
+.admin-show-sm { display: none; }
+@media (max-width: 640px) { .admin-show-sm { display: block; } }
+/* == end page:users == */
+
+/* == page:content == */
+.content-chip-sm { display: none; }
+@media (max-width: 640px) {
+  .content-chip-sm { display: inline-block; margin-top: 6px; }
+  .content-table .content-url { display: none; }
+  .content-table .admin-actions form { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+  .content-table .admin-actions, .content-table .admin-actions .admin-btn, .content-table .admin-editor { min-width: 0; max-width: 100%; }
+  .content-table .admin-actions .compact-select { max-width: 100%; }
+}
+/* == end page:content == */
+
+/* == page:models == */
+.admin-editor-field.is-wide { grid-column: 1 / -1; }
+.admin-editor-field input[type="color"] { width: 56px; padding: 2px; }
+.admin-breakdown.is-flat { border: none; padding: 0; }
+.admin-metric small { overflow-wrap: anywhere; }
+.admin-breakdown .admin-actions form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+/* == end page:models == */
+
+/* == page:jobs == */
+.jobs-error { max-width: 280px; overflow-wrap: anywhere; }
+.jobs-pre { margin: 0; font-size: 12px; white-space: pre-wrap; word-break: break-all; max-height: 220px; overflow: auto; }
+.jobs-attempts-field { max-width: 140px; }
+@media (min-width: 641px) {
+  .admin-table small.jobs-model-inline { display: none; }
+}
+/* == end page:jobs == */
+
+/* == page:annotations == */
+/* == end page:annotations == */
+
+/* == page:access == */
+.admin-insight-grid + .admin-section-head { margin-top: 16px; }
+@media (max-width: 640px) {
+  .admin-table .admin-inline-form { flex-direction: column; align-items: stretch; gap: 6px; min-width: 0; }
+  .admin-table .admin-inline-form .field-select { width: 100%; min-width: 0; }
+}
+/* == end page:access == */
+
+/* == page:revenue == */
+.revenue-amount-sm { display: none; }
+@media (max-width: 760px) {
+  .revenue-amount-sm { display: block; }
+  #payments .admin-actions { flex-direction: column; align-items: stretch; }
+}
+/* == end page:revenue == */
+
+/* == page:pricing == */
+.admin-plan-card .admin-editor-actions,
+.admin-coupon-create .admin-editor-actions { margin-top:12px; }
+.admin-coupon-create + .table-wrap { margin-top:16px; }
+.admin-plan-card .admin-editor-grid,
+.admin-coupon-create .admin-editor-grid { align-items:end; }
+/* == end page:pricing == */
+
+/* == page:security == */
+.admin-security-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+a.admin-insight-card { color: inherit; text-decoration: none; }
+a.admin-insight-card:hover { border-color: var(--color-silver-ash); }
+/* == end page:security == */
+
+/* == page:storage == */
+.admin-storage-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+.admin-storage-cards .admin-insight-card {
+  min-height: 0;
+  gap: 6px;
+}
+.admin-storage-maint {
+  margin-top: 16px;
+}
+@media (max-width: 640px) {
+  .admin-storage-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .admin-storage-cards .admin-insight-card {
+    padding: 12px;
+  }
+  .admin-storage-maint .admin-btn {
+    width: 100%;
+  }
+}
+/* == end page:storage == */
+
+/* == page:system == */
+.admin-insight-card.is-alert {
+  border-color: var(--color-sunset-orange);
+  background: var(--color-orange-wash);
+}
+.system-pre {
+  margin: 0;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+/* == end page:system == */
+
+/* == page:logs == */
+.logs-user-input { width: 110px; }
+.logs-date-input { width: 150px; }
+.admin-table small.logs-time-sm { display: none; }
+.logs-details { word-break: break-word; }
+.logs-details summary { cursor: pointer; }
+.logs-details details[open] summary { display: none; }
+@media (max-width: 640px) {
+  .admin-table small.logs-time-sm { display: block; }
+  .logs-user { word-break: break-all; }
+}
+/* == end page:logs == */
+
+/* == page:backups == */
+#backups .admin-table td { overflow-wrap: anywhere; }
+/* == end page:backups == */
+
+/* == page:blog == */
+.admin-blog-new > summary { display: inline-flex; list-style: none; cursor: pointer; }
+.admin-blog-new > summary::-webkit-details-marker { display: none; }
+.admin-blog-new .admin-blog-form { max-width: none; }
+.admin-blog-new .admin-blog-field input[type="file"] { width: auto; max-width: 100%; border: 0; padding: 0; }
+.admin-blog-row .admin-blog-field { min-width: 140px; }
+.admin-muted { margin: 0; color: var(--color-silver-ash); font-size: 12px; }
+.admin-blog-row-actions { flex-wrap: wrap; }
+@media (max-width: 640px) {
+  .admin-blog-row-actions .admin-btn { padding-left: 8px; padding-right: 8px; }
+}
+/* == end page:blog == */
+
+/* == page:institutions == */
+.admin-currency { width: 70px; }
+.admin-show-sm { display: none; }
+@media (max-width: 640px) { .admin-show-sm { display: block; } }
+.admin-mb { margin-bottom: 12px; }
+.admin-nowrap { white-space: nowrap; }
+.admin-logo-label {
+  font-family: var(--font-inter);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-silver-ash);
+}
+.admin-logo-preview {
+  height: 40px;
+  padding: 4px;
+  border: 1px solid var(--color-light-pearl);
+  background: var(--color-canvas-white);
+}
+.admin-new { margin-bottom: 16px; }
+.admin-new > summary { display: inline-flex; cursor: pointer; list-style: none; }
+.admin-new > summary::-webkit-details-marker { display: none; }
+.admin-new[open] > summary { margin-bottom: 12px; }
+.admin-danger-zone { border-top: 1px solid var(--color-light-pearl); }
+/* == end page:institutions == */
+
+/* == page:analytics == */
+.admin-audience { align-items: stretch; }
+.admin-audience .admin-section { margin: 0; }
+.admin-audience small { color: var(--color-silver-ash); font-weight: 400; }
+/* == end page:analytics == */

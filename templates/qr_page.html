@@ -46,8 +46,8 @@
     .downloads .btn { padding: 8px 12px; font-size: 13px; font-weight: 700; }
     .downloads-title { width: 100%; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #6b6b6b; }
     .downloads-note { width: 100%; font-size: 12px; line-height: 1.5; color: #6b6b6b; }
-    @media (max-width: 760px) { .sheet { grid-template-columns: 1fr; } .qr-panel { min-height: 0; } }
-    @media (max-width: 560px) { body { padding: 24px 12px; } .sheet { padding: 18px; } }
+    @media (max-width: 760px) { .sheet { grid-template-columns: 1fr; } .qr-panel { min-height: 0; order: -1; } }
+    @media (max-width: 560px) { body { padding: 24px 12px; } .sheet { padding: 18px; } .share-copy { min-height: 36px; padding: 8px 12px; } .btn { min-height: 40px; } }
     @media print {
       body { background: white; padding: 0; }
       .sheet { width: 100%; display: block; box-shadow: none; border: none; border-radius: 0; }
