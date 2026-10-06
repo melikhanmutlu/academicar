@@ -693,6 +693,11 @@ body:has(.admin-layout) .flash-stack {
 /* == end page:access == */
 
 /* == page:revenue == */
+.revenue-amount-sm { display: none; }
+@media (max-width: 760px) {
+  .revenue-amount-sm { display: block; }
+  #payments .admin-actions { flex-direction: column; align-items: stretch; }
+}
 /* == end page:revenue == */
 
 /* == page:pricing == */

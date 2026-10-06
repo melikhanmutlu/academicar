@@ -397,8 +397,8 @@ def test_revenue_page_provider_filter_applies_to_rows(client):
         _add_payment("development", "ref-dev")
         db.session.commit()
     page = client.get("/admin/revenue?provider=development").get_data(as_text=True)
-    assert "<td>development</td>" in page
-    assert "<td>lemonsqueezy</td>" not in page
+    assert "· development</small>" in page
+    assert "· lemonsqueezy</small>" not in page
 
 
 # --- 8. layered model appearance form ---------------------------------------

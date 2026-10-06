@@ -1029,7 +1029,7 @@ def test_admin_dashboard_requires_admin_user(client):
         "/admin/models": "Model and conversion health",
         "/admin/jobs": "Conversion jobs",
         "/admin/access": "QR and viewer analytics",
-        "/admin/revenue": "License and revenue",
+        "/admin/revenue": "Payment states",
         "/admin/security": "Operations and security",
         "/admin/storage": "Storage",
         "/admin/users": "Users",

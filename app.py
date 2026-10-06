@@ -7097,7 +7097,7 @@ def register_routes(app: Flask) -> None:
         )
         license_counts = (
             grouped_counts(Model3D.license_type, Model3D.id, "free", live_model)
-            if page_is("overview", "revenue")
+            if page_is("overview")
             else {}
         )
         source_format_counts = (
@@ -7162,7 +7162,7 @@ def register_routes(app: Flask) -> None:
             .order_by(Model3D.access_expires_at.asc())
             .limit(10)
             .all()
-            if page_is("overview", "revenue")
+            if page_is("overview")
             else []
         )
         average_conversion_seconds = None
@@ -8916,7 +8916,7 @@ def register_routes(app: Flask) -> None:
         new_status = (request.form.get("status") or "pending").strip().lower()
         if new_status not in {"pending", "paid", "failed", "refunded"}:
             flash("Invalid payment status.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="revenue"))
+            return redirect(admin_return_url("revenue"))
         previous = payment.status
         if new_status == previous:
             flash("Payment status unchanged.", "info")
@@ -9005,10 +9005,10 @@ def register_routes(app: Flask) -> None:
         except SQLAlchemyError:
             db.session.rollback()
             flash("Could not clear pending payments. Please try again.", "danger")
-            return redirect(url_for("admin_dashboard", admin_page="revenue"))
+            return redirect(admin_return_url("revenue"))
         log_audit("admin_payments_pending_cleared", user_id=current_user.id, details={"count": deleted})
         flash(f"Deleted {deleted} pending payment record(s).", "success")
-        return redirect(url_for("admin_dashboard", admin_page="revenue"))
+        return redirect(admin_return_url("revenue"))
 
     @app.route("/admin/jobs/<int:job_id>/retry", methods=["POST"])
     @login_required
