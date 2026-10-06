@@ -94,3 +94,21 @@ def test_job_builds_a_variant_for_a_section_only_scene(app, usdz, r2, tmp_path):
         assert db.session.get(Model3D, model_id).processing_status == "ready"
         variant = _plain(scene.ar_glb_path, tmp_path)
     assert _used_materials(variant) == {"A", "B"}  # C is beyond the cut
+
+
+def test_ar_status_endpoint_reports_the_variant_and_respects_visibility(app, client):
+    model_id = _make_model(app)
+    _add_scene(app, model_id, ar_status="queued")
+    assert client.get(f"/models/{model_id}/scenes/1/ar-status").get_json() == {
+        "id": 1, "ar_status": "queued", "ar_glb_url": None, "ar_usdz_url": None,
+    }
+    with app.app_context():
+        scene = db.session.get(ModelScene, 1)
+        scene.ar_status, scene.ar_glb_path = "ready", "x.glb"
+        db.session.commit()
+    data = client.get(f"/models/{model_id}/scenes/1/ar-status").get_json()
+    assert data["ar_status"] == "ready" and data["ar_glb_url"].endswith(f"/files/{model_id}/scenes/1.glb")
+    assert client.get(f"/models/{model_id}/scenes/99/ar-status").status_code == 404
+    private_id = _make_model(app, visibility="private", email="private@example.com")
+    _add_scene(app, private_id)
+    assert client.get(f"/models/{private_id}/scenes/2/ar-status").status_code == 404

@@ -4401,6 +4401,7 @@
           const data = await sceneRequest(`${scenesUrl}/${scene.id}`, { state: window.viewerView.getState() });
           scenes = scenes.map((item) => (item.id === scene.id ? data.scene : item));
           renderScenes();
+          if (window.viewerSceneAr && window.viewerSceneAr.watch) window.viewerSceneAr.watch();
         } catch (error) { window.alert(error.message); }
       };
       const deleteScene = async (scene) => {
@@ -4489,6 +4490,7 @@
             }
             closeSceneForm();
             renderScenes();
+            if (window.viewerSceneAr && window.viewerSceneAr.watch) window.viewerSceneAr.watch();
           } catch (error) {
             sceneFormError.textContent = error.message;
             sceneFormError.hidden = false;
@@ -4568,10 +4570,35 @@
         sceneArNoteTimer = setTimeout(() => { sceneArNote.hidden = true; }, 6000);
       };
       iosArButtons.forEach((anchor) => anchor.addEventListener('click', notePreparing));
+      // A scene saved here gets its AR file from the worker a minute later:
+      // poll its status (for up to ten minutes) so AR switches to it without a reload.
+      let sceneArPoll = null;
+      let sceneArPollUntil = 0;
+      const pollSceneAr = async () => {
+        sceneArPoll = null;
+        const queued = scenes.filter((scene) => scene.ar_status === 'queued');
+        if (!queued.length || Date.now() > sceneArPollUntil) return;
+        await Promise.all(queued.map(async (scene) => {
+          try {
+            const response = await fetch(`/models/${modelId}/scenes/${scene.id}/ar-status`, { credentials: 'same-origin' });
+            if (!response.ok) return;
+            const data = await response.json();
+            Object.assign(scene, { ar_status: data.ar_status, ar_glb_url: data.ar_glb_url, ar_usdz_url: data.ar_usdz_url });
+          } catch (e) { /* try again on the next round */ }
+        }));
+        syncSceneAr();
+        sceneArPoll = setTimeout(pollSceneAr, 6000);
+      };
+      const watchSceneAr = () => {
+        sceneArPollUntil = Date.now() + 10 * 60 * 1000;
+        if (!sceneArPoll) sceneArPoll = setTimeout(pollSceneAr, 6000);
+      };
+      watchSceneAr();
       window.viewerSceneAr = {
         androidViewer: () => (sceneArViewer && sceneArViewer.canActivateAR ? sceneArViewer : null),
         usdzUrl: () => sceneArFile('ar_usdz_url'),
         notePreparing,
+        watch: watchSceneAr,
       };
 
       window.viewerScenes = {
@@ -4770,6 +4797,7 @@
         }
         syncSectionUi();
         requestViewerRender();
+        startPlaneWatch();
         onSectionChanged();
       };
 
@@ -5278,7 +5306,24 @@
         requestSliceDraw();
       };
 
-      viewer.addEventListener('before-render', () => { if (section && sectionCtx) updatePlane(); });
+      // model-viewer fires 'before-render' only once after a load, so while a
+      // section is on a frame loop re-derives the world-space plane whenever the
+      // model root moves (orientation sliders), keeping the cut on the model.
+      let planeWatch = 0;
+      let lastRootPlacement = '';
+      const watchPlane = () => {
+        planeWatch = 0;
+        if (!section || !sectionCtx) { lastRootPlacement = ''; return; }
+        sectionCtx.root.updateMatrixWorld();
+        const placement = sectionCtx.root.matrixWorld.elements.join(',');
+        if (placement !== lastRootPlacement) {
+          lastRootPlacement = placement;
+          updatePlane();
+          requestViewerRender();
+        }
+        planeWatch = requestAnimationFrame(watchPlane);
+      };
+      const startPlaneWatch = () => { if (!planeWatch && section) planeWatch = requestAnimationFrame(watchPlane); };
       const onSectionModelLoad = () => {
         // A reload brings new meshes and materials: drop what the old ones held.
         sectionSides.clear();

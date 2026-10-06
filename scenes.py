@@ -461,6 +461,23 @@ def serve_scene_ar(unique_id, scene_id, ext):
     return response
 
 
+@scenes_bp.route("/models/<model_id>/scenes/<int:scene_id>/ar-status")
+def scene_ar_status(model_id, scene_id):
+    """A scene's AR variant status and file URLs, polled by the viewer while the
+    worker builds it; same visibility rules as the model's viewer."""
+    from app import paper_visible_to_request
+    from licensing import model_is_accessible
+
+    model = _load_model(model_id)
+    scene = _model_scene_or_404(model, scene_id)
+    if not paper_visible_to_request(model.paper) or not model_is_accessible(model) or not scenes_enabled(model):
+        abort(404)
+    data = scene_to_dict(scene, model)
+    response = jsonify({key: data[key] for key in ("id", "ar_status", "ar_glb_url", "ar_usdz_url")})
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @scenes_bp.route("/s/<public_id>")
 def scene_resolver(public_id):
     """Public scene link. Same access rules as the model QR resolver: always a
