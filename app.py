@@ -6800,6 +6800,7 @@ def register_routes(app: Flask) -> None:
         job_status_filter = (request.args.get("job_status") or "all").strip().lower()
         audit_event_filter = (request.args.get("audit_event") or "all").strip().lower()
         audit_query_text = (request.args.get("audit_q") or "").strip()
+        annotation_query_text = (request.args.get("annotation_q") or "").strip()
         audit_user_filter = (request.args.get("audit_user") or "").strip()
         paper_query_text = (request.args.get("paper_q") or "").strip()
         paper_visibility_filter = (request.args.get("paper_visibility") or "all").strip().lower()
@@ -6897,6 +6898,14 @@ def register_routes(app: Flask) -> None:
         annotations_query = ModelAnnotation.query.options(
             selectinload(ModelAnnotation.model).selectinload(Model3D.paper)
         )
+        if annotation_query_text:
+            annotation_pattern = admin_like_pattern(annotation_query_text)
+            annotations_query = annotations_query.filter(
+                or_(
+                    func.lower(ModelAnnotation.label).like(annotation_pattern, escape="\\"),
+                    func.lower(ModelAnnotation.description).like(annotation_pattern, escape="\\"),
+                )
+            )
 
         audit_query = AuditLog.query
         if audit_event_filter != "all":
@@ -7560,6 +7569,7 @@ def register_routes(app: Flask) -> None:
                 "job_status": job_status_filter,
                 "audit_event": audit_event_filter,
                 "audit_q": audit_query_text,
+                "annotation_q": annotation_query_text,
                 "audit_user": audit_user_filter,
                 "paper_q": paper_query_text,
                 "paper_visibility": paper_visibility_filter,
