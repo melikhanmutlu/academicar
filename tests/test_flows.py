@@ -1028,7 +1028,7 @@ def test_admin_dashboard_requires_admin_user(client):
         "/admin/content": "Content and publication statistics",
         "/admin/models": "Model and conversion health",
         "/admin/jobs": "Conversion jobs",
-        "/admin/access": "QR and viewer analytics",
+        "/admin/access": "QR &amp; viewer",
         "/admin/revenue": "License and revenue",
         "/admin/security": "Operations and security",
         "/admin/storage": "Storage",
