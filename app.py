@@ -7180,14 +7180,8 @@ def register_routes(app: Flask) -> None:
             if admin_page == "jobs"
             else []
         )
-        field_counts = {}
-        daily_publication_trend = []
         daily_viewer_trend = []
-        if admin_page in {"content", "access"}:
-            if admin_page == "content":
-                for field, count in db.session.query(Paper.field, func.count(Paper.id)).group_by(Paper.field).order_by(func.count(Paper.id).desc()).limit(8).all():
-                    key = field or "Unspecified"
-                    field_counts[key] = field_counts.get(key, 0) + count
+        if admin_page == "access":
             trend_start = (now - timedelta(days=29)).replace(hour=0, minute=0, second=0, microsecond=0)
             trend_days = [trend_start + timedelta(days=offset) for offset in range(30)]
 
@@ -7204,10 +7198,7 @@ def register_routes(app: Flask) -> None:
                 }
                 return [{"label": day_label(day), "count": counts.get(day.strftime("%Y-%m-%d"), 0)} for day in trend_days]
 
-            if admin_page == "content":
-                daily_publication_trend = per_day(Paper.created_at)
-            else:
-                daily_viewer_trend = per_day(AuditLog.timestamp, AuditLog.event_type == "public_model_viewed")
+            daily_viewer_trend = per_day(AuditLog.timestamp, AuditLog.event_type == "public_model_viewed")
         monthly_revenue = []
         monthly_revenue_currency = None
         payment_providers = []
@@ -7518,13 +7509,11 @@ def register_routes(app: Flask) -> None:
             source_format_counts=source_format_counts,
             payment_counts=payment_counts,
             job_counts=job_counts,
-            field_counts=field_counts,
             failed_format_counts=failed_format_counts,
             failed_jobs=failed_jobs,
             largest_models=largest_models,
             expiring_models=expiring_models,
             near_limit_models=near_limit_models,
-            daily_publication_trend=daily_publication_trend,
             daily_viewer_trend=daily_viewer_trend,
             monthly_revenue=monthly_revenue,
             monthly_revenue_currency=monthly_revenue_currency,
@@ -8456,16 +8445,20 @@ def register_routes(app: Flask) -> None:
         if visibility not in PROJECT_VISIBILITIES:
             flash("Invalid visibility value.", "danger")
             return redirect(admin_return_url("content"))
+        new_status = (request.form.get("status") or "active").strip().lower()
+        if new_status not in {"active", "deleted"}:
+            flash("Invalid status value.", "danger")
+            return redirect(admin_return_url("content"))
+        if previous["status"] == "deleted" and new_status == "deleted":
+            # A deleted project is always private; there is nothing to change.
+            flash("Project is deleted and stays private. Restore it to change its visibility.", "info")
+            return redirect(admin_return_url("content"))
         paper.visibility = visibility
         paper.is_public = visibility == "public"
         if visibility != previous["visibility"]:
             invalidate_paper_qr(paper)
         if visibility == "unlisted" and not paper.share_token:
             paper.share_token = new_project_share_token()
-        new_status = (request.form.get("status") or "active").strip().lower()
-        if new_status not in {"active", "deleted"}:
-            flash("Invalid status value.", "danger")
-            return redirect(admin_return_url("content"))
         paper.status = new_status
         if paper.status == "deleted":
             paper.is_public = False

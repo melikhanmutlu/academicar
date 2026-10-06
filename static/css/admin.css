@@ -678,6 +678,14 @@ body:has(.admin-layout) .flash-stack {
 /* == end page:users == */
 
 /* == page:content == */
+.content-chip-sm { display: none; }
+@media (max-width: 640px) {
+  .content-chip-sm { display: inline-block; margin-top: 6px; }
+  .content-table .content-url { display: none; }
+  .content-table .admin-actions form { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+  .content-table .admin-actions, .content-table .admin-actions .admin-btn, .content-table .admin-editor { min-width: 0; max-width: 100%; }
+  .content-table .admin-actions .compact-select { max-width: 100%; }
+}
 /* == end page:content == */
 
 /* == page:models == */
