@@ -7016,8 +7016,6 @@ def register_routes(app: Flask) -> None:
             totals["qr_links"] = QRLink.query.count()
             totals["payments"] = Payment.query.count()
             totals["paid_revenue"] = format_money_by_currency(paid_revenue_by_currency())
-            stats["revenue_30_days"] = format_money_by_currency(paid_revenue_by_currency(Payment.paid_at >= last_30_days))
-            stats["qr_resolved_30d"] = QRLink.query.filter(QRLink.last_resolved_at >= last_30_days).count()
         elif page_is("revenue"):
             totals["paid_revenue"] = format_money_by_currency(paid_revenue_by_currency())
 
@@ -7053,16 +7051,13 @@ def register_routes(app: Flask) -> None:
                             or_(Model3D.access_expires_at.is_(None), Model3D.access_expires_at >= now),
                         )
                     ),
-                    flag_sum(Model3D.created_at >= last_30_days),
                     func.coalesce(func.sum(Model3D.file_size), 0),
                 )
                 .filter(live_model)
                 .one()
             )
             totals["models"], totals["active_models"] = int(model_row[0]), int(model_row[1])
-            stats["new_models_30d"] = int(model_row[2])
-            stats["total_model_storage"] = int(model_row[3] or 0)
-            stats["storage_average"] = int(stats["total_model_storage"] / totals["models"]) if totals["models"] else 0
+            stats["total_model_storage"] = int(model_row[2] or 0)
 
         def grouped_counts(column, id_column, default_key, *filters):
             counts = {}
@@ -7078,16 +7073,14 @@ def register_routes(app: Flask) -> None:
         )
         license_counts = (
             grouped_counts(Model3D.license_type, Model3D.id, "free", live_model)
-            if page_is("overview", "revenue")
+            if page_is("revenue")
             else {}
         )
-        source_format_counts = (
-            grouped_counts(Model3D.source_format, Model3D.id, "unknown", live_model) if page_is("overview") else {}
-        )
+        source_format_counts = {}
         payment_counts = (
-            grouped_counts(Payment.status, Payment.id, "pending") if page_is("overview", "revenue") else {}
+            grouped_counts(Payment.status, Payment.id, "pending") if page_is("revenue") else {}
         )
-        job_counts = grouped_counts(ConversionJob.status, ConversionJob.id, "pending") if page_is("overview") else {}
+        job_counts = {}
 
         if page_is("access"):
             stats["qr_resolved_30d"] = QRLink.query.filter(QRLink.last_resolved_at >= last_30_days).count()
@@ -7111,7 +7104,7 @@ def register_routes(app: Flask) -> None:
                 )
                 .scalar()
             ) or 0
-        if page_is("overview", "security"):
+        if page_is("security"):
             stats["failed_login_24h"] = AuditLog.query.filter(
                 AuditLog.event_type == "user_login_failed",
                 AuditLog.timestamp >= now - timedelta(hours=24),
@@ -7119,6 +7112,7 @@ def register_routes(app: Flask) -> None:
 
         near_limit_models = (
             Model3D.query.filter(
+                live_model,
                 Model3D.file_size.isnot(None),
                 Model3D.storage_limit_bytes.isnot(None),
                 Model3D.file_size >= Model3D.storage_limit_bytes * 0.8,
@@ -7130,12 +7124,16 @@ def register_routes(app: Flask) -> None:
             else []
         )
         largest_models = (
-            Model3D.query.filter(Model3D.file_size.isnot(None)).order_by(Model3D.file_size.desc()).limit(5).all()
+            Model3D.query.filter(live_model, Model3D.file_size.isnot(None))
+            .order_by(Model3D.file_size.desc())
+            .limit(5)
+            .all()
             if page_is("overview")
             else []
         )
         expiring_models = (
             Model3D.query.filter(
+                live_model,
                 Model3D.access_expires_at.isnot(None),
                 Model3D.access_expires_at >= now,
                 Model3D.access_expires_at <= now + timedelta(days=30),
@@ -7394,22 +7392,22 @@ def register_routes(app: Flask) -> None:
                 })
             if totals["failed_jobs"]:
                 critical_alerts.append({
-                    "text": f"{totals['failed_jobs']} failed conversion job(s)",
+                    "text": f"{totals['failed_jobs']} failed conversion {'job' if totals['failed_jobs'] == 1 else 'jobs'}",
                     "url": url_for("admin_dashboard", admin_page="jobs", job_status="failed"),
                 })
             if near_limit_models:
                 critical_alerts.append({
-                    "text": f"{len(near_limit_models)} model(s) near storage limit",
+                    "text": f"{len(near_limit_models)} {'model' if len(near_limit_models) == 1 else 'models'} near storage limit",
                     "url": url_for("admin_dashboard", admin_page="models"),
                 })
             if sum(orphan_counts.values()):
                 critical_alerts.append({
-                    "text": f"{sum(orphan_counts.values())} orphan file(s) detected",
+                    "text": f"{sum(orphan_counts.values())} orphan {'file' if sum(orphan_counts.values()) == 1 else 'files'} detected",
                     "url": url_for("admin_dashboard", admin_page="storage"),
                 })
             if mirror_failed_count:
                 critical_alerts.append({
-                    "text": f"{mirror_failed_count} model(s) failed to mirror to R2",
+                    "text": f"{mirror_failed_count} {'model' if mirror_failed_count == 1 else 'models'} failed to mirror to R2",
                     "url": url_for("admin_dashboard", admin_page="storage"),
                 })
         # Daily archives are made by the worker (run_scheduled_backups).
