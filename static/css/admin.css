@@ -705,6 +705,16 @@ body:has(.admin-layout) .flash-stack {
 /* == end page:storage == */
 
 /* == page:system == */
+.admin-insight-card.is-alert {
+  border-color: var(--color-sunset-orange);
+  background: var(--color-orange-wash);
+}
+.system-pre {
+  margin: 0;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
 /* == end page:system == */
 
 /* == page:logs == */
