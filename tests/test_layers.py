@@ -416,3 +416,17 @@ def test_verified_layer_info_keeps_instance_count(tmp_path):
     info = verified_layer_info(str(glb), layers)
 
     assert [l.get("count") for l in info["layers"]] == [None, 3]
+
+
+def test_layers_lost_in_compression_leave_a_note_instead_of_vanishing(tmp_path):
+    from app import verified_layer_info
+
+    parts = [("Housing", "gh", _mat("h"), 0), ("Cap", "gc", _mat("c"), 2)]
+    glb = _make_glb(tmp_path / "a.glb", parts)
+    layers = normalize_layers(str(glb))
+    layers[1] = dict(layers[1], materials=["merged away by an optimizer"])
+
+    info = verified_layer_info(str(glb), layers)
+
+    assert info["layers"] == []
+    assert info["notes"] == ["The parts of this model could not be kept as separate layers, so it is shown as one piece."]

@@ -1113,3 +1113,29 @@ def test_mr_auto_threshold_is_unchanged():
     masks, notes = _layer_masks(vol, ["auto"], modality="MR")
     assert masks["Auto threshold"].sum() == int(sphere((40, 40, 20), (20, 20, 10), 8).sum())
     assert notes == []
+
+
+def test_auto_threshold_is_dropped_next_to_skin_on_ct():
+    from converters.medical.dicom_series import _resolve_presets
+
+    keys, notes = _resolve_presets(["bone", "skin", "auto"], "CT")
+    assert keys == ["bone", "skin"]
+    assert any("only Skin was kept" in note for note in notes)
+    assert _resolve_presets(["skin", "auto"], "MR")[0] == ["auto"]  # MR: every preset falls back to auto
+    assert _resolve_presets(["auto"], "CT")[0] == ["auto"]  # alone it still runs
+
+
+def test_contrast_scatter_in_a_scan_without_contrast_is_not_a_layer():
+    vol = _head_ct(with_holder=False)
+    vol[30:33, 30:32, 20] = 200  # a few bright voxels in the brain: noise, not vessels
+    masks, notes = _layer_masks(vol, ["bone", "contrast"])
+    assert masks["Bone"].any() and not masks["Contrast vessels"].any()
+    assert any("No contrast-filled vessels" in note for note in notes)
+
+
+def test_real_contrast_vessels_are_kept():
+    vol = _head_ct(with_holder=False)
+    vol[28:36, 28:36, 8:32] = 200  # a vessel ~1.5 mL in a ~14 mL head, between the contrast and bone thresholds
+    masks, notes = _layer_masks(vol, ["bone", "contrast"])
+    assert masks["Contrast vessels"].sum() > 1000
+    assert not any("No contrast-filled vessels" in note for note in notes)

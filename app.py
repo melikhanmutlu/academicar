@@ -3334,7 +3334,8 @@ def verified_layer_info(
         present = set()
     if any(name not in present for layer in layers for name in layer.get("materials", [])):
         logger.warning("Layer materials did not survive optimization for %s; hiding the layer panel", glb_path)
-        return {"layers": [], "notes": notes} if notes else None
+        notes.append("The parts of this model could not be kept as separate layers, so it is shown as one piece.")
+        return {"layers": [], "notes": notes}
     keep = ("name", "materials", "color", "volume_ml", "count")
     info = {"layers": [{key: layer[key] for key in keep if layer.get(key) is not None} for layer in layers], "notes": notes}
     metrics = restrict_metrics(metrics, (layer.get("name") for layer in layers))

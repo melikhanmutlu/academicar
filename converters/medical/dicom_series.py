@@ -240,6 +240,10 @@ def _resolve_presets(presets, modality):
         if key not in keys:
             keys.append(key)
     notes = []
+    if modality == "CT" and "auto" in keys and "skin" in keys:
+        # On CT the two-class Otsu split is air vs body: the same surface as Skin.
+        keys.remove("auto")
+        notes.append("The automatic threshold finds the same body surface as Skin on CT scans, so only Skin was kept.")
     if fallback:
         shown = modality or "unknown"
         plural = "s" if len(fallback) > 1 else ""
@@ -254,6 +258,10 @@ def _resolve_presets(presets, modality):
 # scanner writes outside its circular field of view (-2000, -3024, ...).
 _CT_MIN_HU = -1024
 # A dense structure that is not inside the body (scanner table, head holder).
+# Contrast-filled vessels are at least ~0.25% of the body they run through
+# (head CTA ~1%, hand CTA ~0.5%); less is scatter in a scan without contrast.
+_MIN_CONTRAST_SHARE = 0.0025
+_NO_CONTRAST_NOTE = "No contrast-filled vessels were found in this scan, so that layer was left out."
 _OUTSIDE_BODY_NOTE = "Dense parts outside the body (such as the scanner table or a head holder) were left out."
 
 
@@ -290,6 +298,11 @@ def _threshold_layers(volume: np.ndarray, keys, modality=None, notes=None) -> li
             if key == "contrast" and "bone" in keys:
                 # Bone (plus one voxel of partial-volume rim) belongs to the Bone layer only.
                 mask &= ~ndimage.binary_dilation(mask_for("bone"))
+            if ct and key == "contrast" and body().any() and int(mask.sum()) < _MIN_CONTRAST_SHARE * int(body().sum()):
+                # A few bright voxels in a scan without contrast agent are noise, not vessels.
+                mask = np.zeros_like(mask)
+                if notes is not None:
+                    notes.append(_NO_CONTRAST_NOTE)
             total = int(mask.sum())
             # Only a patient scan has a soft-tissue body several times larger than its
             # dense structures; dry specimens scanned side by side (bone ~ body) keep
