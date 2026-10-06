@@ -651,6 +651,148 @@ def admin_like_pattern(text: str) -> str:
     return f"%{escaped}%"
 
 
+_AUDIT_EMAIL_RE = re.compile(r"[\w.+'-]+@[\w-]+(?:\.[\w-]+)+")
+_AUDIT_TEXT_KEYS = {"message", "body", "text", "notes", "comment"}
+# High-volume view/redirect events hidden from the default "Actions" view.
+_AUDIT_NOISE_EVENTS = ("public_model_viewed", "qr_resolved", "admin_backup_downloaded")
+
+
+def mask_email(value: str | None) -> str:
+    """``jane@example.com`` -> ``j***@example.com`` (display/export only)."""
+    value = (value or "").strip()
+    if "@" not in value:
+        return value
+    local, _, domain = value.rpartition("@")
+    return f"{local[:1]}***@{domain}"
+
+
+def mask_ip(value: str | None) -> str:
+    """Truncate an IP to its /24 (IPv4) or /48 (IPv6) network for display."""
+    import ipaddress
+
+    value = (value or "").strip()
+    if not value:
+        return ""
+    try:
+        addr = ipaddress.ip_address(value)
+    except ValueError:
+        return "***"
+    prefix = 24 if addr.version == 4 else 48
+    return str(ipaddress.ip_network(f"{addr}/{prefix}", strict=False))
+
+
+def _mask_audit_value(key: str, value, event_type: str):
+    if isinstance(value, dict):
+        return {k: _mask_audit_value(str(k), v, event_type) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_mask_audit_value(key, v, event_type) for v in value]
+    if not isinstance(value, str):
+        return value
+    if key in _AUDIT_TEXT_KEYS:
+        return f"[{len(value)} chars]"
+    if event_type == "user_login_failed" and key == "email":
+        # The "email" typed at login may really be a password: keep at most a
+        # plausible domain.
+        domain = value.rpartition("@")[2] if "@" in value else ""
+        return f"***@{domain}" if "." in domain and " " not in domain else "***"
+    return _AUDIT_EMAIL_RE.sub(lambda m: mask_email(m.group(0)), value)
+
+
+def mask_audit_details(event_type: str, details):
+    """Copy of an audit row's ``details`` with emails, free-text bodies and
+    login-attempt identifiers masked. Shared by the admin page and its CSV."""
+    if not details:
+        return details
+    return _mask_audit_value("", details, event_type or "")
+
+
+def audit_details_text(event_type: str, details) -> str:
+    masked = mask_audit_details(event_type, details)
+    if not masked:
+        return ""
+    if isinstance(masked, dict):
+        return " · ".join(f"{k}: {v}" for k, v in masked.items())
+    return str(masked)
+
+
+def _audit_date_arg(name: str):
+    try:
+        return datetime.strptime((request.args.get(name) or "").strip(), "%Y-%m-%d")
+    except ValueError:
+        return None
+
+
+def audit_filtered_query():
+    """AuditLog query for the current request's audit_* filters (page + CSV).
+
+    ``audit_event``: ``actions`` (default, hides high-volume view noise),
+    ``all``, or one exact event type. Dates are inclusive, UTC."""
+    event = (request.args.get("audit_event") or "actions").strip().lower()
+    text = (request.args.get("audit_q") or "").strip()
+    user = (request.args.get("audit_user") or "").strip()
+    query = AuditLog.query
+    if event == "actions":
+        query = query.filter(
+            AuditLog.event_type.notin_(_AUDIT_NOISE_EVENTS),
+            AuditLog.event_type.notlike("%\\_viewed", escape="\\"),
+        )
+    elif event != "all":
+        query = query.filter(AuditLog.event_type == event)
+    if user.isdigit():
+        query = query.filter(AuditLog.user_id == int(user))
+    start, end = _audit_date_arg("audit_from"), _audit_date_arg("audit_to")
+    if start:
+        query = query.filter(AuditLog.timestamp >= start)
+    if end:
+        query = query.filter(AuditLog.timestamp < end + timedelta(days=1))
+    if text:
+        pattern = admin_like_pattern(text)
+        query = query.filter(
+            or_(
+                func.lower(AuditLog.event_type).like(pattern, escape="\\"),
+                func.lower(AuditLog.resource_id).like(pattern, escape="\\"),
+                func.lower(AuditLog.ip_address).like(pattern, escape="\\"),
+            )
+        )
+    return query
+
+
+def audit_event_type_options() -> list[str]:
+    """Distinct event types for the filter, cached per app for 5 minutes (the
+    DISTINCT scan is expensive on a large audit table)."""
+    cache = current_app.extensions.setdefault("audit_event_types_cache", {"at": 0.0, "types": []})
+    if not cache["types"] or time.monotonic() - cache["at"] > 300:
+        cache["types"] = [
+            row[0] for row in db.session.query(AuditLog.event_type).distinct().order_by(AuditLog.event_type).all()
+        ]
+        cache["at"] = time.monotonic()
+    return cache["types"]
+
+
+def audit_row_views(events) -> list[dict]:
+    """Display data per audit row: masked user/IP/details, one user query."""
+    ids = {e.user_id for e in events if e.user_id}
+    emails = {u.id: u.email for u in User.query.filter(User.id.in_(ids)).all()} if ids else {}
+    rows = []
+    for e in events:
+        if e.user_id and e.user_id in emails:
+            user_label, user_id = mask_email(emails[e.user_id]), e.user_id
+        elif e.user_id:
+            user_label, user_id = f"Deleted user #{e.user_id}", None
+        elif e.event_type in ("account_deleted", "admin_user_deleted"):
+            user_label, user_id = "Deleted user", None
+        else:
+            user_label, user_id = "Visitor / system", None
+        rows.append({
+            "event": e,
+            "user_label": user_label,
+            "user_id": user_id,
+            "ip": mask_ip(e.ip_address),
+            "details": audit_details_text(e.event_type, e.details),
+        })
+    return rows
+
+
 def admin_nav_counts() -> dict[str, int]:
     """Failed/pending conversion job counts for the admin sidebar badge. One
     small query, memoised per request, shared by every admin render (list and
@@ -6798,7 +6940,7 @@ def register_routes(app: Flask) -> None:
         user_role_filter = (request.args.get("user_role") or "all").strip().lower()
         model_status_filter = (request.args.get("model_status") or "all").strip().lower()
         job_status_filter = (request.args.get("job_status") or "all").strip().lower()
-        audit_event_filter = (request.args.get("audit_event") or "all").strip().lower()
+        audit_event_filter = (request.args.get("audit_event") or "actions").strip().lower()
         audit_query_text = (request.args.get("audit_q") or "").strip()
         audit_user_filter = (request.args.get("audit_user") or "").strip()
         paper_query_text = (request.args.get("paper_q") or "").strip()
@@ -6898,20 +7040,7 @@ def register_routes(app: Flask) -> None:
             selectinload(ModelAnnotation.model).selectinload(Model3D.paper)
         )
 
-        audit_query = AuditLog.query
-        if audit_event_filter != "all":
-            audit_query = audit_query.filter(AuditLog.event_type == audit_event_filter)
-        if audit_user_filter.isdigit():
-            audit_query = audit_query.filter(AuditLog.user_id == int(audit_user_filter))
-        if audit_query_text:
-            audit_pattern = admin_like_pattern(audit_query_text)
-            audit_query = audit_query.filter(
-                or_(
-                    func.lower(AuditLog.event_type).like(audit_pattern, escape="\\"),
-                    func.lower(AuditLog.resource_id).like(audit_pattern, escape="\\"),
-                    func.lower(AuditLog.ip_address).like(audit_pattern, escape="\\"),
-                )
-            )
+        audit_query = audit_filtered_query() if admin_page == "logs" else None
 
         # Paginated lists (50 rows/page). Each page passes both the items (as the
         # existing template variable) and the Pagination object for the controls.
@@ -7465,11 +7594,9 @@ def register_routes(app: Flask) -> None:
                     row[0]: {"models": int(row[1] or 0), "bytes": int(row[2] or 0) + scene_ar_bytes.get(row[0], 0)}
                     for row in usage_rows
                 }
-        audit_event_types = (
-            [row[0] for row in db.session.query(AuditLog.event_type).distinct().order_by(AuditLog.event_type).all()]
-            if admin_page == "logs"
-            else []
-        )
+        audit_event_types = audit_event_type_options() if admin_page == "logs" else []
+        audit_rows = audit_row_views(audit_logs) if admin_page == "logs" else []
+        audit_export_args = {k: v for k, v in request.args.items() if k != "page"}
         system_health = _admin_system_health() if admin_page == "system" else {}
         ar_doctor_job = (
             ConversionJob.query.filter_by(job_type="ar_doctor").order_by(ConversionJob.created_at.desc()).first()
@@ -7495,6 +7622,8 @@ def register_routes(app: Flask) -> None:
             qr_links=qr_links,
             audit_logs=audit_logs,
             audit_event_types=audit_event_types,
+            audit_rows=audit_rows,
+            audit_export_args=audit_export_args,
             jobs=jobs,
             annotations=annotations,
             annotations_pagination=annotations_pagination,
@@ -7561,6 +7690,8 @@ def register_routes(app: Flask) -> None:
                 "audit_event": audit_event_filter,
                 "audit_q": audit_query_text,
                 "audit_user": audit_user_filter,
+                "audit_from": (request.args.get("audit_from") or "").strip(),
+                "audit_to": (request.args.get("audit_to") or "").strip(),
                 "paper_q": paper_query_text,
                 "paper_visibility": paper_visibility_filter,
                 "paper_status": paper_status_filter,
@@ -7703,30 +7834,22 @@ def register_routes(app: Flask) -> None:
     @login_required
     def admin_logs_export():
         require_admin()
-        audit_event_filter = (request.args.get("audit_event") or "all").strip().lower()
-        audit_query_text = (request.args.get("audit_q") or "").strip()
-        audit_user_filter = (request.args.get("audit_user") or "").strip()
-        query = AuditLog.query
-        if audit_event_filter != "all":
-            query = query.filter(AuditLog.event_type == audit_event_filter)
-        if audit_user_filter.isdigit():
-            query = query.filter(AuditLog.user_id == int(audit_user_filter))
-        if audit_query_text:
-            pattern = admin_like_pattern(audit_query_text)
-            query = query.filter(
-                or_(func.lower(AuditLog.event_type).like(pattern, escape="\\"), func.lower(AuditLog.resource_id).like(pattern, escape="\\"), func.lower(AuditLog.ip_address).like(pattern, escape="\\"))
-            )
+        fetched = (
+            audit_filtered_query().order_by(AuditLog.timestamp.desc()).limit(ADMIN_CSV_EXPORT_ROW_LIMIT + 1).all()
+        )
+        if len(fetched) > ADMIN_CSV_EXPORT_ROW_LIMIT:
+            fetched = fetched[:ADMIN_CSV_EXPORT_ROW_LIMIT]
+            flash(f"Export truncated to the first {ADMIN_CSV_EXPORT_ROW_LIMIT} matching rows.", "warning")
+        # Same masking as the page; the stored rows are unchanged.
         rows = [
             {
                 "id": a.id, "event_type": a.event_type, "user_id": a.user_id, "resource_id": a.resource_id,
-                "ip_address": a.ip_address, "timestamp": a.timestamp,
-                # e.g. a deleted account's email lives only here (user_id is nulled).
-                "details": json.dumps(a.details, default=str, sort_keys=True) if a.details else "",
+                "ip_address": mask_ip(a.ip_address), "timestamp": a.timestamp,
+                "details": json.dumps(mask_audit_details(a.event_type, a.details), default=str, sort_keys=True)
+                if a.details else "",
             }
-            for a in query.order_by(AuditLog.timestamp.desc()).limit(ADMIN_CSV_EXPORT_ROW_LIMIT).all()
+            for a in fetched
         ]
-        if len(rows) >= ADMIN_CSV_EXPORT_ROW_LIMIT:
-            flash(f"Export truncated to the first {ADMIN_CSV_EXPORT_ROW_LIMIT} matching rows.", "warning")
         return _csv_response(
             rows, ["id", "event_type", "user_id", "resource_id", "ip_address", "timestamp", "details"], "audit_log.csv"
         )

@@ -708,6 +708,16 @@ body:has(.admin-layout) .flash-stack {
 /* == end page:system == */
 
 /* == page:logs == */
+.logs-user-input { width: 110px; }
+.logs-date-input { width: 150px; }
+.admin-table small.logs-time-sm { display: none; }
+.logs-details { word-break: break-word; }
+.logs-details summary { cursor: pointer; }
+.logs-details details[open] summary { display: none; }
+@media (max-width: 640px) {
+  .admin-table small.logs-time-sm { display: block; }
+  .logs-user { word-break: break-all; }
+}
 /* == end page:logs == */
 
 /* == page:backups == */
