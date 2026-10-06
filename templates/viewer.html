@@ -183,6 +183,26 @@
       padding-top: 0.85rem;
     }
     .viewer-bg-tools [data-bg-options] { flex-wrap: wrap; }
+    .viewer-light-tools [data-light-presets] { flex-wrap: wrap; justify-content: flex-end; }
+    .viewer-media-tools { border-top: 1px solid rgba(255,255,255,0.10); padding-top: 0.85rem; }
+    .viewer-media-count { font-weight: 500; letter-spacing: 0; }
+    .viewer-media-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 0.6rem; }
+    .viewer-media-grid:empty { display: none; }
+    .viewer-media-item { position: relative; aspect-ratio: 1 / 1; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.06); }
+    .viewer-media-item img, .viewer-media-item video { display: block; width: 100%; height: 100%; object-fit: cover; }
+    .viewer-media-item .viewer-media-badge { position: absolute; left: 4px; bottom: 4px; padding: 1px 5px; border-radius: 4px; font-size: 9px; font-weight: 700; color: #fff; background: rgba(0,0,0,0.6); }
+    .viewer-media-item .viewer-media-actions { position: absolute; inset: auto 0 0 auto; display: none; gap: 3px; padding: 3px; }
+    .viewer-media-item:hover .viewer-media-actions, .viewer-media-item:focus-within .viewer-media-actions { display: flex; }
+    .viewer-media-actions a, .viewer-media-actions button { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; font-size: 12px; color: #fff; background: rgba(0,0,0,0.65); border: 0; }
+    .viewer-media-status { margin-top: 0.5rem; font-size: 0.72rem; color: rgba(255,255,255,0.55); }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-media-tools { border-color: rgba(15,23,42,0.10); }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-media-status { color: #6b6b6b; }
+    .viewer-light-sliders { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem; margin-top: 0.6rem; }
+    .viewer-light-sliders label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.7rem; color: rgba(255,255,255,0.6); }
+    .viewer-light-sliders input { width: 100%; accent-color: #ff682c; }
+    .viewer-light-save { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.6rem; font-size: 0.72rem; color: rgba(255,255,255,0.6); }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-light-sliders label,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-light-save { color: #6b6b6b; }
     .viewer-bg-tools button[aria-pressed="true"] {
       background: #ffffff;
       color: #111111;
@@ -288,6 +308,7 @@
     /* Pill buttons + screenshot cards. */
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-tool-heading button,
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-shot-actions button,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-light-save button,
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-shot-card,
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-shot-card a {
       background: rgba(15, 23, 42, 0.05);
@@ -499,23 +520,20 @@
     @media (max-width: 640px) {
       .layers-panel { top: auto; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: auto; max-height: 50%; }
     }
-    /* Layers panel "Distances": shortest distance between two nearby layers. */
-    .layers-dist { flex: none; border-top: 1px solid rgba(255, 255, 255, 0.1); padding: 4px 6px; }
-    .layers-dist-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 8px; font-size: 13px; font-weight: 600; color: inherit; background: none; border: 0; cursor: pointer; }
-    .layers-dist-toggle svg { transition: transform 0.15s; }
-    .layers-dist-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
-    .layers-dist-body { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: center; gap: 8px; padding: 0 8px 10px; font-size: 13px; }
-    .layers-dist-body[hidden] { display: none; }
-    .layers-dist-body select { min-width: 0; width: 100%; padding: 6px 8px; font-size: 13px; border-radius: 8px; color: #fff; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.18); }
-    .layers-dist-body select option { color: #202020; background: #fff; }
-    .layers-dist-body select:disabled { opacity: 0.55; }
-    .layers-dist-result { grid-column: 1 / -1; margin: 0; font-size: 13px; font-weight: 600; color: #ff9a6c; }
-    .layers-dist-result:empty { display: none; }
+    /* Layers panel "Finish": metallic / roughness presets for one layer or all. */
+    .layers-finish { flex: none; border-top: 1px solid rgba(255, 255, 255, 0.1); padding: 10px 14px; }
+    .layers-finish-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 600; }
+    .layers-finish-head select { min-width: 0; max-width: 60%; padding: 4px 8px; font-size: 12px; border-radius: 8px; color: #fff; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.18); }
+    .layers-finish-head select option { color: #202020; background: #fff; }
+    .layers-finish-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .layers-finish-presets button { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; color: #fff; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.14); }
+    .layers-finish-presets button:hover { background: rgba(255, 255, 255, 0.18); }
+    .layers-finish-presets button[aria-pressed="true"] { background: #ff682c; border-color: #ff682c; }
     .layers-note + .layers-note { border-top: 0; padding-top: 0; }
-    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layers-dist { border-color: #e8e8e8; }
-    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layers-dist-body select { color: #202020; background: #f5f5f5; border-color: #d4d4d4; }
-    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layers-dist-result { color: #c2410c; }
-    .tour-mode .layers-dist-line { display: none; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layers-finish { border-color: #e8e8e8; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layers-finish-head select,
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layers-finish-presets button { color: #202020; background: #f5f5f5; border-color: #d4d4d4; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layers-finish-presets button[aria-pressed="true"] { color: #fff; background: #ff682c; border-color: #ff682c; }
     /* Scenes panel: saved views of the model (reuses the layers panel shell). */
     #tourBtn[hidden] { display: none; }
     .tour-mode .scenes-panel { display: none !important; }
@@ -658,6 +676,7 @@
     }
     .viewer-tool-heading button,
     .viewer-shot-actions button,
+    .viewer-light-save button,
     .viewer-shot-card,
     .viewer-shot-card a {
       border: 1px solid rgba(255,255,255,0.12);
@@ -1287,11 +1306,12 @@
       {% if has_usdz %}ios-src="{{ url_for('serve_glb', unique_id=model.id, filename='model.usdz') }}?v={{ model_asset_token(model) }}"{% endif %}
       {% if model.poster_path %}poster="{{ url_for('serve_poster', unique_id=model.id) }}"{% endif %}
       alt="3D model: {{ model.display_name or model.original_filename }}"
-      shadow-intensity="0"
-      shadow-softness="1.0"
-      exposure="1.0"
+      {% set lighting = model_lighting(model) %}
+      shadow-intensity="{{ lighting.shadow_intensity }}"
+      shadow-softness="{{ lighting.shadow_softness }}"
+      exposure="{{ lighting.exposure }}"
       tone-mapping="neutral"
-      environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
+      environment-image="{{ url_for('static', filename='environments/studio.webp') if lighting.environment == 'studio' else lighting.environment }}"
       {% if 'ar' in viewer_features %}ar
       ar-modes="scene-viewer quick-look"
       ar-scale="auto"
@@ -1331,15 +1351,9 @@
       <div class="measure-point" slot="hotspot-measure-a" data-position="0m 0m 0m" hidden></div>
       <div class="measure-point" slot="hotspot-measure-b" data-position="0m 0m 0m" hidden></div>
       <div class="measure-label" slot="hotspot-measure-mid" data-position="0m 0m 0m" id="measureLabel" hidden></div>
-      {% if viewer_metrics and viewer_metrics.pairs %}
-      <div class="measure-point" slot="hotspot-dist-a" data-position="0m 0m 0m" hidden></div>
-      <div class="measure-point" slot="hotspot-dist-b" data-position="0m 0m 0m" hidden></div>
-      <div class="measure-label" slot="hotspot-dist-mid" data-position="0m 0m 0m" id="distLabel" hidden></div>
-      {% endif %}
     </model-viewer>
     <svg class="measure-line" id="measureLine" aria-hidden="true" hidden><line x1="0" y1="0" x2="0" y2="0"></line></svg>
     {% if 'section_plane' in viewer_features %}<svg class="section-overlay" id="sectionOverlay" aria-hidden="true" hidden><g data-section-axes-lines></g><polygon data-section-frame points=""></polygon></svg>{% endif %}
-    {% if viewer_metrics and viewer_metrics.pairs %}<svg class="measure-line layers-dist-line" id="distLine" aria-hidden="true" hidden><line x1="0" y1="0" x2="0" y2="0"></line></svg>{% endif %}
     <div id="measureHint" class="annotate-hint" role="status" hidden>
       <span class="annotate-hint-dot" aria-hidden="true"></span>
       <span class="annotate-hint-text" id="measureHintText">Click or tap two points on the model</span>
@@ -1579,11 +1593,14 @@
             <p class="viewer-video-status" data-video-status role="status" aria-live="polite">Record a WebM/MP4 clip of the interactive canvas.</p>
           </div>{% endif %}
 
-          {# A whole-model colour would flatten the per-layer colours: layered models set colours per layer. #}
-          {% if 'medical_colors' in viewer_features and viewer_layers|length >= 2 %}<div class="viewer-color-tools">
-            <div class="viewer-tool-heading"><span>Color</span></div>
-            <p class="viewer-color-hint">Colours are set per layer: open Layers and click a layer's colour.</p>
-          </div>{% elif 'medical_colors' in viewer_features %}<div class="viewer-color-tools" data-color-tools>
+          {% if is_owner and not is_embed and not (demo_mode is defined and demo_mode) %}<div class="viewer-media-tools" data-media-tools data-url="{{ url_for('model_media.upload_media', model_id=model.id) }}">
+            <div class="viewer-tool-heading"><span>Saved media <span class="viewer-media-count" data-media-count></span></span></div>
+            <div class="viewer-media-grid" data-media-grid></div>
+            <p class="viewer-media-status" data-media-status role="status" aria-live="polite">Screenshots, figures and recordings you take are kept here. Only project editors see them.</p>
+          </div>{% endif %}
+
+          {# Layered models: a colour here paints every layer (saved through the layer editor); single layers are coloured in Layers. #}
+          {% if 'medical_colors' in viewer_features %}<div class="viewer-color-tools" data-color-tools{% if viewer_layers|length >= 2 %} data-color-layered{% endif %}>
             <div class="viewer-tool-heading">
               <span>Color</span>
               <div class="flex items-center gap-2">
@@ -1600,6 +1617,7 @@
                 <input type="color" value="#cccccc" data-color-picker>
               </label>
             </div>
+            {% if viewer_layers|length >= 2 %}<p class="viewer-color-hint">Colours every layer. To colour one layer, open Layers and click its colour.</p>{% endif %}
             {% if is_owner %}
             <p class="viewer-color-hint" data-color-hint hidden>Previewing - press "Apply to model" to save this color to the model (and its AR file).</p>
             <p class="viewer-color-hint" data-color-status role="status" aria-live="polite" hidden></p>
@@ -1617,6 +1635,21 @@
                 <button type="button" data-bg="white" aria-pressed="false">White</button>
               </div>
             </div>
+          </div>
+
+          <div class="viewer-bg-tools viewer-light-tools" data-light-tools data-studio-env="{{ url_for('static', filename='environments/studio.webp') }}"{% if is_owner and not is_embed %} data-save-url="{{ url_for('viewer_lighting.save_lighting', model_id=model.id) }}"{% endif %}>
+            <div class="viewer-tool-heading">
+              <span>Lighting</span>
+              <div class="flex items-center gap-2" data-light-presets>
+                {% for key, preset in lighting_presets.items() %}<button type="button" data-light-preset="{{ key }}" aria-pressed="{{ 'true' if key == lighting.preset else 'false' }}">{{ preset.label }}</button>{% endfor %}
+              </div>
+            </div>
+            <div class="viewer-light-sliders">
+              <label>Brightness <input type="range" min="0.1" max="3" step="0.05" value="{{ lighting.exposure }}" data-light-input="exposure"></label>
+              <label>Shadow <input type="range" min="0" max="3" step="0.05" value="{{ lighting.shadow_intensity }}" data-light-input="shadow_intensity"></label>
+              <label>Softness <input type="range" min="0" max="1" step="0.05" value="{{ lighting.shadow_softness }}" data-light-input="shadow_softness"></label>
+            </div>
+            {% if is_owner and not is_embed %}<div class="viewer-light-save"><button type="button" data-light-save>Save lighting</button><span data-light-status role="status" aria-live="polite"></span></div>{% endif %}
           </div>
 
           <div class="viewer-rotation-tools" data-rotation-tools>
@@ -1899,23 +1932,23 @@
         </div>
       </div>
       <ul class="layers-list" data-layers-list></ul>
-      {% if is_owner and not is_embed %}<div class="layers-save" data-layers-save data-url="{{ url_for('layer_editor.update_layers', model_id=model.id) }}" hidden>
-        <button type="button" data-layers-save-btn>Save colours</button><span data-layers-save-status role="status" aria-live="polite"></span>
-      </div>{% endif %}
-      {% if viewer_metrics and viewer_metrics.pairs %}
-      <div class="layers-dist" data-dist>
-        <button type="button" class="layers-dist-toggle" data-dist-toggle aria-expanded="false" aria-controls="layersDistBody">Distances
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6l5 5 5-5"/></svg></button>
-        <div class="layers-dist-body" id="layersDistBody" hidden>
-          <label for="layersDistA">From</label><select id="layersDistA" data-dist-a></select>
-          <label for="layersDistB">To</label><select id="layersDistB" data-dist-b></select>
-          <p class="layers-dist-result" data-dist-result role="status" aria-live="polite"></p>
+      <div class="layers-finish" data-finish>
+        <div class="layers-finish-head">
+          <span>Finish</span>
+          <select data-finish-target aria-label="Apply the finish to">
+            <option value="all">All layers</option>
+            {% for layer in viewer_layers %}<option value="{{ loop.index0 }}">{{ layer.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="layers-finish-presets" role="group" aria-label="Finish presets">
+          {% for key, label in [('matte', 'Matte'), ('plastic', 'Plastic'), ('ceramic', 'Ceramic'), ('glossy', 'Glossy'), ('metal', 'Metal'), ('gold', 'Gold'), ('chrome', 'Chrome'), ('glass', 'Glass')] %}<button type="button" data-finish-preset="{{ key }}">{{ label }}</button>{% endfor %}
         </div>
       </div>
-      {% endif %}
+      {% if is_owner and not is_embed %}<div class="layers-save" data-layers-save data-url="{{ url_for('layer_editor.update_layers', model_id=model.id) }}" hidden>
+        <button type="button" data-layers-save-btn>Save layers</button><span data-layers-save-status role="status" aria-live="polite">Saves colours, finishes and which layers show — the viewer and AR open this way.</span>
+      </div>{% endif %}
       {% if is_medical_model %}<p class="layers-note">For education and presentation only — not for diagnosis.{% if viewer_layers|selectattr('volume_ml')|list %} Volumes are estimated from the segmentation.{% endif %}</p>{% endif %}
       {% if viewer_metrics and is_medical_model %}<p class="layers-note">Approximate measurements for education, not for diagnosis.</p>{% endif %}
-      {% if viewer_metrics and viewer_metrics.truncated %}<p class="layers-note">Some distances were not measured.</p>{% endif %}
     </section>
     {% endif %}
   </main>
@@ -2146,6 +2179,104 @@
         } catch (e) { return null; }
       },
     };
+
+    // --- Saved media (model_media.py): what the owner captures is uploaded and
+    // listed in the left panel; window.viewerMedia.save() is the one entry point. ---
+    (() => {
+      const mediaTools = document.querySelector('[data-media-tools]');
+      if (!mediaTools) return;
+      const grid = mediaTools.querySelector('[data-media-grid]');
+      const countEl = mediaTools.querySelector('[data-media-count]');
+      const statusEl = mediaTools.querySelector('[data-media-status]');
+      let items = {{ (model_media_list(model) if is_owner and not is_embed and not (demo_mode is defined and demo_mode) else [])|tojson }};
+      const render = () => {
+        grid.textContent = '';
+        countEl.textContent = items.length ? `(${items.length})` : '';
+        items.forEach((item) => {
+          const cell = document.createElement('div');
+          cell.className = 'viewer-media-item';
+          const media = document.createElement(item.kind === 'video' ? 'video' : 'img');
+          // Videos show a frame two seconds in (a layer reveal starts empty).
+          media.src = item.kind === 'video' ? `${item.url}#t=2` : item.url;
+          if (item.kind === 'video') { media.muted = true; media.preload = 'metadata'; media.playsInline = true; }
+          else { media.alt = item.label || 'Saved image'; media.loading = 'lazy'; }
+          const open = document.createElement('a');
+          open.href = item.url;
+          open.target = '_blank';
+          open.rel = 'noopener';
+          open.title = item.label || (item.kind === 'video' ? 'Video' : 'Image');
+          open.appendChild(media);
+          cell.appendChild(open);
+          const badge = document.createElement('span');
+          badge.className = 'viewer-media-badge';
+          badge.textContent = item.kind === 'video' ? 'Video' : (item.source === 'auto' ? 'Auto' : 'Image');
+          cell.appendChild(badge);
+          const actions = document.createElement('div');
+          actions.className = 'viewer-media-actions';
+          const download = document.createElement('a');
+          download.href = item.download_url;
+          download.textContent = '↓';
+          download.setAttribute('aria-label', `Download ${open.title}`);
+          const remove = document.createElement('button');
+          remove.type = 'button';
+          remove.textContent = '×';
+          remove.setAttribute('aria-label', `Delete ${open.title}`);
+          remove.addEventListener('click', async () => {
+            if (!window.confirm('Delete this saved file?')) return;
+            const response = await fetch(`${mediaTools.dataset.url}/${item.id}/delete`, {
+              method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': csrfToken },
+            });
+            if (response.ok) { items = items.filter((other) => other.id !== item.id); render(); }
+          });
+          actions.append(download, remove);
+          cell.appendChild(actions);
+          grid.appendChild(cell);
+        });
+      };
+      // Large PNGs (publication figures) are re-encoded as JPEG to fit the 8 MB limit.
+      const fitImage = async (blob) => {
+        if (blob.size <= 7.5 * 1024 * 1024 || !blob.type.startsWith('image/')) return blob;
+        const bitmap = await createImageBitmap(blob);
+        const canvas = document.createElement('canvas');
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(bitmap, 0, 0);
+        return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+      };
+      const save = async (blob, { label = '', source = 'user' } = {}) => {
+        try {
+          const file = await fitImage(blob);
+          const type = (file.type || '').split(';')[0];
+          const ext = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'video/mp4': 'mp4', 'video/webm': 'webm' }[type] || 'bin';
+          const body = new FormData();
+          body.append('file', new File([file], `media.${ext}`, { type }));
+          body.append('label', label);
+          body.append('source', source);
+          const response = await fetch(mediaTools.dataset.url, {
+            method: 'POST', body, credentials: 'same-origin', headers: { 'X-CSRFToken': csrfToken },
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || !data.ok) throw new Error(data.error || 'The file could not be saved.');
+          items = [data.media, ...items.filter((other) => !(source === 'auto' && other.source === 'auto' && other.kind === data.media.kind && other.label === label))];
+          render();
+          statusEl.textContent = `Saved “${label || data.media.kind}” to this model.`;
+          return data.media;
+        } catch (error) {
+          statusEl.textContent = error.message || 'The file could not be saved.';
+          return null;
+        }
+      };
+      const dataUrlToBlob = async (url) => (await fetch(url)).blob();
+      window.viewerMedia = {
+        save,
+        saveDataUrl: async (url, options) => save(await dataUrlToBlob(url), options),
+        list: () => items.slice(),
+      };
+      render();
+    })();
 
     // --- Saved view state (scenes, figures, comparison). Each viewer section
     // registers a part { get(), apply(value) }; apply receives undefined when
@@ -2378,7 +2509,11 @@
     if (layersBtn && layersPanel && viewer) {
       const layerData = {{ viewer_layers|tojson }};
       const list = layersPanel.querySelector('[data-layers-list]');
-      const state = layerData.map(() => ({ visible: true, opacity: 1 }));
+      // The owner's saved default view (layer_editor: "visible" / "opacity").
+      const state = layerData.map((layer) => ({
+        visible: layer.visible !== false,
+        opacity: typeof layer.opacity === 'number' ? layer.opacity : 1,
+      }));
       let mats = null; // per layer: [{ material, mode, cutoff, factor, applied }]
       const toSrgbHex = (rgba) => '#' + rgba.slice(0, 3).map((c) => {
         const v = c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
@@ -2502,18 +2637,20 @@
         // A hand edit leaves the saved scene: AR then opens the full model, not
         // that scene's variant, which would no longer match what is on screen.
         const leaveScene = () => { if (window.viewerScenes && window.viewerScenes.activeId() != null) window.viewerScenes.markActive(null); };
-        row.querySelector('.layer-eye').addEventListener('click', () => { leaveScene(); state[i].visible = !state[i].visible; apply(i); });
+        row.querySelector('.layer-eye').addEventListener('click', () => { leaveScene(); state[i].visible = !state[i].visible; apply(i); markDirty(); });
         row.querySelector('.layer-name').addEventListener('click', () => {
           leaveScene();
           const solo = state.every((s, j) => s.visible === (j === i));
           state.forEach((s, j) => { s.visible = solo || j === i; });
           applyAll();
+          markDirty();
         });
         row.querySelector('.layer-opacity').addEventListener('input', (event) => {
           leaveScene();
           state[i].opacity = Number(event.target.value) / 100;
           if (state[i].opacity > 0.01) state[i].visible = true;
           apply(i);
+          markDirty();
         });
         list.appendChild(row);
       });
@@ -2560,15 +2697,23 @@
           saveBox.querySelector('[data-layers-save-status]').textContent = '';
         }
       };
+      let saveLayers = async () => ({ ok: false, error: 'Only project editors can save colours.' });
       if (saveBox) {
         const saveBtn = saveBox.querySelector('[data-layers-save-btn]');
         const saveStatus = saveBox.querySelector('[data-layers-save-status]');
-        saveBtn.addEventListener('click', async () => {
+        saveLayers = async () => {
           const body = new FormData();
           body.append('csrf_token', csrfToken);
           layerData.forEach((layer, i) => {
             body.append(`layer_name_${i}`, layer.name);
             if (layer.color) body.append(`layer_color_${i}`, pendingColors.get(i) || layer.color);
+            const finish = pendingFinishes.get(i);
+            if (finish) {
+              body.append(`layer_metallic_${i}`, finish.metallic);
+              body.append(`layer_roughness_${i}`, finish.roughness);
+            }
+            body.append(`layer_visible_${i}`, state[i].visible ? '1' : '0');
+            body.append(`layer_opacity_${i}`, Math.round(state[i].opacity * 100) / 100);
           });
           saveBtn.disabled = true;
           saveStatus.textContent = 'Saving…';
@@ -2578,122 +2723,80 @@
               headers: { Accept: 'application/json', 'X-CSRFToken': csrfToken },
             });
             const result = await response.json().catch(() => ({}));
-            if (!response.ok || !result.ok) throw new Error(result.message || 'The colours could not be saved.');
+            if (!response.ok || !result.ok) throw new Error(result.message || 'The layers could not be saved.');
             pendingColors.forEach((hex, i) => { layerData[i].color = hex; viewColors[i] = null; });
             pendingColors.clear();
-            saveStatus.textContent = 'Colours saved. The AR file updates in a minute.';
+            pendingFinishes.forEach((finish, i) => Object.assign(layerData[i], finish));
+            pendingFinishes.clear();
+            layerData.forEach((layer, i) => { layer.visible = state[i].visible; layer.opacity = state[i].opacity; });
+            saveStatus.textContent = 'Layers saved. The AR file updates in a minute.';
+            return { ok: true, message: 'Colours saved to every layer. The AR file updates in a minute.' };
           } catch (error) {
-            saveStatus.textContent = error.message || 'The colours could not be saved.';
+            saveStatus.textContent = error.message || 'The layers could not be saved.';
+            return { ok: false, error: saveStatus.textContent };
           } finally {
             saveBtn.disabled = false;
           }
-        });
+        };
+        saveBtn.addEventListener('click', () => saveLayers());
       }
-      // --- Distances: the shortest distance between two nearby layers, drawn
-      // like Measure (two hotspots, a label hotspot and an SVG line over the
-      // viewer) on their own hotspot slots. Points are model-space metres. ---
-      let clearDistance = () => {};
-      const distBox = layersPanel.querySelector('[data-dist]');
-      if (distBox && layerMetrics?.pairs?.length) {
-        const distToggle = distBox.querySelector('[data-dist-toggle]');
-        const distBody = distBox.querySelector('.layers-dist-body');
-        const selectA = distBox.querySelector('[data-dist-a]');
-        const selectB = distBox.querySelector('[data-dist-b]');
-        const distResult = distBox.querySelector('[data-dist-result]');
-        const distLine = document.getElementById('distLine');
-        const distLabel = document.getElementById('distLabel');
-        const distPoints = ['a', 'b'].map((key) => viewer.querySelector(`[slot="hotspot-dist-${key}"]`));
-        const lineEl = distLine.querySelector('line');
-        const pairsOf = (name) => layerMetrics.pairs
-          .filter((p) => p.a === name || p.b === name)
-          .map((p) => (p.a === name ? { other: p.b, mm: p.min_distance_mm, from: p.point_a, to: p.point_b } : { other: p.a, mm: p.min_distance_mm, from: p.point_b, to: p.point_a }));
-        const makeOption = (value, text, disabled = false) => {
-          const option = document.createElement('option');
-          option.value = value;
-          option.textContent = text;
-          option.disabled = disabled;
-          return option;
-        };
-        const asPos = (p) => `${p[0]}m ${p[1]}m ${p[2]}m`;
-        const drawDistLine = () => {
-          if (distLine.hasAttribute('hidden')) return;
-          const a = viewer.queryHotspot && viewer.queryHotspot('hotspot-dist-a');
-          const b = viewer.queryHotspot && viewer.queryHotspot('hotspot-dist-b');
-          if (!a || !b) return;
-          const host = distLine.parentElement.getBoundingClientRect();
-          const rect = viewer.getBoundingClientRect();
-          const dx = rect.left - host.left;
-          const dy = rect.top - host.top;
-          lineEl.setAttribute('x1', a.canvasPosition.x + dx);
-          lineEl.setAttribute('y1', a.canvasPosition.y + dy);
-          lineEl.setAttribute('x2', b.canvasPosition.x + dx);
-          lineEl.setAttribute('y2', b.canvasPosition.y + dy);
-        };
-        const hideLine = () => {
-          [...distPoints, distLabel].forEach((el) => { el.hidden = true; });
-          distLine.setAttribute('hidden', ''); // <svg> has no .hidden property
-        };
-        clearDistance = () => {
-          hideLine();
-          distResult.textContent = '';
-          selectA.value = '';
-          fillB('');
-        };
-        function fillB(name) {
-          selectB.replaceChildren();
-          const partners = name ? pairsOf(name).sort((x, y) => x.mm - y.mm) : [];
-          if (!name) {
-            selectB.append(makeOption('', 'Choose a layer first', true));
-          } else if (!partners.length) {
-            selectB.append(makeOption('', 'Not measured (more than 5 cm apart)', true));
-          } else {
-            selectB.append(makeOption('', 'Choose a layer'));
-            partners.forEach((p) => selectB.append(makeOption(p.other, p.other)));
-          }
-          selectB.value = '';
-          selectB.disabled = !partners.length;
-        }
-        const showPair = () => {
-          hideLine();
-          distResult.textContent = '';
-          const pair = selectA.value && selectB.value ? pairsOf(selectA.value).find((p) => p.other === selectB.value) : null;
-          if (!pair) {
-            if (selectA.value && selectB.disabled) distResult.textContent = 'Not measured: these layers are more than 5 cm apart.';
-            return;
-          }
-          distResult.textContent = pair.mm < 0.005 ? 'Shortest distance 0 mm (the layers touch)' : `Shortest distance ${formatLength(pair.mm)}`;
-          // Unhide first: model-viewer skips hotspots that are display:none.
-          [...distPoints, distLabel].forEach((el) => { el.hidden = false; });
-          viewer.updateHotspot({ name: 'hotspot-dist-a', position: asPos(pair.from) });
-          viewer.updateHotspot({ name: 'hotspot-dist-b', position: asPos(pair.to) });
-          viewer.updateHotspot({ name: 'hotspot-dist-mid', position: asPos(pair.from.map((v, k) => (v + pair.to[k]) / 2)) });
-          distLabel.textContent = pair.mm < 0.005 ? '0 mm' : formatLength(pair.mm);
-          distLine.removeAttribute('hidden');
-          // Hotspot screen positions update on the next rendered frames.
-          requestAnimationFrame(() => requestAnimationFrame(drawDistLine));
-          setTimeout(drawDistLine, 120);
-        };
-        selectA.append(makeOption('', 'Choose a layer'));
-        layerData.forEach((layer) => selectA.append(makeOption(layer.name, layer.name)));
-        fillB('');
-        selectA.addEventListener('change', () => {
-          fillB(selectA.value);
-          if (!selectB.disabled && selectB.options.length > 1) selectB.selectedIndex = 1; // the nearest partner
-          showPair();
+      // The left panel's Color section colours every layer through these.
+      window.viewerLayers = {
+        previewAll: (hex) => layerData.forEach((layer, i) => { if (layer.color) setLayerColor(i, hex); }),
+        resetColors: () => {
+          layerData.forEach((layer, i) => { if (layer.color) { pendingColors.delete(i); paintLayer(i, layer.color); } });
+          if (saveBox && !pendingColors.size) saveBox.hidden = true;
+        },
+        saveColors: () => saveLayers(),
+      };
+      // --- Finish presets (metallic / roughness, like web_ar's material
+      // presets): preview on one layer or all, saved with "Save layers" into
+      // the GLB. Gold / Chrome also set the colour; Glass fades the layer. ---
+      const FINISHES = {
+        matte: { metallic: 0, roughness: 1 },
+        plastic: { metallic: 0, roughness: 0.45 },
+        ceramic: { metallic: 0, roughness: 0.25 },
+        glossy: { metallic: 0, roughness: 0.08 },
+        metal: { metallic: 1, roughness: 0.32 },
+        gold: { metallic: 1, roughness: 0.28, color: '#e6b800' },
+        chrome: { metallic: 1, roughness: 0.05, color: '#e8e8e8' },
+        glass: { metallic: 0, roughness: 0.04, opacity: 0.35 },
+      };
+      const pendingFinishes = new Map(); // layer index -> { metallic, roughness }
+      const markDirty = () => {
+        if (!saveBox) return;
+        saveBox.hidden = false;
+        saveBox.querySelector('[data-layers-save-status]').textContent = 'Saves colours, finishes and which layers show — the viewer and AR open this way.';
+      };
+      const finishBox = layersPanel.querySelector('[data-finish]');
+      if (finishBox) {
+        const target = finishBox.querySelector('[data-finish-target]');
+        finishBox.querySelectorAll('[data-finish-preset]').forEach((button) => {
+          button.addEventListener('click', () => {
+            const finish = FINISHES[button.dataset.finishPreset];
+            const indexes = target.value === 'all' ? layerData.map((_, i) => i) : [Number(target.value)];
+            indexes.forEach((i) => {
+              (resolveMaterials()?.[i] || []).forEach(({ material }) => {
+                material.pbrMetallicRoughness.setMetallicFactor(finish.metallic);
+                material.pbrMetallicRoughness.setRoughnessFactor(finish.roughness);
+              });
+              pendingFinishes.set(i, { metallic: finish.metallic, roughness: finish.roughness });
+              if (finish.color && layerData[i].color) setLayerColor(i, finish.color);
+              if (finish.opacity) {
+                state[i].opacity = finish.opacity;
+                state[i].visible = true;
+                const input = list.children[i]?.querySelector('.layer-opacity');
+                if (input) input.value = Math.round(finish.opacity * 100);
+                apply(i);
+              }
+            });
+            finishBox.querySelectorAll('[data-finish-preset]').forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+            markDirty();
+          });
         });
-        selectB.addEventListener('change', showPair);
-        distToggle.addEventListener('click', () => {
-          const open = distBody.hidden;
-          distBody.hidden = !open;
-          distToggle.setAttribute('aria-expanded', String(open));
-          if (!open) clearDistance();
-        });
-        viewer.addEventListener('camera-change', () => requestAnimationFrame(drawDistLine));
-        window.addEventListener('resize', () => requestAnimationFrame(drawDistLine));
       }
       const setOpen = (open) => {
         if (open) refreshSwatches();
-        else clearDistance();
         layersPanel.hidden = !open;
         layersBtn.setAttribute('aria-expanded', String(open));
         layersBtn.classList.toggle('is-active', open);
@@ -2705,6 +2808,7 @@
         state.forEach((s) => { s.visible = true; s.opacity = 1; });
         list.querySelectorAll('.layer-opacity').forEach((input) => { input.value = 100; });
         applyAll();
+        markDirty();
       });
       const applyViewColors = () => viewColors.forEach((hex, i) => { if (hex) paintLayer(i, hex); });
       const onLoad = () => { mats = null; resolveMaterials(); refreshSwatches(); applyViewColors(); applyAll(); };
@@ -3090,7 +3194,10 @@
         // it directly and only handle rejection on the returned promise.
         // With a ready scene variant the hidden scene-AR viewer (src = the scene's
         // GLB) is used instead: Scene Viewer takes its file from the element's src.
-        const arViewer = (sceneAr && sceneAr.androidViewer()) || viewer;
+        // Without an active scene, a saved default layer view has its own GLB.
+        const sceneActive = window.viewerScenes && window.viewerScenes.activeId() != null;
+        const defaultViewer = !sceneActive && defaultArViewer && defaultArViewer.canActivateAR ? defaultArViewer : null;
+        const arViewer = (sceneAr && sceneAr.androidViewer()) || defaultViewer || viewer;
         if (arViewer && arViewer.canActivateAR) {
           arViewer.activateAR().catch(showQrFallback);
           return;
@@ -3116,6 +3223,27 @@
       if (event.detail && event.detail.status === 'failed') showQrFallback();
     };
     viewer.addEventListener('ar-status', onArStatus);
+
+    // --- AR for the saved default layer view (Android). Scene Viewer reads the
+    // src of the model-viewer that activateAR() runs on, so a hidden, lazy
+    // second viewer carries ar.glb (the model without the layers the owner
+    // hid by default); iOS's model.usdz is already built from that view. ---
+    const defaultArUrl = {{ (default_ar_url if default_ar_url is defined else none)|tojson }};
+    let defaultArViewer = null;
+    if (defaultArUrl && viewer && !isIOS) {
+      defaultArViewer = document.createElement('model-viewer');
+      defaultArViewer.setAttribute('ar', '');
+      defaultArViewer.setAttribute('ar-modes', 'scene-viewer');
+      defaultArViewer.setAttribute('ar-scale', 'auto');
+      defaultArViewer.setAttribute('ar-placement', viewer.getAttribute('ar-placement') || 'floor');
+      defaultArViewer.setAttribute('loading', 'lazy');
+      defaultArViewer.setAttribute('reveal', 'manual');
+      defaultArViewer.setAttribute('alt', viewer.getAttribute('alt') || '3D model');
+      defaultArViewer.setAttribute('src', defaultArUrl);
+      defaultArViewer.hidden = true;
+      defaultArViewer.addEventListener('ar-status', onArStatus);
+      viewer.parentElement.appendChild(defaultArViewer);
+    }
 
     // Count one "rotated" engagement per page load, only for real visitor
     // interaction (auto-rotate and programmatic camera moves are ignored).
@@ -3503,6 +3631,7 @@
         // Preview the current view in the modal (with a Download button) rather than
         // pushing the file straight to the browser's downloads.
         openShotModal({ key: 'current-view', label: 'Current view', rawDataUrl: raw, dataUrl: out, qr: qrEnabled() });
+        window.viewerMedia?.saveDataUrl(out, { label: 'Current view' });
       } finally {
         if (wasAuto) setAutoRotateState(true);
       }
@@ -3541,6 +3670,10 @@
           }
         }
         await restoreCamera(state);
+        // The set is kept as the model's views; generating it again replaces them.
+        if (window.viewerMedia) {
+          for (const shot of shotGallery) await window.viewerMedia.saveDataUrl(shot.dataUrl, { label: `View: ${shot.label}`, source: 'auto' });
+        }
         if (shotStatusEl) {
           if (shotGallery.length === shotViews.length) {
             shotStatusEl.textContent = '8 views ready.';
@@ -3943,7 +4076,8 @@
       const applyLive = (hex) => {
         const rgb = hexToRgb(hex);
         if (!rgb) return;
-        originals.forEach(({ mat }) => {
+        if (layered) window.viewerLayers?.previewAll(hex);
+        else originals.forEach(({ mat }) => {
           try {
             const cur = mat.pbrMetallicRoughness.baseColorFactor || [1, 1, 1, 1];
             mat.pbrMetallicRoughness.setBaseColorFactor([rgb[0], rgb[1], rgb[2], cur[3] ?? 1]);
@@ -3954,8 +4088,12 @@
         setActive(hex);
         setDirty(true);
       };
+      // Layered models: the Layers panel owns the colours (sRGB -> linear, per
+      // layer, saved through the layer editor), so this panel drives it.
+      const layered = colorTools.hasAttribute('data-color-layered');
       const restoreOriginal = () => {
-        originals.forEach(({ mat, factor }) => {
+        if (layered) window.viewerLayers?.resetColors();
+        else originals.forEach(({ mat, factor }) => {
           try { mat.pbrMetallicRoughness.setBaseColorFactor(factor); } catch (e) { /* skip */ }
         });
         currentHex = null;
@@ -3980,12 +4118,19 @@
         applyBtn.disabled = true;
         applyBtn.textContent = 'Applying…';
         try {
-          const resp = await fetch(`/models/${modelId}/viewer-color`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-            body: JSON.stringify({ color: currentHex }),
-          });
-          const data = await resp.json().catch(() => ({}));
+          let resp;
+          let data;
+          if (layered) {
+            data = await window.viewerLayers.saveColors();
+            resp = { ok: data.ok };
+          } else {
+            resp = await fetch(`/models/${modelId}/viewer-color`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+              body: JSON.stringify({ color: currentHex }),
+            });
+            data = await resp.json().catch(() => ({}));
+          }
           if (resp.ok && data.ok) {
             // The saved colour is now the model's colour: fold it into the
             // captured originals so a later "Original" resets to what was saved
@@ -4082,6 +4227,84 @@
       setAnimationPlayback(!modelAnimationPlaying);
     });
     setAutoRotateState(false);
+
+    // --- Lighting presets (viewer_lighting.py): exposure, ground shadow and
+    // environment on model-viewer; owners can fine-tune and save them. ---
+    const lightTools = document.querySelector('[data-light-tools]');
+    if (lightTools && viewer) {
+      const LIGHT_PRESETS = {{ lighting_presets|tojson }};
+      const studioEnv = lightTools.dataset.studioEnv;
+      const lightState = {{ model_lighting(model)|tojson }};
+      const lightInputs = lightTools.querySelectorAll('[data-light-input]');
+      const lightStatus = lightTools.querySelector('[data-light-status]');
+      const applyLighting = () => {
+        viewer.exposure = lightState.exposure;
+        viewer.shadowIntensity = lightState.shadow_intensity;
+        viewer.shadowSoftness = lightState.shadow_softness;
+        const env = lightState.environment === 'studio' ? studioEnv : lightState.environment;
+        if (viewer.getAttribute('environment-image') !== env) viewer.setAttribute('environment-image', env);
+        lightTools.querySelectorAll('[data-light-preset]').forEach((button) => {
+          button.setAttribute('aria-pressed', String(button.dataset.lightPreset === lightState.preset));
+        });
+        lightInputs.forEach((input) => { input.value = lightState[input.dataset.lightInput]; });
+        if (lightStatus) lightStatus.textContent = '';
+      };
+      lightTools.querySelectorAll('[data-light-preset]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const preset = LIGHT_PRESETS[button.dataset.lightPreset];
+          if (!preset) return;
+          Object.assign(lightState, { preset: button.dataset.lightPreset, environment: preset.environment,
+            exposure: preset.exposure, shadow_intensity: preset.shadow_intensity, shadow_softness: preset.shadow_softness });
+          applyLighting();
+        });
+      });
+      lightInputs.forEach((input) => input.addEventListener('input', () => {
+        lightState[input.dataset.lightInput] = Number(input.value);
+        applyLighting();
+      }));
+      const lightSave = lightTools.querySelector('[data-light-save]');
+      lightSave?.addEventListener('click', async () => {
+        lightSave.disabled = true;
+        lightStatus.textContent = 'Saving…';
+        try {
+          const response = await fetch(lightTools.dataset.saveUrl, {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify(lightState),
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || !data.ok) throw new Error(data.error || 'The lighting could not be saved.');
+          lightStatus.textContent = 'Saved. The viewer opens with this lighting.';
+        } catch (error) {
+          lightStatus.textContent = error.message;
+        } finally { lightSave.disabled = false; }
+      });
+    }
+
+    // --- Texture sharpness: anisotropic filtering keeps textures crisp at
+    // grazing angles (model-viewer leaves it at 1). ---
+    if (viewer) {
+      const sharpenTextures = () => {
+        try {
+          const three = viewerInternals.getRenderer()?.threeRenderer;
+          const scene = viewerInternals.getScene();
+          if (!three || !scene || !three.capabilities) return;
+          const level = Math.min(8, three.capabilities.getMaxAnisotropy());
+          if (!(level > 1)) return;
+          scene.traverse((object) => {
+            if (!object.isMesh || !object.material) return;
+            (Array.isArray(object.material) ? object.material : [object.material]).forEach((material) => {
+              ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap'].forEach((slot) => {
+                const texture = material[slot];
+                if (texture && texture.anisotropy !== level) { texture.anisotropy = level; texture.needsUpdate = true; }
+              });
+            });
+          });
+        } catch (e) { /* internals differ: keep model-viewer's defaults */ }
+      };
+      if (viewer.loaded) sharpenTextures();
+      viewer.addEventListener('load', sharpenTextures);
+    }
 
     // --- Viewer background theme (dark / light / white) ---
     const VIEWER_BG_KEY = 'academicar:viewerBg';
@@ -4227,6 +4450,9 @@
         link.click();
         setTimeout(() => URL.revokeObjectURL(link.href), 1500);
         setVideoStatus('Recording downloaded.');
+        if (window.viewerMedia && await window.viewerMedia.save(blob, { label: 'Recording' })) {
+          setVideoStatus('Recording downloaded and kept under Saved media.');
+        }
       }, { once: true });
       videoRecorder.start(250);
       if (videoRecordButton) videoRecordButton.textContent = 'Stop & download';
@@ -5351,6 +5577,204 @@
       });
     }
 
+    // --- Automatic media (model_media.py, source "auto"). Once a model is
+    // ready, the owner's browser renders eight labelled views and three short
+    // showcase videos in a hidden second model-viewer (the visible one is left
+    // alone) and keeps them under Saved media. Only what is missing is made;
+    // "Regenerate" in Saved media redoes everything. Needs the tab in front:
+    // a hidden tab stops rendering, so the run waits for the next visit. ---
+    (() => {
+      const autoMedia = {{ (auto_media if auto_media is defined and not is_embed else none)|tojson }};
+      const mediaTools = document.querySelector('[data-media-tools]');
+      if (!autoMedia || !mediaTools || !viewer || !window.viewerMedia) return;
+      const statusEl = mediaTools.querySelector('[data-media-status]');
+      const layerInfo = {{ viewer_layers|tojson }};
+      const layered = layerInfo.length >= 2;
+      const VIDEOS = [
+        { label: 'Video: 360° turntable', seconds: 8, kind: 'turntable' },
+        { label: 'Video: Showcase', seconds: 8, kind: 'showcase' },
+        layered
+          ? { label: 'Video: Layer reveal', seconds: Math.min(12, 3 + layerInfo.length * 1.2), kind: 'reveal' }
+          : { label: 'Video: Elevation sweep', seconds: 8, kind: 'elevation' },
+      ];
+      const viewLabel = (view) => `View: ${view.label}`;
+      const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
+      let running = false;
+
+      const makeHiddenViewer = () => {
+        const hidden = document.createElement('model-viewer');
+        ['src', 'environment-image', 'exposure', 'shadow-intensity', 'shadow-softness', 'tone-mapping', 'orientation'].forEach((name) => {
+          const value = viewer.getAttribute(name);
+          if (value != null) hidden.setAttribute(name, value);
+        });
+        // The lighting as currently shown (presets set properties, not attributes).
+        hidden.setAttribute('exposure', String(viewer.exposure));
+        hidden.setAttribute('shadow-intensity', String(viewer.shadowIntensity));
+        hidden.setAttribute('shadow-softness', String(viewer.shadowSoftness));
+        hidden.setAttribute('field-of-view', '28deg');
+        hidden.setAttribute('bounds', 'tight');
+        hidden.setAttribute('interaction-prompt', 'none');
+        hidden.setAttribute('aria-hidden', 'true');
+        hidden.setAttribute('loading', 'eager');
+        // In the viewport (model-viewer only renders what intersects it) but
+        // behind the page and transparent.
+        hidden.style.cssText = 'position:fixed;left:0;top:0;width:1280px;height:720px;opacity:0;pointer-events:none;z-index:-1;';
+        document.body.appendChild(hidden);
+        return hidden;
+      };
+      const loaded = (el) => (el.loaded ? Promise.resolve() : new Promise((resolve, reject) => {
+        el.addEventListener('load', () => resolve(), { once: true });
+        el.addEventListener('error', () => reject(new Error('load')), { once: true });
+      }));
+      // The owner's saved default layer view: hidden layers out, faded ones blended.
+      const layerMaterials = (el) => {
+        const byName = new Map();
+        (el.model?.materials || []).forEach((m) => { if (!byName.has(m.name)) byName.set(m.name, []); byName.get(m.name).push(m); });
+        return layerInfo.map((layer) => (layer.materials || [layer.name]).flatMap((name) => byName.get(name) || []).map((material) => ({
+          material, mode: material.getAlphaMode(), factor: [...material.pbrMetallicRoughness.baseColorFactor],
+        })));
+      };
+      const setLayerAlpha = (entries, alpha) => entries.forEach(({ material, mode, factor }) => {
+        const pbr = material.pbrMetallicRoughness;
+        if (alpha >= 0.999) { material.setAlphaMode(mode); pbr.setBaseColorFactor(factor); return; }
+        if (alpha <= 0.001) { material.setAlphaMode('MASK'); material.setAlphaCutoff(0.5); pbr.setBaseColorFactor([factor[0], factor[1], factor[2], 0]); return; }
+        material.setAlphaMode('BLEND');
+        pbr.setBaseColorFactor([factor[0], factor[1], factor[2], factor[3] * alpha]);
+      });
+      const defaultAlpha = (layer) => (layer.visible === false ? 0 : (typeof layer.opacity === 'number' ? layer.opacity : 1));
+      const setOrbit = async (el, theta, phi, radius) => {
+        el.cameraOrbit = `${theta}deg ${phi}deg ${radius}`;
+        el.jumpCameraToGoal();
+        await el.updateComplete;
+      };
+      const elementCanvas = (el) => {
+        const canvases = [...(el.shadowRoot?.querySelectorAll('canvas') || [])];
+        return canvases.find((c) => c.classList.contains('show')) || canvases[0] || null;
+      };
+      const whiteJpeg = async (dataUrl) => {
+        const image = await new Promise((resolve, reject) => { const im = new Image(); im.onload = () => resolve(im); im.onerror = reject; im.src = dataUrl; });
+        const canvas = document.createElement('canvas');
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(image, 0, 0);
+        return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+      };
+
+      const recordVideo = async (el, video, layers) => {
+        const source = elementCanvas(el);
+        const frame = document.createElement('canvas');
+        frame.width = 1280;
+        frame.height = 720;
+        if (!source || typeof frame.captureStream !== 'function') return null;
+        const ctx = frame.getContext('2d');
+        const types = ['video/mp4;codecs=avc1.42E01E', 'video/mp4;codecs=avc1', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+        const mimeType = types.find((type) => MediaRecorder.isTypeSupported?.(type)) || '';
+        const stream = frame.captureStream(30);
+        const recorder = new MediaRecorder(stream, mimeType ? { mimeType, videoBitsPerSecond: 6e6 } : undefined);
+        const chunks = [];
+        recorder.addEventListener('dataavailable', (event) => { if (event.data && event.data.size) chunks.push(event.data); });
+        const stopped = new Promise((resolve) => recorder.addEventListener('stop', resolve, { once: true }));
+        const duration = video.seconds * 1000;
+        const ease = (x) => 0.5 - Math.cos(Math.PI * x) / 2;
+        const pose = async (t) => {
+          if (video.kind === 'turntable') return setOrbit(el, -180 + 360 * t, 72, '105%');
+          if (video.kind === 'showcase') return setOrbit(el, -40 + 110 * ease(t), 62 + 20 * ease(t), `${130 - 50 * ease(t)}%`);
+          if (video.kind === 'elevation') return setOrbit(el, 30 + 40 * t, 25 + 85 * ease(t), '110%');
+          // Layer reveal: layers fade in one after another while the model turns.
+          const slot = 1 / (layers.length + 1);
+          layers.forEach((entries, i) => setLayerAlpha(entries, Math.min(defaultAlpha(layerInfo[i]), Math.max(0, (t - i * slot * 0.8) / slot))));
+          return setOrbit(el, -30 + 90 * t, 70, '110%');
+        };
+        await pose(0);
+        await nextFrame();
+        recorder.start(250);
+        const started = performance.now();
+        for (;;) {
+          if (document.hidden) { recorder.stop(); await stopped; return null; }
+          const t = Math.min(1, (performance.now() - started) / duration);
+          await pose(t);
+          await nextFrame();
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, frame.width, frame.height);
+          const rendered = elementCanvas(el) || source;
+          ctx.drawImage(rendered, 0, 0, rendered.width, rendered.height, 0, 0, frame.width, frame.height);
+          if (t >= 1) break;
+        }
+        recorder.stop();
+        await stopped;
+        stream.getTracks().forEach((track) => track.stop());
+        const type = recorder.mimeType || mimeType || 'video/webm';
+        let blob = new Blob(chunks, { type: type.split(';')[0] });
+        if (type.includes('mp4') && typeof window.academicarDefragmentMp4 === 'function') {
+          try { blob = new Blob([await window.academicarDefragmentMp4(blob)], { type: 'video/mp4' }); } catch (e) { /* keep the raw file */ }
+        } else if (typeof window.ysFixWebmDuration === 'function') {
+          try { blob = new Blob([await window.ysFixWebmDuration(blob, duration, { logger: false })], { type: 'video/webm' }); } catch (e) { /* keep */ }
+        }
+        return blob.size ? blob : null;
+      };
+
+      const run = async (everything) => {
+        if (running || document.hidden) return;
+        const have = new Set(everything ? [] : autoMedia.have);
+        const views = shotViews.filter((view) => !have.has(viewLabel(view)));
+        const videos = window.MediaRecorder ? VIDEOS.filter((video) => !have.has(video.label)) : [];
+        if (!views.length && !videos.length) return;
+        running = true;
+        const total = views.length + videos.length;
+        let done = 0;
+        const progress = () => { statusEl.textContent = `Creating your model's images and videos (${done}/${total})… keep this tab open.`; };
+        progress();
+        const ModelViewer = customElements.get('model-viewer');
+        const previousScale = ModelViewer && typeof ModelViewer.minimumRenderScale === 'number' ? ModelViewer.minimumRenderScale : 0.5;
+        if (ModelViewer) ModelViewer.minimumRenderScale = 1;
+        const hidden = makeHiddenViewer();
+        try {
+          await loaded(hidden);
+          await nextFrame();
+          const layers = layerMaterials(hidden);
+          const showDefault = () => layers.forEach((entries, i) => setLayerAlpha(entries, defaultAlpha(layerInfo[i])));
+          showDefault();
+          for (const view of views) {
+            if (document.hidden) break;
+            const [theta, phi] = view.orbit.split(' ').map((part) => parseFloat(part));
+            await setOrbit(hidden, theta, phi, 'auto');
+            await nextFrame(); await nextFrame();
+            const blob = await whiteJpeg(hidden.toDataURL('image/png'));
+            if (blob && await window.viewerMedia.save(blob, { label: viewLabel(view), source: 'auto' })) autoMedia.have.push(viewLabel(view));
+            done += 1; progress();
+          }
+          for (const video of videos) {
+            if (document.hidden) break;
+            showDefault();
+            const blob = await recordVideo(hidden, video, layers);
+            if (blob && await window.viewerMedia.save(blob, { label: video.label, source: 'auto' })) autoMedia.have.push(video.label);
+            done += 1; progress();
+          }
+          statusEl.textContent = done === total
+            ? 'Your model’s views and showcase videos are ready below.'
+            : 'Some images or videos were not created (the tab was in the background). They will be finished on your next visit.';
+        } catch (error) {
+          statusEl.textContent = 'The automatic images and videos could not be created in this browser.';
+        } finally {
+          hidden.remove();
+          if (ModelViewer) ModelViewer.minimumRenderScale = previousScale;
+          running = false;
+        }
+      };
+
+      const regenerate = document.createElement('button');
+      regenerate.type = 'button';
+      regenerate.textContent = 'Regenerate';
+      regenerate.title = 'Create the automatic views and showcase videos again';
+      regenerate.addEventListener('click', () => run(true));
+      mediaTools.querySelector('.viewer-tool-heading').appendChild(regenerate);
+      const start = () => setTimeout(() => run(false), 1500);
+      if (viewer.loaded) start(); else viewer.addEventListener('load', start, { once: true });
+    })();
+
     // --- Publication figure export (paid plans). Renders the model at the
     // chosen pixel width by temporarily raising model-viewer's render
     // resolution (devicePixelRatio override + minimumRenderScale, as video
@@ -5666,6 +6090,7 @@
           link.href = figPreviewUrl;
           link.download = `${safeName(modelBaseName)}-figure.png`;
           link.click();
+          window.viewerMedia?.save(blob, { label: 'Figure' });
           setFigStatus(`Downloaded ${canvas.width} × ${canvas.height} px${scale ? ` · scale bar ${scale.text}` : ''}.`);
         } catch (error) {
           setFigStatus('The figure could not be created at this size on this device. Try a smaller width.', true);

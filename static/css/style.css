@@ -5306,6 +5306,52 @@ input[type="file"]::-webkit-file-upload-button {
   gap: 18px;
   padding: 18px;
 }
+/* Saved media (model_media.py): a small gallery on the card's right side. */
+.model-card-body.has-media { grid-template-columns: 168px minmax(0, 1fr) 118px; }
+.model-media { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.model-media-title {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-inter);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-silver-ash);
+}
+.model-media-title span { font-weight: 600; letter-spacing: 0; color: var(--color-midnight-graphite); }
+.model-media-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.model-media-item {
+  position: relative;
+  display: block;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border: 1px solid var(--color-light-pearl);
+  border-radius: 8px;
+  background: var(--color-cloud-whisper);
+  transition: border-color 160ms ease;
+}
+.model-media-item:hover { border-color: var(--color-silver-ash); }
+.model-media-item img, .model-media-item video { display: block; width: 100%; height: 100%; object-fit: cover; }
+.model-media-badge {
+  position: absolute;
+  left: 3px;
+  bottom: 3px;
+  padding: 0 4px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(17, 17, 17, 0.6);
+}
+.model-media-more {
+  font-family: var(--font-inter);
+  font-size: 11.5px;
+  font-weight: 650;
+  color: var(--color-midnight-graphite);
+  text-decoration: none;
+}
+.model-media-more:hover { color: var(--color-sunset-orange); }
 .model-registry-grid .model-card .model-preview {
   height: 168px;
   border-radius: 10px;
@@ -5777,7 +5823,8 @@ input[type="file"]::-webkit-file-upload-button {
 @media (max-width: 560px) {
   .model-registry-grid .model-row-grid { grid-template-columns: 1fr; }
   .model-registry-grid .model-preview { height: 180px; }
-  .model-card-body { grid-template-columns: 1fr; }
+  .model-card-body, .model-card-body.has-media { grid-template-columns: 1fr; }
+  .model-media-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .model-registry-grid .model-card .model-preview { height: 180px; }
   /* Two rows on phones: the "Open" and "Upgrade" pills first, then the quiet
      links on their own full-width row. A single nowrap row overflowed the

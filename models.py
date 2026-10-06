@@ -230,6 +230,9 @@ class Model3D(db.Model):
     appearance_roughness = db.Column(db.Float, nullable=True, default=0.35)
     appearance_metallic = db.Column(db.Float, nullable=True, default=0.05)
     ar_placement = db.Column(db.String(10), nullable=True, default="floor")
+    # Viewer lighting saved by the owner: {"preset", "exposure", "shadow_intensity",
+    # "shadow_softness"} (viewer_lighting.py); None = the default Studio preset.
+    viewer_lighting = db.Column(db.JSON, nullable=True)
     replaced_at = db.Column(db.DateTime, nullable=True)
     version = db.Column(db.Integer, nullable=False, default=1)
     replacement_status = db.Column(db.String(30), nullable=True)
@@ -342,6 +345,30 @@ class ModelAnnotation(db.Model):
                 "fov": self.camera_fov,
             } if self.camera_orbit else None,
         }
+
+
+class ModelMedia(db.Model):
+    """An image or video of a model kept for its owner: captured in the viewer
+    (source "user") or generated automatically by the owner's browser after
+    processing (source "auto", replaced when regenerated). Files live in
+    converted/<model_id>/media/ and are mirrored to R2 (model_media.py)."""
+
+    __tablename__ = "model_media"
+
+    id = db.Column(db.Integer, primary_key=True)
+    model_id = db.Column(db.String(36), db.ForeignKey("models.id", ondelete="CASCADE"), nullable=False, index=True)
+    kind = db.Column(db.String(10), nullable=False)  # "image" | "video"
+    source = db.Column(db.String(10), nullable=False, default="user")  # "user" | "auto"
+    label = db.Column(db.String(120), nullable=True)
+    filename = db.Column(db.String(120), nullable=False)
+    mimetype = db.Column(db.String(60), nullable=False)
+    file_size = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, default=utc_now, nullable=False)
+
+    model = db.relationship(
+        "Model3D",
+        backref=db.backref("media", lazy=True, cascade="all, delete-orphan", order_by="ModelMedia.created_at.desc()"),
+    )
 
 
 class ModelScene(db.Model):

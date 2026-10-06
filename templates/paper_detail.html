@@ -249,7 +249,8 @@
           {% set conversion_label = (m.source_format or 'stl')|upper ~ ' → GLB' %}
           {% set dimensions_label = format_model_dimensions_cm(m) %}
           <div class="model-row model-card surface rounded-xl group reveal-up" data-model-row data-status-url="{{ url_for('model_status', model_id=m.id) }}" data-status="{{ model_status }}"{% if m.replacement_status == 'replacement_processing' %} data-replacing="1"{% endif %} data-name="{{ (m.display_name or m.original_filename or '')|lower }}" data-size="{{ m.file_size or 0 }}" data-order="{{ loop.index0 }}">
-            <div class="model-card-body">
+            {% set saved_media = m.media %}
+            <div class="model-card-body{% if saved_media %} has-media{% endif %}">
               {% if model_status == 'ready' %}
                 <a href="{{ url_for('view_model', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-preview" aria-label="Open 3D viewer for {{ m.display_name or m.original_filename }}">
                   <model-viewer
@@ -314,6 +315,21 @@
                   <div><dt>Size</dt><dd title="{{ dimensions_label }}">{{ dimensions_label }}</dd></div>
                 </dl>
               </div>
+              {% if saved_media %}
+              <div class="model-media" aria-label="Saved images and videos">
+                <p class="model-media-title">Media <span>{{ saved_media|length }}</span></p>
+                <div class="model-media-grid">
+                  {% for item in saved_media[:4] %}
+                    {% set item_url = url_for('model_media.serve_media', model_id=m.id, media_id=item.id) %}
+                    <a href="{{ item_url }}" target="_blank" rel="noopener" class="model-media-item" title="{{ item.label or item.kind|title }}">
+                      {% if item.kind == 'video' %}<video src="{{ item_url }}#t=2" muted preload="metadata" playsinline></video><span class="model-media-badge">Video</span>
+                      {% else %}<img src="{{ item_url }}" alt="{{ item.label or 'Saved image' }}" loading="lazy">{% endif %}
+                    </a>
+                  {% endfor %}
+                </div>
+                <a class="model-media-more" href="{{ url_for('view_model', model_id=m.id) }}">{% if saved_media|length > 4 %}+{{ saved_media|length - 4 }} more · {% endif %}Open in viewer</a>
+              </div>
+              {% endif %}
             </div>
 
             <div class="model-card-footer">

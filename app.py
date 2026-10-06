@@ -76,7 +76,9 @@ from licensing import (
 from blog_content import code_post_slugs, get_all_posts, get_post, render_body
 from discipline_content import all_disciplines, discipline_slugs, get_discipline, related_disciplines
 from institution_panel import institution_bp
-from layer_editor import layer_editor_bp, model_has_layers, model_layers, viewer_layer_metrics
+from layer_editor import default_ar_materials, layer_editor_bp, model_has_layers, model_layers, viewer_layer_metrics
+from viewer_lighting import viewer_lighting_bp
+from model_media import model_media_bp
 from comparisons import comparisons_bp
 from scenes import (
     remove_scene_ar_files,
@@ -251,6 +253,8 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.register_blueprint(auth_bp)
     app.register_blueprint(institution_bp)
     app.register_blueprint(layer_editor_bp)
+    app.register_blueprint(viewer_lighting_bp)
+    app.register_blueprint(model_media_bp)
     app.register_blueprint(comparisons_bp)
     app.register_blueprint(scenes_bp)
     app.register_blueprint(uploads_bp)
@@ -1898,6 +1902,8 @@ def ensure_sqlite_schema(app: Flask) -> None:
             connection.execute(text("ALTER TABLE models ADD COLUMN processing_progress INTEGER"))
         if model_columns and "processing_stage" not in model_columns:
             connection.execute(text("ALTER TABLE models ADD COLUMN processing_stage VARCHAR(120)"))
+        if model_columns and "viewer_lighting" not in model_columns:
+            connection.execute(text("ALTER TABLE models ADD COLUMN viewer_lighting JSON"))
 
 
 def _alembic_head_revision(app: Flask) -> str | None:
@@ -4082,6 +4088,32 @@ def process_model_upload_job(
                 cleanup_dir(converted_dir)
 
 
+def _build_default_ar_files(app: Flask, model: Model3D, glb_path: str, usdz_path: str) -> None:
+    """The AR files for the model's default view. When the owner saved a layer
+    view that hides or fades layers, Android gets converted/<id>/ar.glb (the GLB
+    without / with those layers faded) and the USDZ is built from the same
+    view (faded layers rounded for Quick Look); otherwise ar.glb is removed and
+    the USDZ comes from the full GLB."""
+    from layer_editor import default_ar_materials
+
+    ar_glb = os.path.join(app.config["CONVERTED_FOLDER"], model.id, "ar.glb")
+    hidden, faded = default_ar_materials(model)
+    if not (hidden or faded):
+        if os.path.exists(ar_glb):
+            cleanup_file(ar_glb)
+            mirror_delete(f"converted/{model.id}/ar.glb")
+        convert_glb_to_usdz(glb_path, usdz_path)
+    else:
+        if build_scene_variant(glb_path, ar_glb, hidden, faded):
+            mirror_file(ar_glb, f"converted/{model.id}/ar.glb")
+        with tempfile.TemporaryDirectory(prefix="academicar-default-ar-") as tmp:
+            source = os.path.join(tmp, "default_view.glb")
+            if build_scene_variant(glb_path, source, hidden, faded, round_faded=True, compress=False):
+                convert_glb_to_usdz(source, usdz_path)
+    if os.path.exists(usdz_path):
+        mirror_file(usdz_path, f"converted/{model.id}/model.usdz")
+
+
 def process_usdz_regen_job(
     app: Flask,
     *,
@@ -4116,9 +4148,7 @@ def process_usdz_regen_job(
                 if os.path.exists(usdz_path):
                     cleanup_file(usdz_path)
                 try:
-                    convert_glb_to_usdz(glb_path, usdz_path)
-                    if os.path.exists(usdz_path):
-                        mirror_file(usdz_path, f"converted/{model_id}/model.usdz")
+                    _build_default_ar_files(app, model, glb_path, usdz_path)
                 except Exception:  # USDZ is a best-effort companion.
                     logger.exception(
                         "USDZ regen failed for model %s (color is saved to the GLB regardless)",
@@ -4588,9 +4618,24 @@ def _build_scene_ar(app: Flask, scene: ModelScene, model: Model3D) -> None:
     _set_scene_ar(scene, "ready", final_glb, final_usdz if usdz_ok else None)
 
 
-def requeue_scene_ar(app: Flask, model: Model3D) -> None:
+def requeue_scene_ar(app: Flask, model: Model3D, include_default: bool = True) -> None:
     """A new GLB (replacement, rescale, unit change) makes every scene variant
-    stale: rebuild the ones whose scene hides or fades layers."""
+    stale: rebuild the ones whose scene hides or fades layers, and (unless the
+    caller queues it itself) the AR files of a saved default layer view."""
+    from layer_editor import default_ar_materials
+
+    if include_default and any(default_ar_materials(model)):
+        try:
+            enqueue_conversion_job(
+                app, model=model, job_type="usdz_regen",
+                job_kwargs={
+                    "model_id": model.id, "glb_path": model.glb_path,
+                    "usdz_path": os.path.join(app.config["CONVERTED_FOLDER"], model.id, "model.usdz"),
+                },
+            )
+        except SQLAlchemyError:
+            db.session.rollback()
+            logger.exception("Could not re-queue the default AR files for model %s", model.id)
     if not scene_ar_enabled(model):
         return
     try:
@@ -6397,6 +6442,12 @@ def register_routes(app: Flask) -> None:
         if not os.path.exists(usdz_path):
             ensure_local(usdz_path, f"converted/{model.id}/model.usdz")
         has_usdz = os.path.exists(usdz_path)
+        # The saved default layer view hides or fades layers: Android AR opens ar.glb.
+        default_ar_url = None
+        if any(default_ar_materials(model)):
+            ar_glb = os.path.join(app.config["CONVERTED_FOLDER"], model.id, "ar.glb")
+            if os.path.exists(ar_glb) or ensure_local(ar_glb, f"converted/{model.id}/ar.glb"):
+                default_ar_url = url_for("serve_glb", unique_id=model.id, filename="ar.glb") + f"?v={model_asset_token(model)}"
         annotations = ModelAnnotation.query.filter_by(model_id=model.id).order_by(ModelAnnotation.order_index).all()
         # Owners and project editors manage the model from the viewer
         # (labels, colour); their visits and admin previews are not reader views
@@ -6424,6 +6475,10 @@ def register_routes(app: Flask) -> None:
             scenes=scenes,
             active_scene_id=active_scene_id,
             viewer_metrics=viewer_layer_metrics(model, can_edit),
+            default_ar_url=default_ar_url,
+            # The owner's browser generates the missing automatic views and videos.
+            auto_media={"have": [m.label for m in model.media if m.source == "auto" and m.label]}
+            if can_edit and (model.processing_status or "ready") == "ready" else None,
         )
 
     @app.route("/m/<public_id>")
@@ -6500,7 +6555,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/files/<unique_id>/<path:filename>")
     def serve_glb(unique_id, filename):
-        if not is_uuid(unique_id) or filename not in {"model.glb", "model.usdz"}:
+        if not is_uuid(unique_id) or filename not in {"model.glb", "model.usdz", "ar.glb"}:
             abort(404)
         model = db.session.get(Model3D, unique_id)
         if not model:
@@ -6519,6 +6574,8 @@ def register_routes(app: Flask) -> None:
         mimetype = (
             "model/vnd.usdz+zip" if filename == "model.usdz" else "model/gltf-binary"
         )
+        if filename == "ar.glb" and not plan_supports_feature(model.license_type, "ar"):
+            abort(403)
         # send_from_directory adds ETag + Last-Modified and honours
         # If-None-Match / If-Modified-Since (conditional=True by default), so a
         # repeat view gets a cheap 304 instead of re-downloading the whole GLB.
@@ -11809,6 +11866,7 @@ def register_routes(app: Flask) -> None:
         slug = model.paper.slug
         file_paths = collect_model_file_paths(app, model)
         scene_ar_r2_keys = [key for scene in model.scenes for key in scene_ar_keys(model_id, scene.id)]
+        media_r2_keys = [f"converted/{model_id}/media/{item.filename}" for item in model.media]
         try:
             db.session.delete(model)
             db.session.commit()
@@ -11823,7 +11881,7 @@ def register_routes(app: Flask) -> None:
         mirror_delete(f"converted/{model_id}/model.usdz")
         mirror_delete(f"converted/{model_id}/poster.png")
         mirror_delete(f"qr_codes/qr_{model_id}.png")
-        for key in scene_ar_r2_keys:
+        for key in scene_ar_r2_keys + media_r2_keys + [f"converted/{model_id}/ar.glb"]:
             mirror_delete(key)
         flash("Model deleted.", "info")
         return redirect(url_for("project_detail", slug=slug))

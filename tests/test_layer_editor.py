@@ -338,7 +338,7 @@ def test_appearance_route_unchanged_for_models_without_layers(client, app, monke
 # --- viewer ------------------------------------------------------------------
 
 
-def test_viewer_hides_colour_controls_for_layered_models_and_shows_counts(client, app):
+def test_viewer_colour_tools_paint_every_layer_of_layered_models_and_show_counts(client, app):
     mid = _make_model(app)
     with app.app_context():
         model = db.session.get(Model3D, mid)
@@ -351,8 +351,8 @@ def test_viewer_hides_colour_controls_for_layered_models_and_shows_counts(client
 
     page = client.get(f"/view/{model_id}").get_data(as_text=True)
 
-    assert "Colours are set per layer: open Layers" in page
-    assert 'class="viewer-color-tools" data-color-tools' not in page and 'data-color-swatch="' not in page
+    assert "Colours every layer. To colour one layer, open Layers" in page
+    assert 'data-color-tools data-color-layered' in page and 'data-color-swatch="' in page
     assert '"count": 12' in page or '"count":12' in page
 
 

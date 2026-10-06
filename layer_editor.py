@@ -126,21 +126,60 @@ def _rgba_from_hex(hex_color: str, alpha: float) -> list[float]:
     return [r, g, b, alpha]
 
 
-def _write_layer_colors(glb_path: str, colors: dict[str, str]) -> None:
-    """Set baseColorFactor (hex is sRGB, the glTF factor linear) on named materials."""
+def _write_layer_colors(glb_path: str, colors: dict[str, str], finishes: dict[str, dict] | None = None) -> None:
+    """Set baseColorFactor (hex is sRGB, the glTF factor linear) and the
+    metallic / roughness factors of a finish on named materials."""
+    from pygltflib import PbrMetallicRoughness
+
+    finishes = finishes or {}
     gltf = GLTF2.load(glb_path)
     found = set()
     for material in gltf.materials or []:
         hex_color = colors.get(material.name)
+        finish = finishes.get(material.name)
         pbr = material.pbrMetallicRoughness
+        if finish is not None:
+            if pbr is None:
+                pbr = material.pbrMetallicRoughness = PbrMetallicRoughness()
+            pbr.metallicFactor = finish["metallic"]
+            pbr.roughnessFactor = finish["roughness"]
+            found.add(material.name)
         if hex_color is None or pbr is None or pbr.baseColorTexture is not None:
             continue
         previous = pbr.baseColorFactor or [1.0, 1.0, 1.0, 1.0]
         pbr.baseColorFactor = _rgba_from_hex(hex_color, previous[3] if len(previous) > 3 else 1.0)
         found.add(material.name)
-    if found != set(colors):
+    if found != set(colors) | set(finishes):
         raise ValueError("Layer materials missing from the model file.")
     gltf.save(glb_path)
+
+
+def default_ar_materials(model) -> tuple[set, dict]:
+    """(hidden material names, faded material name -> opacity) of the layer view
+    the owner saved as the model's default; AR files are built without / with
+    those layers faded (see process_usdz_regen_job)."""
+    return _default_view_materials(model_layers(model))
+
+
+def _default_view_materials(layers) -> tuple[set, dict]:
+    hidden: set = set()
+    faded: dict = {}
+    for layer in layers:
+        materials = layer.get("materials") or [layer.get("name")]
+        if layer.get("visible") is False:
+            hidden.update(materials)
+        elif isinstance(layer.get("opacity"), (int, float)) and layer["opacity"] < 1:
+            faded.update({material: float(layer["opacity"]) for material in materials})
+    return hidden, {m: o for m, o in faded.items() if m not in hidden}
+
+
+def _unit_float(value):
+    """A 0..1 float from a form value, or None (missing or invalid)."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return round(number, 3) if 0.0 <= number <= 1.0 else None
 
 
 @layer_editor_bp.route("/models/<model_id>/layers", methods=["POST"])
@@ -168,7 +207,7 @@ def update_layers(model_id):
     if (model.processing_status or "ready") not in ("ready", "replacement_failed"):
         return reply("Layers can be edited once the model finishes processing.", "warning")
 
-    names, seen, new_colors = [], set(), {}
+    names, seen, new_colors, new_finishes, defaults = [], set(), {}, {}, []
     for index, layer in enumerate(layers):
         name = (request.form.get(f"layer_name_{index}") or "").strip()
         if not name:
@@ -187,21 +226,40 @@ def update_layers(model_id):
             if submitted.lower() != str(layer["color"]).lower():
                 new_colors[index] = submitted.lower()
 
+        # A finish preset (metallic / roughness), baked into the layer's materials.
+        metallic = _unit_float(request.form.get(f"layer_metallic_{index}"))
+        roughness = _unit_float(request.form.get(f"layer_roughness_{index}"))
+        if metallic is not None and roughness is not None and (
+            metallic != layer.get("metallic") or roughness != layer.get("roughness")
+        ):
+            new_finishes[index] = {"metallic": metallic, "roughness": roughness}
+
+        # The default view: shown / hidden and opacity when the viewer opens (and in AR).
+        visible = request.form.get(f"layer_visible_{index}")
+        opacity = _unit_float(request.form.get(f"layer_opacity_{index}"))
+        defaults.append({
+            "visible": layer.get("visible") is not False if visible is None else visible != "0",
+            "opacity": layer.get("opacity", 1.0) if opacity is None else opacity,
+        })
+    if not any(d["visible"] and d["opacity"] > 0.01 for d in defaults):
+        return reply("Keep at least one layer visible in the default view.", "danger")
     glb_path = model.glb_path
     backup_path = glb_path + _BACKUP_SUFFIX
     refreshed_poster = None
-    if new_colors:
+    rewrite_glb = bool(new_colors or new_finishes)
+    if rewrite_glb:
         # Restore the working GLB from the R2 mirror if the local copy is gone.
         ensure_local(glb_path, f"converted/{model.id}/model.glb")
         try:
             shutil.copy2(glb_path, backup_path)
             by_material = {material: new_colors[i] for i in new_colors for material in layers[i].get("materials") or []}
-            _write_layer_colors(glb_path, by_material)
+            finishes = {material: new_finishes[i] for i in new_finishes for material in layers[i].get("materials") or []}
+            _write_layer_colors(glb_path, by_material, finishes)
         except Exception:
             logger.exception("Layer colour update failed for model %s; restoring the previous GLB", model.id)
             if os.path.exists(backup_path):
                 shutil.copy2(backup_path, glb_path)
-            return reply("The layer colours could not be saved. The previous version is still active.", "warning")
+            return reply("The layers could not be saved. The previous version is still active.", "warning")
         finally:
             if os.path.exists(backup_path):
                 os.remove(backup_path)
@@ -211,7 +269,16 @@ def update_layers(model_id):
         item = dict(layer, name=names[index])
         if index in new_colors:
             item["color"] = new_colors[index]
+        if index in new_finishes:
+            item.update(new_finishes[index])
+        item.pop("visible", None)
+        item.pop("opacity", None)
+        if not defaults[index]["visible"]:
+            item["visible"] = False
+        elif defaults[index]["opacity"] < 1:
+            item["opacity"] = defaults[index]["opacity"]
         updated.append(item)
+    default_changed = _default_view_materials(layers) != _default_view_materials(updated)
     info = dict(model.layer_info)
     info["layers"] = updated
     renames = {l["name"]: names[i] for i, l in enumerate(layers) if l.get("name") != names[i]}
@@ -224,7 +291,7 @@ def update_layers(model_id):
             if isinstance(saved, dict):
                 scene.state = dict(scene.state, layers={renames.get(k, k): v for k, v in saved.items()})
     try:
-        if new_colors:
+        if rewrite_glb:
             model.file_size = os.path.getsize(glb_path)  # part of model_asset_token
             refreshed_poster = _refresh_model_poster(model)
         db.session.commit()
@@ -233,12 +300,13 @@ def update_layers(model_id):
         logger.exception("Layer update could not be saved for model %s", model.id)
         return reply("The layers could not be saved.", "danger")
 
-    if new_colors:
+    if rewrite_glb:
         mirror_file(glb_path, f"converted/{model.id}/model.glb")
         if refreshed_poster:
             mirror_file(refreshed_poster, f"converted/{model.id}/poster.png")
-        # The iOS USDZ is built from the GLB: regenerate it in the worker so AR
-        # shows the new colours (the colours are already saved if this fails).
+    if rewrite_glb or default_changed:
+        # The AR files are built from the GLB and the default view: regenerate
+        # them in the worker (the layers are already saved if this fails).
         usdz_path = os.path.join(current_app.config["CONVERTED_FOLDER"], model.id, "model.usdz")
         try:
             enqueue_conversion_job(
@@ -250,14 +318,15 @@ def update_layers(model_id):
         except SQLAlchemyError:
             db.session.rollback()
             logger.exception("Could not enqueue USDZ regen after layer recolour for %s", model.id)
+    if rewrite_glb:
         # Scene AR variants are cut from the GLB, so they need the new colours too.
-        requeue_scene_ar(current_app._get_current_object(), model)
+        requeue_scene_ar(current_app._get_current_object(), model, include_default=False)
 
     log_audit(
         "model_layers_updated",
         user_id=current_user.id,
         resource_id=model.id,
-        details={"layers": len(updated), "recoloured": len(new_colors)},
+        details={"layers": len(updated), "recoloured": len(new_colors), "finished": len(new_finishes), "default_view_changed": default_changed},
     )
     return reply("Layers saved.", "success")
 

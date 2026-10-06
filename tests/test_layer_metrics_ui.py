@@ -61,7 +61,8 @@ def test_viewer_shows_measurements_to_anonymous_when_public_on_paid_plan(client,
     mid = _setup(app, public=True)
     html = _viewer(client, mid)
     assert "max_diameter_mm" in _embedded_metrics(html)
-    assert 'class="layers-dist"' in html and 'slot="hotspot-dist-a"' in html and 'id="distLine"' in html
+    # The Distances tool was removed from the Layers panel (finish presets took its place).
+    assert 'class="layers-dist"' not in html and 'slot="hotspot-dist-a"' not in html and 'id="distLine"' not in html
     assert "centroid" not in html and "dims_mm" not in _embedded_metrics(html)
 
 
@@ -78,7 +79,7 @@ def test_viewer_hides_private_measurements_from_anonymous_but_not_editors(client
     assert 'class="layers-dist"' not in _viewer(client, mid)
     login(client, email="owner@example.com", password=PASSWORD)
     html = _viewer(client, mid)
-    assert "max_diameter_mm" in _embedded_metrics(html) and 'class="layers-dist"' in html
+    assert "max_diameter_mm" in _embedded_metrics(html) and 'class="layers-finish"' in html
 
 
 def test_viewer_shows_private_measurements_to_a_project_editor(client, app):
@@ -106,7 +107,6 @@ def test_viewer_notes_for_segmentation_models_and_truncated_metrics(client, app)
     mid = _setup(app, public=True, source_format="segmentation", truncated=True)
     html = _viewer(client, mid)
     assert "Approximate measurements for education, not for diagnosis." in html
-    assert "Some distances were not measured." in html
     plain = _setup(app, public=True)
     assert "Approximate measurements for education" not in _viewer(client, plain)
     assert "Some distances were not measured." not in _viewer(client, plain)
