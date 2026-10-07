@@ -5474,6 +5474,7 @@ input[type="file"]::-webkit-file-upload-button {
 }
 .model-edit-main {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   min-width: 0;
 }
@@ -5482,6 +5483,10 @@ input[type="file"]::-webkit-file-upload-button {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
+/* An odd card out (Resize when Source unit shows) takes the full row instead
+   of leaving an empty half beside it. */
+.model-edit-secondary-grid > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+.model-edit-card .model-meta-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .model-edit-card {
   display: grid;
   gap: 18px;
@@ -5554,7 +5559,7 @@ input[type="file"]::-webkit-file-upload-button {
   font-weight: 400;
   letter-spacing: -0.56px;
   color: var(--color-midnight-graphite);
-  margin: 10px 0 8px;
+  margin: 0 0 8px;
 }
 .model-edit-card-head p,
 .model-edit-side p,
@@ -5586,6 +5591,17 @@ input[type="file"]::-webkit-file-upload-button {
 .model-edit-card-primary .model-edit-actions {
   grid-column: 2;
 }
+/* Measurements: visibility toggle and CSV on one row (the tables live in the CSV). */
+.model-edit-measure-row { align-items: center; }
+.model-edit-measure-row > span {
+  margin-right: auto;
+  font-family: var(--font-inter);
+  font-size: 13px;
+  color: var(--color-dark-shale);
+}
+.model-edit-measure-row form { margin: 0; }
+/* Saved media on the edit page: the project card's 16:9 tiles, all of them. */
+.model-edit-media-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 .model-edit-color-row {
   display: flex;
   align-items: center;
@@ -5707,6 +5723,13 @@ input[type="file"]::-webkit-file-upload-button {
     position: static;
     order: -1;
   }
+  /* Above the form on narrower screens: a compact summary, not a tall column. */
+  .model-edit-side-list { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .model-edit-side-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .model-edit-side-actions form { grid-column: 1 / -1; }
+}
+@media (max-width: 560px) {
+  .model-edit-side-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 780px) {

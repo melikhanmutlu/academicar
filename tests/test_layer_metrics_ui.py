@@ -230,29 +230,26 @@ def test_visibility_form_carries_a_csrf_token_and_posts_need_it(client, app, own
 # --- model_edit card ----------------------------------------------------------------------------
 
 
-def test_edit_card_lists_layers_pairs_csv_link_and_state(client, app, owner):
+def test_edit_card_offers_the_csv_and_the_visibility_toggle(client, app, owner):
     login(client, email="owner@example.com", password=PASSWORD)
     html = client.get(f"/models/{owner}/edit").get_data(as_text=True)
     assert 'id="measurementsSection"' in html and "Measurements</h2>" in html
-    assert "29.0 × 20.0 × 10.0" in html and "34.3" in html
-    assert html.index("1.5</td>") < html.index("3.2</td>")  # shortest first
+    # The tables moved to the CSV; the card stays compact.
+    assert "29.0 × 20.0 × 10.0" not in html and "measure-table" not in html
     assert f"/models/{owner}/layer-metrics.csv" in html and "Download CSV" in html
     assert "Show measurements to viewers: <strong>Off</strong>" in html
     client.post(f"/models/{owner}/layer-metrics/visibility", data={"metrics_public": "1"})
     assert "Show measurements to viewers: <strong>On</strong>" in client.get(f"/models/{owner}/edit").get_data(as_text=True)
 
 
-def test_edit_card_shows_the_volume_column_only_when_layers_have_volumes(client, app, owner):
+def test_layer_volumes_reach_the_csv(client, app, owner):
     login(client, email="owner@example.com", password=PASSWORD)
-    assert "Volume (mL)" not in client.get(f"/models/{owner}/edit").get_data(as_text=True)
     with app.app_context():
         model = db.session.get(Model3D, owner)
         info = dict(model.layer_info)
         info["layers"] = [dict(layer, volume_ml=12.34) for layer in info["layers"]]
         model.layer_info = info
         db.session.commit()
-    html = client.get(f"/models/{owner}/edit").get_data(as_text=True)
-    assert "Volume (mL)" in html and "12.3" in html
     csv_rows = list(csv.reader(io.StringIO(client.get(f"/models/{owner}/layer-metrics.csv").get_data(as_text=True))))
     assert csv_rows[1][7] == "12.34"
 
@@ -278,7 +275,7 @@ def test_edit_card_absent_for_models_without_layers(client, app):
     assert 'id="measurementsSection"' not in client.get(f"/models/{mid}/edit").get_data(as_text=True)
 
 
-def test_layer_rename_keeps_measurements_in_the_card(client, app, owner):
+def test_layer_rename_keeps_measurements_in_the_csv(client, app, owner):
     layers = _layers(app, owner)
     data = {f"layer_name_{i}": layer["name"] for i, layer in enumerate(layers)}
     data["layer_name_1"] = "Renamed"
@@ -287,5 +284,5 @@ def test_layer_rename_keeps_measurements_in_the_card(client, app, owner):
             data[f"layer_color_{i}"] = layer["color"]
     login(client, email="owner@example.com", password=PASSWORD)
     client.post(f"/models/{owner}/layers", data=data)
-    html = client.get(f"/models/{owner}/edit").get_data(as_text=True)
-    assert "<td>Renamed</td>" in html
+    rows = list(csv.reader(io.StringIO(client.get(f"/models/{owner}/layer-metrics.csv").get_data(as_text=True))))
+    assert any(row[:2] == ["layer", "Renamed"] for row in rows)

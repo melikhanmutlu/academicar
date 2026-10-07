@@ -201,78 +201,63 @@
       </form>
       {% endif %}
 
+      {% if model_status == 'ready' %}
+      {# Saved media (model_media.py): the automatic views and showcase videos
+         plus the owner's captures, as on the project card but all of them. #}
+      {% set media_videos = model.media|selectattr('kind', 'equalto', 'video')|list %}
+      {% set media_images = model.media|selectattr('kind', 'equalto', 'image')|list %}
+      <div class="surface model-edit-card" id="mediaSection">
+        <div class="model-edit-card-head">
+          <h2>Images &amp; videos</h2>
+          {% if model.media %}
+          <p>{% if media_videos %}{{ media_videos|length }} video{{ 's' if media_videos|length != 1 }}{% endif %}{% if media_videos and media_images %} and {% endif %}{% if media_images %}{{ media_images|length }} image{{ 's' if media_images|length != 1 }}{% endif %} of this model. Only you and project editors see them. Click one to open it full size.</p>
+          {% else %}
+          <p>Views and short showcase videos are created automatically the next time you open this model in the viewer on a computer.</p>
+          {% endif %}
+        </div>
+        {% if model.media %}
+        <div class="model-media-grid model-edit-media-grid">
+          {% for item in media_videos + media_images %}
+            {% set item_url = url_for('model_media.serve_media', model_id=model.id, media_id=item.id) %}
+            <a href="{{ item_url }}" target="_blank" rel="noopener" class="model-media-item" title="{{ item.label or item.kind|title }}">
+              {% if item.kind == 'video' %}<video src="{{ item_url }}#t=2" muted preload="metadata" playsinline></video><span class="model-media-badge">Video</span>
+              {% else %}<img src="{{ item_url }}" alt="{{ item.label or 'Saved image' }}" loading="lazy">{% endif %}
+            </a>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if model_access_status(model) == 'active' %}
+        <div class="model-edit-actions">
+          <a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action">Capture, download or regenerate in the viewer</a>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+
       {% if model_status == 'ready' and model_has_layers(model) %}
       {% set layer_stats = model_layer_metrics(model) if layer_metrics_enabled(model) else none %}
-      {% set has_volume = model_layers(model)|selectattr('volume_ml')|list|length > 0 %}
+      {# Compact: each layer's diameter and volume show in the viewer's Layers
+         panel; the full table (sizes and shortest distances) is the CSV. #}
       <div class="surface model-edit-card" id="measurementsSection">
-        <style>
-          .measure-table-wrap { overflow-x: auto; }
-          .measure-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-          .measure-table th, .measure-table td { padding: 6px 8px 6px 0; text-align: left; vertical-align: top; border-top: 1px solid #e8e8e8; overflow-wrap: anywhere; }
-          .measure-table th { font-size: 12px; font-weight: 600; color: #6b6b6b; border-top: 0; }
-          .measure-table td.num, .measure-table th.num { text-align: right; padding-right: 0; padding-left: 8px; }
-          .measure-table td.nowrap { white-space: nowrap; }
-          .measure-table td:first-child, .measure-table th:first-child { min-width: 72px; overflow-wrap: break-word; word-break: normal; }
-          .measure-sub { margin: 14px 0 4px; font-size: 13px; font-weight: 600; }
-          .measure-visibility { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 14px 0 0; font-size: 14px; }
-          .measure-visibility form { margin: 0; }
-        </style>
         <div class="model-edit-card-head">
           <h2>Measurements</h2>
           {% if not layer_metrics_enabled(model) %}
           <p>Structure sizes and shortest distances between layers are available on paid plans.{% if is_project_owner and model.license_type != 'institutional' %} <a href="{{ url_for('model_upgrade_page', model_id=model.id) }}" class="underline">Upgrade this model</a> to use them.{% endif %}</p>
           {% elif layer_stats %}
-          <p>Size of each layer and the shortest distance between layers that are within 5 cm of each other, in millimetres.{% if model.source_format in ('dicom', 'segmentation') %} Approximate measurements for education, not for diagnosis.{% endif %}</p>
+          <p>Size of each layer and the shortest distances between layers, in millimetres. The viewer's Layers panel shows each layer's diameter; the CSV has the full table.{% if model.source_format in ('dicom', 'segmentation') %} Approximate measurements for education, not for diagnosis.{% endif %}</p>
           {% else %}
           <p>Measurements are being prepared. Check back in a few minutes.</p>
           {% endif %}
         </div>
         {% if layer_stats %}
-        <div class="measure-table-wrap">
-          <table class="measure-table">
-            <thead><tr><th scope="col">Layer</th><th scope="col" class="num">L &times; W &times; H (mm)</th><th scope="col" class="num">Max &oslash; (mm)</th>{% if has_volume %}<th scope="col" class="num">Volume (mL)</th>{% endif %}</tr></thead>
-            <tbody>
-              {% for layer in model_layers(model) %}
-              {% set stat = layer_stats.layers.get(layer.name) %}
-              {% if stat %}
-              <tr>
-                <td>{{ layer.name }}</td>
-                <td class="num">{% if stat.dims_mm %}{{ stat.dims_mm|map('round', 1)|join(' × ') }}{% else %}&mdash;{% endif %}</td>
-                <td class="num nowrap">{% if stat.max_diameter_mm is not none %}{{ stat.max_diameter_mm|round(1) }}{% else %}&mdash;{% endif %}</td>
-                {% if has_volume %}<td class="num nowrap">{% if layer.volume_ml is number %}{{ layer.volume_ml|round(1) }}{% else %}&mdash;{% endif %}</td>{% endif %}
-              </tr>
-              {% endif %}
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-        <h3 class="measure-sub">Shortest distances</h3>
-        {% if layer_stats.pairs %}
-        <div class="measure-table-wrap">
-          <table class="measure-table">
-            <thead><tr><th scope="col">Layer A</th><th scope="col">Layer B</th><th scope="col" class="num">Distance (mm)</th></tr></thead>
-            <tbody>
-              {% for pair in layer_stats.pairs %}
-              <tr><td>{{ pair.a }}</td><td>{{ pair.b }}</td><td class="num nowrap">{{ pair.min_distance_mm|round(2) }}</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-        {% else %}
-        <p class="text-sm text-[#64748b]">No two layers are within 5 cm of each other.</p>
-        {% endif %}
-        {% if layer_stats.truncated %}<p class="text-sm text-[#64748b]">Some distances were not measured.</p>{% endif %}
         {% set metrics_public = (model.layer_info or {}).get('metrics_public') %}
-        <div class="measure-visibility">
+        <div class="model-edit-actions model-edit-measure-row">
           <span>Show measurements to viewers: <strong>{{ 'On' if metrics_public else 'Off' }}</strong></span>
           <form method="POST" action="{{ url_for('layer_editor.update_layer_metrics_visibility', model_id=model.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="metrics_public" value="{{ '0' if metrics_public else '1' }}">
             <button type="submit" class="detail-action">{{ 'Turn off' if metrics_public else 'Turn on' }}</button>
           </form>
-        </div>
-        <p class="text-sm text-[#64748b]">When off, only you and project editors see measurements in the viewer.</p>
-        <div class="model-edit-actions">
           <a href="{{ url_for('layer_editor.layer_metrics_csv', model_id=model.id) }}" class="detail-action detail-action-primary">Download CSV</a>
         </div>
         {% endif %}
