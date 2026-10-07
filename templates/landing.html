@@ -77,6 +77,33 @@
   </div>
 </section>
 
+<!-- ============================= SHOWREEL ============================= -->
+<!-- Only the lazy poster loads with the page; the MP4 is fetched on click. -->
+<section class="lp-section lp-launch" id="launch-video">
+  <div class="lp-container">
+    <div class="lp-head reveal-up">
+      <span class="lp-eyebrow">Showreel</span>
+      <h2 class="lp-h2">See AcademicAR in action</h2>
+      <p class="lp-sub">Every viewer feature in 60 seconds.</p>
+    </div>
+    <div class="lp-launch-frame reveal-up" data-launch-video>
+      <img class="lp-launch-poster"
+           src="{{ url_for('static', filename='images/showreel-poster.webp') }}"
+           alt="AcademicAR showreel: a 3D model orbiting in the viewer" loading="lazy" decoding="async" width="1600" height="900">
+      <video class="lp-launch-video" preload="none" playsinline width="1920" height="1080" hidden>
+        <source src="{{ url_for('static', filename='videos/academicar-showreel.mp4') }}" type="video/mp4">
+      </video>
+      <button type="button" class="lp-launch-play" aria-label="Play the AcademicAR showreel (1:00)">
+        <span class="lp-launch-play-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg>
+        </span>
+        <span class="lp-launch-play-text">Watch the showreel</span>
+        <span class="lp-launch-play-time">1:00</span>
+      </button>
+    </div>
+  </div>
+</section>
+
 <!-- ============================= HOW IT WORKS ============================= -->
 <section class="lp-section" id="how-it-works">
   <div class="lp-container">
@@ -369,6 +396,22 @@
           if (!ticking) { window.requestAnimationFrame(updateParallax); ticking = true; }
         }, { passive: true });
       }
+    }
+
+    // Showreel: swap the poster for the video only when asked to play.
+    const launch = document.querySelector('[data-launch-video]');
+    if (launch) {
+      const video = launch.querySelector('video');
+      const poster = launch.querySelector('.lp-launch-poster');
+      launch.querySelector('.lp-launch-play').addEventListener('click', (event) => {
+        video.poster = poster.currentSrc || poster.src;
+        video.hidden = false;
+        video.controls = true;
+        launch.classList.add('is-playing');
+        event.currentTarget.remove();
+        video.play().catch(() => {});
+        video.focus();
+      });
     }
   })();
   </script>
