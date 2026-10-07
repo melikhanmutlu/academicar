@@ -4,16 +4,18 @@
 
 {% block admin_body %}
   <section id="backups" class="admin-section">
-    <form method="POST" action="{{ url_for('admin_backup_create') }}" class="admin-filter-bar">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <button type="submit" class="admin-btn admin-btn-primary compact"{% if backup_requested %} disabled{% endif %}>Create backup now</button>
-      {% if backup_requested %}<span class="admin-editor-note">Requested {{ backup_requested.timestamp.strftime("%Y-%m-%d %H:%M") }} UTC, the worker is building it.</span>
-      {% elif backup_failed %}<span class="admin-editor-note">Last backup failed {{ backup_failed.timestamp.strftime("%Y-%m-%d %H:%M") }} UTC: {{ (backup_failed.details or {}).get("error") or "see the worker log" }}</span>
-      {% elif backup_skipped %}<span class="admin-editor-note">Last backup skipped {{ backup_skipped.timestamp.strftime("%Y-%m-%d %H:%M") }} UTC: not enough disk space. Delete old archives.</span>{% endif %}
-    </form>
     <div class="admin-section-head">
-      <p>Made daily by the worker. Keeps the newest {{ backup_keep }}{% if backup_offsite %} offsite and {{ backup_local_keep }} on this server{% endif %}.{% if backup_age_hours is not none %} Last backup: {{ backup_age_hours }} h ago.{% endif %}</p>
-      <span>{{ backups|length }} {{ "archive" if backups|length == 1 else "archives" }}</span>
+      <div>
+        <span>{{ backups|length }} {{ "archive" if backups|length == 1 else "archives" }}</span>
+        <p>Made daily by the worker. Keeps the newest {{ backup_keep }}{% if backup_offsite %} offsite and {{ backup_local_keep }} on this server{% endif %}.{% if backup_age_hours is not none %} Last backup: {{ backup_age_hours }} h ago.{% endif %}</p>
+        {% if backup_requested %}<p class="admin-editor-note">Requested {{ backup_requested.timestamp.strftime("%Y-%m-%d %H:%M") }} UTC, the worker is building it.</p>
+        {% elif backup_failed %}<p class="admin-editor-note">Last backup failed {{ backup_failed.timestamp.strftime("%Y-%m-%d %H:%M") }} UTC: {{ (backup_failed.details or {}).get("error") or "see the worker log" }}</p>
+        {% elif backup_skipped %}<p class="admin-editor-note">Last backup skipped {{ backup_skipped.timestamp.strftime("%Y-%m-%d %H:%M") }} UTC: not enough disk space. Delete old archives.</p>{% endif %}
+      </div>
+      <form method="POST" action="{{ url_for('admin_backup_create') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="admin-btn admin-btn-primary compact"{% if backup_requested %} disabled{% endif %}>Create backup now</button>
+      </form>
     </div>
     <div class="table-wrap">
       <table class="data-table admin-table">
@@ -28,7 +30,7 @@
             <tr>
               <td>{{ backup.filename }}<small>{{ backup.created_at.strftime("%Y-%m-%d %H:%M") }} UTC &middot; {{ format_file_size(backup.size) }}</small></td>
               <td>
-                <div class="admin-blog-row-actions">
+                <div class="admin-actions">
                   <a href="{{ url_for('admin_backup_download', filename=backup.filename) }}" class="admin-btn admin-btn-secondary compact">Download</a>
                   <form method="POST" action="{{ url_for('admin_backup_delete', filename=backup.filename) }}" class="admin-inline" onsubmit="return confirm('Delete this archive permanently{% if backup_offsite %}, here and offsite{% endif %}?')">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

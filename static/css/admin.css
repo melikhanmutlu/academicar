@@ -376,12 +376,13 @@
 }
 
 .admin-editor > summary::after {
-  content: " +";
+  content: "+";
+  margin-left: 5px;
   color: var(--color-silver-ash);
 }
 
 .admin-editor[open] > summary::after {
-  content: " –";
+  content: "–";
 }
 
 .admin-editor-body {
@@ -447,6 +448,101 @@
   flex-wrap: wrap;
 }
 
+/* An editor placed in a row's action bar (.admin-actions) closes to a compact
+   button beside the other actions and opens on its own line below them,
+   instead of a full-width grey bar that doubles every row's height. */
+.admin-actions > .admin-editor {
+  margin: 0;
+  border: 0;
+  background: none;
+}
+
+.admin-actions > .admin-editor > summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 7px 11px;
+  border: 1px solid var(--color-light-pearl);
+  border-radius: 8px;
+  background: var(--color-canvas-white);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.admin-actions > .admin-editor > summary:hover {
+  background: var(--color-cloud-whisper);
+  border-color: var(--color-silver-ash);
+}
+
+.admin-actions > .admin-editor[open] {
+  flex-basis: 100%;
+}
+
+.admin-actions > .admin-editor[open] > summary {
+  background: var(--color-slate-mist);
+}
+
+.admin-actions > .admin-editor > .admin-editor-body {
+  width: min(560px, 100%);
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid var(--color-light-pearl);
+  border-radius: 8px;
+  background: var(--color-cloud-whisper);
+}
+
+/* A form inside an action bar is one group of controls in its wrapping row. */
+.admin-actions > form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Selects in an action bar size to their longest option. */
+.admin-actions .compact-select {
+  width: auto;
+  min-width: 0;
+}
+
+/* ---- Tables --------------------------------------------------------------
+   Cells centre on the row so text lines up with the buttons and chips beside
+   it. Below 1180px cells tighten so six columns fit beside the sidebar; above
+   it headings stay on one line and the first column, which names the row,
+   never collapses to a word per line. From 1400px a row's actions stay on one
+   line and the text columns wrap instead (an opened editor still drops to its
+   own line). */
+.admin-table td {
+  vertical-align: middle;
+}
+
+@media (max-width: 1179px) {
+  .admin-table th,
+  .admin-table td {
+    padding-left: 7px;
+    padding-right: 7px;
+  }
+}
+
+@media (min-width: 1180px) {
+  .admin-table th {
+    white-space: nowrap;
+  }
+  .admin-table td:first-child {
+    min-width: 220px;
+  }
+}
+
+@media (min-width: 1400px) {
+  .admin-table .admin-actions,
+  .admin-table .admin-actions > form {
+    flex-wrap: nowrap;
+  }
+  .admin-table .admin-actions:has(> .admin-editor[open]) {
+    flex-wrap: wrap;
+  }
+}
+
 .admin-page-note {
   font-family: var(--font-inter);
   font-size: 13px;
@@ -505,6 +601,86 @@
   }
   .admin-editor-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ---- Phones: tables become stacked rows -------------------------------------
+   A five-column table squeezed to 360px wraps every cell to one word per line.
+   Each row becomes a block instead: the first cell is the title, the others
+   follow as "LABEL  value" lines (labels copied from the header by
+   admin/base.html), and the action bar wraps underneath. */
+@media (max-width: 760px) {
+  .admin-table,
+  .admin-table tbody,
+  .admin-table tr,
+  .admin-table td {
+    display: block;
+    width: 100%;
+  }
+  .admin-table thead {
+    display: none;
+  }
+  .admin-table tr {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--color-light-pearl);
+  }
+  .admin-table td {
+    padding: 3px 0;
+    border: 0;
+  }
+  .admin-table td[data-label] {
+    text-align: right;
+  }
+  .admin-table td[data-label]::after {
+    content: "";
+    display: block;
+    clear: both;
+  }
+  .admin-table td[data-label]::before {
+    content: attr(data-label);
+    float: left;
+    margin-right: 12px;
+    line-height: 22px;
+    color: var(--color-silver-ash);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: left;
+  }
+  .admin-table td:has(> .admin-actions) {
+    padding-top: 10px;
+  }
+  .admin-table .compact-select {
+    min-width: 0;
+    max-width: 100%;
+  }
+  /* Filters: full-width fields, buttons side by side underneath. */
+  .admin-filter-bar .field-input,
+  .admin-filter-bar .field-select,
+  .admin-filter-bar input[type="date"] {
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: none;
+  }
+  /* KPI tiles stay two per row instead of one tall card per screen. */
+  .admin-metrics,
+  .admin-insight-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .admin-metric,
+  .admin-insight-card {
+    padding: 12px;
+  }
+  .admin-metric strong {
+    font-size: 28px;
+  }
+  .admin-insight-card strong {
+    font-size: 24px;
+  }
+  .admin-section {
+    padding: 16px;
   }
 }
 
@@ -639,9 +815,6 @@
 .admin-data-list span { min-width:0; overflow-wrap:anywhere; }
 .admin-data-list strong { color:var(--color-midnight-graphite); font-weight:600; white-space:nowrap; font-variant-numeric:tabular-nums; }
 .admin-empty { margin:0; color:var(--color-silver-ash); font-family:var(--font-inter); font-size:13px; }
-/* An insight card without a caption line keeps its value under the label
-   instead of dropping it to the card's bottom edge (QR, model health). */
-.admin-insight-card > strong:last-child { margin-top: 10px; margin-bottom: auto; }
 /* Secondary text (counts, slugs, dates) anywhere in the admin shell. */
 .admin-muted { margin: 0; color: var(--color-silver-ash); font-family: var(--font-inter); font-size: 12px; }
 
@@ -689,9 +862,9 @@ body:has(.admin-layout) .flash-stack {
 /* Short values (dates, sizes) never split mid-value when a table squeezes. */
 .admin-nowrap { white-space: nowrap; }
 .admin-field-narrow { max-width: 520px; }
-/* Secondary table columns drop out on phones. */
+/* Secondary table columns drop out on phones (td: beats the stacked-row cell rule). */
 @media (max-width: 640px) {
-  .admin-hide-sm, .admin-table small.admin-hide-sm, .admin-metric small.admin-hide-sm { display: none; }
+  .admin-hide-sm, .admin-table td.admin-hide-sm, .admin-table small.admin-hide-sm, .admin-metric small.admin-hide-sm { display: none; }
 }
 
 /* ================================================================
@@ -708,24 +881,16 @@ a.admin-metric:hover, a.admin-metric:focus-visible { border-color: var(--color-s
 /* == end page:overview == */
 
 /* == page:users == */
-/* Row actions stay in one wrapping row on phones instead of a tall stack. */
-.admin-users-table .admin-actions { flex-direction: row; flex-wrap: wrap; align-items: center; }
-.admin-users-table .admin-actions .admin-btn { width: auto; }
-.admin-users-table td, .admin-users-table th { padding-left: 8px; padding-right: 8px; }
-.admin-users-table td small, .admin-users-table td a { overflow-wrap: anywhere; }
-@media (max-width: 640px) { .admin-users-table td:first-child { width: 46%; } }
 .admin-table small.admin-show-sm { display: none; }
 @media (max-width: 640px) { .admin-table small.admin-show-sm { display: block; } }
 /* == end page:users == */
 
 /* == page:content == */
 .content-chip-sm { display: none; }
+.content-url { overflow-wrap: anywhere; }
 @media (max-width: 640px) {
   .content-chip-sm { display: inline-block; margin-top: 6px; }
   .content-table .content-url { display: none; }
-  .content-table .admin-actions form { display: flex; flex-direction: column; gap: 8px; width: 100%; }
-  .content-table .admin-actions, .content-table .admin-actions .admin-btn, .content-table .admin-editor { min-width: 0; max-width: 100%; }
-  .content-table .admin-actions .compact-select { max-width: 100%; }
 }
 /* == end page:content == */
 
@@ -734,9 +899,6 @@ a.admin-metric:hover, a.admin-metric:focus-visible { border-color: var(--color-s
 .admin-editor-field input[type="color"] { width: 56px; padding: 2px; }
 .admin-breakdown.is-flat { border: none; padding: 0; }
 .admin-metric small { overflow-wrap: anywhere; }
-.admin-breakdown .admin-actions form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-/* Poster & QR buttons group to the left instead of the breakdown row's space-between. */
-.admin-breakdown div.admin-wrap-row { justify-content: flex-start; }
 /* "Project deleted" stands in for the Viewer button: a neutral chip that wraps. */
 .models-offline { align-self: flex-start; white-space: normal; text-align: left; line-height: 1.3; }
 /* == end page:models == */
@@ -756,22 +918,13 @@ a.admin-metric:hover, a.admin-metric:focus-visible { border-color: var(--color-s
 
 /* == page:access == */
 .admin-insight-grid + .admin-section-head { margin-top: 16px; }
-@media (max-width: 640px) {
-  .admin-table .admin-inline-form { flex-direction: column; align-items: stretch; gap: 6px; min-width: 0; }
-  .admin-table .admin-inline-form .field-select { width: 100%; min-width: 0; }
-  #qr .admin-table td:last-child { min-width: 112px; }
-}
 /* == end page:access == */
 
 /* == page:revenue == */
 .admin-table small.revenue-amount-sm { display: none; }
-@media (max-width: 760px) {
+@media (max-width: 640px) {
   .admin-table small.revenue-amount-sm { display: block; }
   #payments .revenue-hide-sm { display: none; }
-  #payments .admin-table td:last-child { min-width: 124px; }
-  #payments .admin-actions { flex-direction: column; align-items: stretch; min-width: 0; }
-  #payments .admin-actions .admin-inline-form { flex-direction: column; align-items: stretch; gap: 6px; min-width: 0; }
-  #payments .admin-actions .compact-select, #payments .admin-actions .admin-btn { width: 100%; min-width: 0; max-width: 100%; }
 }
 /* == end page:revenue == */
 
@@ -796,19 +949,12 @@ a.admin-insight-card:hover { border-color: var(--color-silver-ash); }
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
-.admin-storage-cards .admin-insight-card {
-  min-height: 0;
-  gap: 6px;
-}
 .admin-storage-maint {
   margin-top: 16px;
 }
 @media (max-width: 640px) {
   .admin-storage-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .admin-storage-cards .admin-insight-card {
-    padding: 12px;
   }
   .admin-storage-maint .admin-btn {
     width: 100%;
@@ -888,7 +1034,4 @@ a.admin-insight-card:hover { border-color: var(--color-silver-ash); }
 .admin-audience { align-items: stretch; }
 .admin-audience .admin-section { margin: 0; }
 .admin-audience small { color: var(--color-silver-ash); font-weight: 400; }
-/* KPI cards here have no caption line, so they hug label + number instead of
-   spreading them across the shared card min-height. */
-.analytics-metrics .admin-metric { min-height: 0; justify-content: flex-start; gap: 12px; }
 /* == end page:analytics == */

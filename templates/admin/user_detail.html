@@ -106,27 +106,29 @@
               <td class="admin-hide-sm">{{ paper.models|length }}</td>
               <td class="admin-hide-sm admin-nowrap">{{ paper.created_at.strftime("%Y-%m-%d") if paper.created_at else "-" }}</td>
               <td>
-                <details class="admin-editor">
-                  <summary>Edit metadata</summary>
-                  <div class="admin-editor-body">
-                    <form method="POST" action="{{ url_for('admin_paper_metadata_update', paper_id=paper.id) }}">
-                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                      <input type="hidden" name="next" value="user_detail">
-                      <div class="admin-editor-grid">
-                        <label class="admin-editor-field"><span>Title</span><input name="title" value="{{ paper.title }}" required maxlength="500"></label>
-                        <label class="admin-editor-field"><span>Authors</span><input name="authors" value="{{ paper.authors or '' }}" maxlength="500"></label>
-                        <label class="admin-editor-field"><span>Year</span><input name="year" value="{{ paper.year or '' }}" inputmode="numeric"></label>
-                        <label class="admin-editor-field"><span>Field</span><input name="field" value="{{ paper.field or '' }}" maxlength="100"></label>
-                        <label class="admin-editor-field"><span>DOI</span><input name="doi" value="{{ paper.doi or '' }}" maxlength="200"></label>
-                        <label class="admin-editor-field"><span>PMID</span><input name="pmid" value="{{ paper.pmid or '' }}" maxlength="100"></label>
-                        <label class="admin-editor-field"><span>Institution</span><input name="institution" value="{{ paper.institution or '' }}" maxlength="300"></label>
-                      </div>
-                      <div class="admin-editor-actions">
-                        <button type="submit" class="admin-btn admin-btn-primary compact">Save metadata</button>
-                      </div>
-                    </form>
-                  </div>
-                </details>
+                <div class="admin-actions">
+                  <details class="admin-editor">
+                    <summary>Edit</summary>
+                    <div class="admin-editor-body">
+                      <form method="POST" action="{{ url_for('admin_paper_metadata_update', paper_id=paper.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="next" value="user_detail">
+                        <div class="admin-editor-grid">
+                          <label class="admin-editor-field"><span>Title</span><input name="title" value="{{ paper.title }}" required maxlength="500"></label>
+                          <label class="admin-editor-field"><span>Authors</span><input name="authors" value="{{ paper.authors or '' }}" maxlength="500"></label>
+                          <label class="admin-editor-field"><span>Year</span><input name="year" value="{{ paper.year or '' }}" inputmode="numeric"></label>
+                          <label class="admin-editor-field"><span>Field</span><input name="field" value="{{ paper.field or '' }}" maxlength="100"></label>
+                          <label class="admin-editor-field"><span>DOI</span><input name="doi" value="{{ paper.doi or '' }}" maxlength="200"></label>
+                          <label class="admin-editor-field"><span>PMID</span><input name="pmid" value="{{ paper.pmid or '' }}" maxlength="100"></label>
+                          <label class="admin-editor-field"><span>Institution</span><input name="institution" value="{{ paper.institution or '' }}" maxlength="300"></label>
+                        </div>
+                        <div class="admin-editor-actions">
+                          <button type="submit" class="admin-btn admin-btn-primary compact">Save metadata</button>
+                        </div>
+                      </form>
+                    </div>
+                  </details>
+                </div>
               </td>
             </tr>
           {% else %}

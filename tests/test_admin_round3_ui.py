@@ -106,5 +106,5 @@ def test_security_grid_has_fixed_columns():
 def test_analytics_metrics_scoped_rule(client):
     html = client.get("/admin/analytics").get_data(as_text=True)
     assert 'class="admin-metrics analytics-metrics"' in html
-    block = ADMIN_CSS.split("/* == page:analytics == */", 1)[1]
-    assert ".analytics-metrics .admin-metric" in block
+    # KPI cards hug their content everywhere now, so no page override is needed.
+    assert "min-height: 132px" not in open(ROOT / "static" / "css" / "style.css", encoding="utf-8").read()

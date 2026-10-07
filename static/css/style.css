@@ -7063,12 +7063,11 @@ label.rounded-xl input[type="checkbox"] {
   margin-bottom: 24px;
 }
 
-/* KPI cards: label and value from the top, note pinned to the bottom, so
-   values line up across a row whatever the note length. */
+/* KPI cards: label, value and note stacked from the top; cards in a row
+   share the row height, so values line up whatever the note length. */
 .admin-metric {
   min-width: 0;
   overflow-wrap: anywhere;
-  min-height: 132px;
   border: 1px solid var(--color-light-pearl);
   background: var(--color-canvas-white);
   border-radius: 8px;
@@ -7077,9 +7076,6 @@ label.rounded-xl input[type="checkbox"] {
   flex-direction: column;
   gap: 8px;
 }
-.admin-metric small,
-.admin-insight-card small { margin-top: auto; }
-
 .admin-metric span,
 .admin-section-head span {
   color: var(--color-silver-ash);
@@ -7112,8 +7108,8 @@ label.rounded-xl input[type="checkbox"] {
   background: var(--color-canvas-white);
   border: 1px solid var(--color-light-pearl);
   border-radius: 8px;
-  padding: 24px;
-  margin-bottom: 18px;
+  padding: 20px;
+  margin-bottom: 16px;
   scroll-margin-top: 92px;
 }
 
@@ -7122,14 +7118,14 @@ label.rounded-xl input[type="checkbox"] {
   align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 
 .admin-section-head h2 {
   font-family: var(--font-polysans);
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 400;
-  letter-spacing: -0.56px;
+  letter-spacing: -0.44px;
   color: var(--color-midnight-graphite);
   margin: 0 0 4px;
 }
@@ -7152,7 +7148,6 @@ label.rounded-xl input[type="checkbox"] {
 .admin-insight-card {
   min-width: 0;
   overflow-wrap: anywhere;
-  min-height: 128px;
   border: 1px solid var(--color-light-pearl);
   border-radius: 8px;
   background: var(--color-cloud-whisper);
@@ -7192,7 +7187,7 @@ label.rounded-xl input[type="checkbox"] {
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
   margin-top: 16px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .admin-two-col {
@@ -7200,14 +7195,14 @@ label.rounded-xl input[type="checkbox"] {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin-top: 16px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .admin-three-col {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 12px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .admin-breakdown,
@@ -7228,7 +7223,7 @@ label.rounded-xl input[type="checkbox"] {
   margin: 0 0 12px;
 }
 
-.admin-breakdown div,
+.admin-breakdown > div:not([class]),
 .admin-watch-list li {
   display: flex;
   align-items: center;
@@ -7261,7 +7256,7 @@ label.rounded-xl input[type="checkbox"] {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin-top: 16px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .admin-watch-list {
@@ -7802,25 +7797,6 @@ details[open] > .upload-summary .upload-inline-action svg {
   .admin-section {
     padding: 18px;
   }
-  .admin-actions,
-  .admin-inline-form,
-  .admin-filter-bar {
-    align-items: stretch;
-    flex-direction: column;
-  }
-  .admin-breakdown-grid,
-  .admin-two-col {
-    grid-template-columns: 1fr;
-  }
-  .admin-table .compact-select,
-  .admin-table .compact-input,
-  .admin-filter-bar .field-input,
-  .admin-filter-bar .field-select,
-  .admin-filter-bar .btn-secondary,
-  .admin-actions .btn-secondary,
-  .admin-inline-form .btn-secondary {
-    width: 100%;
-  }
   .dashboard-upload-band,
   .dashboard-upload-actions {
     align-items: stretch;
@@ -7871,11 +7847,8 @@ details[open] > .upload-summary .upload-inline-action svg {
     flex: 1 1 180px;
   }
   .admin-breakdown-grid,
-  .admin-breakdown,
   .admin-two-col {
-    grid-template-columns: minmax(0, 1fr) !important;
-    min-width: 0;
-    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
   }
   .admin-watch-list li {
     align-items: flex-start;

@@ -70,6 +70,20 @@
       if (window.innerWidth > 1023 && sidebar.classList.contains('is-open')) close();
     });
   })();
+  // Phones show table rows stacked (admin.css): each cell after the first gets
+  // its column heading as a label. Action cells and blank headings get none.
+  document.querySelectorAll('.admin-table').forEach(function (table) {
+    var heads = Array.prototype.map.call(table.querySelectorAll('thead th'), function (th) {
+      return th.textContent.trim();
+    });
+    table.querySelectorAll('tbody tr').forEach(function (row) {
+      Array.prototype.forEach.call(row.children, function (cell, i) {
+        var label = heads[i];
+        if (i === 0 || !label || cell.colSpan > 1 || /^actions?$/i.test(label) || cell.querySelector('.admin-actions')) return;
+        cell.setAttribute('data-label', label);
+      });
+    });
+  });
 </script>
 {% block admin_scripts %}{% endblock %}
 {% endblock %}
