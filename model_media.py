@@ -11,6 +11,7 @@ import io
 import logging
 import os
 import uuid
+from datetime import UTC, datetime
 
 from flask import Blueprint, abort, current_app, jsonify, request, send_from_directory, url_for
 from flask_login import login_required
@@ -28,6 +29,9 @@ MAX_VIDEOS_PER_MODEL = 8
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 MAX_VIDEO_BYTES = 60 * 1024 * 1024
 LABEL_MAX = 120
+# Automatic views and videos made before this were often captured at half size
+# in a corner and framed loosely; they are made again on the owner's next visit.
+AUTO_MEDIA_FRAMED_SINCE = datetime(2026, 10, 7, 6, 0, tzinfo=UTC)
 _TYPES = {
     "image/png": ("image", "png"),
     "image/jpeg": ("image", "jpg"),
@@ -92,13 +96,22 @@ def _remove(media: ModelMedia) -> None:
     mirror_delete(media_r2_key(media))
 
 
+def _stale_auto(item: ModelMedia) -> bool:
+    created = item.created_at
+    if created is not None and created.tzinfo is None:
+        created = created.replace(tzinfo=UTC)
+    return item.source == "auto" and created is not None and created < AUTO_MEDIA_FRAMED_SINCE
+
+
 def auto_media_state(model) -> dict:
     """What the owner's browser needs to fill in the automatic media: the labels
-    already made and how much room each kind has left under the caps."""
-    images = sum(1 for item in model.media if item.kind == "image")
-    videos = sum(1 for item in model.media if item.kind == "video")
+    already made and how much room each kind has left under the caps. Stale
+    automatic items count as missing and are replaced in place."""
+    current = [item for item in model.media if not _stale_auto(item)]
+    images = sum(1 for item in current if item.kind == "image")
+    videos = sum(1 for item in current if item.kind == "video")
     return {
-        "have": [item.label for item in model.media if item.source == "auto" and item.label],
+        "have": [item.label for item in current if item.source == "auto" and item.label],
         "image_room": MAX_IMAGES_PER_MODEL - images,
         "video_room": MAX_VIDEOS_PER_MODEL - videos,
     }

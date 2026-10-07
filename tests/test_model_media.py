@@ -165,3 +165,25 @@ def test_rename_and_replace_a_regenerated_set(app, client):
     renamed = client.post(f"/models/{mid}/media/{other['id']}/rename", json={"label": "  Poster shot "}).get_json()
     assert renamed["ok"] and renamed["media"]["label"] == "Poster shot"
     assert client.post(f"/models/{mid}/media/{other['id']}/rename", json={"label": " "}).status_code == 400
+
+
+def test_auto_media_made_before_the_framing_fix_is_made_again(app, client):
+    """Automatic views made before AUTO_MEDIA_FRAMED_SINCE were captured at half
+    size in a corner; the owner's next visit regenerates them in place."""
+    from datetime import timedelta
+
+    from models import Model3D
+
+    mid, _ = _make_model(app)
+    _login(client)
+    assert _upload(client, mid, _png(), label="View: Front", source="auto").status_code == 201
+    assert _upload(client, mid, _png(), label="View: Side", source="auto").status_code == 201
+    assert _upload(client, mid, _png(), label="Mine").status_code == 201
+    with app.app_context():
+        front = ModelMedia.query.filter_by(label="View: Front").one()
+        front.created_at = model_media.AUTO_MEDIA_FRAMED_SINCE - timedelta(days=1)
+        db.session.commit()
+        state = model_media.auto_media_state(db.session.get(Model3D, mid))
+    assert state["have"] == ["View: Side"]
+    # The stale view is replaced in place, so it does not use up room.
+    assert state["image_room"] == model_media.MAX_IMAGES_PER_MODEL - 2
