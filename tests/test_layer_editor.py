@@ -390,3 +390,20 @@ def test_viewer_offers_saving_layer_colours_to_editors_only(client, app, owner):
     visitor = client.get(f"/view/{owner}").get_data(as_text=True)
     assert "data-layers-save data-url" not in visitor  # visitors can preview colours, not save them
     assert 'type="color" class="layer-swatch"' in visitor
+
+
+def test_colour_change_drops_stale_automatic_media_but_rename_keeps_it(client, app, owner):
+    from models import ModelMedia
+
+    with app.app_context():
+        for source in ("auto", "user"):
+            db.session.add(ModelMedia(model_id=owner, kind="image", source=source,
+                                      label=f"{source} view", filename=f"{source}.jpg", mimetype="image/jpeg"))
+        db.session.commit()
+    layers = _layers(app, owner)
+    client.post(f"/models/{owner}/layers", data=_form(layers, names={0: "Renamed"}))
+    with app.app_context():
+        assert sorted(m.source for m in ModelMedia.query.filter_by(model_id=owner)) == ["auto", "user"]
+    client.post(f"/models/{owner}/layers", data=_form(_layers(app, owner), colors={1: "#336699"}))
+    with app.app_context():
+        assert [m.source for m in ModelMedia.query.filter_by(model_id=owner)] == ["user"]

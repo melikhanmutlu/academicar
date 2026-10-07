@@ -435,16 +435,20 @@
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
               <div class="upload-form-header">
-                <div>
-                  <h2 class="upload-form-title">{{ 'Add a model' if paper.models else 'Add the first model' }}</h2>
-                </div>
+                <h2 class="upload-form-title">{{ 'Add a model' if paper.models else 'Add the first model' }}</h2>
+                <p class="upload-description">Upload an anonymized model file. The platform prepares a stable public viewer, managed QR code, and AR-ready GLB asset.</p>
               </div>
 
               <div class="upload-workflow-left">
-                <label class="upload-dropzone">
-                  <span class="block text-[#111827] font-semibold">Select a 3D model, CAD file or medical scan</span>
-                  <span class="block text-sm text-[#64748b] mt-1" data-dropzone-copy>GLB, STL, OBJ, FBX, STEP/STP, or a DICOM series (ZIP), NIfTI, NRRD or DICOM-SEG. Drag and drop, or choose a file.</span>
-                  <span class="file-picker-control mt-4"><span>Choose file</span><small data-file-name>No file selected</small></span>
+                <label class="upload-dropzone upload-dropzone-hero">
+                  <span class="upload-dropzone-icon" aria-hidden="true">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+                  </span>
+                  <span class="upload-dropzone-copy">
+                    <span class="upload-dropzone-title">Select a 3D model, CAD file or medical scan</span>
+                    <span class="upload-dropzone-hint" data-dropzone-copy>GLB, STL, OBJ, FBX, STEP/STP, or a DICOM series (ZIP), NIfTI, NRRD or DICOM-SEG. Drag and drop, or choose a file.</span>
+                  </span>
+                  <span class="file-picker-control"><span>Choose file</span><small data-file-name>No file selected</small></span>
                   <input type="file" name="file" accept=".glb,.stl,.obj,.fbx,.step,.stp,.zip,.nii,.nii.gz,.gz,.nrrd,.dcm" required class="native-file-input" data-dropzone-input>
                 </label>
                 <div class="companion-files-section" data-companion-section style="display: none;">
@@ -459,7 +463,6 @@
               </div>
 
               <div class="upload-workflow-right">
-                <p class="upload-description">Upload an anonymized model file. The platform prepares a stable public viewer, managed QR code, and AR-ready GLB asset.</p>
                 {% set upgrade_hint = "Upgrade to Academic (3-year) or Extended Archive (10-year) any time from the model card below — the same QR and viewer link stay stable." %}
                 {% include "_upload_plan_note.html" %}
                 <div class="grid sm:grid-cols-2 gap-4">

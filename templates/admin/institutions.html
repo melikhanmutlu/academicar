@@ -51,7 +51,7 @@
                 {% endif %}
               </td>
               <td><span class="status-chip {{ admin_chip_class(state) }}">{{ state|replace("_", " ")|capitalize }}</span></td>
-              <td class="admin-hide-sm">{{ institution.contract_ends_at.strftime("%Y-%m-%d") if institution.contract_ends_at else "Open-ended" }}</td>
+              <td class="admin-hide-sm admin-nowrap">{{ institution.contract_ends_at.strftime("%Y-%m-%d") if institution.contract_ends_at else "Open-ended" }}</td>
               <td class="admin-hide-sm">{{ institution_member_counts.get(institution.id, 0) }}</td>
               <td class="admin-hide-sm">
                 {{ usage.models }}{% if institution.quota_model_count is not none %} / {{ institution.quota_model_count }}{% endif %} models

@@ -200,3 +200,22 @@ def test_set_base_color_factor_preserves_existing_alpha(tmp_path):
     bcf = g2.materials[0].pbrMetallicRoughness.baseColorFactor
     assert bcf[:3] == [0.2, 0.4, 0.8]
     assert bcf[3] == 0.5  # translucent material keeps its opacity
+
+
+def test_viewer_color_drops_stale_automatic_media(client, app, monkeypatch):
+    """Auto views/videos show the old colour; a saved recolour drops them so the
+    owner's next visit regenerates them. Media the owner captured is kept."""
+    from models import ModelMedia
+    from tests.conftest import login
+
+    mid = _owned_ready_model(app, email="vc3@example.com")
+    with app.app_context():
+        for source in ("auto", "user"):
+            db.session.add(ModelMedia(model_id=mid, kind="image", source=source,
+                                      label=f"{source} view", filename=f"{source}.jpg", mimetype="image/jpeg"))
+        db.session.commit()
+    login(client, email="vc3@example.com", password="password123")
+    monkeypatch.setattr("app._bake_viewer_color", lambda model, color: (True, "ok"))
+    assert client.post(f"/models/{mid}/viewer-color", json={"color": "#3366CC"}).status_code == 200
+    with app.app_context():
+        assert [m.source for m in ModelMedia.query.filter_by(model_id=mid).all()] == ["user"]

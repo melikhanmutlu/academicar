@@ -38,7 +38,7 @@
                 <small>{{ user.email }}</small>{% if user.is_admin or user.deactivated_at %}<small class="admin-show-sm">{{ "Admin" if user.is_admin else "" }}{{ " · " if user.is_admin and user.deactivated_at else "" }}{{ "Deactivated" if user.deactivated_at else "" }}</small>{% endif %}
               </td>
               <td class="admin-hide-sm"><span class="status-chip">{{ "Admin" if user.is_admin else "Member" }}</span>{% if user.deactivated_at %} <span class="status-chip is-failed" title="Deactivated {{ user.deactivated_at.strftime('%Y-%m-%d') }}">Deactivated</span>{% endif %}</td>
-              <td class="admin-hide-sm">{{ user.created_at.strftime("%Y-%m-%d") if user.created_at else "-" }}</td>
+              <td class="admin-hide-sm admin-nowrap">{{ user.created_at.strftime("%Y-%m-%d") if user.created_at else "-" }}</td>
               <td>
                 <div class="admin-actions">
                   {% if user.id != current_user.id and not (user.is_admin and user_is_configured_admin(user)) %}

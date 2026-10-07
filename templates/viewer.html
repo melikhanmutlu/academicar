@@ -367,12 +367,17 @@
       display: flex;
       align-items: center;
       gap: 6px;
+      max-width: min(240px, 60vw);
     }
+    /* Long labels (up to 120 characters) truncate instead of running off screen. */
+    .annotation-hotspot .annotation-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
     .annotation-hotspot:hover { background: rgba(255, 104, 44, 0.85); }
     .annotation-hotspot[data-hidden] { opacity: 0; pointer-events: none; transform: scale(0.8); }
-    /* Guided tour (presentation mode): one label at a time, the rest dimmed. */
-    .tour-mode .annotation-hotspot { opacity: 0.35; }
-    .tour-mode .annotation-hotspot[data-hidden] { opacity: 0.35; pointer-events: auto; transform: none; }
+    /* Label tour (presentation mode): one label at a time, the rest dimmed.
+       A scene tour keeps each scene's own label state (a scene saved with
+       labels off must not show them, dimmed or not). */
+    .tour-mode:not(.is-scene-tour) .annotation-hotspot { opacity: 0.35; }
+    .tour-mode:not(.is-scene-tour) .annotation-hotspot[data-hidden] { opacity: 0.35; pointer-events: auto; transform: none; }
     .tour-mode .annotation-hotspot.is-tour-active { opacity: 1; background: rgba(255, 104, 44, 0.92); border-color: transparent; }
     .tour-mode .viewer-control-panel { display: none !important; }
     .tour-bar {
@@ -459,7 +464,9 @@
       left: 50%;
       bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
       transform: translateX(-50%);
-      z-index: 45;
+      /* Above the label note popover (also bottom-centre, z 45) so the hint's
+         Done button can always be reached. */
+      z-index: 46;
       display: inline-flex;
       align-items: center;
       gap: 10px;
@@ -504,6 +511,9 @@
     .layer-swatch::-moz-color-swatch { border: 0; border-radius: 3px; }
     .layer-swatch:disabled { cursor: default; opacity: 0.6; }
     .layer-swatch:focus-visible { outline: 2px solid #ff682c; outline-offset: 2px; }
+    /* Same visible focus ring as the panel controls (the default dark outline
+       was ~1.2:1 against the dark toolbar buttons). */
+    .viewer-tool-btn:focus-visible { outline: 2px solid #ff682c; outline-offset: 2px; }
     .layers-save { display: flex; align-items: center; gap: 10px; padding: 8px 14px 12px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
     .layers-save[hidden] { display: none; }
     .layers-save button { font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 999px; color: #202020; background: #fff; border: 1px solid #fff; }
@@ -1148,6 +1158,24 @@
       border-radius: 999px;
     }
     .viewer-panel-body::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.42); }
+    /* Above phone width the open control panel floats over the left of the
+    canvas (24px + 380px). The camera frames the model in the full canvas, so
+    on tablets and small laptops the panel hid up to half of it. While the
+    panel is open the viewer starts at the panel's right edge, so the model is
+    framed in the area that is actually visible; collapsed, it is full width. */
+    @media (min-width: 641px) {
+      body:has(#controlPanel[data-collapsed="false"]) #viewer { left: 404px; width: auto; }
+    }
+    /* The header toolbar carries up to nine labelled buttons, which need about
+       1280px; the Tailwind sm: (640px) label switch let them overflow the
+       screen at tablet widths and wrap "Full screen" / "View in AR" onto two
+       lines on small laptops. Below 1280px the toolbar is icon-only (labels
+       stay as aria-labels). */
+    @media (max-width: 1279px) {
+      header .viewer-toolbar .viewer-tool-btn { min-width: 40px; padding: 0.45rem; justify-content: center; }
+      header .viewer-toolbar .viewer-tool-btn > svg { display: block; }
+      header .viewer-toolbar .viewer-tool-btn > span.sm\:inline { display: none; }
+    }
     @media (max-width: 640px) {
       .viewer-tool-btn { min-height: 40px; min-width: 40px; }
       /* Icon-only on phones: the header toolbar and the AR button. Modal
@@ -1238,6 +1266,8 @@
     .section-overlay line { stroke-width: 1.5; stroke-opacity: 0.85; }
     .section-overlay line.is-cut-axis { stroke-width: 2.5; stroke-opacity: 1; }
     .section-overlay text { font: 700 12px Inter, system-ui, sans-serif; paint-order: stroke; stroke: rgba(0, 0, 0, 0.65); stroke-width: 3px; }
+    /* On light backgrounds a dark halo smudged the axis labels; use a light one. */
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .section-overlay text { stroke: rgba(255, 255, 255, 0.85); }
     .tour-mode .section-overlay { display: none !important; }
     /* 2D slice view (Slicer-like): the cross-section at the plane, with its own measure tool. */
     .section-panel { overflow-y: auto; }
@@ -1361,7 +1391,7 @@
               data-annotation-id="{{ ann.id }}"
               data-annotation-desc="{{ ann.description or '' }}"
               {% if ann.camera_orbit %}data-camera-orbit="{{ ann.camera_orbit }}" data-camera-target="{{ ann.camera_target }}" data-camera-fov="{{ ann.camera_fov }}"{% endif %}>
-        <span class="annotation-label">{{ ann.label }}</span>
+        <span class="annotation-label" title="{{ ann.label }}">{{ ann.label }}</span>
         <span class="annotation-delete-btn" data-delete-ann="{{ ann.id }}" role="button" tabindex="0" title="Remove label" aria-label="Remove label {{ ann.label }}">×</span>
       </button>
       {% endfor %}{% endif %}
@@ -1453,15 +1483,15 @@
         <span class="font-serif font-semibold hidden sm:inline">AcademicAR</span>
       </a>
       <div class="pointer-events-auto flex items-center justify-end gap-1.5 sm:gap-2 viewer-toolbar">
-        <button id="fullscreenBtn" class="viewer-tool-btn" type="button" aria-label="Full screen">
+        <button id="fullscreenBtn" class="viewer-tool-btn" type="button" aria-label="Full screen" title="Full screen">
           <svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5V2h3M11 2h3v3M14 11v3h-3M5 14H2v-3"/></svg>
           <span class="hidden sm:inline">Full screen</span>
         </button>
-        <button id="qrBtn" class="viewer-tool-btn" type="button" aria-label="QR code">
+        <button id="qrBtn" class="viewer-tool-btn" type="button" aria-label="QR code" title="QR code">
           <svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="5" height="5" rx="0.5"/><rect x="9" y="2" width="5" height="5" rx="0.5"/><rect x="2" y="9" width="5" height="5" rx="0.5"/><rect x="10" y="10" width="3" height="3" rx="0.5"/></svg>
           <span class="hidden sm:inline">QR</span>
         </button>
-        {% if annotations and 'annotations' in viewer_features %}<button id="annotationsBtn" class="viewer-tool-btn" type="button" aria-label="Labels" aria-pressed="true">
+        {% if annotations and 'annotations' in viewer_features %}<button id="annotationsBtn" class="viewer-tool-btn" type="button" aria-label="Labels" title="Labels" aria-pressed="true">
           <svg class="sm:hidden viewer-icon-labels" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h8M2 8h6M2 12h10"/><circle cx="13" cy="4" r="1.5"/></svg>
           <span class="hidden sm:inline">Labels</span>
         </button>{% endif %}
@@ -1489,7 +1519,7 @@
           <svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="2" width="9" height="12" rx="1.5"/><path d="M1 8h14" stroke-dasharray="2 1.6"/></svg>
           <span class="hidden sm:inline">Section</span>
         </button>{% endif %}
-        {% if 'ar' in viewer_features %}<button id="arBtn" data-ar-btn class="viewer-tool-btn primary" type="button" aria-label="View in AR">
+        {% if 'ar' in viewer_features %}<button id="arBtn" data-ar-btn class="viewer-tool-btn primary" type="button" aria-label="View in AR" title="View in AR">
           <svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1L14 4.5v7L8 15L2 11.5v-7z"/><path d="M8 1v6.5M8 7.5L14 4.5M8 7.5L2 4.5"/></svg>
           <span class="hidden sm:inline">View in AR</span>
         </button>
@@ -1500,7 +1530,7 @@
           <span class="hidden sm:inline">View in AR</span>
         </a>
         {% endif %}{% endif %}
-        <button id="infoBtn" class="viewer-tool-btn" type="button" aria-label="Info">
+        <button id="infoBtn" class="viewer-tool-btn" type="button" aria-label="Info" title="Info">
           <svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M8 7v4M8 5v.5"/></svg>
           <span class="hidden sm:inline">Info</span>
         </button>
@@ -1527,7 +1557,7 @@
       <div class="viewer-panel-header flex items-start justify-between gap-3">
         <div class="min-w-0">
           <p class="text-[11px] uppercase tracking-[0.18em] text-white/55">Live spatial viewer</p>
-          <h1 class="font-serif text-xl sm:text-2xl font-semibold mt-0.5 line-clamp-1">{{ model.display_name or model.original_filename }}</h1>
+          <h1 class="font-serif text-xl sm:text-2xl font-semibold mt-0.5 line-clamp-1 break-all">{{ model.display_name or model.original_filename }}</h1>
           <p class="text-sm text-white/60 mt-1 line-clamp-1">{{ paper.title }}</p>
           {% if model.license_type == 'institutional' and model.institution %}
             <p class="text-xs text-white/45 mt-1 line-clamp-1 flex items-center gap-1.5">
@@ -1645,7 +1675,7 @@
               {% endfor %}
               <label class="viewer-color-custom" title="Custom color" aria-label="Custom color">
                 <span>Custom color</span>
-                <input type="color" value="#cccccc" data-color-picker>
+                <input type="color" value="{{ model.appearance_color if (model.appearance_color or '')|length == 7 else '#cccccc' }}" data-color-picker>
               </label>
             </div>
             {% if viewer_layers|length >= 2 %}<p class="viewer-color-hint">Colours every layer. To colour one layer, open Layers and click its colour.</p>{% endif %}
@@ -2046,17 +2076,11 @@
       { key: 'right-perspective', label: 'Right perspective', orbit: '35deg 65deg auto' }
     ];
     const defaultCameraOrbit = '0deg 90deg auto';
-    // 28deg is the vertical field of view. On a portrait phone that leaves a
-    // narrow horizontal view and wide models were cut off at both sides, so
-    // widen it to keep roughly the same horizontal framing (capped at 56deg).
-    const defaultFieldOfView = (() => {
-      const aspect = window.innerWidth / Math.max(window.innerHeight, 1);
-      if (aspect >= 1) return '28deg';
-      const vertical = 2 * Math.atan(Math.tan(14 * Math.PI / 180) / aspect) * 180 / Math.PI;
-      return `${Math.min(56, Math.max(28, Math.round(vertical)))}deg`;
-    })();
-    // Attribute, not property: <model-viewer> may not be upgraded yet.
-    if (viewer && defaultFieldOfView !== '28deg') viewer.setAttribute('field-of-view', defaultFieldOfView);
+    // model-viewer applies field-of-view to the element's narrower axis, so on a
+    // portrait phone 28deg already frames the width (the rendered vertical FOV
+    // opens up to ~57deg by itself). Widening it here as well produced a ~98deg
+    // fisheye view, so the same 28deg is used on every screen.
+    const defaultFieldOfView = '28deg';
     const defaultOrientation = '0deg 0deg 0deg';
     // Resolved (numeric) camera captured once the model is framed at load. Reset view
     // restores this exact state so it can never re-resolve an "auto" radius to a
@@ -2097,6 +2121,9 @@
       if (isMobile) {
         controlPanel.setAttribute('data-collapsed', 'true');
       }
+      // True from a fold click until data-collapsed flips on the next frame, so
+      // the phone handler below can tell a fold from an open.
+      let panelFolding = false;
       panelToggle.addEventListener('click', () => {
         const collapsed = controlPanel.getAttribute('data-collapsed') === 'true';
         if (collapsed) {
@@ -2105,9 +2132,11 @@
           controlPanel.setAttribute('data-collapsed', 'false');
         } else {
           panelBody.style.maxHeight = panelBody.scrollHeight + 'px';
+          panelFolding = true;
           requestAnimationFrame(() => {
             panelBody.style.maxHeight = '0';
             controlPanel.setAttribute('data-collapsed', 'true');
+            panelFolding = false;
           });
         }
       });
@@ -2125,7 +2154,9 @@
         if (phone() && toggle.getAttribute('aria-expanded') === 'true' && controlPanel.getAttribute('data-collapsed') === 'false') panelToggle.click();
       }, 0)));
       panelToggle.addEventListener('click', () => {
-        if (!phone() || controlPanel.getAttribute('data-collapsed') === 'true') return;
+        // Only when the panel is being opened: folding it (e.g. because a corner
+        // panel just opened) must not close that corner panel again.
+        if (!phone() || panelFolding || controlPanel.getAttribute('data-collapsed') === 'true') return;
         cornerToggles.forEach((toggle) => { if (toggle.getAttribute('aria-expanded') === 'true') toggle.click(); });
       });
     }
@@ -2579,6 +2610,7 @@
         hideAnnotationNote();
         // Fullscreen is requested on <main>; the bar lives inside it.
         document.body.classList.add('tour-mode');
+        document.body.classList.toggle('is-scene-tour', tourScenes);
         tourBtn?.classList.add('is-active');
         tourBar.hidden = false;
         showTourStop(0);
@@ -2589,7 +2621,7 @@
         setTourPlaying(false);
         tourIndex = -1;
         tourBar.hidden = true;
-        document.body.classList.remove('tour-mode');
+        document.body.classList.remove('tour-mode', 'is-scene-tour');
         tourBtn?.classList.remove('is-active');
         if (tourScenes) {
           if (tourRestore) window.viewerView.applyState(tourRestore);
@@ -3211,6 +3243,11 @@
         if (annSpan) annSpan.textContent = on ? 'Cancel' : 'Annotate';
         annotateBtn.setAttribute('aria-label', on ? 'Cancel annotate' : 'Annotate');
         annotateBtn.classList.toggle('is-active', on);
+        // As in Measure: one point-placing tool at a time, and a placement
+        // click must not also re-centre the camera on that point (the form
+        // then pointed at the wrong place).
+        if (on && document.getElementById('measureBtn')?.classList.contains('is-active')) document.getElementById('measureBtn').click();
+        viewer.toggleAttribute('disable-tap', on);
         if (on) {
           // Precise placement is impossible while the model spins: a click's
           // positionAndNormalFromPoint would land on whatever surface rotated
@@ -3692,10 +3729,23 @@
       await restoreCamera(cameraBeforeRotation);
       if (modelAnimationPlaying && typeof viewer.play === 'function') viewer.play();
     };
+    // getFieldOfView() reports the rendered vertical FOV, but the field-of-view
+    // property is applied to the narrower axis. Writing the rendered value back
+    // on a portrait screen widened the view on every Reset; store the value in
+    // the property's own terms (narrow-axis FOV) so it restores exactly.
+    const framedFieldOfView = () => {
+      if (!viewer.getFieldOfView) return viewer.fieldOfView;
+      const vertical = viewer.getFieldOfView();
+      const rect = viewer.getBoundingClientRect();
+      const aspect = rect.width / Math.max(rect.height, 1);
+      if (!(aspect > 0) || aspect >= 1) return `${vertical}deg`;
+      const framed = 2 * Math.atan(Math.tan(vertical * Math.PI / 360) * aspect) * 180 / Math.PI;
+      return `${framed.toFixed(3)}deg`;
+    };
     const cameraState = () => ({
       orbit: viewer.getCameraOrbit ? viewer.getCameraOrbit().toString() : viewer.cameraOrbit,
       target: viewer.getCameraTarget ? viewer.getCameraTarget().toString() : viewer.cameraTarget,
-      fov: viewer.getFieldOfView ? `${viewer.getFieldOfView()}deg` : viewer.fieldOfView
+      fov: framedFieldOfView()
     });
     const restoreCamera = async (state) => {
       if (!state) return;
@@ -3719,11 +3769,45 @@
         viewer.cameraOrbit = view.orbit;
         if (typeof viewer.jumpCameraToGoal === 'function') viewer.jumpCameraToGoal();
       }
-      if (viewer.updateComplete) await viewer.updateComplete;
-      await waitFrame();
-      const dataUrl = viewer.toDataURL('image/png');
+      // Same as video recording: when frames are slow model-viewer renders a
+      // reduced-size image into the top-left of its canvas and scales it up
+      // with CSS, so a raw toDataURL() captured a small model in a corner.
+      // Hold full resolution for the capture (the setter has no getter; 0.5 is
+      // model-viewer's default) ...
+      const ModelViewer = customElements.get('model-viewer');
+      const previousRenderScale = (ModelViewer && typeof ModelViewer.minimumRenderScale === 'number') ? ModelViewer.minimumRenderScale : 0.5;
+      if (ModelViewer) ModelViewer.minimumRenderScale = 1;
+      let dataUrl;
+      try {
+        if (viewer.updateComplete) await viewer.updateComplete;
+        await waitFrame();
+        await waitFrame();
+        dataUrl = viewer.toDataURL('image/png');
+      } finally {
+        if (ModelViewer) ModelViewer.minimumRenderScale = previousRenderScale;
+      }
       if (shouldResumeAnimation && typeof viewer.play === 'function') viewer.play();
-      return dataUrl;
+      // ... and if a reduced frame still slipped through, scale the rendered
+      // region (reported by "render-scale") back up to the full frame.
+      return fullFrameShot(dataUrl);
+    };
+    const fullFrameShot = async (dataUrl) => {
+      if (!dataUrl || !renderedPixels) return dataUrl;
+      try {
+        const image = await loadImage(dataUrl);
+        const W = image.naturalWidth, H = image.naturalHeight;
+        const rw = Math.min(W, renderedPixels.w), rh = Math.min(H, renderedPixels.h);
+        if (rw >= W * 0.98 && rh >= H * 0.98) return dataUrl;
+        const canvas = document.createElement('canvas');
+        canvas.width = W;
+        canvas.height = H;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(image, 0, 0, rw, rh, 0, 0, W, H);
+        return canvas.toDataURL('image/png');
+      } catch (error) {
+        return dataUrl;
+      }
     };
     const loadImage = (src) => new Promise((resolve, reject) => {
       const im = new Image();
@@ -4373,6 +4457,7 @@
       // Layered models: the Layers panel owns the colours (sRGB -> linear, per
       // layer, saved through the layer editor), so this panel drives it.
       const layered = colorTools.hasAttribute('data-color-layered');
+      const savedHex = {{ (model.appearance_color if (model.appearance_color or '')|length == 7 else none)|tojson }};
       const restoreOriginal = () => {
         if (layered) window.viewerLayers?.resetColors();
         else originals.forEach(({ mat, factor }) => {
@@ -4389,6 +4474,8 @@
         captureOriginals();
         // Layered models keep the colours the Layers panel applied.
         if (!layered) restoreOriginal();
+        // Show the colour already saved to the model (picker + matching swatch).
+        if (!layered && savedHex) { if (picker) picker.value = savedHex; setActive(savedHex); }
       });
 
       swatches.forEach((b) => b.addEventListener('click', () => applyLive(b.dataset.colorSwatch)));
@@ -6199,15 +6286,88 @@
         const canvases = [...(el.shadowRoot?.querySelectorAll('canvas') || [])];
         return canvases.find((c) => c.classList.contains('show')) || canvases[0] || null;
       };
+      // Framing. The hidden viewer's buffer does not reliably map 1:1 to the
+      // element (HiDPI screens and a second, visible viewer can leave the model
+      // drawn at reduced scale in one corner), so automatic media never copies
+      // the buffer as-is: it measures where the model's pixels actually are
+      // (non-transparent bounds) and fits that box, centred and with its aspect
+      // kept, into the output frame.
+      const FRAME_FILL = 0.8; // the model's larger side takes ~80% of the frame
+      const probe = document.createElement('canvas');
+      const contentBox = (source) => {
+        const sw = source.width || source.naturalWidth;
+        const sh = source.height || source.naturalHeight;
+        if (!sw || !sh) return null;
+        const scale = Math.min(1, 480 / sw);
+        probe.width = Math.max(1, Math.round(sw * scale));
+        probe.height = Math.max(1, Math.round(sh * scale));
+        const pctx = probe.getContext('2d', { willReadFrequently: true });
+        pctx.clearRect(0, 0, probe.width, probe.height);
+        pctx.drawImage(source, 0, 0, probe.width, probe.height);
+        const { data } = pctx.getImageData(0, 0, probe.width, probe.height);
+        // Transparent buffer: the model is whatever has alpha. Opaque buffer
+        // (some GPUs/drivers): the model is whatever differs from the corner.
+        const opaque = data[3] > 12;
+        const [br, bg, bb] = [data[0], data[1], data[2]];
+        const isModel = (i) => (opaque
+          ? Math.abs(data[i] - br) + Math.abs(data[i + 1] - bg) + Math.abs(data[i + 2] - bb) > 36
+          : data[i + 3] > 12);
+        let minX = probe.width, minY = probe.height, maxX = -1, maxY = -1;
+        for (let y = 0; y < probe.height; y += 1) {
+          for (let x = 0; x < probe.width; x += 1) {
+            if (isModel((y * probe.width + x) * 4)) {
+              if (x < minX) minX = x; if (x > maxX) maxX = x;
+              if (y < minY) minY = y; if (y > maxY) maxY = y;
+            }
+          }
+        }
+        if (maxX < 0) return null;
+        return { x: minX / scale, y: minY / scale, w: (maxX - minX + 1) / scale, h: (maxY - minY + 1) / scale };
+      };
+      const unionBox = (a, b) => {
+        if (!a) return b;
+        if (!b) return a;
+        const x = Math.min(a.x, b.x);
+        const y = Math.min(a.y, b.y);
+        return { x, y, w: Math.max(a.x + a.w, b.x + b.w) - x, h: Math.max(a.y + a.h, b.y + b.h) - y };
+      };
+      // Source rectangle with the output's aspect ratio, centred on the box and
+      // large enough that the box fills FRAME_FILL of it. It may extend past
+      // the buffer edges; the frame is pre-filled white, so that reads as margin.
+      const framingRect = (box, outW, outH) => {
+        const aspect = outW / outH;
+        const w = Math.max(box.w, box.h * aspect) / FRAME_FILL;
+        const h = w / aspect;
+        return { x: box.x + box.w / 2 - w / 2, y: box.y + box.h / 2 - h / 2, w, h };
+      };
+      // drawImage with a source rect that leaves the buffer is clipped
+      // differently across browsers; clip it here and map the destination.
+      const drawFramed = (ctx, source, rect, outW, outH) => {
+        const sw = source.width || source.naturalWidth;
+        const sh = source.height || source.naturalHeight;
+        const x0 = Math.max(0, rect.x), y0 = Math.max(0, rect.y);
+        const x1 = Math.min(sw, rect.x + rect.w), y1 = Math.min(sh, rect.y + rect.h);
+        if (x1 <= x0 || y1 <= y0) return;
+        const k = outW / rect.w;
+        ctx.drawImage(source, x0, y0, x1 - x0, y1 - y0, (x0 - rect.x) * k, (y0 - rect.y) * k, (x1 - x0) * k, (y1 - y0) * k);
+      };
+      const PHOTO_W = 1920;
+      const PHOTO_H = 1080;
       const whiteJpeg = async (dataUrl) => {
         const image = await new Promise((resolve, reject) => { const im = new Image(); im.onload = () => resolve(im); im.onerror = reject; im.src = dataUrl; });
         const canvas = document.createElement('canvas');
-        canvas.width = image.naturalWidth;
-        canvas.height = image.naturalHeight;
+        canvas.width = PHOTO_W;
+        canvas.height = PHOTO_H;
         const ctx = canvas.getContext('2d');
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(image, 0, 0);
+        const box = contentBox(image);
+        if (box) {
+          ctx.imageSmoothingQuality = 'high';
+          drawFramed(ctx, image, framingRect(box, PHOTO_W, PHOTO_H), PHOTO_W, PHOTO_H);
+        } else {
+          ctx.drawImage(image, 0, 0, PHOTO_W, PHOTO_H);
+        }
         return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
       };
 
@@ -6237,6 +6397,19 @@
           layers.forEach((entries, i) => setLayerAlpha(entries, Math.min(defaultAlpha(layerInfo[i]), Math.max(0, (t - i * step) / step))));
           return setOrbit(el, -30 + 90 * ease(t), 70, '110%');
         };
+        // One fixed framing for the whole clip (a per-frame fit would make the
+        // model pulse): the union of the model's bounds over sampled poses.
+        let box = null;
+        for (let i = 0; i <= 12; i += 1) {
+          await pose(i / 12);
+          await nextFrame(); await nextFrame();
+          box = unionBox(box, contentBox(elementCanvas(el) || source));
+        }
+        // Nothing visible in any pose (e.g. every layer faded out): saving would
+        // store a blank clip reported as ready.
+        if (!box) { stream.getTracks().forEach((track) => track.stop()); return null; }
+        const rect = framingRect(box, frame.width, frame.height);
+        ctx.imageSmoothingQuality = 'high';
         await pose(0);
         await nextFrame();
         recorder.start(250);
@@ -6249,7 +6422,8 @@
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, frame.width, frame.height);
           const rendered = elementCanvas(el) || source;
-          ctx.drawImage(rendered, 0, 0, rendered.width, rendered.height, 0, 0, frame.width, frame.height);
+          if (rect) drawFramed(ctx, rendered, rect, frame.width, frame.height);
+          else ctx.drawImage(rendered, 0, 0, rendered.width, rendered.height, 0, 0, frame.width, frame.height);
           if (t >= 1) break;
         }
         recorder.stop();
@@ -6309,7 +6483,11 @@
           for (const video of videos) {
             if (document.hidden) break;
             showDefault();
-            const blob = await recordVideo(hidden, video, layers);
+            // Chrome's first MediaRecorder on a page can return no data when
+            // frames arrive slowly (the first clip, the turntable, was always
+            // the one lost); one retry recovers it.
+            let blob = await recordVideo(hidden, video, layers);
+            if (!blob && !document.hidden) { showDefault(); blob = await recordVideo(hidden, video, layers); }
             if (blob && await window.viewerMedia.save(blob, { label: video.label, source: 'auto' })) autoMedia.have.push(video.label);
             done += 1; progress();
           }

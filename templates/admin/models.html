@@ -111,7 +111,7 @@
                 {% if model_access_status(model) == "expired" %}<span class="status-chip {{ admin_chip_class('expired') }}">Expired</span>{% endif %}
                 {% if model.processing_error or model.replacement_error %}<small title="{{ model.processing_error or model.replacement_error }}">{{ (model.processing_error or model.replacement_error)|truncate(90) }}</small>{% endif %}
               </td>
-              <td class="admin-hide-sm">{{ format_file_size(model.file_size) }}</td>
+              <td class="admin-hide-sm admin-nowrap">{{ format_file_size(model.file_size) }}</td>
               <td>
                 <div class="admin-actions">
                   {% if paper_is_deleted(model.paper) %}<span class="status-chip models-offline" title="The project was deleted, so its viewer is offline.">Project deleted</span>{% else %}<a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener noreferrer" class="admin-btn admin-btn-secondary compact">Viewer</a>{% endif %}

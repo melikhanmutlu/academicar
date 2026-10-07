@@ -18,6 +18,7 @@ from pathlib import Path
 import numpy as np
 
 from .glb_optimize import decompress_glb, glb_has_draco
+from .glb_quality import _linear_to_srgb
 
 # Must be set before pyrender/PyOpenGL is imported anywhere in the process —
 # forces the OSMesa software backend instead of EGL (no GPU) or a windowed
@@ -245,14 +246,17 @@ def _vertex_colors_for(geom):
             pass
 
     # Flat baseColorFactor. glTF stores it as 0..1 floats, but trimesh often
-    # returns it as 0..255 after a GLB round-trip — handle both scales.
+    # returns it as 0..255 after a GLB round-trip — handle both scales. The
+    # factor is LINEAR while the rasteriser paints display (sRGB) colours, so
+    # encode it; using it raw made posters far darker than the viewer.
     bcf = getattr(material, "baseColorFactor", None)
     if bcf is not None:
         try:
             arr = _np.asarray(bcf[:3], dtype=_np.float64)
-            if arr.max() <= 1.0:
-                arr = arr * 255.0
-            rgb = _np.clip(arr, 0, 255).astype(_np.uint8)
+            if arr.max() > 1.0:
+                arr = arr / 255.0
+            arr = _linear_to_srgb(_np.clip(arr, 0.0, 1.0)) * 255.0
+            rgb = _np.clip(_np.round(arr), 0, 255).astype(_np.uint8)
             return _np.tile(rgb, (n, 1))
         except Exception:
             pass

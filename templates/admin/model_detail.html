@@ -209,7 +209,7 @@
               <td>v{{ version.version_number }}</td>
               <td><span class="status-chip {{ admin_chip_class(version.status) }}">{{ version.status|replace("_", " ")|capitalize }}</span></td>
               <td class="admin-hide-sm">{{ (version.source_format or "-")|upper }}</td>
-              <td class="admin-hide-sm">{{ format_file_size(version.file_size) }}</td>
+              <td class="admin-hide-sm admin-nowrap">{{ format_file_size(version.file_size) }}</td>
               <td>{{ version.created_at.strftime("%Y-%m-%d %H:%M") if version.created_at else "-" }}</td>
               <td>{{ version.error or "-" }}</td>
             </tr>

@@ -686,6 +686,8 @@ body:has(.admin-layout) .flash-stack {
 .admin-wrap-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 .admin-mt { margin-top: 12px; }
 .admin-inline { display: inline; }
+/* Short values (dates, sizes) never split mid-value when a table squeezes. */
+.admin-nowrap { white-space: nowrap; }
 .admin-field-narrow { max-width: 520px; }
 /* Secondary table columns drop out on phones. */
 @media (max-width: 640px) {
@@ -740,7 +742,8 @@ a.admin-metric:hover, a.admin-metric:focus-visible { border-color: var(--color-s
 /* == end page:models == */
 
 /* == page:jobs == */
-.jobs-error { max-width: 280px; overflow-wrap: anywhere; }
+/* min-width: long model names squeezed this column to one letter per line. */
+.jobs-error { min-width: 180px; max-width: 280px; overflow-wrap: anywhere; }
 .jobs-pre { margin: 0; font-size: 12px; white-space: pre-wrap; word-break: break-all; max-height: 220px; overflow: auto; }
 .jobs-attempts-field { max-width: 140px; }
 @media (min-width: 641px) {
@@ -783,8 +786,7 @@ a.admin-metric:hover, a.admin-metric:focus-visible { border-color: var(--color-s
 /* == page:security == */
 .admin-security-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
 @media (max-width: 1180px) { .admin-security-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-/* !important: style.css forces every .admin-insight-grid to one column on phones. */
-@media (max-width: 640px) { .admin-security-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+@media (max-width: 640px) { .admin-security-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 a.admin-insight-card { color: inherit; text-decoration: none; }
 a.admin-insight-card:hover { border-color: var(--color-silver-ash); }
 /* == end page:security == */
@@ -803,7 +805,7 @@ a.admin-insight-card:hover { border-color: var(--color-silver-ash); }
 }
 @media (max-width: 640px) {
   .admin-storage-cards {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .admin-storage-cards .admin-insight-card {
     padding: 12px;

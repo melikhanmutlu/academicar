@@ -187,6 +187,7 @@ def _unit_float(value):
 @require_model_editor
 def update_layers(model_id):
     from app import _refresh_model_poster, enqueue_conversion_job, log_audit, requeue_scene_ar
+    from model_media import drop_auto_media
     from services.r2_mirror import ensure_local, mirror_file
 
     model = db.session.get(Model3D, model_id)
@@ -305,6 +306,9 @@ def update_layers(model_id):
         if refreshed_poster:
             mirror_file(refreshed_poster, f"converted/{model.id}/poster.png")
     if rewrite_glb or default_changed:
+        # The automatic views/videos show the old colours or default layer
+        # view; drop them so the owner's next visit renders them again.
+        drop_auto_media(model)
         # The AR files are built from the GLB and the default view: regenerate
         # them in the worker (the layers are already saved if this fails).
         usdz_path = os.path.join(current_app.config["CONVERTED_FOLDER"], model.id, "model.usdz")

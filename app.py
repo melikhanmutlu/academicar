@@ -571,6 +571,32 @@ def human_file_size(limit_bytes: int) -> str:
     return f"{limit_bytes / (1024 * 1024):.0f} MB"
 
 
+_CAMERA_TOKEN = re.compile(r"^(auto|-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)(rad|deg|mm|cm|m|%)?$")
+
+
+def _compact_camera_value(value, *, parts: int, bare_unit: str | None = None) -> str | None:
+    """A model-viewer camera value ("<n><unit> <n><unit> <n><unit>" or one value)
+    rewritten with 6 significant digits, or None when it does not parse.
+    ``bare_unit`` is added to a unitless number (getFieldOfView() returns degrees)."""
+    tokens = str(value or "").split()
+    if len(tokens) != parts:
+        return None
+    out = []
+    for token in tokens:
+        match = _CAMERA_TOKEN.match(token)
+        if not match:
+            return None
+        number, unit = match.groups()
+        if number == "auto":
+            out.append("auto")
+            continue
+        unit = unit or bare_unit
+        if not unit:
+            return None
+        out.append(f"{float(number):.6g}{unit}")
+    return " ".join(out)
+
+
 def format_file_size(size_bytes: int | None) -> str:
     if not size_bytes:
         return "0 B"
@@ -11584,6 +11610,7 @@ def register_routes(app: Flask) -> None:
         if not ok:
             return jsonify({"ok": False, "error": message}), 400
         log_audit("model_viewer_color_updated", user_id=current_user.id, resource_id=model_id, details={"color": color})
+        drop_auto_media(model)  # the automatic views/videos show the old colour
         # GLB now carries the color (web / desktop / Android AR). Regenerate the
         # iOS USDZ in the worker (Blender is heavy) so Quick Look matches too.
         usdz_path = os.path.join(app.config["CONVERTED_FOLDER"], model.id, "model.usdz")
@@ -11820,9 +11847,12 @@ def register_routes(app: Flask) -> None:
             return jsonify({"error": "Normal must be [x, y, z]"}), 400
         # Optional camera angle the note was placed from (model-viewer strings).
         camera = data.get("camera") or {}
-        camera_orbit = (str(camera.get("orbit")).strip()[:64] or None) if camera.get("orbit") else None
-        camera_target = (str(camera.get("target")).strip()[:96] or None) if camera.get("target") else None
-        camera_fov = (str(camera.get("fov")).strip()[:16] or None) if camera.get("fov") else None
+        # Stored compactly (6 significant digits, units kept): the columns are
+        # String(64)/(96)/(16) and slicing JavaScript's full-precision output cut
+        # off the camera distance and units, so labels flew to the wrong view.
+        camera_orbit = _compact_camera_value(camera.get("orbit"), parts=3)
+        camera_target = _compact_camera_value(camera.get("target"), parts=3)
+        camera_fov = _compact_camera_value(camera.get("fov"), parts=1, bare_unit="deg")
         max_order = db.session.query(func.max(ModelAnnotation.order_index)).filter_by(model_id=model_id).scalar() or 0
         try:
             annotation = ModelAnnotation(

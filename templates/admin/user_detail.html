@@ -104,7 +104,7 @@
               </td>
               <td><span class="status-chip {{ admin_chip_class(project_visibility(paper)) }}">{{ visibility_label(paper) }}</span></td>
               <td class="admin-hide-sm">{{ paper.models|length }}</td>
-              <td class="admin-hide-sm">{{ paper.created_at.strftime("%Y-%m-%d") if paper.created_at else "-" }}</td>
+              <td class="admin-hide-sm admin-nowrap">{{ paper.created_at.strftime("%Y-%m-%d") if paper.created_at else "-" }}</td>
               <td>
                 <details class="admin-editor">
                   <summary>Edit metadata</summary>

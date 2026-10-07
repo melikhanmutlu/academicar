@@ -107,7 +107,7 @@
                 {% if member.role == "admin" %}<small class="admin-show-sm">Institution admin</small>{% endif %}
               </td>
               <td class="admin-hide-sm"><span class="status-chip {{ admin_chip_class(member.role) }}">{{ "Institution admin" if member.role == "admin" else "Member" }}</span></td>
-              <td class="admin-hide-sm">{{ member.joined_at.strftime("%Y-%m-%d") if member.joined_at else "-" }}</td>
+              <td class="admin-hide-sm admin-nowrap">{{ member.joined_at.strftime("%Y-%m-%d") if member.joined_at else "-" }}</td>
               <td>
                 <form method="POST" action="{{ url_for('admin_institution_member_remove', institution_id=institution.id, member_id=member.id) }}" onsubmit="return confirm('Remove this member? Their already-funded models keep institutional access.')">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -138,9 +138,9 @@
             <tr>
               <td><strong><a href="{{ url_for('admin_model_detail', model_id=model.id) }}">{{ model.display_name or model.original_filename or model.id }}</a></strong></td>
               <td class="admin-hide-sm">{{ model.paper.title if model.paper else "-" }}</td>
-              <td class="admin-hide-sm">{{ format_file_size(model.file_size) }}</td>
+              <td class="admin-hide-sm admin-nowrap">{{ format_file_size(model.file_size) }}</td>
               <td class="admin-hide-sm"><span class="status-chip">{{ model.license_type|title }}</span></td>
-              <td>{{ model.access_expires_at.strftime("%Y-%m-%d") if model.access_expires_at else "Open-ended" }}</td>
+              <td class="admin-nowrap">{{ model.access_expires_at.strftime("%Y-%m-%d") if model.access_expires_at else "Open-ended" }}</td>
               <td><a href="{{ url_for('view_model', model_id=model.id) }}" target="_blank" rel="noopener" class="admin-btn admin-btn-secondary compact">View</a></td>
             </tr>
           {% else %}
@@ -165,8 +165,8 @@
         <tbody>
           {% for invite in invites %}
             <tr>
-              <td>{{ invite.created_at.strftime("%Y-%m-%d") if invite.created_at else "-" }}</td>
-              <td>{{ invite.expires_at.strftime("%Y-%m-%d") if invite.expires_at else "Never" }}</td>
+              <td class="admin-nowrap">{{ invite.created_at.strftime("%Y-%m-%d") if invite.created_at else "-" }}</td>
+              <td class="admin-nowrap">{{ invite.expires_at.strftime("%Y-%m-%d") if invite.expires_at else "Never" }}</td>
               <td>{{ invite.use_count }}{% if invite.max_uses is not none %} / {{ invite.max_uses }}{% endif %}</td>
               <td>
                 {% set _state = invite_state(invite) %}
@@ -217,7 +217,7 @@
         <tbody>
           {% for payment in payments %}
             <tr>
-              <td>{{ payment.created_at.strftime("%Y-%m-%d") if payment.created_at else "-" }}</td>
+              <td class="admin-nowrap">{{ payment.created_at.strftime("%Y-%m-%d") if payment.created_at else "-" }}</td>
               <td>{{ "%.2f"|format(payment.amount_kurus / 100) }} {{ payment.currency }}</td>
               <td><span class="status-chip {{ admin_chip_class(payment.status) }}">{{ payment.status|replace("_", " ")|capitalize }}</span></td>
               <td class="admin-hide-sm">{{ payment.invoice_number or "-" }}</td>
