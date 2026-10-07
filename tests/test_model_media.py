@@ -187,3 +187,18 @@ def test_auto_media_made_before_the_framing_fix_is_made_again(app, client):
     assert state["have"] == ["View: Side"]
     # The stale view is replaced in place, so it does not use up room.
     assert state["image_room"] == model_media.MAX_IMAGES_PER_MODEL - 2
+
+
+def test_edit_page_shows_all_saved_media_and_the_viewer_links_back(app, client):
+    mid, _ = _make_model(app)
+    _login(client)
+    assert _upload(client, mid, _png(), label="View: Front", source="auto").status_code == 201
+    assert _upload(client, mid, MP4, "rec.mp4", "video/mp4").status_code == 201
+    edit = client.get(f"/models/{mid}/edit").get_data(as_text=True)
+    assert 'id="mediaSection"' in edit and edit.count("class=\"model-media-item\"") == 2
+    assert "1 video and 1 image" in edit
+    viewer = client.get(f"/view/{mid}").get_data(as_text=True)
+    assert f'href="/models/{mid}/edit"' in viewer
+    client.post("/auth/logout")
+    public = client.get(f"/view/{mid}").get_data(as_text=True)
+    assert f"/models/{mid}/edit" not in public

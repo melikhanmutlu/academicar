@@ -1577,6 +1577,10 @@
                href="{{ url_for('auth.register', utm_source='viewer', utm_medium='viewer_panel', utm_campaign='viral_loop') }}">
               Publish your own 3D model <span class="arrow" aria-hidden="true">&rarr;</span>
             </a>
+          {% elif not (demo_mode is defined and demo_mode) %}
+            <a class="viewer-publish-cta" href="{{ url_for('model_edit', model_id=model.id) }}">
+              Edit model <span class="arrow" aria-hidden="true">&rarr;</span>
+            </a>
           {% endif %}
         </div>
         <button id="panelToggle" type="button" class="flex-shrink-0 mt-1 rounded-full border border-white/10 w-8 h-8 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors" aria-label="Toggle panel">
