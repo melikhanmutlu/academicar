@@ -74,3 +74,33 @@ def test_seed_keeps_admin_edits_to_builtin_post(app, monkeypatch):
         seed_builtin_blog_posts(app)
         db.session.expire_all()
         assert BlogPost.query.filter_by(slug=slug).one().body == "Edited by an admin."
+
+
+def test_blog_post_share_tags_use_post_title_and_cover(client):
+    body = client.get("/blog/dicom-to-3d-model-guide").get_data(as_text=True)
+    assert '<meta property="og:title" content="From DICOM to Interactive 3D' in body
+    assert '<meta property="og:type" content="article">' in body
+    assert "covers/dicom-to-3d-model-guide.webp" in body.split('property="og:image"')[1].split(">")[0]
+    import json
+    import re
+
+    blocks = [json.loads(b) for b in re.findall(r'<script type="application/ld\+json">(.*?)</script>', body, re.S)]
+    posting = next(b for b in blocks if b.get("@type") == "BlogPosting")
+    assert posting["image"].endswith("covers/dicom-to-3d-model-guide.webp")
+    assert posting["keywords"]
+
+
+def test_blog_post_without_cover_falls_back_to_default_share_image(client):
+    body = client.get("/blog/how-to-add-3d-models-to-research-papers").get_data(as_text=True)
+    assert "clinical-spatial-hero.png" in body.split('property="og:image"')[1].split(">")[0]
+
+
+def test_blog_post_links_related_guides(client):
+    body = client.get("/blog/hounsfield-units-ct-thresholding-3d").get_data(as_text=True)
+    assert "Related guides" in body
+    assert '/blog/dicom-to-3d-model-guide"' in body
+
+
+def test_sitemap_blog_posts_have_lastmod(client):
+    body = client.get("/sitemap.xml").get_data(as_text=True)
+    assert "/blog/dicom-to-3d-model-guide</loc><lastmod>2026-09-24</lastmod>" in body

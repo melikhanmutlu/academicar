@@ -73,7 +73,14 @@ from licensing import (
     refresh_license_plan_cache,
     strongest_project_plan_key,
 )
-from blog_content import code_post_slugs, get_all_posts, get_post, render_body
+from blog_content import (
+    code_post_slugs,
+    cover_image_path,
+    get_all_posts,
+    get_post,
+    related_posts,
+    render_body,
+)
 from discipline_content import all_disciplines, discipline_slugs, get_discipline, related_disciplines
 from institution_panel import institution_bp
 from layer_editor import default_ar_materials, layer_editor_bp, model_has_layers, model_layers, viewer_layer_metrics
@@ -5883,10 +5890,15 @@ def register_routes(app: Flask) -> None:
         cache_key = (
             f"db:{post['id']}:{post['updated_at']}" if post.get("source") == "db" else post["slug"]
         )
+        cover = cover_image_path(post["body"])
+        updated = post.get("updated_at")
         return render_template(
             "blog_post.html",
             post=post,
             body_html=render_body(post["body"], cache_key=cache_key),
+            cover_url=public_url("static", filename=cover.removeprefix("/static/")) if cover else None,
+            date_modified=updated.strftime("%Y-%m-%d") if updated else post["date"],
+            related=related_posts(post, merged_blog_posts()),
         )
 
     @app.route("/i/<slug>")
@@ -6033,11 +6045,15 @@ def register_routes(app: Flask) -> None:
                 urls.append(public_url("ar_for", discipline=slug))
             except Exception:
                 continue
+        lastmods: dict[str, str] = {}
         for post in merged_blog_posts():
             try:
-                urls.append(public_url("blog_post", slug=post["slug"]))
+                url = public_url("blog_post", slug=post["slug"])
             except Exception:
                 continue
+            urls.append(url)
+            updated = post.get("updated_at")
+            lastmods[url] = updated.strftime("%Y-%m-%d") if updated else post["date"]
         # Public, non-deleted publication pages are indexable SEO assets.
         public_papers = (
             Paper.query.filter(Paper.is_public.is_(True))
@@ -6069,7 +6085,12 @@ def register_routes(app: Flask) -> None:
                 urls.append(public_url("institution_showcase", slug=institution.slug))
             except Exception:
                 continue
-        items = "".join(f"<url><loc>{escape(u)}</loc></url>" for u in urls)
+        items = "".join(
+            f"<url><loc>{escape(u)}</loc>"
+            + (f"<lastmod>{escape(lastmods[u])}</lastmod>" if u in lastmods else "")
+            + "</url>"
+            for u in urls
+        )
         xml = (
             '<?xml version="1.0" encoding="UTF-8"?>'
             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'

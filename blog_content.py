@@ -7,6 +7,7 @@ from Markdown to HTML on demand (cached). Adding a post = append a dict to
 from __future__ import annotations
 
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -1170,6 +1171,500 @@ Figure export and comparisons are included in the paid model plans — see
 from a 3D model.*
 """,
     },
+    {
+        "slug": "convert-stl-to-glb",
+        "title": "How to Convert STL to GLB (and Why It Matters for Sharing)",
+        "description": "Convert STL to GLB for the web: set units and colour, keep the file small with Draco, and get a viewer link, AR, and a QR code in one step.",
+        "date": "2026-10-08",
+        "author": "AcademicAR Team",
+        "tags": ["STL", "GLB", "3D formats", "how-to"],
+        "persona": "Researchers, engineers & makers",
+        "read_minutes": 6,
+        "body": """\
+STL is the format almost every 3D pipeline can write: segmentation software, CAD,
+3D scanners, and slicers for 3D printing. GLB is the format browsers, phones, and
+AR viewers want. If you need to show an STL to someone who doesn't have CAD or
+printing software, converting it to GLB is the step in between. Here's what the
+conversion actually does and how to get it right.
+
+## STL and GLB in one paragraph each
+
+**STL** stores a list of triangles and nothing else: no units, no colour, no
+materials, no parts. Most STLs are also uncompressed, so a detailed scan or
+segmentation can easily be tens or hundreds of megabytes.
+
+**GLB** is the single-file, binary form of **glTF 2.0**, the open standard built for
+real-time 3D on the web. One `.glb` holds geometry, materials, textures, and a
+scene of named parts, and it supports compression. Browser viewers such as
+Google's `<model-viewer>` and Android's AR viewer load GLB directly.
+
+For a longer comparison with OBJ, FBX, and glTF, see our
+[3D format guide](/blog/glb-stl-gltf-obj-3d-format-guide).
+
+## What a good STL to GLB conversion does
+
+A conversion is more than rewriting triangles into another container. To end up
+with a model that looks right and loads fast, it should:
+
+1. **Fix the scale.** STL has no units, so the same file can mean 120 mm or 120 m.
+   You have to say which one it is, or AR will show your femur the size of a
+   building.
+2. **Add a material.** A plain STL renders as flat grey. Giving it a colour and a
+   physically based material makes the shape readable.
+3. **Clean up the mesh**, merging duplicate vertices so the file doesn't waste
+   space, and add the texture coordinates some AR viewers expect.
+4. **Compress the geometry.** Draco compression typically shrinks mesh data many
+   times over, which is the difference between a model that opens instantly on
+   mobile data and one that never finishes loading.
+
+## Converting STL to GLB with AcademicAR
+
+1. Create a project and choose **Upload model**.
+2. Select your `.stl` file and pick the **source unit**: millimetres, centimetres,
+   or metres. This is required for STL and OBJ because the file can't tell us.
+3. Optionally set a **model colour**. Without one, the model is shown in a neutral
+   material.
+4. Confirm the compliance checkbox (that you have the rights to publish the model
+   and that any patient data is anonymised) and upload.
+
+Conversion runs in the background. When it finishes you get:
+
+- an optimized **GLB** with Draco-compressed geometry,
+- a **USDZ** companion, so iPhones and iPads can open the model in AR,
+- a public **viewer link** that works in any modern browser,
+- a **QR code** that opens the same model on a phone.
+
+There is nothing to install and no command line involved.
+
+## Tips for large STL files
+
+- **Decimate before uploading.** For on-screen viewing, a few hundred thousand
+  triangles is plenty. Tools like Meshmixer, Blender (Decimate modifier), or 3D
+  Slicer's surface toolbox can reduce counts by 80–90% with no visible loss.
+- **Split by part when it matters.** One STL is one mesh. If readers should be
+  able to hide or recolour parts separately, export the parts to a format that
+  keeps them apart, such as STEP, FBX, or GLB, or upload a segmentation that
+  keeps one label per structure.
+- **Check that the mesh is closed.** Holes and flipped faces in an STL often come
+  from the original export and are easiest to fix at the source.
+
+## Why not just share the STL?
+
+You can attach an STL to a paper's supplementary material, and you should if
+readers might 3D print it. But very few readers will download it, find software
+that opens it, and set up the view. A GLB in a web viewer turns the same geometry
+into something they can rotate in a second, on any device, and place on their desk
+in AR.
+
+*[Create a free account](/auth/register) and convert your first STL to a shareable
+GLB with a viewer link and QR code.*
+""",
+    },
+    {
+        "slug": "view-stl-online-share-link",
+        "title": "How to View and Share an STL File Online (No Software Needed)",
+        "description": "Open an STL file in your browser and share it as a link and QR code that opens in 3D and AR on any phone. No CAD or slicer software needed.",
+        "date": "2026-10-09",
+        "author": "AcademicAR Team",
+        "tags": ["STL", "3D viewer", "sharing", "how-to"],
+        "persona": "Researchers, teachers & students",
+        "read_minutes": 5,
+        "body": """\
+Someone sends you an STL file, or you need to send one. The usual answer is
+"open it in a slicer" or "install a CAD viewer", which is fine for engineers and
+a dead end for everyone else. Here are the ways to view an STL online, and how to
+turn it into a link anyone can open.
+
+## Option 1: a quick local preview
+
+If you only need to look at a file yourself, a browser-based STL viewer that
+renders the file locally is enough: drag the file in and rotate it. Your operating
+system may also have a built-in preview (Windows 3D Viewer, macOS Quick Look).
+
+The limitation is that nothing is shared. The model lives on your computer, and
+the next person has to repeat the process with their own copy of the file.
+
+## Option 2: a link someone else can open
+
+To show an STL to a colleague, reviewer, student, or the audience at a talk, you
+want a **hosted viewer**: the model lives at a URL, and anyone who opens it sees it
+in 3D without downloading anything.
+
+With AcademicAR the steps are:
+
+1. Upload the `.stl` and choose its unit (mm, cm, or m) and, optionally, a colour.
+2. The file is converted to an optimized GLB (plus a USDZ for iPhone AR).
+3. Copy the **viewer link** or download the **QR code**.
+
+Whoever opens the link can rotate, zoom, and pan, and on a phone tap **View in AR** to place the model on their desk at its
+real size.
+
+## What readers can do in the viewer
+
+Beyond turning the model around, the viewer includes tools that are useful for
+real work:
+
+- **Section plane** to cut through the model along any axis and look inside.
+- **Slice view**, which shows that cut as a clean 2D cross-section with a
+  snapping two-point measure.
+- **Annotations and saved scenes**, so you can point at a feature and guide
+  readers through the model in a fixed order.
+- **Lighting presets and a light or dark background** to suit the model.
+- **Screenshots** of the current view.
+
+## A link that survives updates
+
+A common problem with shared files is versioning: you fix the model and the copy
+everyone has is now outdated. On AcademicAR you can **replace the model** while
+the link and QR code stay the same, so a QR printed on a poster or in a thesis
+keeps pointing at the current version. If a model's access window ends, the link
+shows a clear notice instead of an error page.
+
+## Where this helps
+
+- **Papers and theses:** put the link or QR code in the figure caption.
+- **Teaching:** share one link with a whole class instead of a file per student.
+- **Posters and talks:** a QR code turns a still image into a model the audience
+  can explore on their phones (see our
+  [poster QR guide](/blog/qr-codes-on-academic-posters-guide)).
+- **Collaboration:** show a design or a segmentation to a co-author who doesn't
+  have the software you used.
+
+## Privacy note
+
+If the STL comes from patient imaging, make sure it is anonymised and that you have
+consent and ethics approval to publish it. Faces reconstructed from head CT or MRI
+can be identifying even without any metadata.
+
+*[Create a free account](/auth/register) to share your STL as a link and QR code.*
+""",
+    },
+    {
+        "slug": "open-step-stp-file-online",
+        "title": "What Is a STEP (.stp) File and How to Open It Without CAD",
+        "description": "STEP and STP files explained: what's inside, which programs open them, and how to view and share a STEP assembly in your browser and AR without CAD.",
+        "date": "2026-10-10",
+        "author": "AcademicAR Team",
+        "tags": ["STEP", "CAD", "3D viewer", "how-to"],
+        "persona": "Engineers, students & collaborators",
+        "read_minutes": 6,
+        "body": """\
+A `.step` or `.stp` file is the most common way CAD models travel between people
+who don't use the same software. If you've received one and don't have
+SolidWorks, Fusion, or CATIA, or you need to show one to someone who doesn't, this
+guide covers what the file is and the easiest ways to open it.
+
+## What a STEP file is
+
+**STEP** (Standard for the Exchange of Product model data, ISO 10303) is a neutral
+CAD format. The `.step` and `.stp` extensions are the same thing. Unlike mesh
+formats such as STL, a STEP file describes **exact geometry**: surfaces, edges,
+and solids defined mathematically, organised into an **assembly tree** of parts,
+often with colours and part names.
+
+That precision is why manufacturers and engineers exchange STEP. It is also why
+STEP files can't be shown directly in a browser: the exact surfaces first have to
+be turned into triangles (tessellated) before a 3D viewer or AR app can draw them.
+
+## Ways to open a STEP file
+
+- **Desktop CAD:** any major CAD package imports STEP. Free options include
+  **FreeCAD** and Autodesk's free viewers.
+- **Dedicated viewers:** several free desktop and browser viewers open STEP for
+  inspection on your own machine.
+- **A hosted 3D viewer:** convert once, then open it anywhere, including on a
+  phone, and share it with others as a link.
+
+The first two are good for your own inspection. The third is what you want when
+the goal is to **show** the model to reviewers, students, or a project partner.
+
+## Opening and sharing STEP with AcademicAR
+
+Upload the `.step` or `.stp` file to a project. The conversion uses OpenCascade,
+the open-source CAD kernel, and runs in the background:
+
+- Each part of the assembly becomes its own node, and **STEP colours** carry over.
+- Surfaces are tessellated finely enough that holes and fillets stay smooth on
+  small mechanical parts, with a cap on triangle count so the model still loads on
+  a phone.
+- The result is a compressed **GLB** for browsers and Android AR and a **USDZ**
+  for iPhone and iPad AR.
+- STEP units are kept as authored, so the model appears at its real size in AR.
+
+You get a viewer link and a QR code. Anyone can open the assembly in their
+browser, with no CAD licence and nothing to install.
+
+## Assemblies become layers
+
+Multi-part models get a **Layers panel** with one layer per part, and repeated
+parts such as a set of bolts are grouped. Viewers can hide the housing to see the
+mechanism, fade a cover, or recolour parts. The **section plane** and **2D slice
+view** cut through the assembly like a section view on a drawing. For more on
+engineering use, see [From STEP to AR](/blog/step-cad-assemblies-ar-engineering).
+
+## Troubleshooting large STEP files
+
+- **Very large assemblies** can take a while to tessellate. If conversion times
+  out, export the sub-assembly you actually need to show, or simplify small
+  features (threads, text, fasteners) before export.
+- **Missing colours** usually mean the CAD export didn't include them. Most CAD
+  tools have an option to export colours or appearance with STEP.
+- **IP and confidentiality:** confirm you have the right to publish a design
+  before uploading, especially for work with industry partners. An envelope or
+  simplified model is often enough.
+
+*[Upload a STEP file](/auth/register) and open it in your browser and in AR,
+without CAD software.*
+""",
+    },
+    {
+        "slug": "how-to-open-glb-file",
+        "title": "How to Open a GLB File on Desktop, iPhone, and Android",
+        "description": "What a GLB file is and how to open it on Windows, Mac, iPhone, and Android, why iPhones need USDZ for AR, and how to share a GLB as a link.",
+        "date": "2026-10-12",
+        "author": "AcademicAR Team",
+        "tags": ["GLB", "glTF", "augmented reality", "how-to"],
+        "persona": "Anyone sharing 3D models",
+        "read_minutes": 5,
+        "body": """\
+GLB has become the default format for 3D on the web, so more and more people
+receive `.glb` files without knowing what to do with them. Here's what the format
+is and how to open it on each device.
+
+## What is a GLB file?
+
+A **GLB** file is the binary, single-file version of **glTF 2.0**, an open standard
+from the Khronos Group often called "the JPEG of 3D". One `.glb` contains the
+model's geometry, materials, textures, and, where present, animations and a tree
+of named parts. It is designed to load quickly in real-time viewers, which is why
+browsers, game engines, and AR tools support it.
+
+## Opening a GLB on Windows and Mac
+
+- **Windows:** Microsoft's **3D Viewer** app opens GLB where it is installed, and
+  Microsoft 365 apps such as PowerPoint can insert GLB files as 3D models.
+- **Mac:** Apple's built-in previews are built around USDZ rather than GLB, so use
+  a browser-based viewer or a 3D app such as Blender, which imports glTF/GLB.
+- **Any computer:** drag the file into a browser-based glTF viewer. This is the
+  fastest option and needs no installation.
+
+## Opening a GLB on Android
+
+Android's **Scene Viewer** (part of Google Play Services for AR) displays GLB
+models in 3D and in AR. Web pages built with Google's `<model-viewer>` hand the
+model to Scene Viewer when you tap the AR button.
+
+## Opening a GLB on iPhone and iPad
+
+This is where most people get stuck. iOS **AR Quick Look** does not use GLB: it
+expects **USDZ**, Apple's format. A GLB will display in a web viewer on an iPhone,
+but to place it in your room in AR you need a USDZ version of the same model.
+
+## Sharing a GLB so it opens everywhere
+
+If the goal is for other people to see the model, the most reliable route is a
+hosted viewer that handles every device for you. Upload the `.glb` to AcademicAR
+and you get:
+
+- an optimized GLB (Draco geometry compression, webp textures) that loads fast on
+  mobile,
+- a **USDZ companion generated automatically**, so **View in AR** works on iPhone
+  and iPad as well as Android,
+- a **viewer link** that opens in any browser, and a **QR code** for print,
+- for multi-part GLBs, a **Layers panel** with one layer per part.
+
+GLB units are kept as authored, so AR shows the model at the size it was modelled.
+
+## Common GLB problems
+
+- **The model is huge or tiny in AR:** the exporter used the wrong unit. glTF is
+  defined in metres, so a model exported in millimetres appears 1000 times too
+  large. Fix the scale in the source application and re-export.
+- **Textures are missing:** a `.gltf` file references external images, while a
+  `.glb` embeds them. Export as GLB (binary) to keep everything in one file.
+- **The file is too large to share:** compress geometry with Draco and textures
+  with webp or KTX2, or let the upload optimizer do it.
+
+*[Upload a GLB](/auth/register) and get a link that opens in 3D and AR on every
+device.*
+""",
+    },
+    {
+        "slug": "3d-slicer-export-share",
+        "title": "3D Slicer: Export Models and Share Them as Interactive 3D",
+        "description": "Export segmentations from 3D Slicer as STL, OBJ, or .seg.nrrd and share them as a layered 3D viewer link with AR and a QR code, step by step.",
+        "date": "2026-10-13",
+        "author": "AcademicAR Team",
+        "tags": ["3D Slicer", "segmentation", "medical imaging", "how-to"],
+        "persona": "Medical imaging researchers & clinicians",
+        "read_minutes": 7,
+        "body": """\
+3D Slicer is one of the most widely used free tools for segmenting CT and MRI
+data. Getting a segmentation **out** of Slicer and in front of reviewers, students,
+or colleagues is a separate problem. This guide covers the export options and how
+to turn the result into a 3D link anyone can open.
+
+## Two routes out of Slicer
+
+There are two good ways to move a Slicer segmentation to a shareable viewer:
+
+1. **Export surface models (STL or OBJ).** Slicer builds the 3D surfaces and you
+   upload the meshes.
+2. **Save the segmentation itself (`.seg.nrrd`).** You upload the label map and
+   the surfaces are built on upload, one layer per segment.
+
+Route 2 is usually better for multi-structure segmentations, because segment names
+and colours travel with the file. Route 1 is useful when you have already
+smoothed, decimated, or edited the surfaces in Slicer.
+
+## Route 1: export STL or OBJ from Slicer
+
+1. Open the **Segmentations** module and select your segmentation.
+2. Expand **Export/import models and labelmaps**.
+3. Choose **Export to files**, pick the output folder, and set the format to
+   **STL** or **OBJ**.
+4. Tick **Merge into single file** if you want one file for all segments. Leave
+   it unticked for one file per segment.
+5. Check the **size scale** and **coordinate system** settings. Slicer works in
+   millimetres, so keep that unit in mind for the next step.
+
+Then upload the file to AcademicAR and set the **source unit to millimetres**. A
+single STL becomes one mesh. If readers should toggle structures separately,
+prefer OBJ or the `.seg.nrrd` route below.
+
+## Route 2: save the segmentation as .seg.nrrd
+
+1. In Slicer, use **File → Save** (or **Save Data**).
+2. Make sure the segmentation node is ticked and saved as **`.seg.nrrd`**.
+3. Upload that file to AcademicAR as a **medical segmentation**.
+
+On upload, each non-empty segment becomes its own named, coloured layer, with up
+to 64 layers per model. NIfTI (`.nii`/`.nii.gz`), DICOM-SEG, and a ZIP of masks
+work the same way if your pipeline produces those instead (see our post on
+[segmentation formats](/blog/medical-image-segmentation-to-3d-viewer)).
+
+Medical uploads need an extra confirmation that the data is anonymised and that
+you have the right to share it. The raw file is deleted after conversion.
+
+## What your readers get
+
+The result is a viewer link and a QR code. Readers can:
+
+- **show, hide, fade, or recolour** each structure in the Layers panel,
+- cut through the model with the **section plane** and read the cut in the
+  colour-coded **slice view**,
+- see **structure dimensions and distances between layers** where layer
+  measurements are enabled,
+- open the model in **AR** on iPhone or Android at its real size.
+
+You can also save a **default layer view** and **scenes** that walk readers through
+the anatomy step by step.
+
+## Starting from the DICOM instead
+
+If you haven't segmented yet and only need bone or skin surfaces, you can skip
+Slicer and upload the DICOM series as a ZIP with a threshold preset or a custom
+Hounsfield range. See [From DICOM to Interactive 3D](/blog/dicom-to-3d-model-guide)
+and [Hounsfield units explained](/blog/hounsfield-units-ct-thresholding-3d).
+
+## Before you publish
+
+- Remove faces and identifying features from head and neck reconstructions.
+- Confirm consent and ethics approval cover publication of the 3D data.
+- Name your segments clearly in Slicer: those names become the legend your readers
+  see.
+
+*[Create a free account](/auth/register) and share your first Slicer segmentation
+as an interactive 3D model.*
+""",
+    },
+    {
+        "slug": "embed-3d-model-website",
+        "title": "How to Embed a 3D Model on a Website, LMS, or Lab Page",
+        "description": "Two ways to embed an interactive 3D model on a web page: self-host with model-viewer, or paste a hosted viewer iframe into WordPress, Moodle, or Canvas.",
+        "date": "2026-10-14",
+        "author": "AcademicAR Team",
+        "tags": ["embedding", "3D viewer", "teaching", "how-to"],
+        "persona": "Lab website owners & educators",
+        "read_minutes": 6,
+        "body": """\
+A lab website, a course page, or a project site is a natural home for the 3D
+models behind your research. There are two practical ways to put one there: build
+the viewer yourself, or embed a hosted viewer. Here's how each works and when to
+pick which.
+
+## Option 1: self-host with model-viewer
+
+Google's open-source **`<model-viewer>`** web component is the standard way to show
+a GLB on a web page. The minimal version is two lines:
+
+```html
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.3.0/model-viewer.min.js"></script>
+<model-viewer src="model.glb" camera-controls ar alt="A 3D model"></model-viewer>
+```
+
+This works well if you control the site and are comfortable with HTML. You are
+then responsible for:
+
+- **Converting** your source files to an optimized GLB (and compressing them),
+- **Producing a USDZ** if you want AR on iPhones (`ios-src`),
+- **Hosting** the files with the right content types and caching,
+- **Updating** every page by hand when the model changes.
+
+## Option 2: embed a hosted viewer
+
+If your site is WordPress, Squarespace, Google Sites, a university CMS, or an LMS
+such as **Moodle** or **Canvas**, you often can't add scripts, but you can paste an
+**iframe**. A hosted viewer gives you an iframe that already handles conversion,
+compression, AR, and updates.
+
+With AcademicAR:
+
+1. Upload the model (GLB, STL, OBJ, FBX, STEP, or a medical scan or segmentation).
+2. On the project page, click **Embed** next to the model. This copies an iframe
+   snippet like:
+
+```html
+<iframe src="https://academicar.com/view/<model-id>?embed=true"
+        width="100%" height="480" style="border:0;border-radius:8px"
+        allow="xr-spatial-tracking; fullscreen" allowfullscreen loading="lazy"></iframe>
+```
+
+3. Paste it into an HTML or embed block on your page.
+
+Visitors can rotate and zoom the model in the page, open it full screen, and open
+it in AR on their phones. If you later **replace the model**, every page that
+embeds it shows the new version, with no edits on your side.
+
+## Which should you choose?
+
+| | Self-hosted model-viewer | Hosted embed |
+|---|---|---|
+| Setup | HTML and file hosting | Paste an iframe |
+| Works in LMS / CMS without scripts | Rarely | Yes |
+| Conversion from STL, STEP, DICOM | Do it yourself | Automatic |
+| iPhone AR (USDZ) | Generate it yourself | Automatic |
+| Layers, section plane, slice view | Build it yourself | Included |
+| Updating the model | Re-upload on every site | Replace once |
+
+Self-hosting gives full control over look and code. A hosted embed is faster and
+easier to maintain, especially when the same model also appears in a paper, a
+poster QR code, and a course page.
+
+## Tips for embeds that work well
+
+- **Give the iframe a descriptive `title`** for screen readers. The copied snippet
+  includes the model name.
+- **Use `loading="lazy"`** so pages with several models don't load them all at
+  once.
+- **Keep the height at 400–600 px** on desktop. On phones, the full-screen button
+  gives readers more room.
+- **Add a short caption** with what the reader should look for, just like a figure.
+
+*[Create a free account](/auth/register), upload a model, and copy its embed code.
+See also [AR for STEM education](/ar-for-stem-education).*
+""",
+    },
 ]
 
 
@@ -1188,3 +1683,27 @@ def get_post(slug: str) -> dict | None:
 def code_post_slugs() -> set[str]:
     """Slugs reserved by the built-in code posts (avoid DB slug collisions)."""
     return {p["slug"] for p in POSTS}
+
+
+_COVER_RE = re.compile(r"!\[[^\]]*\]\((/static/[^)\s]+\.(?:webp|png|jpe?g))\)", re.IGNORECASE)
+
+
+def cover_image_path(body: str) -> str | None:
+    """Site path of the post's first raster image (its cover), for og:image and
+    the BlogPosting schema. SVG diagrams are skipped: link previews don't render
+    them."""
+    match = _COVER_RE.search(body or "")
+    return match.group(1) if match else None
+
+
+def related_posts(post: dict, posts: list[dict], limit: int = 3) -> list[dict]:
+    """Up to ``limit`` other posts sharing the most tags with ``post`` (newest
+    first on ties), for internal links under an article."""
+    tags = {t.casefold() for t in post.get("tags") or []}
+    scored = [
+        (len(tags & {t.casefold() for t in p.get("tags") or []}), p["date"], p)
+        for p in posts
+        if p["slug"] != post["slug"]
+    ]
+    scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return [p for _score, _date, p in scored[:limit]]

@@ -11,7 +11,7 @@
   {% block canonical %}<link rel="canonical" href="{{ canonical_url() }}">{% endblock %}
   <meta property="og:title" content="{% block og_title %}AcademicAR - 3D and AR models for academic publications{% endblock %}">
   <meta property="og:description" content="{% block og_description %}Share 3D and AR models with academic papers, posters, and presentations.{% endblock %}">
-  <meta property="og:type" content="website">
+  <meta property="og:type" content="{% block og_type %}website{% endblock %}">
   <meta property="og:url" content="{{ canonical_url() }}">
   <meta property="og:site_name" content="AcademicAR">
   <meta property="og:image" content="{% block og_image %}{{ share_image_url() }}{% endblock %}">

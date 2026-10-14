@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block title %}{{ post.title }} - AcademicAR{% endblock %}
 {% block meta_description %}{{ post.description }}{% endblock %}
+{% block og_title %}{{ post.title }}{% endblock %}
+{% block og_description %}{{ post.description }}{% endblock %}
+{% block og_type %}article{% endblock %}
+{% block og_image %}{{ cover_url or super() }}{% endblock %}
 
 {% block head %}
 <script type="application/ld+json">
@@ -10,7 +14,10 @@
   "headline": {{ post.title | tojson }},
   "description": {{ post.description | tojson }},
   "datePublished": "{{ post.date }}",
-  "dateModified": "{{ post.date }}",
+  "dateModified": "{{ date_modified }}",{% if cover_url %}
+  "image": {{ cover_url | tojson }},{% endif %}{% if post.tags %}
+  "keywords": {{ post.tags | join(', ') | tojson }},{% endif %}
+  "inLanguage": "en",
   "author": { "@type": "Organization", "name": "AcademicAR" },
   "publisher": {
     "@type": "Organization",
@@ -20,6 +27,8 @@
   "mainEntityOfPage": "{{ canonical_url() }}"
 }
 </script>
+{% if post.date %}<meta property="article:published_time" content="{{ post.date }}">{% endif %}
+<meta property="article:modified_time" content="{{ date_modified }}">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -50,6 +59,20 @@
   <div class="blog-article">
     {{ body_html | safe }}
   </div>
+
+  {% if related %}
+  <section class="mt-12 pt-8 border-t border-[#e8e8e8]" aria-labelledby="related-heading">
+    <h2 id="related-heading" class="text-lg font-semibold text-[#202020] mb-4">Related guides</h2>
+    <ul class="space-y-3">
+      {% for item in related %}
+      <li>
+        <a href="{{ url_for('blog_post', slug=item.slug) }}" class="font-semibold text-[#202020] hover:underline">{{ item.title }}</a>
+        <p class="text-sm text-[#6b6b6b]">{{ item.description | truncate(140) }}</p>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
 
   <footer class="mt-12 pt-8 border-t border-[#e8e8e8]">
     <p class="text-[#4d4d4d]">
