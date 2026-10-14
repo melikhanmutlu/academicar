@@ -15,7 +15,7 @@ import types
 import uuid
 import zipfile
 from datetime import UTC, datetime, timedelta
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 from flask import Flask, Response, abort, current_app, flash, g, jsonify, make_response, redirect, render_template, request, send_from_directory, session, url_for
 from flask_limiter.errors import RateLimitExceeded
@@ -2534,8 +2534,23 @@ def _db_blogpost_to_view(bp: BlogPost) -> dict:
         "body": bp.body,
         "source": "db",
         "id": bp.id,
+        "created_at": bp.created_at,
         "updated_at": bp.updated_at,
     }
+
+
+def blog_post_modified_date(post: dict) -> str:
+    """Last content change (YYYY-MM-DD) for dateModified and sitemap lastmod.
+
+    A seeded row nobody edited keeps ``updated_at == created_at`` even after
+    _refresh_unedited_builtin_blog_posts rewrites its body (that equality is
+    the "unedited" marker), so for those rows and for code posts the built-in
+    post's optional ``"updated"`` date is used instead."""
+    updated = post.get("updated_at")
+    if updated is not None and updated != post.get("created_at"):
+        return updated.strftime("%Y-%m-%d")
+    code_post = get_post(post["slug"])
+    return (code_post or {}).get("updated") or post["date"]
 
 
 def _code_blogpost_to_view(p: dict) -> dict:
@@ -5891,13 +5906,12 @@ def register_routes(app: Flask) -> None:
             f"db:{post['id']}:{post['updated_at']}" if post.get("source") == "db" else post["slug"]
         )
         cover = cover_image_path(post["body"])
-        updated = post.get("updated_at")
         return render_template(
             "blog_post.html",
             post=post,
             body_html=render_body(post["body"], cache_key=cache_key),
-            cover_url=public_url("static", filename=cover.removeprefix("/static/")) if cover else None,
-            date_modified=updated.strftime("%Y-%m-%d") if updated else post["date"],
+            cover_url=urljoin(public_url("landing"), cover.lstrip("/")) if cover else None,
+            date_modified=blog_post_modified_date(post),
             related=related_posts(post, merged_blog_posts()),
         )
 
@@ -6052,8 +6066,7 @@ def register_routes(app: Flask) -> None:
             except Exception:
                 continue
             urls.append(url)
-            updated = post.get("updated_at")
-            lastmods[url] = updated.strftime("%Y-%m-%d") if updated else post["date"]
+            lastmods[url] = blog_post_modified_date(post)
         # Public, non-deleted publication pages are indexable SEO assets.
         public_papers = (
             Paper.query.filter(Paper.is_public.is_(True))

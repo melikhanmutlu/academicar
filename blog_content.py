@@ -2,7 +2,9 @@
 
 Posts are defined in-repo (version-controlled, no DB/admin needed) and rendered
 from Markdown to HTML on demand (cached). Adding a post = append a dict to
-``POSTS``. Titles/keywords are English (global SEO focus).
+``POSTS``. Titles/keywords are English (global SEO focus). When a post's
+content is revised, set an optional ``"updated": "YYYY-MM-DD"`` so its
+dateModified and sitemap lastmod move with it.
 """
 from __future__ import annotations
 
@@ -1685,13 +1687,15 @@ def code_post_slugs() -> set[str]:
     return {p["slug"] for p in POSTS}
 
 
-_COVER_RE = re.compile(r"!\[[^\]]*\]\((/static/[^)\s]+\.(?:webp|png|jpe?g))\)", re.IGNORECASE)
+_COVER_RE = re.compile(
+    r"!\[[^\]]*\]\((/(?:static|blog-images)/[^)\s]+\.(?:webp|png|jpe?g))\)", re.IGNORECASE
+)
 
 
 def cover_image_path(body: str) -> str | None:
     """Site path of the post's first raster image (its cover), for og:image and
-    the BlogPosting schema. SVG diagrams are skipped: link previews don't render
-    them."""
+    the BlogPosting schema: a repo image under /static/ or an admin upload under
+    /blog-images/. SVG diagrams are skipped: link previews don't render them."""
     match = _COVER_RE.search(body or "")
     return match.group(1) if match else None
 

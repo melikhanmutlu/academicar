@@ -104,3 +104,31 @@ def test_blog_post_links_related_guides(client):
 def test_sitemap_blog_posts_have_lastmod(client):
     body = client.get("/sitemap.xml").get_data(as_text=True)
     assert "/blog/dicom-to-3d-model-guide</loc><lastmod>2026-09-24</lastmod>" in body
+
+
+def test_blog_post_admin_uploaded_image_is_the_cover(app, client):
+    from models import BlogPost, db
+
+    with app.app_context():
+        db.session.add(BlogPost(slug="uploaded-cover", title="Uploaded cover", body="![c](/blog-images/abc.webp)\n\nText."))
+        db.session.commit()
+    body = client.get("/blog/uploaded-cover").get_data(as_text=True)
+    og_image = body.split('property="og:image"')[1].split(">")[0]
+    assert og_image.endswith('/blog-images/abc.webp"')
+    assert og_image.split('content="')[1].startswith("http")
+
+
+def test_refreshed_builtin_post_reports_its_updated_date(app, client, monkeypatch):
+    import blog_content
+    from app import seed_builtin_blog_posts
+
+    slug = "dicom-to-3d-model-guide"
+    with app.app_context():
+        seed_builtin_blog_posts(app)
+        new_posts = [dict(p, updated="2026-10-20") if p["slug"] == slug else p for p in blog_content.POSTS]
+        monkeypatch.setattr(blog_content, "POSTS", new_posts)
+        seed_builtin_blog_posts(app)
+    body = client.get(f"/blog/{slug}").get_data(as_text=True)
+    assert '"dateModified": "2026-10-20"' in body
+    sitemap = client.get("/sitemap.xml").get_data(as_text=True)
+    assert f"/blog/{slug}</loc><lastmod>2026-10-20</lastmod>" in sitemap
