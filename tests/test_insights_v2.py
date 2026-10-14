@@ -202,12 +202,14 @@ def test_headline_without_views(client, app):
     assert snapshot["headline"] == ["No model views in the last 30 days yet."]
 
 
-def test_engagement_comparison_hidden_before_full_tracking(client, app):
+def test_engagement_comparison_hidden_before_full_tracking(client, app, monkeypatch):
     import analytics
 
     register(client)
     owner_id, _, _ = _setup(app)
     with app.app_context():
+        # Pin "tracking started today" so the test doesn't depend on the calendar.
+        monkeypatch.setattr(analytics, "ENGAGEMENT_TRACKED_SINCE", _now().date())
         early = analytics_snapshot(owner_id, days=7)
         assert early["changes"]["engaged_visitors"] is None and early["engagement_partial"] is True
         original = analytics.ENGAGEMENT_TRACKED_SINCE
