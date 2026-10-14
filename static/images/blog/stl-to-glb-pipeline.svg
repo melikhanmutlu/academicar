@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 300" width="960" height="300" role="img" aria-labelledby="t d">
+  <title id="t">What happens when an STL is converted to GLB</title>
+  <desc id="d">An STL with triangles only goes through four steps: set the unit, add a material, clean the mesh, and compress with Draco. The result is an optimized GLB, a USDZ for iPhone AR, a viewer link and a QR code.</desc>
+  <style>
+    .box { fill: #f5f5f5; stroke: #bdbdbd; stroke-width: 1.2; }
+    .hi { fill: #fff4ee; stroke: #ff682c; stroke-width: 1.5; }
+    .lbl { font: 600 15px Inter, system-ui, sans-serif; fill: #202020; }
+    .sub { font: 400 13px Inter, system-ui, sans-serif; fill: #6b6b6b; }
+    .acc { font: 700 13px Inter, system-ui, sans-serif; fill: #c2410c; }
+    .cap { font: 600 12px Inter, system-ui, sans-serif; fill: #6b6b6b; letter-spacing: .08em; }
+    .arr { stroke: #202020; stroke-width: 1.4; fill: none; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#202020"/>
+    </marker>
+  </defs>
+  <rect width="960" height="300" fill="#ffffff"/>
+  <text class="cap" x="40" y="40">INPUT</text>
+  <rect class="box" x="40" y="60" width="150" height="150" rx="10"/>
+  <text class="lbl" x="60" y="100">model.stl</text>
+  <text class="sub" x="60" y="126">triangles only</text>
+  <text class="sub" x="60" y="146">no unit · no colour</text>
+  <text class="sub" x="60" y="166">no parts</text>
+  <path class="arr" d="M196 135 H236" marker-end="url(#a)"/>
+
+  <text class="cap" x="246" y="40">CONVERSION</text>
+  <rect class="box" x="246" y="60" width="122" height="150" rx="10"/>
+  <text class="lbl" x="262" y="100">1 · Unit</text>
+  <text class="sub" x="262" y="124">mm, cm or m</text>
+  <text class="sub" x="262" y="144">real size in AR</text>
+  <rect class="box" x="378" y="60" width="122" height="150" rx="10"/>
+  <text class="lbl" x="394" y="100">2 · Material</text>
+  <text class="sub" x="394" y="124">colour + PBR</text>
+  <text class="sub" x="394" y="144">finish</text>
+  <rect class="box" x="510" y="60" width="122" height="150" rx="10"/>
+  <text class="lbl" x="526" y="100">3 · Clean</text>
+  <text class="sub" x="526" y="124">merge vertices</text>
+  <text class="sub" x="526" y="144">add UVs</text>
+  <rect class="hi" x="642" y="60" width="122" height="150" rx="10"/>
+  <text class="lbl" x="658" y="100">4 · Draco</text>
+  <text class="acc" x="658" y="124">geometry</text>
+  <text class="acc" x="658" y="144">compression</text>
+  <path class="arr" d="M770 135 H806" marker-end="url(#a)"/>
+
+  <text class="cap" x="816" y="40">OUTPUT</text>
+  <text class="lbl" x="816" y="88">model.glb</text>
+  <text class="lbl" x="816" y="118">model.usdz</text>
+  <text class="lbl" x="816" y="148">viewer link</text>
+  <text class="lbl" x="816" y="178">QR code</text>
+  <text class="sub" x="40" y="262">The unit is the one step only you can supply: an STL file can't say whether 120 means millimetres or metres.</text>
+</svg>

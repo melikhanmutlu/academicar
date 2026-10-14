@@ -1183,6 +1183,8 @@ from a 3D model.*
         "persona": "Researchers, engineers & makers",
         "read_minutes": 6,
         "body": """\
+![A faceted STL mesh of a femur converted into a smooth, web-ready 3D model](/static/images/blog/covers/convert-stl-to-glb.webp)
+
 STL is the format almost every 3D pipeline can write: segmentation software, CAD,
 3D scanners, and slicers for 3D printing. GLB is the format browsers, phones, and
 AR viewers want. If you need to show an STL to someone who doesn't have CAD or
@@ -1218,6 +1220,9 @@ with a model that looks right and loads fast, it should:
 4. **Compress the geometry.** Draco compression typically shrinks mesh data many
    times over, which is the difference between a model that opens instantly on
    mobile data and one that never finishes loading.
+
+![The four conversion steps from an STL to a GLB, USDZ, viewer link and QR code](/static/images/blog/stl-to-glb-pipeline.svg)
+*What the conversion adds to an STL, and what comes out.*
 
 ## Converting STL to GLB with AcademicAR
 
@@ -1272,6 +1277,8 @@ GLB with a viewer link and QR code.*
         "persona": "Researchers, teachers & students",
         "read_minutes": 5,
         "body": """\
+![A 3D model shared from a browser to a phone with a QR code](/static/images/blog/covers/view-stl-online-share-link.webp)
+
 Someone sends you an STL file, or you need to send one. The usual answer is
 "open it in a slicer" or "install a CAD viewer", which is fine for engineers and
 a dead end for everyone else. Here are the ways to view an STL online, and how to
@@ -1300,6 +1307,9 @@ With AcademicAR the steps are:
 
 Whoever opens the link can rotate, zoom, and pan, and on a phone tap **View in AR** to place the model on their desk at its
 real size.
+
+![A local STL preview compared with a hosted viewer link and QR code](/static/images/blog/stl-share-link.svg)
+*A local preview is for you; a hosted link is for everyone else.*
 
 ## What readers can do in the viewer
 
@@ -1351,6 +1361,8 @@ can be identifying even without any metadata.
         "persona": "Engineers, students & collaborators",
         "read_minutes": 6,
         "body": """\
+![A cutaway CAD valve assembly, half exact surfaces and half triangle mesh](/static/images/blog/covers/open-step-stp-file-online.webp)
+
 A `.step` or `.stp` file is the most common way CAD models travel between people
 who don't use the same software. If you've received one and don't have
 SolidWorks, Fusion, or CATIA, or you need to show one to someone who doesn't, this
@@ -1367,6 +1379,9 @@ often with colours and part names.
 That precision is why manufacturers and engineers exchange STEP. It is also why
 STEP files can't be shown directly in a browser: the exact surfaces first have to
 be turned into triangles (tessellated) before a 3D viewer or AR app can draw them.
+
+![Exact STEP surfaces tessellated into a triangle mesh](/static/images/blog/step-exact-vs-mesh.svg)
+*Exact surfaces are tessellated into triangles before a browser or AR app can draw them.*
 
 ## Ways to open a STEP file
 
@@ -1429,6 +1444,8 @@ without CAD software.*
         "persona": "Anyone sharing 3D models",
         "read_minutes": 5,
         "body": """\
+![The same skull model on a laptop, an iPhone in AR, and an Android phone](/static/images/blog/covers/how-to-open-glb-file.webp)
+
 GLB has become the default format for 3D on the web, so more and more people
 receive `.glb` files without knowing what to do with them. Here's what the format
 is and how to open it on each device.
@@ -1461,6 +1478,9 @@ model to Scene Viewer when you tap the AR button.
 This is where most people get stuck. iOS **AR Quick Look** does not use GLB: it
 expects **USDZ**, Apple's format. A GLB will display in a web viewer on an iPhone,
 but to place it in your room in AR you need a USDZ version of the same model.
+
+![Which file a desktop browser, Android and iPhone use from one viewer link](/static/images/blog/glb-devices.svg)
+*One link serves GLB to browsers and Android, and USDZ to iPhone AR.*
 
 ## Sharing a GLB so it opens everywhere
 
@@ -1501,6 +1521,8 @@ device.*
         "persona": "Medical imaging researchers & clinicians",
         "read_minutes": 7,
         "body": """\
+![CT slices turned into a 3D kidney model with its vessels highlighted](/static/images/blog/covers/3d-slicer-export-share.webp)
+
 3D Slicer is one of the most widely used free tools for segmenting CT and MRI
 data. Getting a segmentation **out** of Slicer and in front of reviewers, students,
 or colleagues is a separate problem. This guide covers the export options and how
@@ -1518,6 +1540,9 @@ There are two good ways to move a Slicer segmentation to a shareable viewer:
 Route 2 is usually better for multi-structure segmentations, because segment names
 and colours travel with the file. Route 1 is useful when you have already
 smoothed, decimated, or edited the surfaces in Slicer.
+
+![Two routes from a 3D Slicer segmentation to a shareable 3D viewer link](/static/images/blog/slicer-export-routes.svg)
+*Export surface models, or save the segmentation itself.*
 
 ## Route 1: export STL or OBJ from Slicer
 
@@ -1590,6 +1615,8 @@ as an interactive 3D model.*
         "persona": "Lab website owners & educators",
         "read_minutes": 6,
         "body": """\
+![A web page with an embedded interactive 3D molecule viewer](/static/images/blog/covers/embed-3d-model-website.webp)
+
 A lab website, a course page, or a project site is a natural home for the 3D
 models behind your research. There are two practical ways to put one there: build
 the viewer yourself, or embed a hosted viewer. Here's how each works and when to

@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 300" width="960" height="300" role="img" aria-labelledby="t d">
+  <title id="t">Which file each device uses</title>
+  <desc id="d">Desktop browsers and Android Scene Viewer use GLB. iPhone and iPad show GLB in a web viewer, but AR Quick Look needs USDZ. A hosted viewer serves the right file to each device from one link.</desc>
+  <style>
+    .box { fill: #f5f5f5; stroke: #bdbdbd; stroke-width: 1.2; }
+    .hi { fill: #fff4ee; stroke: #ff682c; stroke-width: 1.5; }
+    .lbl { font: 600 15px Inter, system-ui, sans-serif; fill: #202020; }
+    .sub { font: 400 13px Inter, system-ui, sans-serif; fill: #6b6b6b; }
+    .acc { font: 700 13px Inter, system-ui, sans-serif; fill: #c2410c; }
+    .cap { font: 600 12px Inter, system-ui, sans-serif; fill: #6b6b6b; letter-spacing: .08em; }
+    .arr { stroke: #202020; stroke-width: 1.4; fill: none; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#202020"/>
+    </marker>
+  </defs>
+  <rect width="960" height="300" fill="#ffffff"/>
+  <rect class="hi" x="380" y="30" width="200" height="64" rx="10"/>
+  <text class="lbl" x="420" y="58">One viewer link</text>
+  <text class="sub" x="414" y="80">or QR code</text>
+  <path class="arr" d="M430 98 L170 150" marker-end="url(#a)"/>
+  <path class="arr" d="M480 98 V150" marker-end="url(#a)"/>
+  <path class="arr" d="M530 98 L790 150" marker-end="url(#a)"/>
+  <rect class="box" x="60" y="156" width="230" height="100" rx="10"/>
+  <text class="lbl" x="80" y="190">Desktop browser</text>
+  <text class="sub" x="80" y="214">3D in the page</text>
+  <text class="acc" x="80" y="238">GLB</text>
+  <rect class="box" x="365" y="156" width="230" height="100" rx="10"/>
+  <text class="lbl" x="385" y="190">Android</text>
+  <text class="sub" x="385" y="214">3D + Scene Viewer AR</text>
+  <text class="acc" x="385" y="238">GLB</text>
+  <rect class="box" x="670" y="156" width="230" height="100" rx="10"/>
+  <text class="lbl" x="690" y="190">iPhone / iPad</text>
+  <text class="sub" x="690" y="214">3D: GLB · AR Quick Look:</text>
+  <text class="acc" x="690" y="238">USDZ (generated for you)</text>
+  <text class="sub" x="60" y="286">glTF is defined in metres: a model exported in millimetres shows up 1000× too large in AR.</text>
+</svg>

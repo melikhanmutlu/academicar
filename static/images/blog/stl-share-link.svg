@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 280" width="960" height="280" role="img" aria-labelledby="t d">
+  <title id="t">A local preview versus a shared viewer link</title>
+  <desc id="d">A local viewer shows the STL only on your own computer. A hosted viewer gives a link and QR code anyone can open in 3D and AR. Replacing the model keeps the same link and QR code.</desc>
+  <style>
+    .box { fill: #f5f5f5; stroke: #bdbdbd; stroke-width: 1.2; }
+    .hi { fill: #fff4ee; stroke: #ff682c; stroke-width: 1.5; }
+    .lbl { font: 600 15px Inter, system-ui, sans-serif; fill: #202020; }
+    .sub { font: 400 13px Inter, system-ui, sans-serif; fill: #6b6b6b; }
+    .acc { font: 700 13px Inter, system-ui, sans-serif; fill: #c2410c; }
+    .cap { font: 600 12px Inter, system-ui, sans-serif; fill: #6b6b6b; letter-spacing: .08em; }
+    .arr { stroke: #202020; stroke-width: 1.4; fill: none; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#202020"/>
+    </marker>
+  </defs>
+  <rect width="960" height="280" fill="#ffffff"/>
+  <text class="cap" x="40" y="40">LOCAL PREVIEW</text>
+  <rect class="box" x="40" y="56" width="380" height="150" rx="10"/>
+  <text class="lbl" x="62" y="92">Drag the .stl into a viewer</text>
+  <text class="sub" x="62" y="118">only you see it</text>
+  <text class="sub" x="62" y="140">everyone else needs the file</text>
+  <text class="sub" x="62" y="162">and software that opens it</text>
+
+  <text class="cap" x="500" y="40">HOSTED VIEWER LINK</text>
+  <rect class="hi" x="500" y="56" width="420" height="150" rx="10"/>
+  <text class="lbl" x="522" y="92">Upload once → link + QR code</text>
+  <text class="sub" x="522" y="118">opens in any browser, AR on phones</text>
+  <text class="sub" x="522" y="140">section plane, slice view, scenes</text>
+  <text class="acc" x="522" y="166">replace the model: same link, same QR</text>
+  <text class="sub" x="40" y="250">Use the local preview to check a file yourself, and a hosted link whenever someone else needs to see it.</text>
+</svg>

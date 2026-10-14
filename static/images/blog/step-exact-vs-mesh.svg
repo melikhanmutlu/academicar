@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 320" width="960" height="320" role="img" aria-labelledby="t d">
+  <title id="t">Exact STEP geometry versus a tessellated mesh</title>
+  <desc id="d">A STEP file describes a cylinder with a hole as exact surfaces. Before a browser or AR app can draw it, the surfaces are tessellated into triangles. Each part of the assembly becomes its own layer, with its STEP colour.</desc>
+  <style>
+    .box { fill: #f5f5f5; stroke: #bdbdbd; stroke-width: 1.2; }
+    .hi { fill: #fff4ee; stroke: #ff682c; stroke-width: 1.5; }
+    .lbl { font: 600 15px Inter, system-ui, sans-serif; fill: #202020; }
+    .sub { font: 400 13px Inter, system-ui, sans-serif; fill: #6b6b6b; }
+    .acc { font: 700 13px Inter, system-ui, sans-serif; fill: #c2410c; }
+    .cap { font: 600 12px Inter, system-ui, sans-serif; fill: #6b6b6b; letter-spacing: .08em; }
+    .arr { stroke: #202020; stroke-width: 1.4; fill: none; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#202020"/>
+    </marker>
+  </defs>
+  <rect width="960" height="320" fill="#ffffff"/>
+  <text class="cap" x="40" y="40">STEP · EXACT SURFACES</text>
+  <path d="M90 110 V200 A110 34 0 0 0 310 200 V110" fill="#f5f5f5" stroke="#6b6b6b" stroke-width="1.5"/>
+  <ellipse cx="200" cy="110" rx="110" ry="34" fill="#fafafa" stroke="#6b6b6b" stroke-width="1.5"/>
+  <ellipse cx="200" cy="110" rx="40" ry="12" fill="#ffffff" stroke="#6b6b6b" stroke-width="1.5"/>
+  <text class="sub" x="90" y="268">cylinder, plane, hole: defined mathematically</text>
+  <path class="arr" d="M380 160 H560" marker-end="url(#a)"/>
+  <text class="acc" x="410" y="148">tessellate</text>
+  <text class="sub" x="398" y="186">fine enough for fillets,</text>
+  <text class="sub" x="398" y="204">capped for phones</text>
+
+  <text class="cap" x="600" y="40">GLB · TRIANGLES</text>
+  <path d="M650 110 V200 A110 34 0 0 0 870 200 V110" fill="#f5f5f5" stroke="#6b6b6b" stroke-width="1.2"/>
+  <ellipse cx="760" cy="110" rx="110" ry="34" fill="#fafafa" stroke="#6b6b6b" stroke-width="1.2"/>
+  <path d="M870.0 110.0 V200.0 M870.0 110.0 L864.6 210.5 M864.6 120.5 V210.5 M864.6 120.5 L849.0 220.0 M849.0 130.0 V220.0 M849.0 130.0 L824.7 227.5 M824.7 137.5 V227.5 M824.7 137.5 L794.0 232.3 M794.0 142.3 V232.3 M794.0 142.3 L760.0 234.0 M760.0 144.0 V234.0 M760.0 144.0 L726.0 232.3 M726.0 142.3 V232.3 M726.0 142.3 L695.3 227.5 M695.3 137.5 V227.5 M695.3 137.5 L671.0 220.0 M671.0 130.0 V220.0 M671.0 130.0 L655.4 210.5 M655.4 120.5 V210.5 M655.4 120.5 L650.0 200.0 M650.0 110.0 V200.0 M800.0 110.0 L867.9 116.6 M800.0 110.0 L867.9 103.4 M797.0 114.6 L851.5 128.9 M797.0 114.6 L867.9 116.6 M788.3 118.5 L821.1 138.3 M788.3 118.5 L851.5 128.9 M775.3 121.1 L781.5 143.3 M775.3 121.1 L821.1 138.3 M760.0 122.0 L738.5 143.3 M760.0 122.0 L781.5 143.3 M744.7 121.1 L698.9 138.3 M744.7 121.1 L738.5 143.3 M731.7 118.5 L668.5 128.9 M731.7 118.5 L698.9 138.3 M723.0 114.6 L652.1 116.6 M723.0 114.6 L668.5 128.9 M720.0 110.0 L652.1 103.4 M720.0 110.0 L652.1 116.6 M723.0 105.4 L668.5 91.1 M723.0 105.4 L652.1 103.4 M731.7 101.5 L698.9 81.7 M731.7 101.5 L668.5 91.1 M744.7 98.9 L738.5 76.7 M744.7 98.9 L698.9 81.7 M760.0 98.0 L781.5 76.7 M760.0 98.0 L738.5 76.7 M775.3 98.9 L821.1 81.7 M775.3 98.9 L781.5 76.7 M788.3 101.5 L851.5 91.1 M788.3 101.5 L821.1 81.7 M797.0 105.4 L867.9 103.4 M797.0 105.4 L851.5 91.1" stroke="#ff682c" stroke-width="0.8" fill="none"/>
+  <ellipse cx="760" cy="110" rx="40" ry="12" fill="#ffffff" stroke="#6b6b6b" stroke-width="1.2"/>
+  <text class="sub" x="650" y="268">what browsers and AR apps draw</text>
+  <text class="lbl" x="40" y="304">Each assembly part becomes its own layer, and STEP colours and units carry over.</text>
+</svg>
