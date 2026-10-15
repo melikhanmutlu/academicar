@@ -546,6 +546,26 @@ html[data-design="b"][data-viewer-bg] #infoPanel h3 { font-size: 16px; line-heig
 html[data-design="b"][data-viewer-bg] #infoPanel h4 { color: var(--b-ink) !important; }
 html[data-design="b"][data-viewer-bg] #infoPanel a { color: var(--b-ink) !important; text-decoration-color: var(--b-accent); }
 html[data-design="b"][data-viewer-bg] #closeInfo { border: 0 !important; border-radius: 50% !important; background: var(--b-fill) !important; color: var(--b-ink-2) !important; }
+/* Layers save row: the button on one line, the hint beside it on one line. */
+html[data-design="b"][data-viewer-bg] .layers-save { flex-wrap: nowrap; gap: 12px; padding: 12px 18px 14px; }
+html[data-design="b"][data-viewer-bg] .layers-save button {
+  flex: none; white-space: nowrap; padding: 7px 16px; border: 0; border-radius: 999px; background: var(--b-accent); color: #fff;
+}
+html[data-design="b"][data-viewer-bg] .layers-save button:hover:not(:disabled) { filter: brightness(1.08); }
+html[data-design="b"][data-viewer-bg] .layers-save span { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* "Edit model" / publish link under the title: an orange-text button. */
+html[data-design="b"] #controlPanel .viewer-publish-cta {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; padding: 6px 14px; border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--b-accent) 45%, transparent); background: var(--b-glass);
+  color: var(--b-accent) !important; font-size: 12.5px; font-weight: 600; text-decoration: none;
+  backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); transition: background-color 0.15s, border-color 0.15s;
+}
+html[data-design="b"] #controlPanel .viewer-publish-cta:hover {
+  background: color-mix(in srgb, var(--b-accent) 14%, var(--b-glass)); border-color: var(--b-accent);
+}
+/* QR / AR dialogs sit in the middle of the window, both ways. */
+html[data-design="b"] #qrModal:not(.hidden) { display: flex; align-items: center; justify-content: center; }
+html[data-design="b"] #qrModal > div { margin: 0; }
 /* QR dialog */
 html[data-design="b"][data-viewer-bg="dark"] #qrModal { background: rgba(0, 0, 0, 0.5); }
 html[data-design="b"][data-viewer-bg]:is([data-viewer-bg="light"], [data-viewer-bg="white"]) #qrModal { background: rgba(255, 255, 255, 0.5); }
