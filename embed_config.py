@@ -164,8 +164,14 @@ def embed_page(model_id):
     model = db.session.get(Model3D, model_id)
     if not model:
         abort(404)
-    cfg = saved_embed_config(model)
+    cfg = dict(saved_embed_config(model))
     allowed = embed_allowances(model)
+    # Show what the plan lets through, so a saved value the plan no longer
+    # allows is not posted back (and rejected) on the next save.
+    if not allowed["white_label"]:
+        cfg["brand"] = True
+    if not allowed["full_layout"] and cfg["layout"] == "full":
+        cfg["layout"] = "compact"
     return render_template(
         "embed_settings.html",
         model=model,

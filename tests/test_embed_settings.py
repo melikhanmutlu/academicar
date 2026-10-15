@@ -137,3 +137,25 @@ def test_only_editors_open_the_embed_page(client, app):
     register(client, email="other@example.com")
     assert client.get(f"/models/{model_id}/embed").status_code in (403, 404)
     assert _save(client, model_id, theme="light").status_code in (403, 404)
+
+
+def test_embed_page_shows_plan_gated_values_not_stale_saved_ones(client, app):
+    register(client)
+    model_id = _model(app, license_type="free")
+    with app.app_context():
+        model = db.session.get(Model3D, model_id)
+        model.embed_config = {"layout": "full", "brand": False}  # saved before a downgrade
+        db.session.commit()
+    html = client.get(f"/models/{model_id}/embed").get_data(as_text=True)
+    brand = html.split('data-embed-field="brand-hide"', 1)[1].split(">", 1)[0]
+    assert "checked" not in brand
+    layout = html.split('data-embed-field="layout"', 1)[1].split("</select>", 1)[0]
+    assert 'value="compact" selected' in layout
+
+
+def test_embed_ignores_the_stored_viewer_background_and_keeps_embed_in_gallery_links(client, app):
+    register(client)
+    model_id = _model(app)
+    html = _public_embed(client, model_id).get_data(as_text=True)
+    assert "var saved = null;" in html
+    assert "['design', 'mode', 'embed']" in html

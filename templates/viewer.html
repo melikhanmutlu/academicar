@@ -63,7 +63,7 @@
       if (mode === 'dark') m = 'dark';
       {% endif %}
       try {
-        var saved = {% if viewer_preview %}null{% else %}localStorage.getItem('academicar:viewerBg'){% endif %};
+        var saved = {% if viewer_preview or embed_req %}null{% else %}localStorage.getItem('academicar:viewerBg'){% endif %};
         if (saved === 'light' || saved === 'white' || saved === 'dark') m = saved;
       } catch (e) {}
       // An embed can pick its background with ?bg=dark|light|white (not stored).
@@ -6877,7 +6877,7 @@
     var modelId = {{ model.id|tojson }};
     var params = new URLSearchParams(window.location.search);
     var keep = new URLSearchParams();
-    ['design', 'mode'].forEach(function (k) { if (params.get(k)) keep.set(k, params.get(k)); });
+    ['design', 'mode', 'embed'].forEach(function (k) { if (params.get(k)) keep.set(k, params.get(k)); });
     var svg = function (inner) {
       return '<svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + inner + '</svg>';
     };
