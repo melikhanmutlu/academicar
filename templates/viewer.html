@@ -1496,7 +1496,7 @@
         <button id="measureBtn" class="viewer-tool-btn !py-1.5 !px-3 !text-xs" type="button" aria-label="Measure a distance" aria-pressed="false" title="Measure the distance between two points">Measure</button>
         {% if show_scenes %}<button id="scenesBtn" class="viewer-tool-btn !py-1.5 !px-3 !text-xs" type="button" aria-label="Scenes" aria-expanded="false" aria-controls="scenesPanel">Scenes</button>{% endif %}
         {% if viewer_layers|length > 1 %}<button id="layersBtn" class="viewer-tool-btn !py-1.5 !px-3 !text-xs" type="button" aria-label="Layers" aria-expanded="false" aria-controls="layersPanel">Layers</button>{% endif %}
-        {% if 'section_plane' in viewer_features %}<button id="sectionBtn" class="viewer-tool-btn !py-1.5 !px-3 !text-xs" type="button" aria-label="Section plane" aria-expanded="false" aria-controls="sectionPanel" hidden>Section</button>{% endif %}
+        {% if 'section_plane' in viewer_features %}<button id="sectionBtn" class="viewer-tool-btn !py-1.5 !px-3 !text-xs" type="button" aria-label="Slice" aria-expanded="false" aria-controls="sectionPanel" title="Cut the model with a plane to see inside" hidden>Slice</button>{% endif %}
         {% if 'ar' in viewer_features %}<button id="arBtn" data-ar-btn class="viewer-tool-btn primary !py-1.5 !px-4 !text-xs" type="button">
           <span class="hidden sm:inline">View in AR</span>
           <span class="sm:hidden">AR</span>
@@ -3278,7 +3278,7 @@
         if (onSlice()) {
           picked = window.viewerSection.pointAt(e.clientX, e.clientY);
           if (!picked) {
-            measureHintText.textContent = 'Click on the cut face · Face in the Section panel looks at it straight on';
+            measureHintText.textContent = 'Click on the cut face · Face in the Slice panel looks at it straight on';
             return;
           }
         } else {
