@@ -147,7 +147,7 @@ html[data-design="b"] main > header > a[href="/"] .brand-mark { background: tran
 
 /* Right rail: icons in a fixed column; hovering opens it into a labelled menu. */
 html[data-design="b"] .viewer-toolbar {
-  position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
+  position: absolute; right: 20px; top: 20px;
   flex-direction: column; flex-wrap: nowrap !important; align-items: flex-end; gap: 2px !important;
   padding: 6px; border-radius: 28px; background: var(--b-glass);
   border: 1px solid var(--b-line); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
@@ -177,6 +177,12 @@ html[data-design="b"] .viewer-toolbar .viewer-tool-btn.primary {
 @media (hover: hover) and (min-width: 641px) {
   html[data-design="b"] .viewer-toolbar:is(:hover, :focus-within) .viewer-tool-btn { width: 172px; }
   html[data-design="b"] .viewer-toolbar:is(:hover, :focus-within) .viewer-tool-btn > span { opacity: 1; transition-delay: 0.06s; }
+}
+
+/* While a window is open the rail stays slim (labels are in the tooltips) so it never covers the window beside it. */
+@media (hover: hover) and (min-width: 641px) {
+  html[data-design="b"] body:is(:has(.layers-panel:not([hidden])), :has(#infoPanel.open)) .viewer-toolbar:is(:hover, :focus-within) .viewer-tool-btn { width: 44px; }
+  html[data-design="b"] body:is(:has(.layers-panel:not([hidden])), :has(#infoPanel.open)) .viewer-toolbar:is(:hover, :focus-within) .viewer-tool-btn > span { opacity: 0; }
 }
 
 /* Left panel: title lockup when folded, a compact glass tools sheet when open. */
