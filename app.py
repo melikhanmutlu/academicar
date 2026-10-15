@@ -691,6 +691,8 @@ def admin_like_pattern(text: str) -> str:
 
 _AUDIT_EMAIL_RE = re.compile(r"[\w.+'-]+@[\w-]+(?:\.[\w-]+)+")
 _AUDIT_TEXT_KEYS = {"message", "body", "text", "notes", "comment"}
+# B2B leads the admin has to answer: shown in full (IP is still masked).
+_AUDIT_UNMASKED_EVENTS = {"institution_inquiry_submitted"}
 # High-volume view/redirect events hidden from the default "Actions" view.
 _AUDIT_NOISE_EVENTS = ("public_model_viewed", "qr_resolved", "admin_backup_downloaded")
 
@@ -739,7 +741,7 @@ def _mask_audit_value(key: str, value, event_type: str):
 def mask_audit_details(event_type: str, details):
     """Copy of an audit row's ``details`` with emails, free-text bodies and
     login-attempt identifiers masked. Shared by the admin page and its CSV."""
-    if not details:
+    if not details or event_type in _AUDIT_UNMASKED_EVENTS:
         return details
     return _mask_audit_value("", details, event_type or "")
 
@@ -5862,10 +5864,12 @@ def register_routes(app: Flask) -> None:
                 "AcademicAR institutional inquiry",
                 (
                     f"Institution: {institution_name}\n"
-                    f"Contact: {contact_name} <{email}>\n"
+                    f"Contact: {contact_name}\n"
+                    f"Email: {email}\n"
                     f"Estimated members: {estimated_members or '-'}\n\n"
                     f"{message or '(no message)'}"
                 ),
+                reply_to=email,
             )
             # The audit row keeps the whole enquiry, so a lead survives even
             # when email delivery is down and can be followed up from admin.
@@ -7939,6 +7943,14 @@ def register_routes(app: Flask) -> None:
                     row[0]: {"models": int(row[1] or 0), "bytes": int(row[2] or 0) + scene_ar_bytes.get(row[0], 0)}
                     for row in usage_rows
                 }
+        institution_inquiries = (
+            AuditLog.query.filter_by(event_type="institution_inquiry_submitted")
+            .order_by(AuditLog.timestamp.desc())
+            .limit(50)
+            .all()
+            if admin_page == "institutions"
+            else []
+        )
         audit_event_types = audit_event_type_options() if admin_page == "logs" else []
         audit_rows = audit_row_views(audit_logs) if admin_page == "logs" else []
         audit_export_args = {k: v for k, v in request.args.items() if k != "page"}
@@ -8025,6 +8037,7 @@ def register_routes(app: Flask) -> None:
             institutions_pagination=institutions_pagination,
             institution_member_counts=institution_member_counts,
             institution_usage_map=institution_usage_map,
+            institution_inquiries=institution_inquiries,
             active_page=admin_page,
             analytics=analytics,
             filters={

@@ -35,7 +35,9 @@ def _resolve_sender() -> str:
     )
 
 
-def _send_via_api(api_key: str, sender: str, to_address: str, subject: str, body: str) -> bool:
+def _send_via_api(
+    api_key: str, sender: str, to_address: str, subject: str, body: str, reply_to: str | None = None
+) -> bool:
     """Send through Brevo's transactional HTTP API (port 443, never blocked).
 
     ``sender`` may be a bare address or a "Name <addr>" form; we split it so the
@@ -47,14 +49,15 @@ def _send_via_api(api_key: str, sender: str, to_address: str, subject: str, body
     if sender_name:
         sender_obj["name"] = sender_name
 
-    payload = json.dumps(
-        {
-            "sender": sender_obj,
-            "to": [{"email": to_address}],
-            "subject": subject,
-            "textContent": body,
-        }
-    ).encode("utf-8")
+    data = {
+        "sender": sender_obj,
+        "to": [{"email": to_address}],
+        "subject": subject,
+        "textContent": body,
+    }
+    if reply_to:
+        data["replyTo"] = {"email": reply_to}
+    payload = json.dumps(data).encode("utf-8")
 
     request = urllib.request.Request(
         api_url,
@@ -84,11 +87,15 @@ def _send_via_api(api_key: str, sender: str, to_address: str, subject: str, body
         return False
 
 
-def _send_via_smtp(server: str, sender: str, to_address: str, subject: str, body: str) -> bool:
+def _send_via_smtp(
+    server: str, sender: str, to_address: str, subject: str, body: str, reply_to: str | None = None
+) -> bool:
     message = EmailMessage()
     message["Subject"] = subject
     message["From"] = sender
     message["To"] = to_address
+    if reply_to:
+        message["Reply-To"] = reply_to
     message.set_content(body)
 
     port = int(current_app.config.get("MAIL_PORT", 587))
@@ -110,18 +117,19 @@ def _send_via_smtp(server: str, sender: str, to_address: str, subject: str, body
         return False
 
 
-def send_email(to_address: str, subject: str, body: str) -> bool:
+def send_email(to_address: str, subject: str, body: str, reply_to: str | None = None) -> bool:
     """Send a plain-text email. Returns True if handed to a delivery backend,
     False if email is unconfigured or sending failed (in which case the message
-    is logged so non-production environments can still proceed)."""
+    is logged so non-production environments can still proceed). ``reply_to``
+    makes "Reply" in the recipient's mail client go to that address."""
     sender = _resolve_sender()
     api_key = current_app.config.get("MAIL_API_KEY")
     if api_key:
-        return _send_via_api(api_key, sender, to_address, subject, body)
+        return _send_via_api(api_key, sender, to_address, subject, body, reply_to)
 
     server = current_app.config.get("MAIL_SERVER")
     if server:
-        return _send_via_smtp(server, sender, to_address, subject, body)
+        return _send_via_smtp(server, sender, to_address, subject, body, reply_to)
 
     logger.warning(
         "No email backend configured (MAIL_API_KEY/MAIL_SERVER); email NOT sent "

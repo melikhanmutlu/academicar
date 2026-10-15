@@ -37,14 +37,16 @@ def test_mask_helpers():
     assert mask_ip("203.0.113.77") == "203.0.113.0/24"
     assert mask_ip("2001:db8:abcd:12::1") == "2001:db8:abcd::/48"
     assert mask_audit_details("contact_message_submitted", {"from_email": "a@b.org"}) == {"from_email": "a***@b.org"}
-    assert mask_audit_details("institution_inquiry_submitted", {"message": "hello"}) == {"message": "[5 chars]"}
+    # Leads must be readable so the admin can reply; other events stay masked.
+    assert mask_audit_details("institution_inquiry_submitted", {"email": "a@b.org", "message": "hello"}) == {
+        "email": "a@b.org", "message": "hello"}
     assert mask_audit_details("user_login_failed", {"email": "Secret pass1"}) == {"email": "***"}
     assert mask_audit_details("user_login_failed", {"email": "x@corp.edu"}) == {"email": "***@corp.edu"}
 
 
 def test_page_and_csv_mask_sensitive_data(admin_client):
     with admin_client.application.app_context():
-        _add(event_type="institution_inquiry_submitted", ip_address="198.51.100.9",
+        _add(event_type="contact_message_submitted", ip_address="198.51.100.9",
              details={"email": "lead@uni.edu", "message": "please call me secretly"})
         _add(event_type="user_login_failed", details={"email": "hunter2pass"})
         db.session.commit()
@@ -58,6 +60,18 @@ def test_page_and_csv_mask_sensitive_data(admin_client):
     assert "l***@uni.edu" in html and "198.51.100.0/24" in html and "[23 chars]" in body
     with admin_client.application.app_context():
         assert AuditLog.query.filter_by(event_type="user_login_failed").one().details == {"email": "hunter2pass"}
+
+
+def test_institution_inquiry_shows_full_email_and_message(admin_client):
+    with admin_client.application.app_context():
+        _add(event_type="institution_inquiry_submitted", ip_address="198.51.100.9",
+             details={"email": "lead@uni.edu", "message": "Please send a quote."})
+        db.session.commit()
+    html = admin_client.get("/admin/logs").get_data(as_text=True)
+    rows, body = _csv(admin_client)
+    for text in (html, body):
+        assert "lead@uni.edu" in text and "Please send a quote." in text
+        assert "198.51.100.9" not in text
 
 
 def test_default_actions_view_hides_noise_and_all_shows_it(admin_client):
