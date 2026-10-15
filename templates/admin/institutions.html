@@ -21,33 +21,6 @@
     </section>
   </details>
 
-  <section class="admin-section" id="inquiries">
-    <div class="admin-section-head">
-      <span>{{ institution_inquiries|length }} recent inquir{{ "y" if institution_inquiries|length == 1 else "ies" }}</span>
-    </div>
-    <div class="table-wrap">
-      <table class="data-table admin-table">
-        <thead>
-          <tr><th>Institution</th><th>Contact</th><th class="admin-hide-sm">Members</th><th>Message</th><th class="admin-hide-sm">Received (UTC)</th></tr>
-        </thead>
-        <tbody>
-          {% for row in institution_inquiries %}
-            {% set d = row.details or {} %}
-            <tr>
-              <td>{{ d.get("institution_name") or "-" }}</td>
-              <td>{{ d.get("contact_name") or "-" }}{% if d.get("email") %}<small class="logs-time-sm"><a href="mailto:{{ d.get('email') }}">{{ d.get("email") }}</a></small>{% endif %}</td>
-              <td class="admin-hide-sm">{{ d.get("estimated_members") or "-" }}</td>
-              <td style="white-space:pre-wrap">{{ d.get("message") or "-" }}</td>
-              <td class="admin-hide-sm">{{ row.timestamp.strftime("%Y-%m-%d %H:%M") if row.timestamp else "-" }}</td>
-            </tr>
-          {% else %}
-            <tr><td colspan="5" class="admin-empty">No inquiries yet.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </section>
-
   <section class="admin-section">
     <div class="admin-section-head">
       <span>{% set total = institutions_pagination.total if institutions_pagination else institutions|length %}{{ total }} institution{{ "" if total == 1 else "s" }}</span>

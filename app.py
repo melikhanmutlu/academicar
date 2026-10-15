@@ -7295,6 +7295,7 @@ def register_routes(app: Flask) -> None:
             "backups",
             "blog",
             "institutions",
+            "inquiries",
             "analytics",
         }
         if admin_page not in admin_pages:
@@ -7947,13 +7948,12 @@ def register_routes(app: Flask) -> None:
                     row[0]: {"models": int(row[1] or 0), "bytes": int(row[2] or 0) + scene_ar_bytes.get(row[0], 0)}
                     for row in usage_rows
                 }
-        institution_inquiries = (
+        inquiries_pagination = (
             AuditLog.query.filter_by(event_type="institution_inquiry_submitted")
             .order_by(AuditLog.timestamp.desc())
-            .limit(50)
-            .all()
-            if admin_page == "institutions"
-            else []
+            .paginate(page=page, per_page=ADMIN_PER_PAGE, error_out=False)
+            if admin_page == "inquiries"
+            else None
         )
         audit_event_types = audit_event_type_options() if admin_page == "logs" else []
         audit_rows = audit_row_views(audit_logs) if admin_page == "logs" else []
@@ -8041,7 +8041,7 @@ def register_routes(app: Flask) -> None:
             institutions_pagination=institutions_pagination,
             institution_member_counts=institution_member_counts,
             institution_usage_map=institution_usage_map,
-            institution_inquiries=institution_inquiries,
+            inquiries_pagination=inquiries_pagination,
             active_page=admin_page,
             analytics=analytics,
             filters={
