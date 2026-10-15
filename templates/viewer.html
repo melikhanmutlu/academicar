@@ -7063,6 +7063,7 @@
       } else {
         frame.removeAttribute('src');
         setUrl(null);
+        root.setAttribute('data-split-active', 'left');
       }
       // model-viewer measures itself; nudge it after the layout change.
       setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 60);
@@ -7114,6 +7115,56 @@
         } catch (err) { /* still loading */ }
       }
     });
+
+    // Active side: the last model touched. The right rail forwards its model tools
+    // (AR, Layers, Slice, Measure, Scenes, Tour) to the second model while it is
+    // active; tools that exist only for the first model dim until it is active again.
+    var ROUTED = ['arBtn', 'tourBtn', 'scenesBtn', 'layersBtn', 'measureBtn', 'sectionBtn'];
+    var LEFT_ONLY = ['qrBtn', 'annotationsBtn', 'annotateBtn', 'infoBtn'];
+    var panelEl = document.getElementById('controlPanel');
+    var paneBtn = function (id) {
+      var el = null;
+      try { el = frame.contentDocument && frame.contentDocument.getElementById(id); } catch (err) { el = null; }
+      return el && !el.hidden ? el : null;
+    };
+    var syncRail = function () {
+      var right = root.getAttribute('data-split-active') === 'right' && root.classList.contains('b-split');
+      toolbar.setAttribute('data-target', right ? 'right' : 'left');
+      ROUTED.concat(LEFT_ONLY).forEach(function (id) {
+        var b = document.getElementById(id);
+        if (!b) return;
+        var off = right && (LEFT_ONLY.indexOf(id) >= 0 || !paneBtn(id));
+        b.classList.toggle('b-off', off);
+        if (off) b.setAttribute('title', 'Only for the first model'); else b.removeAttribute('data-b-note');
+      });
+    };
+    var setActive = function (side) {
+      if (root.getAttribute('data-split-active') === side) return;
+      root.setAttribute('data-split-active', side);
+      syncRail();
+    };
+    root.setAttribute('data-split-active', 'left');
+    mine.addEventListener('pointerdown', function () { setActive('left'); }, true);
+    if (panelEl) panelEl.addEventListener('pointerdown', function () { setActive('left'); }, true);
+    frame.addEventListener('load', function () {
+      try {
+        frame.contentWindow.addEventListener('pointerdown', function () { setActive('right'); }, true);
+        frame.contentWindow.addEventListener('focus', function () { setActive('right'); });
+      } catch (err) { /* cross-origin: stays on the first model */ }
+      setTimeout(syncRail, 1500);
+    });
+    ROUTED.concat(LEFT_ONLY).forEach(function (id) {
+      var b = document.getElementById(id);
+      if (!b) return;
+      b.addEventListener('click', function (e) {
+        if (!root.classList.contains('b-split') || root.getAttribute('data-split-active') !== 'right') return;
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        var target = ROUTED.indexOf(id) >= 0 ? paneBtn(id) : null;
+        if (target) target.click();
+      }, true);
+    });
+    new MutationObserver(syncRail).observe(root, { attributes: true, attributeFilter: ['class'] });
     if (params.get('split')) setSplit(true, params.get('split'));
   })();
 </script>

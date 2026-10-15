@@ -807,4 +807,11 @@ html[data-design="c"] #infoPanel { border-left-color: #202020 !important; }
 }
 
 /* Split bar: the camera link toggle. */
+/* Active side of the split view: a thin orange frame; the rail follows it. */
+html[data-design="b"].b-split[data-split-active="left"] #viewer { outline: 2px solid var(--b-accent); outline-offset: -2px; }
+html[data-design="b"].b-split[data-split-active="right"] [data-split-frame] { outline: 2px solid var(--b-accent); outline-offset: -2px; }
+html[data-design="b"].b-split[data-split-active="right"] #controlPanel { opacity: 0.55; transition: opacity 0.15s ease; }
+html[data-design="b"].b-split[data-split-active="right"] #controlPanel:hover { opacity: 1; }
+html[data-design="b"] .viewer-toolbar[data-target="right"] { border-color: var(--b-accent); }
+html[data-design="b"] .viewer-toolbar .viewer-tool-btn.b-off { opacity: 0.35; cursor: default; }
 html[data-design="b"] .b-split-bar button[data-split-link][aria-pressed="true"] { background: var(--b-accent); color: #fff; }
