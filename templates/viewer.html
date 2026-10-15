@@ -6981,6 +6981,121 @@
     var panel = document.getElementById('controlPanel'), toggle = document.getElementById('panelToggle');
     if (panel && toggle && panel.getAttribute('data-collapsed') === 'false') toggle.click();
   }, 0);
+
+  // Design B: the tool sections fold into three groups, one open at a time. Only
+  // headers and data attributes are added; the sections and their scripts stay put.
+  (function () {
+    var body = document.getElementById('panelBody');
+    var stack = body && body.querySelector('.viewer-tool-stack');
+    if (!stack) return;
+    var KEY = 'academicar:viewerPanelGroup';
+    var groups = [
+      { key: 'look', title: 'Appearance', sel: '.viewer-color-tools, [data-bg-tools], [data-light-tools]' },
+      { key: 'capture', title: 'Screen capture', sel: '.viewer-shot-tools, [data-video-tools], [data-media-tools]' },
+      { key: 'orient', title: 'Orientation', sel: '[data-rotation-tools], [data-animation-tools]' }
+    ];
+    var chevron = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 4.5 6 7.5 9 4.5"/></svg>';
+    var heads = {};
+    groups.forEach(function (g, i) {
+      var secs = stack.querySelectorAll(g.sel);
+      if (!secs.length) return;
+      secs.forEach(function (el) { el.setAttribute('data-b-group', g.key); el.style.order = String(i * 2 + 1); });
+      var head = document.createElement('button');
+      head.type = 'button';
+      head.className = 'b-group-head';
+      head.setAttribute('data-b-head', g.key);
+      head.style.order = String(i * 2);
+      head.innerHTML = '<span class="b-group-title"></span><span class="b-group-sum"></span>' + chevron;
+      head.querySelector('.b-group-title').textContent = g.title;
+      stack.appendChild(head);
+      heads[g.key] = head;
+    });
+    var setOpen = function (key, scroll) {
+      if (key && !heads[key]) key = '';
+      stack.setAttribute('data-b-open', key || '');
+      Object.keys(heads).forEach(function (k) { heads[k].setAttribute('aria-expanded', k === key ? 'true' : 'false'); });
+      try { localStorage.setItem(KEY, key || '-'); } catch (e) {}
+      if (scroll && key) body.scrollTo({ top: Math.max(0, heads[key].offsetTop - body.offsetTop - 4), behavior: 'smooth' });
+    };
+    Object.keys(heads).forEach(function (k) {
+      heads[k].addEventListener('click', function () { setOpen(stack.getAttribute('data-b-open') === k ? '' : k, true); });
+    });
+    var saved = null;
+    try { saved = localStorage.getItem(KEY); } catch (e) {}
+    setOpen(saved === '-' ? '' : (saved || 'look'), false);
+
+    // Fixed help lines show as a tooltip on their section instead; status
+    // lines appear in the panel only once they say something new.
+    var quiet = [].slice.call(stack.querySelectorAll('[data-video-status], [data-media-status], [data-light-status], .viewer-color-hint:not([data-color-hint]):not([data-color-status])'));
+    quiet.forEach(function (el) {
+      el.setAttribute('data-b-initial', el.textContent.trim());
+      var sec = el.closest('[data-b-group]'), heading = sec && sec.querySelector('.viewer-tool-heading > span');
+      if (heading && el.textContent.trim()) heading.title = (heading.title ? heading.title + ' ' : '') + el.textContent.trim();
+    });
+
+    // Saved media: four thumbnails per row until "Show all".
+    var media = stack.querySelector('[data-media-tools]');
+    var more = null;
+    if (media) {
+      more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'b-media-more';
+      more.addEventListener('click', function () { media.classList.toggle('b-all'); update(); });
+      media.appendChild(more);
+    }
+
+    // A thin progress line under the screenshot buttons while views are generated ("(3/8)").
+    var shotActions = stack.querySelector('.viewer-shot-actions');
+    var bar = null;
+    if (shotActions) {
+      bar = document.createElement('div');
+      bar.className = 'b-progress';
+      bar.innerHTML = '<i></i>';
+      shotActions.insertAdjacentElement('afterend', bar);
+    }
+
+    var txt = function (sel) { var el = stack.querySelector(sel); return el ? el.textContent.trim() : ''; };
+    var pressed = function (sel) { var el = stack.querySelector(sel + ' [aria-pressed="true"]'); return el ? el.textContent.trim() : ''; };
+    var cap = function (v) { return v ? v.charAt(0).toUpperCase() + v.slice(1) : ''; };
+    var update = function () {
+      quiet.forEach(function (el) { el.classList.toggle('b-quiet', el.textContent.trim() === el.getAttribute('data-b-initial')); });
+      var sums = {};
+      var swatch = stack.querySelector('.viewer-color-swatch[aria-pressed="true"]');
+      sums.look = [cap(document.documentElement.getAttribute('data-viewer-bg') || 'dark'), pressed('[data-light-presets]')].filter(Boolean).join(' · ');
+      if (heads.look) {
+        var dot = heads.look.querySelector('.b-group-sum');
+        dot.style.setProperty('--b-swatch', swatch ? swatch.getAttribute('data-color-swatch') : 'transparent');
+        dot.classList.toggle('has-swatch', !!swatch);
+      }
+      var count = (txt('[data-media-count]').match(/\d+/) || [])[0];
+      var shots = stack.querySelectorAll('[data-shot-gallery] .viewer-shot-card').length;
+      sums.capture = count ? count + ' saved' : (shots ? shots + ' shots' : 'Screenshots · Video');
+      if (heads.capture) heads.capture.classList.toggle('is-recording', /stop/i.test(txt('[data-video-record]')));
+      var auto = stack.querySelector('[data-auto-rotate-toggle][aria-pressed="true"]');
+      var angles = [].slice.call(stack.querySelectorAll('[data-rotate-num]')).filter(function (i) { return Number(i.value) % 360; })
+        .map(function (i) { return i.getAttribute('data-rotate-num').toUpperCase() + ' ' + Math.round(Number(i.value)) + '\u00b0'; });
+      sums.orient = auto ? 'Auto rotate on' : (angles.length ? angles.join(' ') : 'Default');
+      Object.keys(heads).forEach(function (k) { heads[k].querySelector('.b-group-sum').textContent = sums[k] || ''; });
+      if (more) {
+        var n = media.querySelectorAll('.viewer-media-item').length;
+        more.hidden = n <= 4;
+        more.textContent = media.classList.contains('b-all') ? 'Show less' : 'Show all ' + n;
+      }
+      if (bar) {
+        var m = (txt('[data-shot-status]') + ' ' + txt('[data-media-status]')).match(/\((\d+)\s*\/\s*(\d+)\)/);
+        var on = m && Number(m[1]) < Number(m[2]);
+        bar.classList.toggle('is-on', !!on);
+        if (on) bar.firstChild.style.width = Math.max(4, Math.round(100 * Number(m[1]) / Number(m[2]))) + '%';
+      }
+    };
+    var queued = false;
+    var schedule = function () { if (!queued) { queued = true; requestAnimationFrame(function () { queued = false; update(); }); } };
+    new MutationObserver(schedule).observe(stack, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['aria-pressed', 'value'] });
+    new MutationObserver(schedule).observe(document.documentElement, { attributes: true, attributeFilter: ['data-viewer-bg'] });
+    stack.addEventListener('input', schedule);
+    stack.addEventListener('change', schedule);
+    update();
+  })();
 </script>
 {% endif %}
 </body>
