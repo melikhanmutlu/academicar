@@ -7,6 +7,9 @@
 {% set is_medical_model = model.source_format in ('dicom', 'segmentation') %}
 {# Per-layer measurements (paid plans; passed by view_model already filtered for who may see them). #}
 {% set viewer_metrics = viewer_metrics|default(none) %}
+{# Design preview (?design=a|b|c, or current for the production look): never in an embed. #}
+{% set viewer_design = (request.args.get('design') or '')|lower %}
+{% set viewer_design = viewer_design if (viewer_design in ('a', 'b', 'c', 'current') and not is_embed) else '' %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -33,8 +36,14 @@
   <script>
     (function () {
       var m = 'dark';
+      {% if viewer_design %}
+      document.documentElement.setAttribute('data-design-preview', '1');
+      {% if viewer_design != 'current' %}document.documentElement.setAttribute('data-design', '{{ viewer_design }}');{% endif %}
+      {# A previews on the light technical canvas, C on the white plate, B on the dark stage. #}
+      m = {{ {'a': 'light', 'c': 'white'}.get(viewer_design, 'dark')|tojson }};
+      {% endif %}
       try {
-        var saved = localStorage.getItem('academicar:viewerBg');
+        var saved = {% if viewer_design %}null{% else %}localStorage.getItem('academicar:viewerBg'){% endif %};
         if (saved === 'light' || saved === 'white' || saved === 'dark') m = saved;
       } catch (e) {}
       // An embed can pick its background with ?bg=dark|light|white (not stored).
@@ -1331,6 +1340,7 @@
   </style>
   {# Compiled Tailwind, last in <head> like the old Play CDN styles. #}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css', v=asset_version) }}">
+  {% if viewer_design %}<link rel="stylesheet" href="{{ url_for('static', filename='css/viewer-designs.css', v=asset_version) }}">{% endif %}
 </head>
 <body class="bg-[#050505] text-white min-h-screen overflow-hidden max-w-[100vw]">
   {% set viewer_features = get_license_plan(model.license_type).features %}
@@ -1341,6 +1351,14 @@
   {% set has_label_tour = annotations and 'annotations' in viewer_features %}
   {% set has_tour = has_label_tour or viewer_scenes %}
 
+  {% if viewer_design %}
+  <nav id="designStrip" aria-label="Design preview">
+    <span class="ds-label">Tasarım önizleme</span>
+    {% for key, label in (('current', 'Mevcut'), ('a', 'A · Atölye'), ('b', 'B · Sahne'), ('c', 'C · Levha')) %}
+    <a href="{{ request.path }}?design={{ key }}{% if request.args.get('scene') %}&amp;scene={{ request.args.get('scene')|urlencode }}{% endif %}"{% if viewer_design == key %} aria-current="true"{% endif %}>{{ label }}</a>
+    {% endfor %}
+  </nav>
+  {% endif %}
   <main class="relative h-screen w-screen">
     <div class="absolute inset-0 volumetric-grid opacity-25 z-0"></div>
     <model-viewer
@@ -6912,5 +6930,14 @@
       }
     });
   </script>
+{% if viewer_design == 'b' %}
+<script>
+  // Design B opens with the tools folded: the stage stays clear, the title lockup sits bottom-left.
+  setTimeout(function () {
+    var panel = document.getElementById('controlPanel'), toggle = document.getElementById('panelToggle');
+    if (panel && toggle && panel.getAttribute('data-collapsed') === 'false') toggle.click();
+  }, 0);
+</script>
+{% endif %}
 </body>
 </html>

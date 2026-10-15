@@ -1,0 +1,303 @@
+/* Viewer design previews — loaded only with ?design=a|b|c (never in embeds).
+   Same DOM and the same JS as the production viewer; only the layout and the
+   chrome change. A = Atölye (docked workbench), B = Sahne (immersive stage),
+   C = Levha (editorial figure plate). Palette and radii follow DESIGN.md. */
+
+/* ---------- Preview strip (top, every design incl. "Mevcut") ---------- */
+:root { --pv: 0px; }
+html[data-design-preview] { --pv: 28px; }
+#designStrip {
+  position: fixed; top: 0; left: 0; right: 0; height: 28px; z-index: 100;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  background: #202020; color: rgba(255, 255, 255, 0.6);
+  font: 500 12px/1 Inter, system-ui, sans-serif;
+}
+#designStrip .ds-label { margin-right: 8px; }
+#designStrip a {
+  padding: 4px 10px; border-radius: 20px; color: rgba(255, 255, 255, 0.78); text-decoration: none; white-space: nowrap;
+}
+#designStrip a:hover { color: #fff; background: rgba(255, 255, 255, 0.12); }
+#designStrip a[aria-current="true"] { background: #fff; color: #202020; }
+@media (max-width: 480px) { #designStrip .ds-label { display: none; } #designStrip a { padding: 4px 8px; } }
+html[data-design-preview] main.h-screen {
+  margin-top: var(--pv); height: calc(100vh - var(--pv)); height: calc(100dvh - var(--pv));
+}
+
+/* Shared: labels/icons of the header toolbar buttons are Tailwind-toggled
+   (svg `sm:hidden`, label `hidden sm:inline`); each design picks one. */
+html[data-design] main > header { pointer-events: none; }
+
+/* =====================================================================
+   A — ATÖLYE: white top bar, docked left sidebar, grey technical canvas
+   ===================================================================== */
+html[data-design="a"] { --a-bar: 56px; --a-side: 360px; }
+html[data-design="a"] body, html[data-design="a"] main { background: #fff; }
+
+@media (min-width: 641px) {
+  html[data-design="a"] main > header {
+    height: var(--a-bar); padding: 0 16px !important; align-items: center;
+    background: #fff; border-bottom: 1px solid #e8e8e8; pointer-events: auto; z-index: 32;
+  }
+  html[data-design="a"] #viewer {
+    left: var(--a-side) !important; top: var(--a-bar) !important; right: 0 !important; bottom: 0 !important;
+    width: auto !important; height: auto !important;
+  }
+  html[data-design="a"] #controlPanel {
+    top: var(--a-bar); bottom: 0; left: 0; right: auto; width: var(--a-side); max-height: none;
+    border-radius: 0; border: 0 !important; border-right: 1px solid #e8e8e8 !important;
+    background: #fff !important; backdrop-filter: none; -webkit-backdrop-filter: none; padding: 0 !important;
+  }
+  html[data-design="a"] #panelToggle { display: none; }
+  html[data-design="a"] #controlPanel[data-collapsed="true"] #panelBody {
+    max-height: none !important; opacity: 1 !important; pointer-events: auto !important; overflow-y: auto;
+  }
+  html[data-design="a"] .viewer-panel-header { padding: 20px 20px 16px !important; border-bottom: 1px solid #e8e8e8 !important; }
+  html[data-design="a"] #panelBody { padding: 0 20px 24px; }
+  html[data-design="a"] .viewer-inline-qr { right: 20px; bottom: 20px; }
+  html[data-design="a"] #infoPanel { top: var(--a-bar); }
+  html[data-design="a"] .layers-panel:not(.is-embed) { top: calc(var(--a-bar) + 16px); right: 16px; max-height: calc(100% - var(--a-bar) - 32px); }
+  html[data-design="a"] .viewer-free-watermark { top: calc(var(--a-bar) + 12px) !important; left: calc(50% + var(--a-side) / 2); }
+}
+html[data-design="a"] main > header > a[href="/"] {
+  background: transparent !important; border: 0 !important; padding: 0 !important; color: #202020 !important; backdrop-filter: none;
+}
+html[data-design="a"] main > header > a[href="/"] .brand-mark { background: #202020; color: #fff; border-radius: 6px; }
+html[data-design="a"] .viewer-toolbar { align-items: center; }
+html[data-design="a"] .viewer-toolbar .viewer-tool-btn:not(.primary) {
+  min-height: 36px; padding: 0 14px; border-radius: 20px; background: transparent; border: 1px solid transparent;
+  color: #4d4d4d; font-size: 13px; font-weight: 500; backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+html[data-design="a"] .viewer-toolbar .viewer-tool-btn:not(.primary):hover { background: #f5f5f5; color: #202020; transform: none; border-color: transparent; }
+html[data-design="a"] .viewer-toolbar .viewer-tool-btn:not(.primary):is([aria-expanded="true"], .is-active) {
+  background: #f5f5f5; color: #202020; box-shadow: inset 0 -2px 0 #202020;
+}
+html[data-design="a"] .viewer-toolbar .viewer-tool-btn.primary {
+  min-height: 36px; padding: 0 16px; border-radius: 20px; background: #202020; border-color: #202020; color: #fff; font-size: 13px; font-weight: 500;
+}
+html[data-design="a"] .viewer-panel-header h1 {
+  display: block !important; overflow: visible !important; -webkit-line-clamp: unset !important; word-break: normal !important;
+  font-size: 24px; line-height: 1.15; letter-spacing: -0.02em; font-weight: 600; margin-top: 6px;
+}
+html[data-design="a"] .viewer-panel-header p:first-child::before {
+  content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 8px; border-radius: 50%; background: #ff682c; vertical-align: 1px;
+}
+
+@media (max-width: 640px) {
+  html[data-design="a"] { --a-bar-m: 100px; }
+  html[data-design="a"] main > header {
+    height: var(--a-bar-m); flex-wrap: wrap; align-content: flex-start; row-gap: 4px; padding: 8px 10px 0 !important;
+    background: #fff; border-bottom: 1px solid #e8e8e8; pointer-events: auto; z-index: 32; align-items: center;
+  }
+  html[data-design="a"] main > header > a[href="/"] { height: 40px; align-items: center; }
+  html[data-design="a"] main > header > a[href="/"] > span.font-serif { display: inline !important; }
+  html[data-design="a"] .viewer-toolbar { order: 3; width: 100%; flex-wrap: nowrap !important; gap: 2px !important; justify-content: space-between; }
+  html[data-design="a"] .viewer-toolbar .viewer-tool-btn { flex: 1 1 0; min-width: 0 !important; max-width: 44px; padding: 0 !important; }
+  html[data-design="a"] #viewer { top: var(--a-bar-m) !important; height: calc(100% - var(--a-bar-m)) !important; }
+  html[data-design="a"] #controlPanel {
+    left: 0 !important; right: 0 !important; bottom: 0 !important; border-radius: 16px 16px 0 0; background: #fff !important;
+    border: 1px solid #e8e8e8 !important; border-bottom: 0 !important; box-shadow: 0 -8px 24px rgba(32, 32, 32, 0.08);
+    max-height: 52dvh; padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  html[data-design="a"] .viewer-free-watermark { top: calc(var(--a-bar-m) + 10px) !important; }
+}
+
+/* =====================================================================
+   B — SAHNE: full-bleed dark stage, icon rail on the right, title lockup
+   ===================================================================== */
+html[data-design="b"] body { background: #000; }
+html[data-design="b"] .volumetric-grid { display: none; }
+html[data-design="b"] model-viewer {
+  background: radial-gradient(ellipse 80% 70% at 50% 46%, #2b2b30 0, #131315 58%, #050506 100%) !important;
+}
+html[data-design="b"] main > header { top: 0; bottom: 0; padding: 20px !important; align-items: flex-start; }
+html[data-design="b"] main > header > a[href="/"] {
+  width: 44px; height: 44px; padding: 0 !important; justify-content: center; border-radius: 50% !important;
+  background: rgba(20, 20, 22, 0.55) !important; border: 1px solid rgba(255, 255, 255, 0.14) !important; pointer-events: auto;
+}
+html[data-design="b"] main > header > a[href="/"] > span:not(.brand-mark) { display: none !important; }
+html[data-design="b"] .viewer-toolbar {
+  position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
+  flex-direction: column; flex-wrap: nowrap !important; align-items: center; gap: 4px;
+  padding: 8px; border-radius: 30px; background: rgba(18, 18, 20, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
+}
+html[data-design="b"] .viewer-toolbar .viewer-tool-btn {
+  position: relative; width: 44px; height: 44px; min-height: 44px; min-width: 44px; padding: 0 !important; border-radius: 50%;
+  border: 0; background: transparent; color: rgba(255, 255, 255, 0.78); font-size: 0;
+}
+html[data-design="b"] .viewer-toolbar .viewer-tool-btn > svg { display: block !important; width: 18px; height: 18px; }
+html[data-design="b"] .viewer-toolbar .viewer-tool-btn > span { display: none !important; }
+html[data-design="b"] .viewer-toolbar .viewer-tool-btn:hover { background: rgba(255, 255, 255, 0.12); color: #fff; transform: none; border: 0; }
+html[data-design="b"] .viewer-toolbar .viewer-tool-btn:is([aria-expanded="true"], .is-active) { background: rgba(255, 255, 255, 0.18); color: #fff; }
+html[data-design="b"] .viewer-toolbar .viewer-tool-btn.primary { order: -1; margin-bottom: 6px; background: #fff !important; color: #111 !important; }
+html[data-design="b"] .viewer-toolbar .viewer-tool-btn::after {
+  content: attr(aria-label); position: absolute; right: calc(100% + 14px); top: 50%; transform: translateY(-50%);
+  white-space: nowrap; padding: 5px 10px; border-radius: 8px; background: rgba(12, 12, 14, 0.94); color: #fff;
+  font-size: 12px; font-weight: 500; line-height: 1.2; opacity: 0; pointer-events: none; transition: opacity 0.15s;
+}
+html[data-design="b"] .viewer-toolbar .viewer-tool-btn:hover::after,
+html[data-design="b"] .viewer-toolbar .viewer-tool-btn:focus-visible::after { opacity: 1; }
+html[data-design="b"] body:has(#controlPanel) #viewer { left: 0 !important; width: 100% !important; }
+html[data-design="b"] #controlPanel {
+  left: 28px; right: auto; bottom: 28px; width: min(400px, calc(100% - 140px)); max-height: calc(100dvh - var(--pv) - 140px);
+  background: transparent !important; border: 1px solid transparent !important; padding: 0 !important;
+  backdrop-filter: none !important; -webkit-backdrop-filter: none !important; transition: background 0.2s, padding 0.2s, border-color 0.2s;
+}
+html[data-design="b"] #controlPanel[data-collapsed="false"] {
+  background: rgba(16, 16, 18, 0.86) !important; border-color: rgba(255, 255, 255, 0.1) !important; padding: 20px !important;
+  border-radius: 22px; backdrop-filter: blur(26px) !important; -webkit-backdrop-filter: blur(26px) !important;
+}
+html[data-design="b"] #controlPanel .viewer-panel-header { border-bottom-color: transparent !important; padding-bottom: 0.5rem; }
+html[data-design="b"] #controlPanel[data-collapsed="false"] .viewer-panel-header { border-bottom-color: rgba(255, 255, 255, 0.1) !important; padding-bottom: 0.9rem; }
+html[data-design="b"] .viewer-panel-header h1 {
+  display: block !important; overflow: visible !important; -webkit-line-clamp: unset !important; word-break: normal !important;
+  font-size: 34px; line-height: 1.05; letter-spacing: -0.025em; font-weight: 600; text-shadow: 0 2px 24px rgba(0, 0, 0, 0.6);
+}
+html[data-design="b"] #controlPanel .viewer-panel-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+html[data-design="b"] #panelToggle {
+  width: auto; order: 2; height: 34px; padding: 0 12px; gap: 8px; border-radius: 20px; font-size: 12px; font-weight: 500; color: #fff;
+  background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.16);
+}
+html[data-design="b"] #panelToggle::before { content: "Tools"; }
+html[data-design="b"] #panelToggle { flex-direction: row-reverse; }
+html[data-design="b"] .viewer-inline-qr { right: 20px; bottom: 20px; padding: 8px; border-radius: 16px; }
+html[data-design="b"] .viewer-inline-qr img { width: 76px; height: 76px; }
+html[data-design="b"] .layers-panel:not(.is-embed) { top: 20px; right: 84px; max-height: calc(100% - 40px); }
+html[data-design="b"] .viewer-free-watermark { top: 24px !important; }
+@media (max-width: 640px) {
+  html[data-design="b"] main > header { padding: 12px !important; }
+  html[data-design="b"] .viewer-toolbar { right: 10px; padding: 6px; gap: 2px !important; }
+  html[data-design="b"] .viewer-toolbar .viewer-tool-btn { width: 40px; height: 40px; min-height: 40px; min-width: 40px; }
+  html[data-design="b"] .viewer-toolbar .viewer-tool-btn::after { display: none; }
+  html[data-design="b"] #controlPanel {
+    left: 16px !important; right: 68px !important; bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+    width: auto !important; max-height: 56dvh; padding: 0 !important; border-radius: 0;
+  }
+  html[data-design="b"] #controlPanel[data-collapsed="false"] {
+    right: 12px !important; left: 12px !important; bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+    padding: 16px !important; border-radius: 20px;
+  }
+  html[data-design="b"] .viewer-panel-header h1 { font-size: 28px; }
+}
+
+/* =====================================================================
+   C — LEVHA: ivory page, framed figure plate, caption column, bottom dock
+   ===================================================================== */
+html[data-design="c"] { --c-col: 340px; }
+html[data-design="c"] body, html[data-design="c"] main { background: #ebe6dd; }
+html[data-design="c"] .volumetric-grid { display: none; }
+html[data-design="c"] main > header > a[href="/"] {
+  background: transparent !important; border: 0 !important; padding: 0 !important; color: #202020 !important;
+  backdrop-filter: none; pointer-events: auto;
+}
+html[data-design="c"] main > header > a[href="/"] .brand-mark { background: #202020; color: #fff; border-radius: 50%; }
+html[data-design="c"] .viewer-toolbar {
+  pointer-events: auto; flex-wrap: nowrap !important; align-items: center; gap: 2px; padding: 6px 8px;
+  background: #fff; border: 1px solid #202020; border-radius: 30px;
+}
+html[data-design="c"] .viewer-toolbar .viewer-tool-btn:not(.primary) {
+  flex-direction: column; gap: 3px; min-width: 40px; min-height: 48px; padding: 6px 10px; border-radius: 22px;
+  background: transparent; border: 0; color: #4d4d4d; font-size: 11px; font-weight: 500; backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+html[data-design="c"] .viewer-toolbar .viewer-tool-btn { flex-direction: column; gap: 3px; min-width: 40px; min-height: 48px; border-radius: 22px; font-size: 11px; font-weight: 500; }
+html[data-design="c"] .viewer-toolbar .viewer-tool-btn > svg { display: block !important; width: 18px; height: 18px; }
+html[data-design="c"] .viewer-toolbar .viewer-tool-btn > span { display: block !important; line-height: 1; }
+html[data-design="c"] .viewer-toolbar .viewer-tool-btn:not(.primary):hover { background: #f5f5f5; color: #202020; transform: none; }
+html[data-design="c"] .viewer-toolbar .viewer-tool-btn:not(.primary):is([aria-expanded="true"], .is-active) { background: #f5f5f5; color: #202020; box-shadow: inset 0 -2px 0 #ff682c; }
+html[data-design="c"] .viewer-toolbar .viewer-tool-btn.primary { padding: 6px 14px; background: #202020 !important; border-color: #202020; color: #fff !important; }
+@media (min-width: 641px) {
+  html[data-design="c"] main > header {
+    top: auto; bottom: 16px; left: 24px; right: 24px; height: 60px; padding: 0 !important; align-items: center; justify-content: center;
+  }
+  html[data-design="c"] main > header > a[href="/"] { position: absolute; left: 0; top: 50%; transform: translateY(-50%); }
+  html[data-design="c"] #viewer {
+    left: 24px !important; top: 24px !important; right: calc(var(--c-col) + 48px) !important; bottom: 92px !important;
+    width: auto !important; height: auto !important; border: 1px solid #202020; border-radius: 8px;
+  }
+  html[data-design="c"] #controlPanel {
+    top: 24px; right: 24px; bottom: 92px; left: auto; width: var(--c-col); max-height: none;
+    border-radius: 8px; background: #fff !important; border: 1px solid #202020 !important; padding: 20px !important;
+    backdrop-filter: none; -webkit-backdrop-filter: none;
+  }
+  html[data-design="c"] #panelToggle { display: none; }
+  html[data-design="c"] #controlPanel[data-collapsed="true"] #panelBody {
+    max-height: none !important; opacity: 1 !important; pointer-events: auto !important; overflow-y: auto;
+  }
+  html[data-design="c"] .viewer-inline-qr {
+    left: 40px; right: auto; bottom: 108px; padding: 6px; border-radius: 6px; background: #fff !important; border: 1px solid #202020 !important;
+  }
+  html[data-design="c"] .viewer-inline-qr img { width: 72px; height: 72px; }
+  html[data-design="c"] .viewer-inline-qr p { margin-top: 4px; font-size: 9px; }
+  html[data-design="c"] .layers-panel:not(.is-embed) { top: 40px; left: 40px; right: auto; max-height: calc(100% - 160px); }
+  html[data-design="c"] .viewer-free-watermark { top: 36px !important; left: calc(50% - (var(--c-col) + 24px) / 2); }
+}
+@media (min-width: 641px) and (max-width: 1179px) {
+  html[data-design="c"] main > header > a[href="/"] > span:not(.brand-mark) { display: none !important; }
+  html[data-design="c"] .viewer-toolbar .viewer-tool-btn > span { display: none !important; }
+  html[data-design="c"] .viewer-toolbar .viewer-tool-btn { flex-direction: row; min-height: 40px; }
+}
+html[data-design="c"] .viewer-panel-header h1 {
+  display: block !important; overflow: visible !important; -webkit-line-clamp: unset !important; word-break: normal !important;
+  font-size: 28px; line-height: 1.1; letter-spacing: -0.02em; font-weight: 600; margin-top: 8px;
+}
+html[data-design="c"] .viewer-panel-header { border-bottom: 1px solid #202020 !important; }
+html[data-design="c"] .viewer-panel-header p:first-child::before { content: "Fig. 1 —"; margin-right: 8px; text-transform: none; letter-spacing: 0; font-weight: 600; color: #202020; }
+html[data-design="c"] .viewer-meta-grid { gap: 14px !important; }
+html[data-design="c"] #controlPanel .viewer-meta-grid > div, html[data-design="c"] #controlPanel .viewer-meta-grid + div {
+  background: transparent !important; border-radius: 0 !important; border-top: 1px solid #202020; padding: 10px 0 !important;
+}
+@media (max-width: 640px) {
+  html[data-design="c"] main > header {
+    top: auto; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); left: 10px !important; right: 10px !important; height: 56px;
+    padding: 0 !important; align-items: center; justify-content: center;
+  }
+  html[data-design="c"] main > header > a[href="/"] {
+    position: fixed; left: 12px; top: calc(var(--pv) + 12px); width: 36px; height: 36px; justify-content: center;
+    background: #fff !important; border: 1px solid #202020 !important; border-radius: 50% !important;
+  }
+  html[data-design="c"] main > header > a[href="/"] > span:not(.brand-mark) { display: none !important; }
+  html[data-design="c"] .viewer-toolbar { width: 100%; justify-content: space-between; gap: 0 !important; padding: 4px 6px; }
+  html[data-design="c"] .viewer-toolbar .viewer-tool-btn { flex: 1 1 0; min-width: 0 !important; max-width: 44px; min-height: 40px; padding: 0 !important; }
+  html[data-design="c"] .viewer-toolbar .viewer-tool-btn > span { display: none !important; }
+  html[data-design="c"] #viewer { bottom: 76px !important; height: calc(100% - 76px) !important; }
+  html[data-design="c"] #controlPanel {
+    left: 10px !important; right: 10px !important; bottom: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
+    background: #fff !important; border: 1px solid #202020 !important; border-radius: 14px; max-height: 50dvh; padding: 14px !important;
+  }
+  html[data-design="c"] .viewer-free-watermark { top: calc(var(--pv) + 60px) !important; }
+}
+
+/* A and C: narrower panel -> each tool heading puts its label above its buttons. */
+html[data-design="a"] #controlPanel .viewer-tool-heading,
+html[data-design="c"] #controlPanel .viewer-tool-heading { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+@media (min-width: 641px) {
+  html[data-design="a"] #controlPanel .viewer-tool-heading > div,
+  html[data-design="c"] #controlPanel .viewer-tool-heading > div { flex-wrap: wrap; }
+}
+
+/* The brand mark sits inside the round brand button; no second box. */
+html[data-design="b"] main > header > a[href="/"] .brand-mark { background: transparent !important; color: #fff; }
+html[data-design="c"] main > header > a[href="/"] .brand-mark { border-radius: 50%; }
+@media (max-width: 640px) {
+  html[data-design="c"] main > header > a[href="/"] .brand-mark { background: transparent; color: #202020; }
+}
+
+/* Active tools: the production look fills them orange; each design marks them its own way. */
+html[data-design="a"] .viewer-toolbar .viewer-tool-btn.is-active { background: #f5f5f5 !important; border-color: transparent !important; color: #202020 !important; box-shadow: inset 0 -2px 0 #ff682c; }
+html[data-design="b"] .viewer-toolbar .viewer-tool-btn.is-active { background: rgba(255, 255, 255, 0.18) !important; border: 0 !important; color: #fff !important; box-shadow: inset 0 0 0 1.5px #ff682c; }
+html[data-design="c"] .viewer-toolbar .viewer-tool-btn.is-active { background: #f5f5f5 !important; border: 0 !important; color: #202020 !important; box-shadow: inset 0 -2px 0 #ff682c; }
+
+@media (max-width: 640px) {
+  /* B: while the tools sheet is open the rail would show through the glass. */
+  html[data-design="b"] body:has(#controlPanel[data-collapsed="false"]) .viewer-toolbar { opacity: 0; pointer-events: none; }
+}
+
+/* A and C: the Info drawer is opaque, so the sidebar underneath does not ghost through. */
+html[data-design="a"] #infoPanel, html[data-design="c"] #infoPanel {
+  background: #fff !important; backdrop-filter: none; -webkit-backdrop-filter: none; border-left: 1px solid #e8e8e8 !important;
+}
+html[data-design="c"] #infoPanel { border-left-color: #202020 !important; }
+@media (min-width: 641px) {
+  html[data-design="a"] #controlPanel .viewer-tool-heading > div,
+  html[data-design="c"] #controlPanel .viewer-tool-heading > div { align-self: stretch; justify-content: flex-start; margin: 0; }
+}
