@@ -418,6 +418,147 @@ html[data-design="b"] .viewer-free-watermark { top: 24px !important; }
   html[data-design="b"] #controlPanel .viewer-tool-stack > .b-group-head { min-height: 46px; }
 }
 
+/* Windows opened from the rail (Scenes, Layers, Slice, Info, QR, label form):
+   the same glass sheet, orange small-caps titles and quiet text actions as the
+   tools panel. Prefix keeps them above the plain light/dark rules. */
+html[data-design="b"] main > header:has(.viewer-toolbar:is(:hover, :focus-within)) { z-index: 37; }
+html[data-design="b"] .viewer-toolbar:is(:hover, :focus-within) { background: var(--b-panel); }
+html[data-design="b"][data-viewer-bg] .layers-panel:not(.is-embed) {
+  width: 344px; background: var(--b-panel); color: var(--b-ink); border: 1px solid var(--b-line); border-radius: 22px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18); backdrop-filter: blur(26px); -webkit-backdrop-filter: blur(26px);
+  animation: b-panel-in 0.4s var(--b-ease) both;
+}
+html[data-design="b"][data-viewer-bg] .layers-head { flex-wrap: nowrap; padding: 16px 14px 8px 18px; }
+html[data-design="b"][data-viewer-bg] .layers-head h2 {
+  color: var(--b-accent); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; white-space: nowrap;
+}
+html[data-design="b"][data-viewer-bg] .layers-head h2 .font-normal,
+html[data-design="b"][data-viewer-bg] .layers-head h2 [data-scenes-count] { color: var(--b-ink-3); letter-spacing: 0; }
+html[data-design="b"][data-viewer-bg] .layers-head-actions { flex-wrap: nowrap; align-items: center; gap: 2px; }
+html[data-design="b"][data-viewer-bg] .layers-head-actions button {
+  white-space: nowrap; padding: 5px 9px; border: 0; border-radius: 10px; background: transparent;
+  color: var(--b-ink-2); font-size: 12px; font-weight: 600;
+}
+html[data-design="b"][data-viewer-bg] .layers-head-actions button:hover:not(:disabled) { background: var(--b-hover); color: var(--b-ink); }
+html[data-design="b"][data-viewer-bg] .layers-head-actions button:disabled { opacity: 0.4; }
+html[data-design="b"][data-viewer-bg] .layers-head-actions button[aria-label^="Close"] {
+  width: 28px; height: 28px; padding: 0; margin-left: 2px; border-radius: 50%; background: var(--b-fill);
+  color: var(--b-ink-2); font-size: 16px; line-height: 1;
+}
+html[data-design="b"][data-viewer-bg] .layers-list { padding: 0 8px 8px; }
+html[data-design="b"][data-viewer-bg] .layer-row:hover,
+html[data-design="b"][data-viewer-bg] .scene-row:hover { background: var(--b-hover); }
+html[data-design="b"][data-viewer-bg] .scene-row.is-active { background: rgba(255, 104, 44, 0.14); }
+html[data-design="b"][data-viewer-bg] .layer-eye {
+  border: 0; border-radius: 50%; background: var(--b-fill); color: var(--b-ink);
+}
+html[data-design="b"][data-viewer-bg] .layer-eye[aria-pressed="false"] { color: var(--b-ink-3); }
+html[data-design="b"][data-viewer-bg] .layer-swatch { border-color: var(--b-line-2); }
+html[data-design="b"][data-viewer-bg] .layer-volume,
+html[data-design="b"][data-viewer-bg] .layer-count,
+html[data-design="b"][data-viewer-bg] .scene-desc,
+html[data-design="b"][data-viewer-bg] .layers-note,
+html[data-design="b"][data-viewer-bg] .layers-save span,
+html[data-design="b"][data-viewer-bg] .section-pos { color: var(--b-ink-3); }
+html[data-design="b"][data-viewer-bg] .layers-finish,
+html[data-design="b"][data-viewer-bg] .layers-note,
+html[data-design="b"][data-viewer-bg] .layers-save,
+html[data-design="b"][data-viewer-bg] .scene-foot,
+html[data-design="b"][data-viewer-bg] .scene-form { border-color: var(--b-line); }
+html[data-design="b"][data-viewer-bg] .layers-finish { padding: 12px 18px 14px; }
+html[data-design="b"][data-viewer-bg] .layers-finish-head { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--b-accent); }
+html[data-design="b"][data-viewer-bg] .layers-finish-head select {
+  text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--b-ink); background: var(--b-fill); border: 1px solid var(--b-line);
+}
+html[data-design="b"][data-viewer-bg] .layers-finish-presets { gap: 4px; }
+html[data-design="b"][data-viewer-bg] .layers-finish-presets button {
+  border: 0; background: var(--b-fill); color: var(--b-ink-2); font-weight: 500; padding: 5px 11px;
+}
+html[data-design="b"][data-viewer-bg] .layers-finish-presets button:hover { background: var(--b-hover); color: var(--b-ink); }
+html[data-design="b"][data-viewer-bg] .layers-finish-presets button[aria-pressed="true"] { background: var(--b-accent); color: #fff; }
+html[data-design="b"][data-viewer-bg] .layers-save button { background: var(--b-cta); color: var(--b-cta-ink); border-color: transparent; }
+/* Scenes: quiet text actions instead of a pill for every verb. */
+html[data-design="b"][data-viewer-bg] .scene-actions { gap: 0; margin: 4px -4px 0; }
+html[data-design="b"][data-viewer-bg] .scene-actions button,
+html[data-design="b"][data-viewer-bg] .scene-actions a {
+  padding: 2px 5px; border: 0; border-radius: 8px; background: transparent; color: var(--b-ink-3); font-weight: 500; font-size: 11px;
+}
+html[data-design="b"][data-viewer-bg] .scene-actions button:hover:not(:disabled),
+html[data-design="b"][data-viewer-bg] .scene-actions a:hover { background: var(--b-hover); color: var(--b-ink); }
+html[data-design="b"][data-viewer-bg] .scene-actions > :last-child:hover { color: #ff6b5e; }
+html[data-design="b"][data-viewer-bg] .scene-foot, html[data-design="b"][data-viewer-bg] .scene-form { padding-left: 18px; padding-right: 18px; }
+html[data-design="b"][data-viewer-bg] .scene-foot button,
+html[data-design="b"][data-viewer-bg] .scene-form .scene-save { background: var(--b-accent); color: #fff; padding: 7px 16px; border: 0; }
+html[data-design="b"][data-viewer-bg] .scene-form button:not(.scene-save) { background: var(--b-fill); color: var(--b-ink-2); border: 0; }
+html[data-design="b"][data-viewer-bg] .scene-form input,
+html[data-design="b"][data-viewer-bg] .scene-form textarea,
+html[data-design="b"][data-viewer-bg] #annotateForm input,
+html[data-design="b"][data-viewer-bg] #annotateForm textarea {
+  background: var(--b-fill); border: 1px solid var(--b-line); color: var(--b-ink); border-radius: 10px;
+}
+/* Slice */
+html[data-design="b"][data-viewer-bg] .section-body { padding: 0 18px 14px; }
+html[data-design="b"][data-viewer-bg] .section-axes { gap: 4px; }
+html[data-design="b"][data-viewer-bg] .section-axes button {
+  border: 0; border-radius: 12px; background: var(--b-fill); color: var(--b-ink-2); font-weight: 600;
+}
+html[data-design="b"][data-viewer-bg] .section-axes button:hover { background: var(--b-hover); color: var(--b-ink); }
+html[data-design="b"][data-viewer-bg] .section-axes button[aria-pressed="true"] { background: var(--b-accent); color: #fff; }
+html[data-design="b"][data-viewer-bg] .section-readout { color: var(--b-ink); }
+html[data-design="b"][data-viewer-bg] .section-pos input { accent-color: var(--b-accent); }
+html[data-design="b"][data-viewer-bg] .slice-title { color: var(--b-accent); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; }
+html[data-design="b"][data-viewer-bg] .slice-actions button {
+  border: 0; border-radius: 10px; background: var(--b-fill); color: var(--b-ink-2); font-weight: 600;
+}
+html[data-design="b"][data-viewer-bg] .slice-actions button:hover { background: var(--b-hover); color: var(--b-ink); }
+html[data-design="b"][data-viewer-bg] .slice-actions button[aria-pressed="true"] { background: var(--b-accent); color: #fff; }
+html[data-design="b"][data-viewer-bg] .slice-readout { color: var(--b-ink); }
+html[data-design="b"][data-viewer-bg] .slice-hint { color: var(--b-ink-3); }
+/* Label form */
+html[data-design="b"][data-viewer-bg] #annotateForm {
+  background: var(--b-panel); border: 1px solid var(--b-line); border-radius: 18px; padding: 16px 18px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18); backdrop-filter: blur(26px); -webkit-backdrop-filter: blur(26px);
+}
+html[data-design="b"][data-viewer-bg] #annotateForm label { color: var(--b-ink-3); }
+html[data-design="b"][data-viewer-bg] #annotateForm button { border-radius: 12px; padding: 6px 14px; }
+html[data-design="b"][data-viewer-bg] #annotateForm .ann-save { background: var(--b-accent); }
+html[data-design="b"][data-viewer-bg] #annotateForm .ann-cancel { background: var(--b-fill); color: var(--b-ink-2); }
+/* Info: a floating card beside the rail instead of a full-height drawer. */
+html[data-design="b"][data-viewer-bg] #infoPanel {
+  top: 20px !important; right: 84px !important; bottom: auto !important; left: auto; width: 380px !important;
+  max-height: calc(100% - 40px); padding: 20px 22px !important; border: 1px solid var(--b-line) !important;
+  border-radius: 22px; background: var(--b-panel) !important; color: var(--b-ink) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18); backdrop-filter: blur(26px); -webkit-backdrop-filter: blur(26px);
+  scrollbar-width: thin;
+}
+html[data-design="b"][data-viewer-bg] #infoPanel [class*="text-white"] { color: var(--b-ink-2) !important; }
+html[data-design="b"][data-viewer-bg] #infoPanel [class*="text-white/4"] { color: var(--b-ink-3) !important; }
+html[data-design="b"][data-viewer-bg] #infoPanel [class*="border-white/"] { border-color: var(--b-line) !important; }
+html[data-design="b"][data-viewer-bg] #infoPanel p.uppercase { color: var(--b-accent) !important; font-weight: 700; letter-spacing: 0.08em; font-size: 12px; }
+html[data-design="b"][data-viewer-bg] #infoPanel h2 { font-family: inherit; font-size: 22px; letter-spacing: -0.02em; color: var(--b-ink); }
+html[data-design="b"][data-viewer-bg] #infoPanel h3 { font-size: 16px; line-height: 1.35; color: var(--b-ink); }
+html[data-design="b"][data-viewer-bg] #infoPanel h4 { color: var(--b-ink) !important; }
+html[data-design="b"][data-viewer-bg] #infoPanel a { color: var(--b-ink) !important; text-decoration-color: var(--b-accent); }
+html[data-design="b"][data-viewer-bg] #closeInfo { border: 0 !important; border-radius: 50% !important; background: var(--b-fill) !important; color: var(--b-ink-2) !important; }
+/* QR dialog */
+html[data-design="b"][data-viewer-bg="dark"] #qrModal { background: rgba(0, 0, 0, 0.5); }
+html[data-design="b"][data-viewer-bg]:is([data-viewer-bg="light"], [data-viewer-bg="white"]) #qrModal { background: rgba(255, 255, 255, 0.5); }
+html[data-design="b"][data-viewer-bg] #qrModal > div {
+  background: var(--b-panel); color: var(--b-ink); border: 1px solid var(--b-line); border-radius: 22px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28); backdrop-filter: blur(26px); -webkit-backdrop-filter: blur(26px);
+}
+html[data-design="b"][data-viewer-bg] #qrModal [data-qr-eyebrow] { color: var(--b-accent); font-weight: 700; letter-spacing: 0.08em; font-size: 12px; }
+html[data-design="b"][data-viewer-bg] #qrModal [data-qr-note] { color: var(--b-ink-3); }
+html[data-design="b"][data-viewer-bg] #qrModal [data-qr-image] { border-radius: 16px; box-shadow: inset 0 0 0 1px var(--b-line); }
+html[data-design="b"][data-viewer-bg] #closeQr { border: 0; background: var(--b-fill); color: var(--b-ink-2); border-radius: 12px; }
+html[data-design="b"][data-viewer-bg] #closeQr:hover { background: var(--b-hover); color: var(--b-ink); }
+@media (max-width: 640px) {
+  html[data-design="b"][data-viewer-bg] .layers-panel:not(.is-embed) { width: auto; top: auto; right: 12px; }
+  /* The rail would sit on top of the sheet; each window has its own close button. */
+  html[data-design="b"] body:is(:has(.layers-panel:not([hidden])), :has(#infoPanel.open)) .viewer-toolbar { opacity: 0; pointer-events: none; }
+  html[data-design="b"][data-viewer-bg] #infoPanel { top: auto !important; right: 12px !important; left: 12px; bottom: 12px !important; width: auto !important; max-height: 70dvh; }
+}
+
 /* =====================================================================
    C — LEVHA: ivory page, framed figure plate, caption column, bottom dock
    ===================================================================== */

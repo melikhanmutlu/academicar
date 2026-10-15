@@ -2676,7 +2676,13 @@
       tourBtn?.addEventListener('click', () => (tourActive() ? endTour() : startTour()));
       tourEls.next.addEventListener('click', () => { setTourPlaying(false); nextTourStop(); });
       tourEls.prev.addEventListener('click', () => { setTourPlaying(false); showTourStop(tourIndex - 1); });
-      tourEls.play.addEventListener('click', () => setTourPlaying(!tourTimer));
+      tourEls.play.addEventListener('click', () => {
+        if (tourTimer) { setTourPlaying(false); return; }
+        // Move on at once so pressing Play visibly does something; the timer
+        // then carries on (and wraps round at the end).
+        showTourStop((tourIndex + 1) % tourStops.length);
+        setTourPlaying(true);
+      });
       tourEls.close.addEventListener('click', endTour);
       document.addEventListener('keydown', (e) => {
         if (!tourActive() || e.target.closest?.('input, textarea, select')) return;
