@@ -1,4 +1,4 @@
-/* Viewer design previews — loaded only with ?design=a|b|c (never in embeds).
+/* Viewer designs — design B is the viewer's look (embeds included); A and C load only with ?design=a|c.
    Same DOM and the same JS as the production viewer; only the layout and the
    chrome change. A = Atölye (docked workbench), B = Sahne (immersive stage),
    C = Levha (editorial figure plate). Palette and radii follow DESIGN.md. */
@@ -670,26 +670,39 @@ html[data-design="b"][data-viewer-bg] #closeQr:hover { background: var(--b-hover
   html[data-design="b"][data-viewer-bg] #infoPanel { top: auto !important; right: 12px !important; left: 12px; bottom: 12px !important; width: auto !important; max-height: 70dvh; }
 }
 
-/* Split view, second pane (?embed=1&pane=1): the embed's top bar wears B's glass
-   pill; the pane's own name already shows in the split bar. */
+/* Embeds (?embed=1) wear B: the top bar is B's glass pill, the brand chip and the title
+   lockup follow the theme. The split view's second pane (&pane=1) drops both, since its
+   name already shows in the split bar. */
+html[data-embed] main > header { justify-content: space-between; }
 html[data-pane] main > header > div:first-child,
 html[data-pane] [data-embed-title] { display: none !important; }
 html[data-pane] main > header { justify-content: flex-end; }
-html[data-pane] main > header > div:last-child {
+html[data-embed] main > header > div:first-child {
+  height: 36px; padding: 0 12px 0 5px !important; border-radius: 18px !important; background: var(--b-glass) !important;
+  border: 1px solid var(--b-line) !important; backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+html[data-embed] main > header > div:first-child .font-serif:not(.brand-mark) { color: var(--b-ink) !important; }
+html[data-embed] main > header > div:first-child .brand-mark { border-radius: 50% !important; }
+html[data-embed] [data-embed-title] { filter: none; }
+html[data-embed] [data-embed-title] p:first-child { color: var(--b-accent) !important; font-weight: 700; letter-spacing: 0.08em; font-size: 11px; }
+html[data-embed] [data-embed-title] h1 { color: var(--b-ink) !important; }
+html[data-embed] [data-embed-title] p:last-child { color: var(--b-ink-3) !important; }
+html[data-embed] main > header > div:last-child {
   gap: 2px !important; padding: 5px; border-radius: 24px; background: var(--b-glass);
   border: 1px solid var(--b-line); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
 }
-html[data-pane] main > header .viewer-tool-btn {
+html[data-embed] main > header .viewer-tool-btn {
   height: 36px; min-height: 36px; padding: 0 14px !important; border-radius: 18px; border: 0;
   background: transparent; color: var(--b-ink-2); box-shadow: none; font-size: 12.5px !important; font-weight: 500;
   backdrop-filter: none; -webkit-backdrop-filter: none; transform: none;
 }
-html[data-pane] main > header .viewer-tool-btn:hover { background: var(--b-hover); color: var(--b-ink); transform: none; border: 0; }
-html[data-pane] main > header .viewer-tool-btn:is([aria-expanded="true"], [aria-pressed="true"], .is-active) {
+html[data-embed] main > header .viewer-tool-btn:hover { background: var(--b-hover); color: var(--b-ink); transform: none; border: 0; }
+html[data-embed] main > header .viewer-tool-btn:is([aria-expanded="true"], [aria-pressed="true"], .is-active) {
   background: var(--b-on) !important; border: 0 !important; color: var(--b-ink) !important;
 }
-html[data-pane] main > header .viewer-tool-btn.primary { background: var(--b-cta) !important; color: var(--b-cta-ink) !important; font-weight: 600; }
+html[data-embed] main > header .viewer-tool-btn.primary { background: var(--b-cta) !important; color: var(--b-cta-ink) !important; font-weight: 600; }
 
 /* =====================================================================
    C — LEVHA: ivory page, framed figure plate, caption column, bottom dock

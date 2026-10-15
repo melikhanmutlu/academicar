@@ -8,12 +8,12 @@
 {# Per-layer measurements (paid plans; passed by view_model already filtered for who may see them). #}
 {% set viewer_metrics = viewer_metrics|default(none) %}
 {# Design B ("Sahne") is the viewer's design. ?design=a|b|c|current opens the comparison
-   preview (with its strip); embeds always keep the plain embed look. #}
+   preview (with its strip); embeds wear design B too (glass top bar, title lockup). #}
 {% set viewer_design = (request.args.get('design') or '')|lower %}
 {% set viewer_preview = viewer_design in ('a', 'b', 'c', 'current') and not is_embed %}
 {# The second model of the split view is an embed (?embed=1&pane=1) that wears design B. #}
 {% set viewer_pane = is_embed and request.args.get('pane') == '1' %}
-{% set viewer_design = 'b' if viewer_pane else ('' if is_embed else (viewer_design if viewer_preview else 'b')) %}
+{% set viewer_design = 'b' if is_embed else (viewer_design if viewer_preview else 'b') %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -42,6 +42,7 @@
       var m = 'dark';
       {% if viewer_design %}
       {% if viewer_preview %}document.documentElement.setAttribute('data-design-preview', '1');{% endif %}
+      {% if is_embed %}document.documentElement.setAttribute('data-embed', '1');{% endif %}
       {% if viewer_pane %}document.documentElement.setAttribute('data-pane', '1');{% endif %}
       {% if viewer_design != 'current' %}document.documentElement.setAttribute('data-design', '{{ viewer_design }}');{% endif %}
       {% endif %}
