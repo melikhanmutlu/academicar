@@ -85,6 +85,7 @@ from discipline_content import all_disciplines, discipline_slugs, get_discipline
 from institution_panel import institution_bp
 from layer_editor import default_ar_materials, layer_editor_bp, model_has_layers, model_layers, viewer_layer_metrics
 from viewer_lighting import viewer_lighting_bp
+from embed_config import effective_embed_config, clean_embed_config, embed_settings_bp
 from model_media import model_media_bp
 from comparisons import comparisons_bp
 from scenes import (
@@ -261,6 +262,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.register_blueprint(institution_bp)
     app.register_blueprint(layer_editor_bp)
     app.register_blueprint(viewer_lighting_bp)
+    app.register_blueprint(embed_settings_bp)
     app.register_blueprint(model_media_bp)
     app.register_blueprint(comparisons_bp)
     app.register_blueprint(scenes_bp)
@@ -1973,6 +1975,8 @@ def ensure_sqlite_schema(app: Flask) -> None:
             connection.execute(text("ALTER TABLE models ADD COLUMN processing_stage VARCHAR(120)"))
         if model_columns and "viewer_lighting" not in model_columns:
             connection.execute(text("ALTER TABLE models ADD COLUMN viewer_lighting JSON"))
+        if model_columns and "embed_config" not in model_columns:
+            connection.execute(text("ALTER TABLE models ADD COLUMN embed_config JSON"))
 
 
 def _alembic_head_revision(app: Flask) -> str | None:
@@ -6588,11 +6592,25 @@ def register_routes(app: Flask) -> None:
         active_scene_id = request.args.get("scene", type=int)
         if active_scene_id not in {scene["id"] for scene in scenes}:
             active_scene_id = None
+        # An embedded viewer shows visitors' view: no owner tools, and the model's
+        # saved embed settings (the owner's Embed page previews unsaved ones via ?cfg=).
+        embedded = request.args.get("embed") in ("true", "1")
+        embed_cfg = None
+        if embedded:
+            preview = None
+            if can_edit and request.args.get("cfg"):
+                try:
+                    preview = clean_embed_config(json.loads(request.args["cfg"]))
+                except ValueError:  # bad JSON (JSONDecodeError) or bad settings
+                    preview = None
+            embed_cfg = effective_embed_config(model, preview)
+            can_edit = False
         return render_template(
             "viewer.html", model=model, paper=model.paper, has_usdz=has_usdz,
             annotations=annotations, scale_reference=scale_ref,
             dimensions_cm=format_model_dimensions_cm(model),
             is_owner=can_edit,
+            embed_cfg=embed_cfg,
             scenes=scenes,
             active_scene_id=active_scene_id,
             viewer_metrics=viewer_layer_metrics(model, can_edit),

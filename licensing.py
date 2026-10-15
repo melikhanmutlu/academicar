@@ -52,6 +52,9 @@ PLAN_FEATURES: tuple[tuple[str, str], ...] = (
     ("comparison", "Before / after comparison"),
     ("slice_view", "2D slice view and slice measurement"),
     ("custom_threshold", "Custom CT threshold (HU) for DICOM uploads"),
+    ("embed", "Embed settings: tools, theme, title and size of the embed code"),
+    ("embed_full_layout", "Embed: full viewer layout (side panels, model gallery)"),
+    ("embed_white_label", "Embed: hide AcademicAR branding"),
 )
 
 # Paid-only viewer capabilities. Migration b6c7d8e9f0a1 made the six v39 tools
@@ -59,7 +62,7 @@ PLAN_FEATURES: tuple[tuple[str, str], ...] = (
 # slice view and custom threshold built on them) to Free as well. Admins can
 # still change every plan's features on /admin/pricing.
 PAID_ONLY_FEATURES: frozenset[str] = frozenset({
-    "layer_metrics", "figure_export", "comparison",
+    "layer_metrics", "figure_export", "comparison", "embed_full_layout", "embed_white_label",
 })
 
 PLAN_RANK: dict[str, int] = {

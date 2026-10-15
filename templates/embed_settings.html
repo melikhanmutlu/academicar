@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}Embed - AcademicAR{% endblock %}
+
+{% block content %}
+{% set visibility = project_visibility(paper) %}
+{% set model_name = model.display_name or model.original_filename or 'Model' %}
+<div class="app-shell model-edit-shell py-10 pb-10">
+  <a href="{{ url_for('project_detail', slug=paper.slug) }}" class="detail-back-button">&larr; Project</a>
+
+  <div class="model-edit-header">
+    <div>
+      <h1>Embed</h1>
+      <p>Choose what {{ model_name }} shows on your own site or app, then copy the code. The settings are saved with the model: change them here and every site that already embeds it follows.</p>
+    </div>
+  </div>
+
+  {% if visibility != 'public' %}
+    <div class="surface model-edit-card" role="status">
+      <p>This project is {{ 'unlisted' if visibility == 'unlisted' else 'private' }}. A framed viewer has no review-link cookie, so the embed only works once the project is public.</p>
+    </div>
+  {% endif %}
+  {% if not allowed.customize %}
+    <div class="surface model-edit-card" role="status">
+      <p>Embed settings are not included in this model's plan. The default embed code below still works.</p>
+    </div>
+  {% endif %}
+
+  <style>@media (min-width:1024px){ #embedApp{grid-template-columns:minmax(0,1fr) minmax(340px,560px)}}@media (max-width:1023px){ #embedApp{grid-template-columns:minmax(0,1fr)}}</style>
+  <div class="model-edit-layout" id="embedApp"
+       data-preview-url="{{ url_for('embed_settings.preview_embed', model_id=model.id) }}"
+       data-save-url="{{ url_for('embed_settings.save_embed', model_id=model.id) }}"
+       data-view-url="{{ url_for('view_model', model_id=model.id) }}"
+       data-csrf="{{ csrf_token() }}">
+    <main class="model-edit-main">
+      <fieldset class="surface model-edit-card" {% if not allowed.customize %}disabled{% endif %}>
+        <div class="model-edit-card-head"><h2>Layout</h2><p>The compact embed is a slim top bar over the model. The full layout is the whole viewer: side panels, tools and model gallery.</p></div>
+        <div class="model-edit-field-grid">
+          <label class="field-label" for="embedLayout">Layout</label>
+          <select id="embedLayout" class="field-input" data-embed-field="layout">
+            <option value="compact" {% if cfg.layout == 'compact' %}selected{% endif %}>Compact</option>
+            <option value="full" {% if cfg.layout == 'full' %}selected{% endif %} {% if not allowed.full_layout %}disabled{% endif %}>Full viewer{% if not allowed.full_layout %} (paid plans){% endif %}</option>
+          </select>
+        </div>
+        <div class="model-edit-field-grid">
+          <label class="field-label" for="embedTheme">Theme</label>
+          <select id="embedTheme" class="field-input" data-embed-field="theme">
+            {% for value, label in (('dark', 'Dark'), ('light', 'Light'), ('white', 'White')) %}
+              <option value="{{ value }}" {% if cfg.theme == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </fieldset>
+
+      <fieldset class="surface model-edit-card" id="embedTools" {% if not allowed.customize %}disabled{% endif %}>
+        <div class="model-edit-card-head"><h2>Tools and labels</h2><p>Compact layout only. A tool also needs the model to have it (for example Scenes need saved scenes).</p></div>
+        <div class="model-edit-field-grid">
+          {% for key, label in tools %}
+            <label class="checkbox-label"><input type="checkbox" data-embed-tool="{{ key }}" {% if key in cfg.tools %}checked{% endif %}> {{ label }}</label>
+          {% endfor %}
+          <label class="checkbox-label"><input type="checkbox" data-embed-field="title" {% if cfg.title %}checked{% endif %}> Show the model title</label>
+          <label class="checkbox-label"><input type="checkbox" data-embed-field="brand-hide" {% if not cfg.brand %}checked{% endif %} {% if not allowed.white_label %}disabled{% endif %}> Hide AcademicAR branding{% if not allowed.white_label %} (paid plans){% endif %}</label>
+        </div>
+      </fieldset>
+
+      <fieldset class="surface model-edit-card" {% if not allowed.customize %}disabled{% endif %}>
+        <div class="model-edit-card-head"><h2>Size</h2><p>The size lives in the code you paste, so it is the one setting that needs a fresh copy when you change it.</p></div>
+        <div class="model-edit-field-grid">
+          <label class="field-label" for="embedSizeMode">Sizing</label>
+          <select id="embedSizeMode" class="field-input" data-embed-size="mode">
+            <option value="fixed" {% if cfg.size.mode == 'fixed' %}selected{% endif %}>Fixed height</option>
+            <option value="ratio" {% if cfg.size.mode == 'ratio' %}selected{% endif %}>Aspect ratio</option>
+            <option value="fill" {% if cfg.size.mode == 'fill' %}selected{% endif %}>Fill its container (full screen)</option>
+          </select>
+        </div>
+        <div class="model-edit-field-grid" data-size-row="fixed">
+          <label class="field-label" for="embedWidth">Width (px, 0 = 100%)</label>
+          <input id="embedWidth" type="number" min="0" max="3000" step="10" class="field-input" data-embed-size="width" value="{{ cfg.size.width }}">
+          <label class="field-label" for="embedHeight">Height (px)</label>
+          <input id="embedHeight" type="number" min="200" max="2000" step="10" class="field-input" data-embed-size="height" value="{{ cfg.size.height }}">
+        </div>
+        <div class="model-edit-field-grid" data-size-row="ratio">
+          <label class="field-label" for="embedRatio">Aspect ratio</label>
+          <select id="embedRatio" class="field-input" data-embed-size="ratio">
+            {% for r in ratios %}<option value="{{ r }}" {% if cfg.size.ratio == r %}selected{% endif %}>{{ r }}</option>{% endfor %}
+          </select>
+        </div>
+        <p data-size-row="fill" class="field-hint">Give the element that holds the iframe a height (for example <code>height: 100vh</code> for a full-screen page).</p>
+      </fieldset>
+    </main>
+
+    <aside class="model-edit-side">
+      <div class="surface model-edit-card">
+        <div class="model-edit-card-head"><h2>Preview</h2></div>
+        <div id="embedPreviewBox" style="max-width:100%;overflow:hidden;border-radius:8px">
+          <iframe id="embedPreview" title="Embed preview" style="border:0;width:100%;height:420px;border-radius:8px;background:#111" allow="xr-spatial-tracking; fullscreen" allowfullscreen></iframe>
+        </div>
+      </div>
+      <div class="surface model-edit-card">
+        <div class="model-edit-card-head"><h2>Embed code</h2></div>
+        <textarea id="embedCode" class="field-input" rows="9" readonly style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px">{{ snippet }}</textarea>
+        <div class="model-edit-actions">
+          <button type="button" id="embedCopy" class="detail-action">Copy code</button>
+          <button type="button" id="embedSave" class="detail-action detail-action-primary" {% if not allowed.customize %}disabled{% endif %}>Save settings</button>
+        </div>
+        <p id="embedStatus" role="status" aria-live="polite" class="field-hint"></p>
+      </div>
+    </aside>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var app = document.getElementById('embedApp');
+  var code = document.getElementById('embedCode'), status = document.getElementById('embedStatus');
+  var preview = document.getElementById('embedPreview');
+  var csrf = app.dataset.csrf;
+
+  function val(sel) { return app.querySelector(sel); }
+  function read() {
+    var tools = Array.prototype.map.call(app.querySelectorAll('[data-embed-tool]:checked'), function (el) { return el.dataset.embedTool; });
+    return {
+      layout: val('[data-embed-field="layout"]').value,
+      theme: val('[data-embed-field="theme"]').value,
+      tools: tools,
+      title: val('[data-embed-field="title"]').checked,
+      brand: !val('[data-embed-field="brand-hide"]').checked,
+      size: {
+        mode: val('[data-embed-size="mode"]').value,
+        width: parseInt(val('[data-embed-size="width"]').value, 10) || 0,
+        height: parseInt(val('[data-embed-size="height"]').value, 10) || 0,
+        ratio: val('[data-embed-size="ratio"]').value
+      }
+    };
+  }
+  function post(url, body) {
+    return fetch(url, { method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().catch(function () { return { ok: false, error: 'Something went wrong.' }; }); });
+  }
+  function toggleRows(cfg) {
+    app.querySelectorAll('[data-size-row]').forEach(function (el) { el.hidden = el.dataset.sizeRow !== cfg.size.mode; });
+    var full = cfg.layout === 'full';
+    app.querySelector('#embedTools').querySelectorAll('[data-embed-tool], [data-embed-field="title"]').forEach(function (el) { el.disabled = full; });
+  }
+  function sizePreview(cfg) {
+    var s = cfg.size, h = 420;
+    preview.style.aspectRatio = '';
+    if (s.mode === 'fixed') { h = Math.min(s.height || 480, 640); preview.style.height = h + 'px'; preview.style.maxWidth = s.width ? s.width + 'px' : '100%'; }
+    else if (s.mode === 'ratio') { preview.style.height = 'auto'; preview.style.aspectRatio = s.ratio.replace(':', '/'); preview.style.maxWidth = '100%'; }
+    else { preview.style.height = '480px'; preview.style.maxWidth = '100%'; }
+  }
+  var timer;
+  function refresh() {
+    var cfg = read();
+    toggleRows(cfg); sizePreview(cfg);
+    clearTimeout(timer);
+    timer = setTimeout(function () {
+      var url = app.dataset.viewUrl + '?embed=true&cfg=' + encodeURIComponent(JSON.stringify(cfg));
+      if (preview.getAttribute('data-src') !== url) { preview.setAttribute('data-src', url); preview.src = url; }
+      post(app.dataset.previewUrl, cfg).then(function (res) { if (res.ok) code.value = res.snippet; else status.textContent = res.error || ''; });
+    }, 300);
+  }
+  app.addEventListener('input', refresh); app.addEventListener('change', refresh);
+
+  document.getElementById('embedCopy').addEventListener('click', function () {
+    code.select();
+    (navigator.clipboard ? navigator.clipboard.writeText(code.value) : Promise.reject()).catch(function () { document.execCommand('copy'); })
+      .then(function () { status.textContent = 'Code copied.'; }, function () { status.textContent = 'Code copied.'; });
+  });
+  document.getElementById('embedSave').addEventListener('click', function () {
+    status.textContent = 'Saving...';
+    post(app.dataset.saveUrl, read()).then(function (res) {
+      if (res.ok) { code.value = res.snippet; status.textContent = 'Saved. Embedded viewers now use these settings.'; }
+      else status.textContent = res.error || 'The settings could not be saved.';
+    });
+  });
+  refresh();
+})();
+</script>
+{% endblock %}

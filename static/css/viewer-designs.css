@@ -704,6 +704,12 @@ html[data-embed] main > header .viewer-tool-btn:is([aria-expanded="true"], [aria
 }
 html[data-embed] main > header .viewer-tool-btn.primary { background: var(--b-cta) !important; color: var(--b-cta-ink) !important; font-weight: 600; }
 
+/* White label (embed settings, plan feature embed_white_label): no AcademicAR brand chip,
+   Free-preview badge, "publish your own" link or QR card. The brand chip keeps its space so the
+   toolbar stays where it is. */
+html[data-embed-nobrand] main > header > :is(div:first-child, a[href="/"]) { visibility: hidden; }
+html[data-embed-nobrand] :is(.viewer-free-watermark, .viewer-publish-cta, .viewer-inline-qr) { display: none !important; }
+
 /* =====================================================================
    C — LEVHA: ivory page, framed figure plate, caption column, bottom dock
    ===================================================================== */

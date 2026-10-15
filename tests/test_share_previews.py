@@ -70,21 +70,23 @@ def test_preview_falls_back_when_crawlers_cannot_fetch_the_poster(client, app):
             assert share_image_url(model=db.session.get(Model3D, expired_id)).endswith("clinical-spatial-hero.png")
 
 
-def test_model_card_offers_embed_code_for_public_projects_only(client, app):
+def test_model_card_links_to_the_embed_page_for_public_projects_only(client, app):
     import html as html_lib
 
     register(client)
     model_id, slug = _model(app)
     page = client.get(f"/projects/{slug}").get_data(as_text=True)
-    match = re.search(r"data-copy-link='([^']*)' aria-label=\"Copy embed code\"", page)
-    assert match, "embed button missing"
+    assert f'href="/models/{model_id}/embed"' in page, "embed link missing"
+    embed_page = client.get(f"/models/{model_id}/embed").get_data(as_text=True)
+    match = re.search(r'<textarea id="embedCode"[^>]*>(.*?)</textarea>', embed_page, re.S)
+    assert match, "embed code missing"
     snippet = html_lib.unescape(match.group(1))
     assert snippet.startswith(f'<iframe src="http')
     assert f"/view/{model_id}?embed=true" in snippet
     assert 'title="Vertebra (interactive 3D model)"' in snippet
 
     _private_id, private_slug = _model(app, visibility="private")
-    assert "Copy embed code" not in client.get(f"/projects/{private_slug}").get_data(as_text=True)
+    assert "/embed" not in client.get(f"/projects/{private_slug}").get_data(as_text=True)
 
 
 def test_embed_mode_accepts_true_and_1(client, app):

@@ -19,7 +19,7 @@
             {% set d = row.details or {} %}
             <tr>
               <td>{{ d.get("institution_name") or "-" }}</td>
-              <td>{{ d.get("contact_name") or "-" }}{% if d.get("email") %}<small class="logs-time-sm"><a href="mailto:{{ d.get('email') }}">{{ d.get("email") }}</a></small>{% endif %}</td>
+              <td>{{ d.get("contact_name") or "-" }}{% if d.get("email") %}<br><a href="mailto:{{ d.get('email') }}">{{ d.get("email") }}</a>{% endif %}</td>
               <td class="admin-hide-sm">{{ d.get("estimated_members") or "-" }}</td>
               <td style="white-space:pre-wrap">{{ d.get("message") or "-" }}</td>
               <td class="admin-hide-sm">{{ row.timestamp.strftime("%Y-%m-%d %H:%M") if row.timestamp else "-" }}</td>
