@@ -18,7 +18,10 @@ html[data-design-preview] { --pv: 28px; }
 }
 #designStrip a:hover { color: #fff; background: rgba(255, 255, 255, 0.12); }
 #designStrip a[aria-current="true"] { background: #fff; color: #202020; }
-@media (max-width: 480px) { #designStrip .ds-label { display: none; } #designStrip a { padding: 4px 8px; } }
+#designStrip .ds-mode { display: inline-flex; margin-left: 10px; padding: 2px; border-radius: 20px; background: rgba(255, 255, 255, 0.1); }
+#designStrip .ds-mode button { padding: 2px 9px; border: 0; border-radius: 20px; background: transparent; color: rgba(255, 255, 255, 0.7); font: inherit; cursor: pointer; }
+#designStrip .ds-mode button[aria-pressed="true"] { background: rgba(255, 255, 255, 0.92); color: #202020; }
+@media (max-width: 480px) { #designStrip .ds-label, #designStrip .ds-name { display: none; } #designStrip a { padding: 4px 6px; } #designStrip .ds-mode { margin-left: 4px; } #designStrip .ds-mode button { padding: 2px 6px; } }
 html[data-design-preview] main.h-screen {
   margin-top: var(--pv); height: calc(100vh - var(--pv)); height: calc(100dvh - var(--pv));
 }
@@ -102,82 +105,243 @@ html[data-design="a"] .viewer-panel-header p:first-child::before {
 }
 
 /* =====================================================================
-   B — SAHNE: full-bleed dark stage, icon rail on the right, title lockup
+   B — SAHNE: full-bleed stage, a glass icon rail on the right that opens
+   into a labelled menu on hover, and a matching compact tools panel on the
+   left. Dark and light (data-viewer-bg) share the layout; tokens switch.
    ===================================================================== */
+html[data-design="b"] {
+  --b-glass: rgba(18, 18, 20, 0.62); --b-panel: rgba(16, 16, 18, 0.88);
+  --b-line: rgba(255, 255, 255, 0.1); --b-line-2: rgba(255, 255, 255, 0.22);
+  --b-ink: #fff; --b-ink-2: rgba(255, 255, 255, 0.74); --b-ink-3: rgba(255, 255, 255, 0.46);
+  --b-hover: rgba(255, 255, 255, 0.08); --b-fill: rgba(255, 255, 255, 0.06);
+  --b-on: rgba(255, 255, 255, 0.18); --b-seg-on: rgba(255, 255, 255, 0.16); --b-seg-shadow: none;
+  --b-cta: #fff; --b-cta-ink: #111; --b-range: #fff;
+}
+html[data-design="b"]:is([data-viewer-bg="light"], [data-viewer-bg="white"]) {
+  --b-glass: rgba(255, 255, 255, 0.74); --b-panel: rgba(255, 255, 255, 0.92);
+  --b-line: rgba(32, 32, 32, 0.1); --b-line-2: rgba(32, 32, 32, 0.24);
+  --b-ink: #202020; --b-ink-2: rgba(32, 32, 32, 0.72); --b-ink-3: rgba(32, 32, 32, 0.5);
+  --b-hover: rgba(32, 32, 32, 0.06); --b-fill: rgba(32, 32, 32, 0.04);
+  --b-on: rgba(32, 32, 32, 0.09); --b-seg-on: #fff; --b-seg-shadow: 0 1px 2px rgba(32, 32, 32, 0.16);
+  --b-cta: #202020; --b-cta-ink: #fff; --b-range: #202020;
+}
+
+/* Stage */
 html[data-design="b"] body { background: #000; }
+html[data-design="b"]:is([data-viewer-bg="light"], [data-viewer-bg="white"]) body { background: #fff; }
 html[data-design="b"] .volumetric-grid { display: none; }
-html[data-design="b"] model-viewer {
+html[data-design="b"][data-viewer-bg="dark"] model-viewer {
   background: radial-gradient(ellipse 80% 70% at 50% 46%, #2b2b30 0, #131315 58%, #050506 100%) !important;
+}
+html[data-design="b"][data-viewer-bg="light"] model-viewer {
+  background: radial-gradient(ellipse 80% 70% at 50% 46%, #ffffff 0, #f2f2f3 60%, #e2e2e4 100%) !important;
 }
 html[data-design="b"] main > header { top: 0; bottom: 0; padding: 20px !important; align-items: flex-start; }
 html[data-design="b"] main > header > a[href="/"] {
   width: 44px; height: 44px; padding: 0 !important; justify-content: center; border-radius: 50% !important;
-  background: rgba(20, 20, 22, 0.55) !important; border: 1px solid rgba(255, 255, 255, 0.14) !important; pointer-events: auto;
+  background: var(--b-glass) !important; border: 1px solid var(--b-line) !important; color: var(--b-ink) !important;
+  backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); pointer-events: auto;
 }
 html[data-design="b"] main > header > a[href="/"] > span:not(.brand-mark) { display: none !important; }
+html[data-design="b"] main > header > a[href="/"] .brand-mark { background: transparent !important; color: var(--b-ink); }
+
+/* Right rail: icons in a fixed column; hovering opens it into a labelled menu. */
 html[data-design="b"] .viewer-toolbar {
   position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
-  flex-direction: column; flex-wrap: nowrap !important; align-items: center; gap: 4px;
-  padding: 8px; border-radius: 30px; background: rgba(18, 18, 20, 0.62);
-  border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
+  flex-direction: column; flex-wrap: nowrap !important; align-items: flex-end; gap: 2px !important;
+  padding: 6px; border-radius: 28px; background: var(--b-glass);
+  border: 1px solid var(--b-line); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
 }
 html[data-design="b"] .viewer-toolbar .viewer-tool-btn {
-  position: relative; width: 44px; height: 44px; min-height: 44px; min-width: 44px; padding: 0 !important; border-radius: 50%;
-  border: 0; background: transparent; color: rgba(255, 255, 255, 0.78); font-size: 0;
+  position: relative; flex-direction: row-reverse; justify-content: flex-start; gap: 0;
+  width: 44px; height: 44px; min-height: 44px; min-width: 44px; padding: 0 !important; border-radius: 22px;
+  border: 0; background: transparent; color: var(--b-ink-2); box-shadow: none;
+  font-size: 13px; font-weight: 500; letter-spacing: 0; white-space: nowrap; overflow: hidden;
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+  transition: width 0.22s ease, background-color 0.15s ease, color 0.15s ease;
 }
-html[data-design="b"] .viewer-toolbar .viewer-tool-btn > svg { display: block !important; width: 18px; height: 18px; }
-html[data-design="b"] .viewer-toolbar .viewer-tool-btn > span { display: none !important; }
-html[data-design="b"] .viewer-toolbar .viewer-tool-btn:hover { background: rgba(255, 255, 255, 0.12); color: #fff; transform: none; border: 0; }
-html[data-design="b"] .viewer-toolbar .viewer-tool-btn:is([aria-expanded="true"], .is-active) { background: rgba(255, 255, 255, 0.18); color: #fff; }
-html[data-design="b"] .viewer-toolbar .viewer-tool-btn.primary { order: -1; margin-bottom: 6px; background: #fff !important; color: #111 !important; }
-html[data-design="b"] .viewer-toolbar .viewer-tool-btn::after {
-  content: attr(aria-label); position: absolute; right: calc(100% + 14px); top: 50%; transform: translateY(-50%);
-  white-space: nowrap; padding: 5px 10px; border-radius: 8px; background: rgba(12, 12, 14, 0.94); color: #fff;
-  font-size: 12px; font-weight: 500; line-height: 1.2; opacity: 0; pointer-events: none; transition: opacity 0.15s;
+html[data-design="b"] .viewer-toolbar .viewer-tool-btn > svg { display: block !important; flex: 0 0 auto; width: 18px; height: 18px; margin: 0 13px; }
+html[data-design="b"] .viewer-toolbar .viewer-tool-btn > span {
+  display: block !important; flex: 1 1 auto; min-width: 0; overflow: hidden; padding-left: 16px; text-align: left;
+  opacity: 0; transition: opacity 0.12s ease;
 }
-html[data-design="b"] .viewer-toolbar .viewer-tool-btn:hover::after,
-html[data-design="b"] .viewer-toolbar .viewer-tool-btn:focus-visible::after { opacity: 1; }
+html[data-design="b"] .viewer-toolbar .viewer-tool-btn:hover { background: var(--b-hover); color: var(--b-ink); transform: none; border: 0; }
+html[data-design="b"] .viewer-toolbar .viewer-tool-btn:is([aria-expanded="true"], .is-active) {
+  background: var(--b-on) !important; border: 0 !important; color: var(--b-ink) !important;
+}
+html[data-design="b"] .viewer-toolbar .viewer-tool-btn.is-active { box-shadow: inset 0 0 0 1.5px #ff682c; }
+html[data-design="b"] .viewer-toolbar .viewer-tool-btn.primary {
+  order: -1; margin-bottom: 4px; background: var(--b-cta) !important; color: var(--b-cta-ink) !important; font-weight: 600;
+}
+@media (hover: hover) and (min-width: 641px) {
+  html[data-design="b"] .viewer-toolbar:is(:hover, :focus-within) .viewer-tool-btn { width: 172px; }
+  html[data-design="b"] .viewer-toolbar:is(:hover, :focus-within) .viewer-tool-btn > span { opacity: 1; transition-delay: 0.06s; }
+}
+
+/* Left panel: title lockup when folded, a compact glass tools sheet when open. */
 html[data-design="b"] body:has(#controlPanel) #viewer { left: 0 !important; width: 100% !important; }
 html[data-design="b"] #controlPanel {
-  left: 28px; right: auto; bottom: 28px; width: min(400px, calc(100% - 140px)); max-height: calc(100dvh - var(--pv) - 140px);
-  background: transparent !important; border: 1px solid transparent !important; padding: 0 !important;
-  backdrop-filter: none !important; -webkit-backdrop-filter: none !important; transition: background 0.2s, padding 0.2s, border-color 0.2s;
+  left: 28px; right: auto; bottom: 28px; width: min(384px, calc(100% - 140px)); max-height: calc(100dvh - var(--pv) - 120px);
+  background: transparent !important; border: 1px solid transparent !important; padding: 0 !important; color: var(--b-ink);
+  box-shadow: none; backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+  transition: background-color 0.2s, padding 0.2s, border-color 0.2s;
 }
 html[data-design="b"] #controlPanel[data-collapsed="false"] {
-  background: rgba(16, 16, 18, 0.86) !important; border-color: rgba(255, 255, 255, 0.1) !important; padding: 20px !important;
-  border-radius: 22px; backdrop-filter: blur(26px) !important; -webkit-backdrop-filter: blur(26px) !important;
+  background: var(--b-panel) !important; border-color: var(--b-line) !important; padding: 18px 18px 6px !important;
+  border-radius: 22px !important; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(26px) !important; -webkit-backdrop-filter: blur(26px) !important;
 }
-html[data-design="b"] #controlPanel .viewer-panel-header { border-bottom-color: transparent !important; padding-bottom: 0.5rem; }
-html[data-design="b"] #controlPanel[data-collapsed="false"] .viewer-panel-header { border-bottom-color: rgba(255, 255, 255, 0.1) !important; padding-bottom: 0.9rem; }
+html[data-design="b"] #controlPanel .viewer-panel-header {
+  flex-direction: column; align-items: flex-start; gap: 10px; border-bottom: 0 !important; padding-bottom: 0;
+}
+html[data-design="b"] #controlPanel[data-collapsed="false"] .viewer-panel-header { padding-bottom: 14px; }
 html[data-design="b"] .viewer-panel-header h1 {
   display: block !important; overflow: visible !important; -webkit-line-clamp: unset !important; word-break: normal !important;
-  font-size: 34px; line-height: 1.05; letter-spacing: -0.025em; font-weight: 600; text-shadow: 0 2px 24px rgba(0, 0, 0, 0.6);
+  font-size: 34px; line-height: 1.05; letter-spacing: -0.025em; font-weight: 600; color: var(--b-ink);
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.6); transition: font-size 0.2s ease;
 }
-html[data-design="b"] #controlPanel .viewer-panel-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+html[data-design="b"] #controlPanel[data-collapsed="false"] .viewer-panel-header h1 { font-size: 24px; text-shadow: none; }
+html[data-design="b"]:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .viewer-panel-header h1 { text-shadow: none; }
 html[data-design="b"] #panelToggle {
-  width: auto; order: 2; height: 34px; padding: 0 12px; gap: 8px; border-radius: 20px; font-size: 12px; font-weight: 500; color: #fff;
-  background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.16);
+  order: 2; flex-direction: row-reverse; width: auto; height: 34px; margin-top: 2px; padding: 0 12px 0 14px; gap: 8px;
+  border-radius: 20px !important; font-size: 12px; font-weight: 500; color: var(--b-ink) !important;
+  background: var(--b-glass) !important; border: 1px solid var(--b-line) !important;
+  backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
 }
+html[data-design="b"] #panelToggle:hover { background: var(--b-on) !important; }
 html[data-design="b"] #panelToggle::before { content: "Tools"; }
-html[data-design="b"] #panelToggle { flex-direction: row-reverse; }
+html[data-design="b"] #controlPanel[data-collapsed="false"] #panelToggle { position: absolute; top: 16px; right: 16px; margin: 0; background: var(--b-fill) !important; backdrop-filter: none; }
+html[data-design="b"] #controlPanel[data-collapsed="false"] #panelToggle::before { content: "Close"; }
+html[data-design="b"] #controlPanel[data-collapsed="false"] .viewer-panel-header > div { padding-right: 84px; }
+
+/* Facts: one hairline strip instead of three boxes. */
+html[data-design="b"] #controlPanel .viewer-meta-grid {
+  display: flex !important; gap: 0 !important; margin-top: 0 !important; border: 1px solid var(--b-line); border-radius: 10px;
+}
+html[data-design="b"] #controlPanel .viewer-meta-grid:has(+ div:not(.viewer-tool-stack)) { border-radius: 10px 10px 0 0; }
+html[data-design="b"] #controlPanel .viewer-meta-grid > div {
+  flex: 1 1 0; min-width: 0; background: transparent !important; border-radius: 0 !important; padding: 7px 11px !important;
+}
+html[data-design="b"] #controlPanel .viewer-meta-grid > div + div { border-left: 1px solid var(--b-line); }
+html[data-design="b"] #controlPanel :is(.viewer-meta-grid > div, .viewer-meta-grid + div:not(.viewer-tool-stack)) > p:first-child {
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--b-ink-3) !important;
+}
+html[data-design="b"] #controlPanel :is(.viewer-meta-grid > div, .viewer-meta-grid + div:not(.viewer-tool-stack)) > p + p {
+  margin-top: 1px !important; font-size: 12.5px; font-weight: 600; color: var(--b-ink) !important;
+}
+html[data-design="b"] #controlPanel .viewer-meta-grid + div:not(.viewer-tool-stack) {
+  display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; margin-top: 0 !important;
+  background: transparent !important; border: 1px solid var(--b-line); border-top: 0; border-radius: 0 0 10px 10px !important; padding: 7px 11px !important;
+}
+html[data-design="b"] #controlPanel .viewer-meta-grid + div:not(.viewer-tool-stack) > p { margin: 0 !important; }
+html[data-design="b"] #controlPanel .viewer-meta-grid + div:not(.viewer-tool-stack) > p:nth-child(3) { flex-basis: 100%; font-size: 11px; color: var(--b-ink-3) !important; }
+
+/* Tool groups: hairline-separated rows, small-caps titles, text actions on the right. */
+html[data-design="b"] #controlPanel .viewer-tool-stack { gap: 0 !important; margin-top: 6px !important; font-size: 12px; }
+html[data-design="b"] #controlPanel .viewer-tool-stack > div { border-top: 1px solid var(--b-line) !important; padding: 12px 0 !important; }
+html[data-design="b"] #controlPanel .viewer-tool-stack > div:first-child { border-top: 0 !important; }
+html[data-design="b"] #controlPanel .viewer-tool-heading {
+  flex-wrap: wrap; row-gap: 6px; column-gap: 8px; min-height: 26px;
+  color: var(--b-ink-3); font-size: 10.5px; font-weight: 600; letter-spacing: 0.1em;
+}
+html[data-design="b"] #controlPanel .viewer-tool-heading > div { gap: 2px !important; margin-left: auto; width: auto; justify-content: flex-end; }
+html[data-design="b"] #controlPanel :is(.viewer-tool-heading button, .viewer-light-save button) {
+  min-height: 26px; padding: 0 7px; border: 0; border-radius: 6px; background: transparent; color: var(--b-ink-2);
+  font-size: 12px; font-weight: 500; letter-spacing: 0; text-transform: none; white-space: nowrap;
+}
+html[data-design="b"] #controlPanel :is(.viewer-tool-heading button, .viewer-light-save button):not(:disabled):hover { background: var(--b-hover); color: var(--b-ink); }
+html[data-design="b"] #controlPanel :is(.viewer-auto-toggle, .viewer-animation-toggle)[aria-pressed="true"] { background: var(--b-on); color: var(--b-ink); }
+
+/* Segmented controls: Background, Lighting presets, screenshot background. */
+html[data-design="b"] #controlPanel :is([data-bg-options], [data-light-presets], .viewer-shot-bg-opts) {
+  display: flex; flex-wrap: nowrap !important; gap: 0 !important; padding: 2px; border-radius: 8px; background: var(--b-fill); border: 1px solid var(--b-line);
+}
+html[data-design="b"] #controlPanel :is([data-bg-options], [data-light-presets], .viewer-shot-bg-opts) button {
+  min-height: 24px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--b-ink-2);
+  font-size: 12px; font-weight: 500; box-shadow: none;
+}
+html[data-design="b"] #controlPanel :is([data-bg-options], [data-light-presets], .viewer-shot-bg-opts) button[aria-pressed="true"] {
+  background: var(--b-seg-on); color: var(--b-ink); box-shadow: var(--b-seg-shadow);
+}
+html[data-design="b"] #controlPanel .viewer-light-tools .viewer-tool-heading { flex-direction: column; align-items: stretch; }
+html[data-design="b"] #controlPanel .viewer-light-tools .viewer-tool-heading > [data-light-presets] { margin-left: 0; width: 100%; }
+html[data-design="b"] #controlPanel [data-light-presets] button { flex: 1 1 0; padding: 0 4px; }
+
+/* Buttons that do something: compact, square-ish, side by side. */
+html[data-design="b"] #controlPanel :is(.viewer-shot-actions, .viewer-video-actions) { gap: 6px; margin-top: 8px; }
+html[data-design="b"] #controlPanel .viewer-shot-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+html[data-design="b"] #controlPanel :is(.viewer-shot-actions button, .viewer-video-actions button) {
+  min-height: 32px; padding: 0 10px; border: 1px solid var(--b-line); border-radius: 8px; background: var(--b-fill);
+  color: var(--b-ink); font-size: 12px; font-weight: 500;
+}
+html[data-design="b"] #controlPanel :is(.viewer-shot-actions button, .viewer-video-actions button):not(:disabled):hover { background: var(--b-hover); border-color: var(--b-line-2); }
+html[data-design="b"] #controlPanel :is(.viewer-shot-actions button, .viewer-video-actions button):disabled { color: var(--b-ink-3); }
+html[data-design="b"] #controlPanel .viewer-video-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+html[data-design="b"] #controlPanel .viewer-video-actions button::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #e5484d; }
+html[data-design="b"] #controlPanel .viewer-shot-qr-toggle {
+  display: inline-flex; margin: 10px 16px 0 0; gap: 6px; font-size: 12px; font-weight: 400; color: var(--b-ink-2);
+}
+html[data-design="b"] #controlPanel .viewer-shot-qr-toggle input { width: 14px; height: 14px; }
+html[data-design="b"] #controlPanel .viewer-shot-bg { margin-top: 8px; }
+html[data-design="b"] #controlPanel :is(.viewer-shot-grid, .viewer-shot-status):empty { display: none; }
+html[data-design="b"] #controlPanel :is(.viewer-shot-status, .viewer-video-status, .viewer-media-status, .viewer-color-hint, .viewer-light-save) {
+  margin-top: 8px; font-size: 11.5px; line-height: 1.4; color: var(--b-ink-3);
+}
+html[data-design="b"] #controlPanel .viewer-light-save { gap: 4px; }
+html[data-design="b"] #controlPanel .viewer-light-save button { margin-left: -8px; }
+html[data-design="b"] #controlPanel .viewer-light-save button + button { margin-left: 0; }
+
+/* Colours: a row of dots (names stay in the tooltip and the accessible label). */
+html[data-design="b"] #controlPanel .viewer-color-swatches { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; margin-top: 8px; }
+html[data-design="b"] #controlPanel :is(.viewer-color-swatch, .viewer-color-custom) {
+  width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: transparent; overflow: visible;
+}
+html[data-design="b"] #controlPanel :is(.viewer-color-swatch, .viewer-color-custom) > span { display: none; }
+html[data-design="b"] #controlPanel .viewer-color-swatch i,
+html[data-design="b"] #controlPanel .viewer-color-custom::before {
+  width: 100%; height: 100%; border-radius: 50%; border: 1px solid var(--b-line-2);
+}
+html[data-design="b"] #controlPanel :is(.viewer-color-swatch, .viewer-color-custom):hover { transform: scale(1.12); }
+html[data-design="b"] #controlPanel .viewer-color-swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--b-panel), 0 0 0 3.5px var(--b-ink); }
+
+/* Sliders */
+html[data-design="b"] #controlPanel .viewer-light-sliders { gap: 12px; margin-top: 10px; }
+html[data-design="b"] #controlPanel .viewer-light-sliders label { font-size: 11px; color: var(--b-ink-3); }
+html[data-design="b"] #controlPanel input[type="range"] { accent-color: var(--b-range); height: 16px; }
+html[data-design="b"] #controlPanel .viewer-rotation-tools label {
+  grid-template-columns: 12px minmax(0, 1fr) 44px; gap: 10px; margin-top: 4px; font-size: 11px; font-weight: 600; color: var(--b-ink-3);
+}
+html[data-design="b"] #controlPanel .viewer-rotate-num {
+  height: 24px; padding: 0 6px; font-size: 12px; border-radius: 6px; color: var(--b-ink); background: var(--b-fill); border-color: var(--b-line);
+}
+
+/* Floating extras */
 html[data-design="b"] .viewer-inline-qr { right: 20px; bottom: 20px; padding: 8px; border-radius: 16px; }
 html[data-design="b"] .viewer-inline-qr img { width: 76px; height: 76px; }
 html[data-design="b"] .layers-panel:not(.is-embed) { top: 20px; right: 84px; max-height: calc(100% - 40px); }
 html[data-design="b"] .viewer-free-watermark { top: 24px !important; }
+
 @media (max-width: 640px) {
   html[data-design="b"] main > header { padding: 12px !important; }
-  html[data-design="b"] .viewer-toolbar { right: 10px; padding: 6px; gap: 2px !important; }
-  html[data-design="b"] .viewer-toolbar .viewer-tool-btn { width: 40px; height: 40px; min-height: 40px; min-width: 40px; }
-  html[data-design="b"] .viewer-toolbar .viewer-tool-btn::after { display: none; }
+  html[data-design="b"] .viewer-toolbar { right: 10px; padding: 5px; }
+  html[data-design="b"] .viewer-toolbar .viewer-tool-btn { width: 40px; height: 40px; min-height: 40px; min-width: 40px; font-size: 0; }
+  html[data-design="b"] .viewer-toolbar .viewer-tool-btn > svg { margin: 0 11px; }
+  html[data-design="b"] .viewer-toolbar .viewer-tool-btn > span { display: none !important; }
+  /* While the tools sheet is open the rail would show through the glass. */
+  html[data-design="b"] body:has(#controlPanel[data-collapsed="false"]) .viewer-toolbar { opacity: 0; pointer-events: none; }
   html[data-design="b"] #controlPanel {
     left: 16px !important; right: 68px !important; bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
-    width: auto !important; max-height: 56dvh; padding: 0 !important; border-radius: 0;
+    width: auto !important; max-height: 58dvh; padding: 0 !important; border-radius: 0;
   }
   html[data-design="b"] #controlPanel[data-collapsed="false"] {
     right: 12px !important; left: 12px !important; bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
-    padding: 16px !important; border-radius: 20px;
+    padding: 16px 16px 4px !important; border-radius: 20px !important;
   }
   html[data-design="b"] .viewer-panel-header h1 { font-size: 28px; }
+  html[data-design="b"] #controlPanel[data-collapsed="false"] .viewer-panel-header h1 { font-size: 20px; }
+  html[data-design="b"] #controlPanel .viewer-tool-heading > div { width: auto; justify-content: flex-end; }
+  html[data-design="b"] #controlPanel .viewer-rotation-tools label { grid-template-columns: 12px minmax(0, 1fr) 44px; gap: 10px; }
 }
 
 /* =====================================================================
@@ -276,7 +440,6 @@ html[data-design="c"] #controlPanel .viewer-tool-heading { flex-direction: colum
 }
 
 /* The brand mark sits inside the round brand button; no second box. */
-html[data-design="b"] main > header > a[href="/"] .brand-mark { background: transparent !important; color: #fff; }
 html[data-design="c"] main > header > a[href="/"] .brand-mark { border-radius: 50%; }
 @media (max-width: 640px) {
   html[data-design="c"] main > header > a[href="/"] .brand-mark { background: transparent; color: #202020; }
@@ -284,13 +447,7 @@ html[data-design="c"] main > header > a[href="/"] .brand-mark { border-radius: 5
 
 /* Active tools: the production look fills them orange; each design marks them its own way. */
 html[data-design="a"] .viewer-toolbar .viewer-tool-btn.is-active { background: #f5f5f5 !important; border-color: transparent !important; color: #202020 !important; box-shadow: inset 0 -2px 0 #ff682c; }
-html[data-design="b"] .viewer-toolbar .viewer-tool-btn.is-active { background: rgba(255, 255, 255, 0.18) !important; border: 0 !important; color: #fff !important; box-shadow: inset 0 0 0 1.5px #ff682c; }
 html[data-design="c"] .viewer-toolbar .viewer-tool-btn.is-active { background: #f5f5f5 !important; border: 0 !important; color: #202020 !important; box-shadow: inset 0 -2px 0 #ff682c; }
-
-@media (max-width: 640px) {
-  /* B: while the tools sheet is open the rail would show through the glass. */
-  html[data-design="b"] body:has(#controlPanel[data-collapsed="false"]) .viewer-toolbar { opacity: 0; pointer-events: none; }
-}
 
 /* A and C: the Info drawer is opaque, so the sidebar underneath does not ghost through. */
 html[data-design="a"] #infoPanel, html[data-design="c"] #infoPanel {
