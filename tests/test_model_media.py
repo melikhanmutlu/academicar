@@ -58,16 +58,12 @@ def test_bad_files_and_limits_are_refused(app, client, monkeypatch):
     assert response.status_code == 400 and "at most 2" in response.get_json()["error"]
 
 
-def test_auto_media_replaces_the_previous_file_of_the_same_name(app, client):
+def test_automatic_media_uploads_are_refused(app, client):
     mid, _ = _make_model(app)
     _login(client)
-    first = _upload(client, mid, _png(), source="auto", label="Front").get_json()["media"]
-    second = _upload(client, mid, _png((1, 2, 3)), source="auto", label="Front").get_json()["media"]
+    assert _upload(client, mid, _png(), source="auto", label="Front").status_code == 400
     with app.app_context():
-        assert [m.id for m in ModelMedia.query.all()] == [second["id"]]
-        folder = os.path.join(app.config["CONVERTED_FOLDER"], mid, "media")
-        assert len(os.listdir(folder)) == 1
-    assert first["id"] != second["id"]
+        assert ModelMedia.query.count() == 0
 
 
 def test_media_is_private_to_project_editors(app, client):
@@ -88,7 +84,6 @@ def test_media_shows_in_the_viewer_panel_and_on_the_project_card(app, client):
     _upload(client, mid, _png(), label="Front view")
     viewer = client.get(f"/view/{mid}").get_data(as_text=True)
     assert "data-media-tools" in viewer and "Front view" in viewer
-    assert '"have": []' in viewer or '"have":[]' in viewer  # nothing automatic yet: the browser makes it
     with app.app_context():
         from models import Model3D
         slug = db.session.get(Model3D, mid).paper.slug
@@ -99,7 +94,7 @@ def test_media_shows_in_the_viewer_panel_and_on_the_project_card(app, client):
     assert 'class="viewer-media-tools"' not in public and "Front view" not in public
 
 
-def test_replacing_the_model_drops_automatic_media_but_keeps_captures(client):
+def test_replacing_the_model_keeps_captures(client):
     from models import Model3D, Paper
     from tests.conftest import register, upload_file_bytes, valid_ascii_stl_bytes
 
@@ -114,7 +109,6 @@ def test_replacing_the_model_drops_automatic_media_but_keeps_captures(client):
     )
     with client.application.app_context():
         mid = Model3D.query.one().id
-    _upload(client, mid, _png(), source="auto", label="View: Front")
     _upload(client, mid, _png(), label="My capture")
     client.post(
         f"/models/{mid}/replace",
@@ -167,32 +161,28 @@ def test_rename_and_replace_a_regenerated_set(app, client):
     assert client.post(f"/models/{mid}/media/{other['id']}/rename", json={"label": " "}).status_code == 400
 
 
-def test_auto_media_made_before_the_framing_fix_is_made_again(app, client):
-    """Automatic views made before AUTO_MEDIA_FRAMED_SINCE were captured at half
-    size in a corner; the owner's next visit regenerates them in place."""
-    from datetime import timedelta
-
-    from models import Model3D
-
+def test_purge_removes_only_automatic_media(app, client):
     mid, _ = _make_model(app)
     _login(client)
-    assert _upload(client, mid, _png(), label="View: Front", source="auto").status_code == 201
-    assert _upload(client, mid, _png(), label="View: Side", source="auto").status_code == 201
-    assert _upload(client, mid, _png(), label="Mine").status_code == 201
+    _upload(client, mid, _png(), label="Mine")
     with app.app_context():
-        front = ModelMedia.query.filter_by(label="View: Front").one()
-        front.created_at = model_media.AUTO_MEDIA_FRAMED_SINCE - timedelta(days=1)
+        folder = os.path.join(app.config["CONVERTED_FOLDER"], mid, "media")
+        for name in ("a.png", "b.png"):
+            with open(os.path.join(folder, name), "wb") as handle:
+                handle.write(_png())
+            db.session.add(ModelMedia(model_id=mid, kind="image", source="auto", label=name,
+                                      filename=name, mimetype="image/png", file_size=1))
         db.session.commit()
-        state = model_media.auto_media_state(db.session.get(Model3D, mid))
-    assert state["have"] == ["View: Side"]
-    # The stale view is replaced in place, so it does not use up room.
-    assert state["image_room"] == model_media.MAX_IMAGES_PER_MODEL - 2
+        assert model_media.purge_auto_media() == 2
+        assert [m.label for m in ModelMedia.query.all()] == ["Mine"]
+        assert len(os.listdir(folder)) == 1
+        assert model_media.purge_auto_media() == 0
 
 
 def test_edit_page_shows_all_saved_media_and_the_viewer_links_back(app, client):
     mid, _ = _make_model(app)
     _login(client)
-    assert _upload(client, mid, _png(), label="View: Front", source="auto").status_code == 201
+    assert _upload(client, mid, _png(), label="View: Front").status_code == 201
     assert _upload(client, mid, MP4, "rec.mp4", "video/mp4").status_code == 201
     edit = client.get(f"/models/{mid}/edit").get_data(as_text=True)
     assert 'id="mediaSection"' in edit and edit.count("class=\"model-media-item\"") == 2

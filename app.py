@@ -85,7 +85,7 @@ from discipline_content import all_disciplines, discipline_slugs, get_discipline
 from institution_panel import institution_bp
 from layer_editor import default_ar_materials, layer_editor_bp, model_has_layers, model_layers, viewer_layer_metrics
 from viewer_lighting import viewer_lighting_bp
-from model_media import auto_media_state, drop_auto_media, model_media_bp
+from model_media import model_media_bp
 from comparisons import comparisons_bp
 from scenes import (
     remove_scene_ar_files,
@@ -4173,7 +4173,6 @@ def process_model_upload_job(
             db.session.commit()
             if is_replacement:
                 requeue_scene_ar(app, model)  # scene AR variants were cut from the old geometry
-                drop_auto_media(model)  # the owner's browser renders the new geometry's views again
             if not mirror_ok:
                 logger.error(
                     "R2 mirror incomplete for model %s; converted files may be "
@@ -6591,8 +6590,6 @@ def register_routes(app: Flask) -> None:
             viewer_metrics=viewer_layer_metrics(model, can_edit),
             default_ar_url=default_ar_url,
             usdz_version=usdz_version,
-            # The owner's browser generates the missing automatic views and videos.
-            auto_media=auto_media_state(model) if can_edit and (model.processing_status or "ready") == "ready" else None,
         )
 
     @app.route("/view/<model_id>/gallery.json")
@@ -11683,7 +11680,6 @@ def register_routes(app: Flask) -> None:
         if not ok:
             return jsonify({"ok": False, "error": message}), 400
         log_audit("model_viewer_color_updated", user_id=current_user.id, resource_id=model_id, details={"color": color})
-        drop_auto_media(model)  # the automatic views/videos show the old colour
         # GLB now carries the color (web / desktop / Android AR). Regenerate the
         # iOS USDZ in the worker (Blender is heavy) so Quick Look matches too.
         usdz_path = os.path.join(app.config["CONVERTED_FOLDER"], model.id, "model.usdz")

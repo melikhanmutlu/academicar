@@ -34,6 +34,16 @@ def main() -> None:
     # left behind and warn when the storage volume is nearly full.
     maintenance_interval = float(os.environ.get("WORKER_MAINTENANCE_INTERVAL", "3600"))
     last_maintenance = float("-inf")
+    # Automatic views/videos are no longer generated; remove the ones already made.
+    try:
+        with app.app_context():
+            from model_media import purge_auto_media
+
+            purged = purge_auto_media()
+        if purged:
+            app.logger.info("Removed %d automatic media files.", purged)
+    except Exception:
+        app.logger.exception("Could not purge the automatic media")
     app.logger.info("AcademicAR worker booted. Polling conversion_jobs every %.1fs.", interval)
     while True:
         try:

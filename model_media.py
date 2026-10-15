@@ -1,9 +1,7 @@
 """Saved images and videos of a model, for its owner and project editors.
 
-The viewer uploads what the owner captures (screenshots, figures, recordings)
-and, once after processing, what the owner's browser generates automatically
-(eight views and short showcase videos; source "auto", replaced when generated
-again). Files live in converted/<model_id>/media/ and are mirrored to R2.
+The viewer uploads what the owner captures (screenshots, figures, recordings).
+Files live in converted/<model_id>/media/ and are mirrored to R2.
 Media is private to people who can edit the project. Registered in create_app.
 """
 
@@ -11,7 +9,6 @@ import io
 import logging
 import os
 import uuid
-from datetime import UTC, datetime
 
 from flask import Blueprint, abort, current_app, jsonify, request, send_from_directory, url_for
 from flask_login import login_required
@@ -29,9 +26,6 @@ MAX_VIDEOS_PER_MODEL = 8
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 MAX_VIDEO_BYTES = 60 * 1024 * 1024
 LABEL_MAX = 120
-# Automatic views and videos made before this were often captured at half size
-# in a corner and framed loosely; they are made again on the owner's next visit.
-AUTO_MEDIA_FRAMED_SINCE = datetime(2026, 10, 7, 6, 0, tzinfo=UTC)
 _TYPES = {
     "image/png": ("image", "png"),
     "image/jpeg": ("image", "jpg"),
@@ -96,44 +90,24 @@ def _remove(media: ModelMedia) -> None:
     mirror_delete(media_r2_key(media))
 
 
-def _stale_auto(item: ModelMedia) -> bool:
-    created = item.created_at
-    if created is not None and created.tzinfo is None:
-        created = created.replace(tzinfo=UTC)
-    return item.source == "auto" and created is not None and created < AUTO_MEDIA_FRAMED_SINCE
-
-
-def auto_media_state(model) -> dict:
-    """What the owner's browser needs to fill in the automatic media: the labels
-    already made and how much room each kind has left under the caps. Stale
-    automatic items count as missing and are replaced in place."""
-    current = [item for item in model.media if not _stale_auto(item)]
-    images = sum(1 for item in current if item.kind == "image")
-    videos = sum(1 for item in current if item.kind == "video")
-    return {
-        "have": [item.label for item in current if item.source == "auto" and item.label],
-        "image_room": MAX_IMAGES_PER_MODEL - images,
-        "video_room": MAX_VIDEOS_PER_MODEL - videos,
-    }
-
-
-def drop_auto_media(model) -> None:
-    """Delete a model's automatic views and videos (after a replacement they
-    show the old geometry); the owner's next visit generates them again.
-    Media the owner captured is kept."""
-    stale = [item for item in model.media if item.source == "auto"]
+def purge_auto_media() -> int:
+    """Delete every automatic view and video made by the retired auto-generation
+    (source "auto"). Media the owners captured is kept. Idempotent; returns the
+    number of items removed."""
+    stale = ModelMedia.query.filter_by(source="auto").all()
     if not stale:
-        return
+        return 0
     try:
         for item in stale:
             db.session.delete(item)
         db.session.commit()
     except SQLAlchemyError:
         db.session.rollback()
-        logger.exception("Could not drop the automatic media of model %s", model.id)
-        return
+        logger.exception("Could not purge the automatic media")
+        return 0
     for item in stale:
         _remove(item)
+    return len(stale)
 
 
 @model_media_bp.route("/models/<model_id>/media", methods=["GET"])
@@ -162,13 +136,14 @@ def upload_media(model_id):
         return jsonify({"ok": False, "error": f"This {kind} is larger than {limit // (1024 * 1024)} MB."}), 400
     if not _sniff(data, kind, ext):
         return jsonify({"ok": False, "error": f"This file is not a valid {kind}."}), 400
-    source = "auto" if request.form.get("source") == "auto" else "user"
+    if request.form.get("source") == "auto":
+        return jsonify({"ok": False, "error": "Automatic media is no longer generated. Capture views from the left panel."}), 400
+    source = "user"
     label = (request.form.get("label") or "").strip()[:LABEL_MAX] or None
 
     replaced = []
-    if label and (source == "auto" or request.form.get("replace") == "1"):
-        # Generated media (and a re-generated set of views) replaces the
-        # previous file of the same name and source.
+    if label and request.form.get("replace") == "1":
+        # A re-generated set of views replaces the previous file of the same name.
         replaced = ModelMedia.query.filter_by(model_id=model.id, source=source, kind=kind, label=label).all()
     count = ModelMedia.query.filter_by(model_id=model.id, kind=kind).count() - len(replaced)
     cap = MAX_IMAGES_PER_MODEL if kind == "image" else MAX_VIDEOS_PER_MODEL
