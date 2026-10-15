@@ -11,7 +11,9 @@
    preview (with its strip); embeds always keep the plain embed look. #}
 {% set viewer_design = (request.args.get('design') or '')|lower %}
 {% set viewer_preview = viewer_design in ('a', 'b', 'c', 'current') and not is_embed %}
-{% set viewer_design = '' if is_embed else (viewer_design if viewer_preview else 'b') %}
+{# The second model of the split view is an embed (?embed=1&pane=1) that wears design B. #}
+{% set viewer_pane = is_embed and request.args.get('pane') == '1' %}
+{% set viewer_design = 'b' if viewer_pane else ('' if is_embed else (viewer_design if viewer_preview else 'b')) %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -40,6 +42,7 @@
       var m = 'dark';
       {% if viewer_design %}
       {% if viewer_preview %}document.documentElement.setAttribute('data-design-preview', '1');{% endif %}
+      {% if viewer_pane %}document.documentElement.setAttribute('data-pane', '1');{% endif %}
       {% if viewer_design != 'current' %}document.documentElement.setAttribute('data-design', '{{ viewer_design }}');{% endif %}
       {% endif %}
       {% if viewer_preview %}
@@ -1577,7 +1580,7 @@
 
     {% if is_embed %}
     <!-- Sleek Overlay for Embed -->
-    <div class="absolute left-4 bottom-4 z-30 pointer-events-none select-none drop-shadow-lg">
+    <div data-embed-title class="absolute left-4 bottom-4 z-30 pointer-events-none select-none drop-shadow-lg">
       <p class="text-xs uppercase tracking-[0.14em] text-white/55">3D Interactive Model</p>
       <h1 class="font-serif text-sm font-semibold text-white mt-0.5">{{ model.display_name or model.original_filename }}</h1>
       <p class="text-[10px] text-white/40 line-clamp-1">{{ paper.title }}</p>
@@ -6664,7 +6667,7 @@
   })();
 </script>
 {% endif %}
-{% if viewer_design == 'b' %}
+{% if viewer_design == 'b' and not viewer_pane %}
 <script>
   // Design B opens with the tools folded: the stage stays clear, the title lockup sits bottom-left.
   setTimeout(function () {
@@ -6979,11 +6982,19 @@
     var choose = function (m) {
       var u = new URL(m.url, window.location.origin);
       u.searchParams.set('embed', '1');
+      u.searchParams.set('pane', '1');
+      u.searchParams.set('bg', document.documentElement.getAttribute('data-viewer-bg') || 'dark');
       frame.src = u.toString();
       nameEl.textContent = m.name;
       showPicker(false);
       setUrl(m.id);
     };
+    // The second pane follows this page's light/dark switch.
+    new MutationObserver(function () {
+      try {
+        frame.contentDocument.documentElement.setAttribute('data-viewer-bg', document.documentElement.getAttribute('data-viewer-bg') || 'dark');
+      } catch (e) { /* not loaded yet */ }
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-viewer-bg'] });
     var setSplit = function (on, preset) {
       pane.hidden = !on;
       root.classList.toggle('b-split', on);
