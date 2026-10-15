@@ -286,8 +286,8 @@ html[data-design="b"] #controlPanel :is(.viewer-shot-actions button, .viewer-vid
 }
 html[data-design="b"] #controlPanel :is(.viewer-shot-actions button, .viewer-video-actions button):not(:disabled):hover { background: var(--b-hover); border-color: var(--b-line-2); }
 html[data-design="b"] #controlPanel :is(.viewer-shot-actions button, .viewer-video-actions button):disabled { color: var(--b-ink-3); }
-html[data-design="b"] #controlPanel .viewer-video-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
-html[data-design="b"] #controlPanel .viewer-video-actions button::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #e5484d; }
+html[data-design="b"] #controlPanel :is(.viewer-video-actions button, .viewer-shot-actions [data-video-record]) { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+html[data-design="b"] #controlPanel :is(.viewer-video-actions button, .viewer-shot-actions [data-video-record])::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #e5484d; }
 html[data-design="b"] #controlPanel .viewer-shot-qr-toggle {
   display: inline-flex; margin: 10px 16px 0 0; gap: 6px; font-size: 12px; font-weight: 400; color: var(--b-ink-2);
 }
@@ -381,7 +381,15 @@ html[data-design="b"] #controlPanel .b-progress > i { display: block; height: 10
 /* Less noise: no greyed-out actions, fixed help lines as tooltips, four media thumbnails until asked. */
 html[data-design="b"] #controlPanel .viewer-shot-tools .viewer-tool-heading button:disabled { display: none; }
 html[data-design="b"] #controlPanel .b-quiet { display: none !important; }
-html[data-design="b"] #controlPanel [data-media-tools]:not(.b-all) .viewer-media-grid > :nth-child(n+5) { display: none; }
+html[data-design="b"] #controlPanel .viewer-media-group:not(.b-all) .viewer-media-grid > :nth-child(n+5) { display: none; }
+html[data-design="b"] #controlPanel [data-shot-gallery][hidden] { display: none !important; }
+html[data-design="b"] #controlPanel .viewer-shot-actions [data-video-record] { grid-column: 1 / -1; }
+html[data-design="b"] #controlPanel [data-media-tools] > .viewer-tool-heading { display: none; }
+html[data-design="b"] #controlPanel .viewer-media-kind { display: flex; align-items: baseline; justify-content: space-between; margin-top: 14px; color: var(--b-ink-3); }
+html[data-design="b"] #controlPanel .viewer-media-kind + .viewer-media-grid { margin-top: 6px; }
+html[data-design="b"] #controlPanel .viewer-media-clear { border: 0; background: transparent; padding: 0; font-size: 11px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--b-ink-3); cursor: pointer; }
+html[data-design="b"] #controlPanel .viewer-media-clear:hover { color: #ff682c; }
+html[data-design="b"] #controlPanel .viewer-media-caption { position: absolute; left: 4px; bottom: 3px; right: 4px; font-size: 9px; font-weight: 600; color: #fff; padding: 1px 4px; border-radius: 4px; background: rgba(0,0,0,.6); right: auto; max-width: calc(100% - 8px); pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 html[data-design="b"] #controlPanel .b-media-more {
   margin-top: 8px; min-height: 26px; padding: 0 8px 0 0; border: 0; background: transparent; color: var(--b-ink-2);
   font-size: 12px; font-weight: 500; cursor: pointer;

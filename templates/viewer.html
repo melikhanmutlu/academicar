@@ -1645,7 +1645,7 @@
         <div class="viewer-tool-stack mt-3 grid gap-3 text-xs">
           {% if 'screenshots' in viewer_features %}<div class="viewer-shot-tools" data-screenshot-tools>
             <div class="viewer-tool-heading">
-              <span>Screenshots</span>
+              <span>Capture</span>
               <div class="flex items-center gap-2">
                 {% if 'combined_view' in viewer_features %}<button type="button" data-combine-shots disabled>Combine</button>{% endif %}
                 {% if 'figure_export' in viewer_features %}<button type="button" data-export-figure disabled>Export figure</button>{% endif %}
@@ -1687,11 +1687,8 @@
           </div>{% endif %}
 
           {% if is_owner and not is_embed and not (demo_mode is defined and demo_mode) %}<div class="viewer-media-tools" data-media-tools data-url="{{ url_for('model_media.upload_media', model_id=model.id) }}">
-            <div class="viewer-tool-heading"><span>Saved media <span class="viewer-media-count" data-media-count></span></span></div>
-            <p class="viewer-media-kind" data-media-videos-title hidden>Videos</p>
-            <div class="viewer-media-grid" data-media-grid-videos></div>
-            <p class="viewer-media-kind" data-media-images-title hidden>Images</p>
-            <div class="viewer-media-grid" data-media-grid></div>
+            <div class="viewer-tool-heading"><span>Library <span class="viewer-media-count" data-media-count></span></span></div>
+            <div data-media-groups></div>
             <p class="viewer-media-status" data-media-status role="status" aria-live="polite">Screenshots, figures and recordings you take are kept here. Only project editors see them.</p>
           </div>{% endif %}
 
@@ -2338,80 +2335,138 @@
     (() => {
       const mediaTools = document.querySelector('[data-media-tools]');
       if (!mediaTools) return;
-      const grid = mediaTools.querySelector('[data-media-grid]');
-      const videoGrid = mediaTools.querySelector('[data-media-grid-videos]');
+      const groupsEl = mediaTools.querySelector('[data-media-groups]');
       const countEl = mediaTools.querySelector('[data-media-count]');
       const statusEl = mediaTools.querySelector('[data-media-status]');
       let items = {{ (model_media_list(model) if is_owner and not is_embed and not (demo_mode is defined and demo_mode) else [])|tojson }};
+      // One library, grouped by what a file is: the 8-view set, single shots,
+      // figures (combined views, exports) and videos.
+      const isFigure = (item) => /^(Combined view|Figure)/i.test(item.label || '');
+      const isSetView = (item) => /^(My )?view: /i.test(item.label || '');
+      const GROUPS = [
+        { key: 'views', title: '8 views', test: (item) => item.kind === 'image' && !isFigure(item) && isSetView(item) },
+        { key: 'shots', title: 'Shots', test: (item) => item.kind === 'image' && !isFigure(item) && !isSetView(item) },
+        { key: 'figures', title: 'Figures', test: (item) => item.kind === 'image' && isFigure(item) },
+        { key: 'videos', title: 'Videos', test: (item) => item.kind === 'video' },
+      ];
+      const openGroups = new Set();
+      const makeCell = (item, group) => {
+        const cell = document.createElement('div');
+        cell.className = 'viewer-media-item';
+        const media = document.createElement(item.kind === 'video' ? 'video' : 'img');
+        // Videos show a frame two seconds in (a layer reveal starts empty).
+        media.src = item.kind === 'video' ? `${item.url}#t=2` : item.url;
+        if (item.kind === 'video') { media.muted = true; media.preload = 'metadata'; media.playsInline = true; }
+        else { media.alt = item.label || 'Saved image'; media.loading = 'lazy'; }
+        const open = document.createElement('a');
+        open.href = item.url;
+        open.target = '_blank';
+        open.rel = 'noopener';
+        open.title = item.label || (item.kind === 'video' ? 'Video' : 'Image');
+        open.appendChild(media);
+        cell.appendChild(open);
+        const actions = document.createElement('div');
+        actions.className = 'viewer-media-actions';
+        const download = document.createElement('a');
+        download.href = item.download_url;
+        download.textContent = '↓';
+        download.setAttribute('aria-label', `Download ${open.title}`);
+        const rename = document.createElement('button');
+        rename.type = 'button';
+        rename.textContent = '✎';
+        rename.setAttribute('aria-label', `Rename ${open.title}`);
+        rename.addEventListener('click', async () => {
+          const label = window.prompt('Name this file', item.label || '');
+          if (label == null || !label.trim() || label.trim() === item.label) return;
+          try {
+            const response = await fetch(`${mediaTools.dataset.url}/${item.id}/rename`, {
+              method: 'POST', credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+              body: JSON.stringify({ label: label.trim() }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || !data.ok) throw new Error(data.error || 'The name could not be saved.');
+            items = items.map((other) => (other.id === item.id ? data.media : other));
+            render();
+          } catch (error) { statusEl.textContent = error.message || 'The name could not be saved.'; }
+        });
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.textContent = '×';
+        remove.setAttribute('aria-label', `Delete ${open.title}`);
+        remove.addEventListener('click', async () => {
+          if (!window.confirm('Delete this saved file?')) return;
+          try {
+            const response = await fetch(`${mediaTools.dataset.url}/${item.id}/delete`, {
+              method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': csrfToken },
+            });
+            if (!response.ok) throw new Error();
+            items = items.filter((other) => other.id !== item.id);
+            render();
+            statusEl.textContent = 'File deleted.';
+          } catch (error) { statusEl.textContent = 'The file could not be deleted. Please try again.'; }
+        });
+        actions.append(rename, download, remove);
+        cell.appendChild(actions);
+        const caption = document.createElement('span');
+        caption.className = 'viewer-media-caption';
+        caption.textContent = group.key === 'views' ? (item.label || '').replace(/^(My )?view: /i, '') : '';
+        if (caption.textContent) cell.appendChild(caption);
+        return cell;
+      };
+      const removeItems = async (list) => {
+        if (!list.length || !window.confirm(`Delete ${list.length} saved ${list.length === 1 ? 'file' : 'files'}?`)) return;
+        let failed = 0;
+        for (const item of list) {
+          try {
+            const response = await fetch(`${mediaTools.dataset.url}/${item.id}/delete`, {
+              method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': csrfToken },
+            });
+            if (!response.ok) throw new Error();
+            items = items.filter((other) => other.id !== item.id);
+          } catch (error) { failed += 1; }
+        }
+        render();
+        statusEl.textContent = failed ? `${failed} could not be deleted. Please try again.` : 'Files deleted.';
+      };
       const render = () => {
-        grid.textContent = '';
-        videoGrid.textContent = '';
-        mediaTools.querySelector('[data-media-videos-title]').hidden = !items.some((item) => item.kind === 'video');
-        mediaTools.querySelector('[data-media-images-title]').hidden = !items.some((item) => item.kind === 'image');
+        groupsEl.textContent = '';
         countEl.textContent = items.length ? `(${items.length})` : '';
-        items.forEach((item) => {
-          const cell = document.createElement('div');
-          cell.className = 'viewer-media-item';
-          const media = document.createElement(item.kind === 'video' ? 'video' : 'img');
-          // Videos show a frame two seconds in (a layer reveal starts empty).
-          media.src = item.kind === 'video' ? `${item.url}#t=2` : item.url;
-          if (item.kind === 'video') { media.muted = true; media.preload = 'metadata'; media.playsInline = true; }
-          else { media.alt = item.label || 'Saved image'; media.loading = 'lazy'; }
-          const open = document.createElement('a');
-          open.href = item.url;
-          open.target = '_blank';
-          open.rel = 'noopener';
-          open.title = item.label || (item.kind === 'video' ? 'Video' : 'Image');
-          open.appendChild(media);
-          cell.appendChild(open);
-          const badge = document.createElement('span');
-          badge.className = 'viewer-media-badge';
-          badge.textContent = item.kind === 'video' ? 'Video' : (item.source === 'auto' ? 'Auto' : 'Image');
-          cell.appendChild(badge);
-          const actions = document.createElement('div');
-          actions.className = 'viewer-media-actions';
-          const download = document.createElement('a');
-          download.href = item.download_url;
-          download.textContent = '↓';
-          download.setAttribute('aria-label', `Download ${open.title}`);
-          const rename = document.createElement('button');
-          rename.type = 'button';
-          rename.textContent = '✎';
-          rename.setAttribute('aria-label', `Rename ${open.title}`);
-          rename.addEventListener('click', async () => {
-            const label = window.prompt('Name this file', item.label || '');
-            if (label == null || !label.trim() || label.trim() === item.label) return;
-            try {
-              const response = await fetch(`${mediaTools.dataset.url}/${item.id}/rename`, {
-                method: 'POST', credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-                body: JSON.stringify({ label: label.trim() }),
-              });
-              const data = await response.json().catch(() => ({}));
-              if (!response.ok || !data.ok) throw new Error(data.error || 'The name could not be saved.');
-              items = items.map((other) => (other.id === item.id ? data.media : other));
-              render();
-            } catch (error) { statusEl.textContent = error.message || 'The name could not be saved.'; }
-          });
-          const remove = document.createElement('button');
-          remove.type = 'button';
-          remove.textContent = '×';
-          remove.setAttribute('aria-label', `Delete ${open.title}`);
-          remove.addEventListener('click', async () => {
-            if (!window.confirm('Delete this saved file?')) return;
-            try {
-              const response = await fetch(`${mediaTools.dataset.url}/${item.id}/delete`, {
-                method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': csrfToken },
-              });
-              if (!response.ok) throw new Error();
-              items = items.filter((other) => other.id !== item.id);
-              render();
-              statusEl.textContent = 'File deleted.';
-            } catch (error) { statusEl.textContent = 'The file could not be deleted. Please try again.'; }
-          });
-          actions.append(rename, download, remove);
-          cell.appendChild(actions);
-          (item.kind === 'video' ? videoGrid : grid).appendChild(cell);
+        GROUPS.forEach((group) => {
+          const list = items.filter(group.test);
+          if (!list.length) return;
+          const section = document.createElement('div');
+          section.className = 'viewer-media-group';
+          section.dataset.mediaGroup = group.key;
+          if (openGroups.has(group.key)) section.classList.add('b-all');
+          const head = document.createElement('div');
+          head.className = 'viewer-media-kind';
+          const title = document.createElement('span');
+          title.textContent = `${group.title} (${list.length})`;
+          const clear = document.createElement('button');
+          clear.type = 'button';
+          clear.className = 'viewer-media-clear';
+          clear.textContent = 'Delete all';
+          clear.addEventListener('click', () => removeItems(list));
+          head.append(title, clear);
+          const grid = document.createElement('div');
+          grid.className = 'viewer-media-grid';
+          list.forEach((item) => grid.appendChild(makeCell(item, group)));
+          section.append(head, grid);
+          if (list.length > 4) {
+            const more = document.createElement('button');
+            more.type = 'button';
+            more.className = 'b-media-more';
+            const label = () => { more.textContent = section.classList.contains('b-all') ? 'Show less' : `Show all ${list.length}`; };
+            label();
+            more.addEventListener('click', () => {
+              section.classList.toggle('b-all');
+              if (section.classList.contains('b-all')) openGroups.add(group.key); else openGroups.delete(group.key);
+              label();
+            });
+            section.appendChild(more);
+          }
+          groupsEl.appendChild(section);
         });
       };
       // Large PNGs (publication figures) are re-encoded as JPEG to fit the 8 MB limit.
@@ -4016,7 +4071,7 @@
         // pushing the file straight to the browser's downloads.
         openShotModal({ key: 'current-view', label: 'Current view', rawDataUrl: raw, dataUrl: out, qr: qrEnabled() });
         if (window.viewerMedia && !(await window.viewerMedia.saveDataUrl(out, { label: 'Current view' })) && shotStatusEl) {
-          shotStatusEl.textContent = `Not kept under Saved media: ${window.viewerMedia.lastError()}`;
+          shotStatusEl.textContent = `Not kept in the Library: ${window.viewerMedia.lastError()}`;
           shotStatusEl.classList.add('is-error');
         }
       } finally {
@@ -4067,7 +4122,7 @@
         }
         if (shotStatusEl) {
           if (shotGallery.length === shotViews.length && keptError) {
-            shotStatusEl.textContent = `8 views ready, but not all kept under Saved media: ${keptError}`;
+            shotStatusEl.textContent = `8 views ready, but not all kept in the Library: ${keptError}`;
             shotStatusEl.classList.add('is-error');
           } else if (shotGallery.length === shotViews.length) {
             shotStatusEl.textContent = '8 views ready.';
@@ -4401,11 +4456,11 @@
           const data = await resp.json().catch(() => ({}));
           throw new Error(data.error || data.message || 'Could not save the combined figure. Please try again.');
         }
-        // Also kept under Saved media (one "Combined view", replaced on each save).
+        // Also kept in the Library (one "Combined view", replaced on each save).
         const kept = window.viewerMedia ? await window.viewerMedia.save(blob, { label: 'Combined view', replace: true }) : true;
         setCollageStatus(kept
-          ? 'Saved — it now shows on your project page and under Saved media.'
-          : `Saved to the project page, but not kept under Saved media: ${window.viewerMedia.lastError()}`, kept ? 'is-success' : 'is-error');
+          ? 'Saved — it now shows on your project page and in the Library.'
+          : `Saved to the project page, but not kept in the Library: ${window.viewerMedia.lastError()}`, kept ? 'is-success' : 'is-error');
       } catch (error) {
         setCollageStatus(error.message === 'empty blob' ? 'Could not save the combined figure. Please try again.' : error.message, 'is-error');
       } finally {
@@ -4909,8 +4964,8 @@
         setTimeout(() => URL.revokeObjectURL(link.href), 1500);
         setVideoStatus('Recording downloaded.');
         if (window.viewerMedia) {
-          if (await window.viewerMedia.save(blob, { label: 'Recording' })) setVideoStatus('Recording downloaded and kept under Saved media.');
-          else setVideoStatus(`Recording downloaded, but not kept under Saved media: ${window.viewerMedia.lastError()}`, true);
+          if (await window.viewerMedia.save(blob, { label: 'Recording' })) setVideoStatus('Recording downloaded and kept in the Library.');
+          else setVideoStatus(`Recording downloaded, but not kept in the Library: ${window.viewerMedia.lastError()}`, true);
         }
       }, { once: true });
       videoRecorder.start(250);
@@ -6570,7 +6625,7 @@
           link.click();
           if (window.viewerMedia) {
             window.viewerMedia.save(blob, { label: 'Figure' }).then((kept) => {
-              if (!kept) setFigStatus(`Figure downloaded, but not kept under Saved media: ${window.viewerMedia.lastError()}`, true);
+              if (!kept) setFigStatus(`Figure downloaded, but not kept in the Library: ${window.viewerMedia.lastError()}`, true);
             });
           }
           setFigStatus(`Downloaded ${canvas.width} × ${canvas.height} px${scale ? ` · scale bar ${scale.text}` : ''}.`);
@@ -6756,15 +6811,17 @@
       if (heading && el.textContent.trim()) heading.title = (heading.title ? heading.title + ' ' : '') + el.textContent.trim();
     });
 
-    // Saved media: four thumbnails per row until "Show all".
+    // One library: owners see every capture there, so the session thumbnails are hidden;
+    // the record button joins the capture buttons.
     var media = stack.querySelector('[data-media-tools]');
-    var more = null;
-    if (media) {
-      more = document.createElement('button');
-      more.type = 'button';
-      more.className = 'b-media-more';
-      more.addEventListener('click', function () { media.classList.toggle('b-all'); update(); });
-      media.appendChild(more);
+    var sessionGrid = stack.querySelector('[data-shot-gallery]');
+    if (media && sessionGrid) sessionGrid.hidden = true;
+    var recordBtn = stack.querySelector('[data-video-record]');
+    var actionsRow = stack.querySelector('.viewer-shot-actions');
+    if (recordBtn && actionsRow) {
+      actionsRow.appendChild(recordBtn);
+      var videoHead = stack.querySelector('[data-video-tools] .viewer-tool-heading');
+      if (videoHead) videoHead.hidden = true;
     }
 
     // A thin progress line under the screenshot buttons while views are generated ("(3/8)").
@@ -6783,11 +6840,6 @@
     var update = function () {
       quiet.forEach(function (el) { el.classList.toggle('b-quiet', el.textContent.trim() === el.getAttribute('data-b-initial')); });
       if (heads.capture) heads.capture.classList.toggle('is-recording', /stop/i.test(txt('[data-video-record]')));
-      if (more) {
-        var n = media.querySelectorAll('.viewer-media-item').length;
-        more.hidden = n <= 4;
-        more.textContent = media.classList.contains('b-all') ? 'Show less' : 'Show all ' + n;
-      }
       if (bar) {
         var m = (txt('[data-shot-status]') + ' ' + txt('[data-media-status]')).match(/\((\d+)\s*\/\s*(\d+)\)/);
         var on = m && Number(m[1]) < Number(m[2]);
