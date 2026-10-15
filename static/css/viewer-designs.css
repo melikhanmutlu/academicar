@@ -776,3 +776,6 @@ html[data-design="c"] #infoPanel { border-left-color: #202020 !important; }
   html[data-design="a"] #controlPanel .viewer-tool-heading > div,
   html[data-design="c"] #controlPanel .viewer-tool-heading > div { align-self: stretch; justify-content: flex-start; margin: 0; }
 }
+
+/* Split bar: the camera link toggle. */
+html[data-design="b"] .b-split-bar button[data-split-link][aria-pressed="true"] { background: var(--b-accent); color: #fff; }

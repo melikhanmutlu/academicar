@@ -7,9 +7,11 @@
 {% set is_medical_model = model.source_format in ('dicom', 'segmentation') %}
 {# Per-layer measurements (paid plans; passed by view_model already filtered for who may see them). #}
 {% set viewer_metrics = viewer_metrics|default(none) %}
-{# Design preview (?design=a|b|c, or current for the production look): never in an embed. #}
+{# Design B ("Sahne") is the viewer's design. ?design=a|b|c|current opens the comparison
+   preview (with its strip); embeds always keep the plain embed look. #}
 {% set viewer_design = (request.args.get('design') or '')|lower %}
-{% set viewer_design = viewer_design if (viewer_design in ('a', 'b', 'c', 'current') and not is_embed) else '' %}
+{% set viewer_preview = viewer_design in ('a', 'b', 'c', 'current') and not is_embed %}
+{% set viewer_design = '' if is_embed else (viewer_design if viewer_preview else 'b') %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -37,8 +39,10 @@
     (function () {
       var m = 'dark';
       {% if viewer_design %}
-      document.documentElement.setAttribute('data-design-preview', '1');
+      {% if viewer_preview %}document.documentElement.setAttribute('data-design-preview', '1');{% endif %}
       {% if viewer_design != 'current' %}document.documentElement.setAttribute('data-design', '{{ viewer_design }}');{% endif %}
+      {% endif %}
+      {% if viewer_preview %}
       {# A previews on the light technical canvas, C on the white plate, B on the dark stage. #}
       m = {{ {'a': 'light', 'c': 'white'}.get(viewer_design, 'dark')|tojson }};
       {# ?mode=light|dark: the strip's light/dark switch (kept in its links). #}
@@ -47,7 +51,7 @@
       if (mode === 'dark') m = 'dark';
       {% endif %}
       try {
-        var saved = {% if viewer_design %}null{% else %}localStorage.getItem('academicar:viewerBg'){% endif %};
+        var saved = {% if viewer_preview %}null{% else %}localStorage.getItem('academicar:viewerBg'){% endif %};
         if (saved === 'light' || saved === 'white' || saved === 'dark') m = saved;
       } catch (e) {}
       // An embed can pick its background with ?bg=dark|light|white (not stored).
@@ -1355,7 +1359,7 @@
   {% set has_label_tour = annotations and 'annotations' in viewer_features %}
   {% set has_tour = has_label_tour or viewer_scenes %}
 
-  {% if viewer_design %}
+  {% if viewer_preview %}
   <nav id="designStrip" aria-label="Design preview">
     <span class="ds-label">Tasarım önizleme</span>
     {% for key, label, name in (('current', 'Mevcut', ''), ('a', 'A', 'Atölye'), ('b', 'B', 'Sahne'), ('c', 'C', 'Levha')) %}
@@ -6944,7 +6948,7 @@
       }
     });
   </script>
-{% if viewer_design %}
+{% if viewer_preview %}
 <script>
   // Preview strip: light/dark switch. Same effect as the panel's Background
   // buttons, without storing the choice for the production viewer.
@@ -7148,6 +7152,25 @@
     toolbar.insertBefore(galBtn, infoBtn);
     toolbar.insertBefore(splitBtn, infoBtn);
 
+    // Light / dark switch: the same choice as the panel's Background buttons.
+    var sunIcon = '<circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1"/>';
+    var moonIcon = '<path d="M13.5 9.6A5.8 5.8 0 0 1 6.4 2.5a5.8 5.8 0 1 0 7.1 7.1z"/>';
+    var themeBtn = mkBtn('themeBtn', 'Light theme', sunIcon);
+    toolbar.appendChild(themeBtn);
+    var syncTheme = function () {
+      var dark = (document.documentElement.getAttribute('data-viewer-bg') || 'dark') === 'dark';
+      var label = dark ? 'Light theme' : 'Dark theme';
+      themeBtn.setAttribute('aria-label', label); themeBtn.title = label;
+      themeBtn.innerHTML = svg(dark ? sunIcon : moonIcon) + '<span class="hidden sm:inline">' + label + '</span>';
+    };
+    themeBtn.addEventListener('click', function () {
+      var dark = (document.documentElement.getAttribute('data-viewer-bg') || 'dark') === 'dark';
+      var target = document.querySelector('[data-bg-options] button[data-bg="' + (dark ? 'light' : 'dark') + '"]');
+      if (target) target.click(); else document.documentElement.setAttribute('data-viewer-bg', dark ? 'light' : 'dark');
+    });
+    new MutationObserver(syncTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-viewer-bg'] });
+    syncTheme();
+
     var models = null, loading = null;
     var load = function () {
       if (models) return Promise.resolve(models);
@@ -7244,6 +7267,7 @@
     pane.id = 'splitPane';
     pane.hidden = true;
     pane.innerHTML = '<div class="b-split-bar"><span class="b-split-name" data-split-name></span>'
+      + '<button type="button" data-split-link aria-pressed="false" title="Move both cameras together">Link cameras</button>'
       + '<button type="button" data-split-change>Change</button><button type="button" data-split-close aria-label="Close split view">×</button></div>'
       + '<iframe title="Second model" data-split-frame allow="fullscreen; xr-spatial-tracking" loading="lazy"></iframe>'
       + '<div class="b-split-pick" data-split-pick><p class="b-split-title">Choose a model for this side</p><div class="b-split-grid" data-split-grid></div></div>';
@@ -7304,6 +7328,49 @@
     panel.querySelector('[data-gal-split]').addEventListener('click', function () { setSplit(true); });
     pane.querySelector('[data-split-close]').addEventListener('click', function () { setSplit(false); });
     pane.querySelector('[data-split-change]').addEventListener('click', function () { showPicker(true); });
+
+    // Link cameras: a drag on either model turns the other to the same angle
+    // (each keeps its own zoom). The frame is same-origin, so its viewer is reachable.
+    var linkBtn = pane.querySelector('[data-split-link]');
+    var linked = false, mine = document.getElementById('viewer'), theirs = null, followed = null;
+    var attachTheirs = function () {
+      var tries = 0;
+      (function find() {
+        var v = null;
+        try { v = frame.contentDocument && frame.contentDocument.getElementById('viewer'); } catch (err) { v = null; }
+        if (!v) { if (tries++ < 80) setTimeout(find, 250); return; }
+        if (followed === v) return;
+        theirs = v; followed = v;
+        v.addEventListener('camera-change', function (e) {
+          if (!linked || !e.detail || e.detail.source !== 'user-interaction') return;
+          try {
+            var o = v.getCameraOrbit(), r = mine.getCameraOrbit();
+            mine.cameraOrbit = o.theta + 'rad ' + o.phi + 'rad ' + r.radius + 'm';
+            if (mine.jumpCameraToGoal) mine.jumpCameraToGoal();
+          } catch (err) { /* still loading */ }
+        });
+      })();
+    };
+    mine.addEventListener('camera-change', function (e) {
+      if (!linked || !theirs || !e.detail || e.detail.source !== 'user-interaction') return;
+      try {
+        var o = mine.getCameraOrbit(), r = theirs.getCameraOrbit();
+        theirs.cameraOrbit = o.theta + 'rad ' + o.phi + 'rad ' + r.radius + 'm';
+        if (theirs.jumpCameraToGoal) theirs.jumpCameraToGoal();
+      } catch (err) { /* still loading */ }
+    });
+    frame.addEventListener('load', function () { followed = null; theirs = null; attachTheirs(); });
+    linkBtn.addEventListener('click', function () {
+      linked = !linked;
+      linkBtn.setAttribute('aria-pressed', String(linked));
+      if (linked && theirs) {
+        try {
+          var o = mine.getCameraOrbit(), r = theirs.getCameraOrbit();
+          theirs.cameraOrbit = o.theta + 'rad ' + o.phi + 'rad ' + r.radius + 'm';
+          if (theirs.jumpCameraToGoal) theirs.jumpCameraToGoal();
+        } catch (err) { /* still loading */ }
+      }
+    });
     if (params.get('split')) setSplit(true, params.get('split'));
   })();
 </script>
