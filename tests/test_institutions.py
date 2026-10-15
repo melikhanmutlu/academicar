@@ -952,6 +952,23 @@ def test_institutional_inquiry_sends_email_and_audits(client, monkeypatch):
         assert row.details["institution_name"] == "Bogazici University"
 
 
+def test_institutional_inquiry_rejects_header_injection_in_email(client, monkeypatch):
+    sent = []
+    monkeypatch.setattr("utils.email.send_email", lambda *a, **k: sent.append(a) or True)
+    response = client.post(
+        "/institutional",
+        data={
+            "institution_name": "Uni",
+            "contact_name": "Ada",
+            "email": "a@b.com\nBcc: victim@example.com",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"valid work email" in response.data
+    assert sent == []
+
+
 def test_institutional_inquiry_validates_required_fields(client, monkeypatch):
     sent = []
     monkeypatch.setattr("utils.email.send_email", lambda *a, **k: sent.append(a) or True)

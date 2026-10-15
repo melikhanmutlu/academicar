@@ -5853,7 +5853,11 @@ def register_routes(app: Flask) -> None:
             if not institution_name or not contact_name or not email:
                 flash("Please fill in the institution name, your name, and your work email.", "danger")
                 return render_template("institutional.html", inquiry=inquiry)
-            if "@" not in email or "." not in email.rsplit("@", 1)[-1]:
+            if (
+                "@" not in email
+                or "." not in email.rsplit("@", 1)[-1]
+                or any(ch.isspace() or ord(ch) < 32 for ch in email)
+            ):
                 flash("Please enter a valid work email address.", "danger")
                 return render_template("institutional.html", inquiry=inquiry)
             from utils import email as email_utils
