@@ -32,6 +32,7 @@ TOOLS: tuple[tuple[str, str], ...] = (
 )
 THEMES = ("dark", "light", "white")
 LAYOUTS = ("compact", "full")
+AR_MODES = ("direct", "viewer")
 RATIOS = ("16:9", "4:3", "1:1", "3:4")
 SIZE_MODES = ("fixed", "ratio", "fill")
 HEIGHT_RANGE = (200, 2000)
@@ -43,6 +44,9 @@ DEFAULTS: dict = {
     "theme": "dark",
     "title": True,
     "brand": True,
+    # direct: View in AR runs inside the frame (QR hand-off on desktop); viewer: it
+    # opens the AcademicAR viewer in a new tab. The full layout ignores it.
+    "ar_mode": "direct",
     # fixed: width px (0 = 100%) x height px; ratio: 100% wide at an aspect
     # ratio; fill: 100% x 100% of the page's own container.
     "size": {"mode": "fixed", "width": 0, "height": 480, "ratio": "16:9"},
@@ -91,12 +95,14 @@ def clean_embed_config(payload) -> dict:
     if size_in.get("ratio", size["ratio"]) not in RATIOS:
         raise ValueError("The embed size is invalid.")
     size["ratio"] = size_in.get("ratio", size["ratio"])
+    ar_mode = payload.get("ar_mode", DEFAULTS["ar_mode"])
     return {
         "layout": layout,
         "tools": [key for key, _ in TOOLS if key in tools],
         "theme": theme,
         "title": payload.get("title", True),
         "brand": payload.get("brand", True),
+        "ar_mode": ar_mode if ar_mode in AR_MODES else DEFAULTS["ar_mode"],
         "size": size,
     }
 

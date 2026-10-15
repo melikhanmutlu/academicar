@@ -159,3 +159,21 @@ def test_embed_ignores_the_stored_viewer_background_and_keeps_embed_in_gallery_l
     html = _public_embed(client, model_id).get_data(as_text=True)
     assert "var saved = null;" in html
     assert "['design', 'mode', 'embed']" in html
+
+
+def test_ar_mode_defaults_to_direct_and_falls_back_on_bad_values():
+    assert clean_embed_config({})["ar_mode"] == "direct"
+    assert clean_embed_config({"ar_mode": "viewer"})["ar_mode"] == "viewer"
+    assert clean_embed_config({"ar_mode": "nope"})["ar_mode"] == "direct"
+
+
+def test_ar_mode_viewer_sends_the_compact_embed_ar_to_the_viewer(client, app):
+    register(client)
+    model_id = _model(app)
+    assert "const arOpensViewer = false;" in _public_embed(client, model_id).get_data(as_text=True)
+    client.post("/auth/login", data={"email": "user@example.com", "password": "password123"})
+    assert _save(client, model_id, ar_mode="viewer").status_code == 200
+    assert "const arOpensViewer = true;" in _public_embed(client, model_id).get_data(as_text=True)
+    client.post("/auth/login", data={"email": "user@example.com", "password": "password123"})
+    assert _save(client, model_id, ar_mode="viewer", layout="full").status_code == 200
+    assert "const arOpensViewer = false;" in _public_embed(client, model_id).get_data(as_text=True)

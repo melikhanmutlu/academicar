@@ -60,6 +60,13 @@
           <label class="checkbox-label"><input type="checkbox" data-embed-field="title" {% if cfg.title %}checked{% endif %}> Show the model title</label>
           <label class="checkbox-label"><input type="checkbox" data-embed-field="brand-hide" {% if not cfg.brand %}checked{% endif %} {% if not allowed.white_label %}disabled{% endif %}> Hide AcademicAR branding{% if not allowed.white_label %} (paid plans){% endif %}</label>
         </div>
+        <div class="model-edit-field-grid">
+          <label class="field-label" for="embedArMode">View in AR</label>
+          <select id="embedArMode" class="field-input" data-embed-field="ar_mode">
+            <option value="direct" {% if cfg.ar_mode == 'direct' %}selected{% endif %}>Open AR in the frame (QR code on desktop)</option>
+            <option value="viewer" {% if cfg.ar_mode == 'viewer' %}selected{% endif %}>Open the AcademicAR viewer in a new tab</option>
+          </select>
+        </div>
       </fieldset>
 
       <fieldset class="surface model-edit-card" {% if not allowed.customize %}disabled{% endif %}>
@@ -126,6 +133,7 @@
       tools: tools,
       title: val('[data-embed-field="title"]').checked,
       brand: !val('[data-embed-field="brand-hide"]').checked,
+      ar_mode: val('[data-embed-field="ar_mode"]').value,
       size: {
         mode: val('[data-embed-size="mode"]').value,
         width: parseInt(val('[data-embed-size="width"]').value, 10) || 0,
@@ -142,7 +150,7 @@
   function toggleRows(cfg) {
     app.querySelectorAll('[data-size-row]').forEach(function (el) { el.hidden = el.dataset.sizeRow !== cfg.size.mode; });
     var full = cfg.layout === 'full';
-    app.querySelector('#embedTools').querySelectorAll('[data-embed-tool], [data-embed-field="title"]').forEach(function (el) { el.disabled = full; });
+    app.querySelector('#embedTools').querySelectorAll('[data-embed-tool], [data-embed-field="title"], [data-embed-field="ar_mode"]').forEach(function (el) { el.disabled = full; });
   }
   function sizePreview(cfg) {
     var s = cfg.size, h = 420;

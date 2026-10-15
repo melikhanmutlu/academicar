@@ -9,6 +9,8 @@
 {% set is_embed = embed_req and not embed_full %}
 {% set embed_tools = embed_cfg.tools if embed_cfg is not none else ['tour', 'measure', 'scenes', 'layers', 'slice', 'ar'] %}
 {% set embed_nobrand = embed_req and embed_cfg is not none and not embed_cfg.brand %}
+{# The compact embed's View in AR opens the AcademicAR viewer instead of AR in the frame. #}
+{% set embed_ar_viewer = is_embed and embed_cfg is not none and embed_cfg.ar_mode == 'viewer' %}
 {# Viewer layers (STEP parts, segmented structures, multi-part meshes): one named material each. #}
 {% set viewer_layers = ((model.layer_info or {}).get('layers') or []) if model.layer_info is mapping else [] %}
 {# The USDZ URL also carries the file's own time: a default-view save rebuilds it without touching the GLB. #}
@@ -1509,7 +1511,7 @@
           <span class="hidden sm:inline">View in AR</span>
           <span class="sm:hidden">AR</span>
         </button>
-        {% if has_usdz %}
+        {% if has_usdz and not embed_ar_viewer %}
         <a data-ios-ar-btn hidden rel="ar" class="viewer-tool-btn primary !py-1.5 !px-4 !text-xs" href="{{ usdz_src }}" type="model/vnd.usdz+zip" aria-label="View in AR">
           <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
           <span class="hidden sm:inline">View in AR</span>
@@ -3531,17 +3533,14 @@
       nativeArBtn.classList.add('is-suppressed');
     }
 
+    // The owner can send View in AR from the compact embed to the AcademicAR viewer
+    // (embed setting ar_mode). The iOS rel="ar" anchor is not rendered then, so the
+    // toolbar button is the only AR control.
+    const arOpensViewer = {{ 'true' if embed_ar_viewer else 'false' }};
     const isPhone = isIOS || /Android/i.test(navigator.userAgent)
       || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches && window.innerWidth < 900);
-    const showQrFallback = () => {
-      if (qrModal) {
-        setQrMode(isPhone ? 'phone-no-ar' : 'handoff');
-        openOverlay('qr', document.activeElement);
-        return;
-      }
-      // Embedded viewer (?embed=true) renders no QR modal. Rather than leave a
-      // failed AR launch with no fallback, open the standalone viewer — which
-      // has the QR + AR affordances — in a new tab.
+    // The standalone viewer (QR + AR affordances) in a new tab, for an embed.
+    const openStandaloneViewer = () => {
       try {
         const standalone = new URL(window.location.href);
         standalone.searchParams.delete('embed');
@@ -3549,6 +3548,16 @@
       } catch (e) {
         /* no-op: window.open blocked or URL unavailable */
       }
+    };
+    const showQrFallback = () => {
+      if (qrModal) {
+        setQrMode(isPhone ? 'phone-no-ar' : 'handoff');
+        openOverlay('qr', document.activeElement);
+        return;
+      }
+      // No QR modal on the page: rather than leave a failed AR launch with no
+      // fallback, open the standalone viewer.
+      openStandaloneViewer();
     };
 
     // Apple's documented way to trigger Quick Look AR. A plain
@@ -3572,6 +3581,7 @@
     // native button is used (useNativeIOSArButton).
     if (arBtn && !useNativeIOSArButton && !useIOSAnchorButton) {
       arBtn.addEventListener('click', () => {
+        if (arOpensViewer) { openStandaloneViewer(); return; }
         // The active saved scene may have its own AR files (window.viewerSceneAr,
         // set up by the scenes block below); this only warns while they are queued.
         const sceneAr = window.viewerSceneAr;
