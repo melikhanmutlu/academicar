@@ -6982,6 +6982,24 @@
     if (panel && toggle && panel.getAttribute('data-collapsed') === 'false') toggle.click();
   }, 0);
 
+  // Design B: no ground-shadow plane. The stage is full-bleed, so the shadow showed
+  // up as a hard-edged slab; the saved lighting values stay untouched (the preview
+  // only keeps model-viewer's shadow off, whatever preset or slider is used).
+  (function () {
+    var viewer = document.getElementById('viewer');
+    if (!viewer) return;
+    customElements.whenDefined('model-viewer').then(function () {
+      for (var o = Object.getPrototypeOf(viewer); o; o = Object.getPrototypeOf(o)) {
+        var d = Object.getOwnPropertyDescriptor(o, 'shadowIntensity');
+        if (d && d.set) {
+          Object.defineProperty(viewer, 'shadowIntensity', { configurable: true, get: function () { return d.get.call(viewer); }, set: function () { d.set.call(viewer, 0); } });
+          viewer.shadowIntensity = 0;
+          return;
+        }
+      }
+    });
+  })();
+
   // Design B: the tool sections fold into three groups, one open at a time. Only
   // headers and data attributes are added; the sections and their scripts stay put.
   (function () {
