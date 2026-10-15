@@ -7117,6 +7117,196 @@
     update();
   })();
 </script>
+<script>
+  // Design B: a model gallery (slider) to switch to another model, and a split
+  // view that shows a second model beside this one. Both read the model list
+  // from /view/<id>/gallery.json; nothing else on the page is touched.
+  (function () {
+    var toolbar = document.querySelector('.viewer-toolbar');
+    var main = document.querySelector('main');
+    var infoBtn = document.getElementById('infoBtn');
+    if (!toolbar || !main || !infoBtn) return;
+    var modelId = {{ model.id|tojson }};
+    var params = new URLSearchParams(window.location.search);
+    var keep = new URLSearchParams();
+    ['design', 'mode'].forEach(function (k) { if (params.get(k)) keep.set(k, params.get(k)); });
+    var svg = function (inner) {
+      return '<svg class="sm:hidden" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + inner + '</svg>';
+    };
+    var cube = '<svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1L14 4.5v7L8 15L2 11.5v-7z"/><path d="M2 4.5L8 8l6-3.5M8 8v7"/></svg>';
+    var esc = function (t) { var d = document.createElement('div'); d.textContent = t == null ? '' : String(t); return d.innerHTML; };
+    var mkBtn = function (id, label, icon, extra) {
+      var b = document.createElement('button');
+      b.id = id; b.type = 'button'; b.className = 'viewer-tool-btn';
+      b.setAttribute('aria-label', label); b.title = label;
+      if (extra) b.setAttribute.apply(b, extra);
+      b.innerHTML = svg(icon) + '<span class="hidden sm:inline">' + label + '</span>';
+      return b;
+    };
+    var galBtn = mkBtn('galleryBtn', 'Models', '<rect x="4" y="3.5" width="8" height="9" rx="1.5"/><path d="M1.5 5.5v5M14.5 5.5v5"/>', ['aria-expanded', 'false']);
+    var splitBtn = mkBtn('splitBtn', 'Split view', '<rect x="1.5" y="2.5" width="13" height="11" rx="2"/><path d="M8 2.5v11"/>', ['aria-pressed', 'false']);
+    toolbar.insertBefore(galBtn, infoBtn);
+    toolbar.insertBefore(splitBtn, infoBtn);
+
+    var models = null, loading = null;
+    var load = function () {
+      if (models) return Promise.resolve(models);
+      if (!loading) {
+        loading = fetch('/view/' + encodeURIComponent(modelId) + '/gallery.json', { credentials: 'same-origin' })
+          .then(function (r) { return r.ok ? r.json() : { models: [] }; })
+          .then(function (d) { models = d.models || []; return models; })
+          .catch(function () { models = []; return models; });
+      }
+      return loading;
+    };
+    var card = function (m, opts) {
+      opts = opts || {};
+      var el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'b-gal-card' + (m.current ? ' is-current' : '');
+      el.setAttribute('data-model', m.id);
+      el.innerHTML = '<span class="b-gal-thumb">' + (m.poster ? '<img src="' + esc(m.poster) + '" alt="" loading="lazy">' : cube) + '</span>'
+        + '<span class="b-gal-name">' + esc(m.name) + '</span><span class="b-gal-proj">' + esc(m.project) + '</span>'
+        + (m.current ? '<span class="b-gal-badge">Viewing</span>' : '');
+      el.addEventListener('click', function () { opts.pick(m); });
+      return el;
+    };
+
+    // ---- Gallery window ----
+    var panel = document.createElement('section');
+    panel.id = 'galleryPanel';
+    panel.className = 'layers-panel gallery-panel';
+    panel.setAttribute('aria-label', 'Model gallery');
+    panel.hidden = true;
+    panel.innerHTML = '<div class="layers-head"><h2>Models <span class="font-normal" data-gal-count></span></h2>'
+      + '<div class="layers-head-actions"><button type="button" data-gal-prev aria-label="Previous models">&lsaquo;</button>'
+      + '<button type="button" data-gal-next aria-label="Next models">&rsaquo;</button>'
+      + '<button type="button" data-gal-close aria-label="Close models">×</button></div></div>'
+      + '<div class="b-gal-track" data-gal-track tabindex="0" aria-label="Your models"></div>'
+      + '<div class="b-gal-foot"><button type="button" data-gal-split>Compare two models side by side &rarr;</button></div>';
+    main.appendChild(panel);
+    var track = panel.querySelector('[data-gal-track]');
+    var closeBtn = panel.querySelector('[data-gal-close]');
+    var openPanel = function (open) {
+      if (open === !panel.hidden) return;
+      if (open) {
+        ['layersBtn', 'scenesBtn', 'sectionBtn'].forEach(function (id) {
+          var b = document.getElementById(id);
+          if (b && b.getAttribute('aria-expanded') === 'true') b.click();
+        });
+        var ci = document.getElementById('closeInfo'), ip = document.getElementById('infoPanel');
+        if (ci && ip && ip.classList.contains('open')) ci.click();
+      }
+      panel.hidden = !open;
+      galBtn.setAttribute('aria-expanded', String(open));
+      galBtn.classList.toggle('is-active', open);
+      if (open) {
+        load().then(function (list) {
+          track.textContent = '';
+          panel.querySelector('[data-gal-count]').textContent = '(' + list.length + ')';
+          list.forEach(function (m) {
+            track.appendChild(card(m, { pick: function (it) {
+              if (it.current) { openPanel(false); return; }
+              window.location.href = it.url + (keep.toString() ? '?' + keep.toString() : '');
+            } }));
+          });
+          if (list.length < 2) {
+            var note = document.createElement('p');
+            note.className = 'b-gal-note';
+            note.textContent = 'No other models to switch to yet.';
+            track.appendChild(note);
+          }
+          var cur = track.querySelector('.is-current');
+          if (cur) track.scrollLeft = 0;
+        });
+        closeBtn.focus({ preventScroll: true });
+      } else if (document.activeElement && panel.contains(document.activeElement)) {
+        galBtn.focus({ preventScroll: true });
+      }
+    };
+    galBtn.addEventListener('click', function () { openPanel(panel.hidden); });
+    closeBtn.addEventListener('click', function () { openPanel(false); });
+    var slide = function (dir) { track.scrollBy({ left: dir * Math.max(160, track.clientWidth - 40), behavior: 'smooth' }); };
+    panel.querySelector('[data-gal-prev]').addEventListener('click', function () { slide(-1); });
+    panel.querySelector('[data-gal-next]').addEventListener('click', function () { slide(1); });
+    track.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowRight') { e.preventDefault(); slide(1); } else if (e.key === 'ArrowLeft') { e.preventDefault(); slide(-1); }
+    });
+    ['layersBtn', 'scenesBtn', 'sectionBtn', 'infoBtn', 'qrBtn'].forEach(function (id) {
+      var b = document.getElementById(id);
+      if (b) b.addEventListener('click', function () { openPanel(false); }, true);
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !panel.hidden) openPanel(false); });
+
+    // ---- Split view ----
+    var root = document.documentElement;
+    var pane = document.createElement('div');
+    pane.id = 'splitPane';
+    pane.hidden = true;
+    pane.innerHTML = '<div class="b-split-bar"><span class="b-split-name" data-split-name></span>'
+      + '<button type="button" data-split-change>Change</button><button type="button" data-split-close aria-label="Close split view">×</button></div>'
+      + '<iframe title="Second model" data-split-frame allow="fullscreen; xr-spatial-tracking" loading="lazy"></iframe>'
+      + '<div class="b-split-pick" data-split-pick><p class="b-split-title">Choose a model for this side</p><div class="b-split-grid" data-split-grid></div></div>';
+    main.appendChild(pane);
+    var frame = pane.querySelector('[data-split-frame]');
+    var pick = pane.querySelector('[data-split-pick]');
+    var grid = pane.querySelector('[data-split-grid]');
+    var nameEl = pane.querySelector('[data-split-name]');
+    var setUrl = function (id) {
+      var u = new URL(window.location.href);
+      if (id) u.searchParams.set('split', id); else u.searchParams.delete('split');
+      try { window.history.replaceState(null, '', u.toString()); } catch (e) { /* embedded previews */ }
+    };
+    var showPicker = function (show) {
+      pick.hidden = !show;
+      if (!show) return;
+      load().then(function (list) {
+        grid.textContent = '';
+        var others = list.filter(function (m) { return !m.current; });
+        others.forEach(function (m) { grid.appendChild(card(m, { pick: choose })); });
+        if (!others.length) {
+          var note = document.createElement('p');
+          note.className = 'b-gal-note';
+          note.textContent = 'There is no other model available to compare with yet.';
+          grid.appendChild(note);
+        }
+      });
+    };
+    var choose = function (m) {
+      var u = new URL(m.url, window.location.origin);
+      u.searchParams.set('embed', '1');
+      frame.src = u.toString();
+      nameEl.textContent = m.name;
+      showPicker(false);
+      setUrl(m.id);
+    };
+    var setSplit = function (on, preset) {
+      pane.hidden = !on;
+      root.classList.toggle('b-split', on);
+      splitBtn.setAttribute('aria-pressed', String(on));
+      splitBtn.classList.toggle('is-active', on);
+      if (on) {
+        openPanel(false);
+        if (preset) {
+          load().then(function (list) {
+            var m = list.filter(function (x) { return x.id === preset && !x.current; })[0];
+            if (m) choose(m); else showPicker(true);
+          });
+        } else if (!frame.getAttribute('src')) showPicker(true);
+      } else {
+        frame.removeAttribute('src');
+        setUrl(null);
+      }
+      // model-viewer measures itself; nudge it after the layout change.
+      setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 60);
+    };
+    splitBtn.addEventListener('click', function () { setSplit(pane.hidden); });
+    panel.querySelector('[data-gal-split]').addEventListener('click', function () { setSplit(true); });
+    pane.querySelector('[data-split-close]').addEventListener('click', function () { setSplit(false); });
+    pane.querySelector('[data-split-change]').addEventListener('click', function () { showPicker(true); });
+    if (params.get('split')) setSplit(true, params.get('split'));
+  })();
+</script>
 {% endif %}
 </body>
 </html>

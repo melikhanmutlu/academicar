@@ -331,3 +331,22 @@ def test_model_edit_compare_section_by_plan(client, app):
     html = client.get(f"/models/{free}/edit").get_data(as_text=True)
     assert "Before / after comparison is available on paid plans." in html
     assert f"/comparisons/new?left={free}" not in html
+
+
+def test_viewer_gallery_lists_switchable_models(client, app):
+    a, paper = _model(app, name="Alpha")
+    b, _ = _model(app, name="Beta", paper_id=paper)
+    other, _ = _model(app, name="Elsewhere")
+    private, _ = _model(app, name="Hidden", visibility="private")
+    data = client.get(f"/view/{a}/gallery.json").get_json()
+    assert [m["id"] for m in data["models"]] == [a, b]
+    assert data["models"][0]["current"] is True
+    login(client, OWNER)
+    ids = {m["id"] for m in client.get(f"/view/{a}/gallery.json").get_json()["models"]}
+    assert {a, b, other, private} <= ids
+    assert client.get(f"/view/{private}/gallery.json").status_code == 200
+
+
+def test_viewer_gallery_hides_private_projects_from_visitors(client, app):
+    private, _ = _model(app, name="Hidden", visibility="private")
+    assert client.get(f"/view/{private}/gallery.json").status_code in (403, 404)

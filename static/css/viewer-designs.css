@@ -566,6 +566,83 @@ html[data-design="b"] #controlPanel .viewer-publish-cta:hover {
 /* QR / AR dialogs sit in the middle of the window, both ways. */
 html[data-design="b"] #qrModal:not(.hidden) { display: flex; align-items: center; justify-content: center; }
 html[data-design="b"] #qrModal > div { margin: 0; }
+/* Model gallery (slider window) and split view. */
+html[data-design="b"] .viewer-toolbar { max-height: calc(100% - 40px); overflow-y: auto; scrollbar-width: none; }
+html[data-design="b"] .viewer-toolbar::-webkit-scrollbar { display: none; }
+html[data-design="b"][data-viewer-bg] .gallery-panel:not(.is-embed) { width: 420px; }
+html[data-design="b"] .b-gal-track {
+  display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 4px 18px 14px; scrollbar-width: none; outline: none;
+}
+html[data-design="b"] .b-gal-track::-webkit-scrollbar { display: none; }
+html[data-design="b"] .b-gal-card {
+  position: relative; flex: 0 0 172px; display: flex; flex-direction: column; gap: 2px; padding: 0 0 10px; text-align: left;
+  scroll-snap-align: start; overflow: hidden; border-radius: 16px; border: 1px solid var(--b-line); background: var(--b-fill);
+  color: var(--b-ink); cursor: pointer; transition: border-color 0.18s, transform 0.25s var(--b-ease), background-color 0.18s;
+}
+html[data-design="b"] .b-gal-card:hover { background: var(--b-hover); transform: translateY(-2px); }
+html[data-design="b"] .b-gal-card:focus-visible { outline: 2px solid var(--b-accent); outline-offset: 2px; }
+html[data-design="b"] .b-gal-card.is-current { border-color: var(--b-accent); }
+html[data-design="b"] .b-gal-thumb {
+  display: grid; place-items: center; aspect-ratio: 4 / 3; margin-bottom: 8px; background: var(--b-hover); color: var(--b-ink-3);
+}
+html[data-design="b"] .b-gal-thumb img { width: 100%; height: 100%; object-fit: cover; }
+html[data-design="b"] .b-gal-name, html[data-design="b"] .b-gal-proj { display: block; padding: 0 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html[data-design="b"] .b-gal-name { font-size: 13px; font-weight: 600; }
+html[data-design="b"] .b-gal-proj { font-size: 11.5px; color: var(--b-ink-3); }
+html[data-design="b"] .b-gal-badge {
+  position: absolute; top: 8px; left: 8px; padding: 2px 9px; border-radius: 999px; background: var(--b-accent); color: #fff;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+}
+html[data-design="b"] .b-gal-note { padding: 8px 4px; font-size: 12.5px; color: var(--b-ink-3); }
+html[data-design="b"] .b-gal-foot { padding: 0 18px 14px; }
+html[data-design="b"] .b-gal-foot button {
+  padding: 6px 0; border: 0; background: none; color: var(--b-accent); font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+html[data-design="b"] .b-gal-foot button:hover { text-decoration: underline; text-underline-offset: 3px; }
+html[data-design="b"] .viewer-toolbar .viewer-tool-btn.is-active:is(#splitBtn) { box-shadow: inset 0 0 0 1.5px var(--b-accent); }
+
+/* Split: the stage keeps the left half, a second model fills the right half. */
+html[data-design="b"].b-split body:has(#controlPanel) #viewer, html[data-design="b"].b-split #viewer { width: 50% !important; }
+html[data-design="b"] #splitPane {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 50%; z-index: 20; overflow: hidden; background: #0c0c0e;
+  border-left: 1px solid var(--b-line-2);
+}
+html[data-design="b"]:is([data-viewer-bg="light"], [data-viewer-bg="white"]) #splitPane { background: #f4f4f5; }
+html[data-design="b"] #splitPane[hidden] { display: none; }
+html[data-design="b"] #splitPane iframe { width: calc(100% - 84px); height: 100%; border: 0; display: block; }
+html[data-design="b"].b-split .viewer-inline-qr { display: none !important; }
+html[data-design="b"] .b-split-bar {
+  position: absolute; bottom: 20px; right: 104px; z-index: 4; display: flex; align-items: center; gap: 2px; padding: 4px 4px 4px 14px;
+  border-radius: 999px; background: var(--b-panel); border: 1px solid var(--b-line); color: var(--b-ink);
+  backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); max-width: calc(100% - 120px);
+}
+html[data-design="b"] .b-split-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 6px; font-size: 12.5px; font-weight: 600; }
+html[data-design="b"] .b-split-bar button {
+  flex: none; padding: 5px 10px; border: 0; border-radius: 999px; background: transparent; color: var(--b-accent); font-size: 12px; font-weight: 600; cursor: pointer;
+}
+html[data-design="b"] .b-split-bar button:hover { background: var(--b-hover); }
+html[data-design="b"] .b-split-bar button[data-split-close] { width: 28px; height: 28px; padding: 0; background: var(--b-fill); color: var(--b-ink-2); font-size: 16px; }
+html[data-design="b"] .b-split-pick {
+  position: absolute; inset: 0; z-index: 3; overflow-y: auto; padding: 84px 92px 28px 28px; background: inherit; color: var(--b-ink);
+}
+html[data-design="b"] .b-split-pick[hidden] { display: none; }
+html[data-design="b"] .b-split-title { margin-bottom: 14px; color: var(--b-accent); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+html[data-design="b"] .b-split-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+html[data-design="b"] .b-split-grid .b-gal-card { flex: none; }
+@media (max-width: 640px) {
+  html[data-design="b"][data-viewer-bg] .gallery-panel:not(.is-embed) { width: auto; }
+  html[data-design="b"] .b-gal-card { flex-basis: 150px; }
+  html[data-design="b"].b-split body:has(#controlPanel) #viewer, html[data-design="b"].b-split #viewer { width: 100% !important; height: 50% !important; }
+  html[data-design="b"] #splitPane { top: 50%; width: 100%; border-left: 0; border-top: 1px solid var(--b-line-2); }
+  html[data-design="b"] #splitPane iframe { width: calc(100% - 60px); }
+  html[data-design="b"] .b-split-bar { bottom: 12px; right: 68px; }
+  html[data-design="b"].b-split #controlPanel { display: none; }
+  html[data-design="b"] .b-split-name { display: none; }
+  html[data-design="b"] .b-split-bar { padding-left: 4px; }
+  html[data-design="b"] .b-split-grid { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); }
+  html[data-design="b"] .b-split-pick { padding: 64px 64px 16px 16px; }
+}
+
 /* QR dialog */
 html[data-design="b"][data-viewer-bg="dark"] #qrModal { background: rgba(0, 0, 0, 0.5); }
 html[data-design="b"][data-viewer-bg]:is([data-viewer-bg="light"], [data-viewer-bg="white"]) #qrModal { background: rgba(255, 255, 255, 0.5); }

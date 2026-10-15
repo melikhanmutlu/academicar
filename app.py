@@ -6595,6 +6595,45 @@ def register_routes(app: Flask) -> None:
             auto_media=auto_media_state(model) if can_edit and (model.processing_status or "ready") == "ready" else None,
         )
 
+    @app.route("/view/<model_id>/gallery.json")
+    def viewer_gallery(model_id):
+        """Models the visitor may switch to from the viewer: the other ready
+        models of this project plus, when signed in, the ones in projects they
+        own or edit. Each model is checked like its own /view page."""
+        model = db.session.get(Model3D, model_id)
+        if not model or not _paper_visible_to_request(model.paper):
+            abort(404)
+        papers = {model.paper_id: model.paper}
+        if current_user.is_authenticated:
+            for paper in active_paper_query().filter(Paper.user_id == current_user.id).all():
+                papers.setdefault(paper.id, paper)
+            for paper in shared_projects_for(current_user):
+                papers.setdefault(paper.id, paper)
+        candidates = (
+            Model3D.query.filter(Model3D.paper_id.in_(list(papers)))
+            .order_by(Model3D.created_at.desc())
+            .limit(120)
+            .all()
+        )
+        items = []
+        for candidate in candidates:
+            if (candidate.processing_status or "ready") != "ready" or model_access_status(candidate) != "active":
+                continue
+            paper = papers[candidate.paper_id]
+            if paper_is_deleted(paper) or not _paper_visible_to_request(paper):
+                continue
+            items.append({
+                "id": candidate.id,
+                "name": candidate.display_name or candidate.original_filename or "3D model",
+                "project": paper.title,
+                "poster": url_for("serve_poster", unique_id=candidate.id) if candidate.poster_path else None,
+                "url": url_for("view_model", model_id=candidate.id),
+                "current": candidate.id == model.id,
+                "same_project": candidate.paper_id == model.paper_id,
+            })
+        items.sort(key=lambda item: (not item["current"], not item["same_project"]))
+        return jsonify(models=items[:60])
+
     @app.route("/m/<public_id>")
     def model_resolver(public_id):
         """Managed QR resolver: stable public URL that survives storage and
