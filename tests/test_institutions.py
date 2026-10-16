@@ -916,8 +916,8 @@ def test_panel_member_management_and_models_list(client):
 def test_institutional_inquiry_sends_email_and_audits(client, monkeypatch):
     sent = []
 
-    def fake_send_email(to_address, subject, body):
-        sent.append((to_address, subject, body))
+    def fake_send_email(to_address, subject, body, reply_to=None):
+        sent.append((to_address, subject, body, reply_to))
         return True
 
     monkeypatch.setattr("utils.email.send_email", fake_send_email)
@@ -940,7 +940,11 @@ def test_institutional_inquiry_sends_email_and_audits(client, monkeypatch):
     assert b"we received your inquiry" in response.data
     assert len(sent) == 1
     assert "Bogazici University" in sent[0][2]
-    assert "ayse@boun.edu.tr" in sent[0][2]
+    # Plain "Email:" line: Brevo renders textContent as HTML, so an address
+    # inside <...> was swallowed as a tag and never reached the inbox.
+    assert "Email: ayse@boun.edu.tr" in sent[0][2]
+    assert "<ayse@boun.edu.tr>" not in sent[0][2]
+    assert sent[0][3] == "ayse@boun.edu.tr"
     with client.application.app_context():
         from models import AuditLog
 
@@ -948,9 +952,26 @@ def test_institutional_inquiry_sends_email_and_audits(client, monkeypatch):
         assert row.details["institution_name"] == "Bogazici University"
 
 
+def test_institutional_inquiry_rejects_header_injection_in_email(client, monkeypatch):
+    sent = []
+    monkeypatch.setattr("utils.email.send_email", lambda *a, **k: sent.append(a) or True)
+    response = client.post(
+        "/institutional",
+        data={
+            "institution_name": "Uni",
+            "contact_name": "Ada",
+            "email": "a@b.com\nBcc: victim@example.com",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert b"valid work email" in response.data
+    assert sent == []
+
+
 def test_institutional_inquiry_validates_required_fields(client, monkeypatch):
     sent = []
-    monkeypatch.setattr("utils.email.send_email", lambda *a: sent.append(a) or True)
+    monkeypatch.setattr("utils.email.send_email", lambda *a, **k: sent.append(a) or True)
 
     missing = client.post(
         "/institutional",

@@ -233,6 +233,9 @@ class Model3D(db.Model):
     # Viewer lighting saved by the owner: {"preset", "exposure", "shadow_intensity",
     # "shadow_softness"} (viewer_lighting.py); None = the default Studio preset.
     viewer_lighting = db.Column(db.JSON, nullable=True)
+    # Embed settings saved by the owner (embed_config.py): layout, tools, theme,
+    # title/brand and the iframe size; None = the default compact embed.
+    embed_config = db.Column(db.JSON, nullable=True)
     replaced_at = db.Column(db.DateTime, nullable=True)
     version = db.Column(db.Integer, nullable=False, default=1)
     replacement_status = db.Column(db.String(30), nullable=True)

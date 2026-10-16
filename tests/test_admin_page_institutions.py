@@ -50,3 +50,20 @@ def test_list_collapses_create_form_and_flags_ended_contract(client):
     assert 'id="create"' in html and 'id="create" open' not in html
     assert "1 institution<" in html
     assert "Expired" in html
+
+
+def test_inquiries_page_lists_leads_with_full_email(client):
+    _make_admin(client)
+    admin_client = client
+    from models import AuditLog
+
+    with admin_client.application.app_context():
+        db.session.add(AuditLog(
+            event_type="institution_inquiry_submitted",
+            details={"institution_name": "Uni X", "contact_name": "Ada", "email": "ada@unix.edu",
+                     "estimated_members": "25", "message": "Need a quote."},
+        ))
+        db.session.commit()
+    html = admin_client.get("/admin/inquiries").get_data(as_text=True)
+    assert "Uni X" in html and "ada@unix.edu" in html and "Need a quote." in html
+    assert "Inquiries" in client.get("/admin/institutions").get_data(as_text=True)  # sidebar entry

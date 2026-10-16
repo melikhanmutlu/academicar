@@ -6,6 +6,7 @@ from licensing import PAID_ONLY_FEATURES, PLAN_FEATURES, default_license_plans
 
 V39 = {"scenes", "scene_ar", "section_plane", "layer_metrics", "figure_export", "comparison"}
 OPEN_TO_ALL = {"scenes", "scene_ar", "section_plane", "slice_view", "custom_threshold"}
+EMBED_PAID = {"embed_full_layout", "embed_white_label"}
 
 
 def _migration(name):
@@ -17,7 +18,7 @@ def _migration(name):
 
 
 def test_feature_split_between_free_and_paid_plans():
-    assert PAID_ONLY_FEATURES == {"layer_metrics", "figure_export", "comparison"}
+    assert PAID_ONLY_FEATURES == {"layer_metrics", "figure_export", "comparison"} | EMBED_PAID
     assert (V39 | OPEN_TO_ALL) <= {key for key, _ in PLAN_FEATURES}
     plans = default_license_plans()
     assert not plans["free"].features & PAID_ONLY_FEATURES
@@ -32,5 +33,15 @@ def test_backfill_migrations_match_the_python_defaults():
     assert set(v39.PAID_KEYS) == {"academic", "extended_archive", "institutional"}
     opened = _migration("c7d8e9f0a1b2_open_viewer_tools_to_all_plans.py")
     assert set(opened.NEW_FEATURES) | set(opened.OPENED_TO_FREE) == OPEN_TO_ALL
-    assert V39 - set(opened.OPENED_TO_FREE) == PAID_ONLY_FEATURES
+    assert V39 - set(opened.OPENED_TO_FREE) == PAID_ONLY_FEATURES - EMBED_PAID
     assert set(opened.ALL_KEYS) == set(default_license_plans())
+
+
+def test_embed_features_match_the_migration():
+    embed = _migration("e9f0a1b2c3d4_embed_config_and_plan_features.py")
+    plans = default_license_plans()
+    assert set(embed.EMBED) == {"embed"} and set(embed.EMBED_PAID) == EMBED_PAID
+    assert set(embed.ALL_KEYS) == set(plans) and set(embed.PAID_KEYS) == set(plans) - {"free"}
+    assert "embed" in plans["free"].features and not plans["free"].features & EMBED_PAID
+    for key in embed.PAID_KEYS:
+        assert {"embed"} | EMBED_PAID <= plans[key].features, key

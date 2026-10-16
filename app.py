@@ -85,6 +85,7 @@ from discipline_content import all_disciplines, discipline_slugs, get_discipline
 from institution_panel import institution_bp
 from layer_editor import default_ar_materials, layer_editor_bp, model_has_layers, model_layers, viewer_layer_metrics
 from viewer_lighting import viewer_lighting_bp
+from embed_config import effective_embed_config, clean_embed_config, embed_settings_bp
 from model_media import model_media_bp
 from comparisons import comparisons_bp
 from scenes import (
@@ -261,6 +262,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.register_blueprint(institution_bp)
     app.register_blueprint(layer_editor_bp)
     app.register_blueprint(viewer_lighting_bp)
+    app.register_blueprint(embed_settings_bp)
     app.register_blueprint(model_media_bp)
     app.register_blueprint(comparisons_bp)
     app.register_blueprint(scenes_bp)
@@ -691,6 +693,8 @@ def admin_like_pattern(text: str) -> str:
 
 _AUDIT_EMAIL_RE = re.compile(r"[\w.+'-]+@[\w-]+(?:\.[\w-]+)+")
 _AUDIT_TEXT_KEYS = {"message", "body", "text", "notes", "comment"}
+# B2B leads the admin has to answer: shown in full (IP is still masked).
+_AUDIT_UNMASKED_EVENTS = {"institution_inquiry_submitted"}
 # High-volume view/redirect events hidden from the default "Actions" view.
 _AUDIT_NOISE_EVENTS = ("public_model_viewed", "qr_resolved", "admin_backup_downloaded")
 
@@ -739,7 +743,7 @@ def _mask_audit_value(key: str, value, event_type: str):
 def mask_audit_details(event_type: str, details):
     """Copy of an audit row's ``details`` with emails, free-text bodies and
     login-attempt identifiers masked. Shared by the admin page and its CSV."""
-    if not details:
+    if not details or event_type in _AUDIT_UNMASKED_EVENTS:
         return details
     return _mask_audit_value("", details, event_type or "")
 
@@ -1971,6 +1975,8 @@ def ensure_sqlite_schema(app: Flask) -> None:
             connection.execute(text("ALTER TABLE models ADD COLUMN processing_stage VARCHAR(120)"))
         if model_columns and "viewer_lighting" not in model_columns:
             connection.execute(text("ALTER TABLE models ADD COLUMN viewer_lighting JSON"))
+        if model_columns and "embed_config" not in model_columns:
+            connection.execute(text("ALTER TABLE models ADD COLUMN embed_config JSON"))
 
 
 def _alembic_head_revision(app: Flask) -> str | None:
@@ -5851,7 +5857,11 @@ def register_routes(app: Flask) -> None:
             if not institution_name or not contact_name or not email:
                 flash("Please fill in the institution name, your name, and your work email.", "danger")
                 return render_template("institutional.html", inquiry=inquiry)
-            if "@" not in email or "." not in email.rsplit("@", 1)[-1]:
+            if (
+                "@" not in email
+                or "." not in email.rsplit("@", 1)[-1]
+                or any(ch.isspace() or ord(ch) < 32 for ch in email)
+            ):
                 flash("Please enter a valid work email address.", "danger")
                 return render_template("institutional.html", inquiry=inquiry)
             from utils import email as email_utils
@@ -5862,10 +5872,12 @@ def register_routes(app: Flask) -> None:
                 "AcademicAR institutional inquiry",
                 (
                     f"Institution: {institution_name}\n"
-                    f"Contact: {contact_name} <{email}>\n"
+                    f"Contact: {contact_name}\n"
+                    f"Email: {email}\n"
                     f"Estimated members: {estimated_members or '-'}\n\n"
                     f"{message or '(no message)'}"
                 ),
+                reply_to=email,
             )
             # The audit row keeps the whole enquiry, so a lead survives even
             # when email delivery is down and can be followed up from admin.
@@ -6580,11 +6592,25 @@ def register_routes(app: Flask) -> None:
         active_scene_id = request.args.get("scene", type=int)
         if active_scene_id not in {scene["id"] for scene in scenes}:
             active_scene_id = None
+        # An embedded viewer shows visitors' view: no owner tools, and the model's
+        # saved embed settings (the owner's Embed page previews unsaved ones via ?cfg=).
+        embedded = request.args.get("embed") in ("true", "1")
+        embed_cfg = None
+        if embedded:
+            preview = None
+            if can_edit and request.args.get("cfg"):
+                try:
+                    preview = clean_embed_config(json.loads(request.args["cfg"]))
+                except ValueError:  # bad JSON (JSONDecodeError) or bad settings
+                    preview = None
+            embed_cfg = effective_embed_config(model, preview)
+            can_edit = False
         return render_template(
             "viewer.html", model=model, paper=model.paper, has_usdz=has_usdz,
             annotations=annotations, scale_reference=scale_ref,
             dimensions_cm=format_model_dimensions_cm(model),
             is_owner=can_edit,
+            embed_cfg=embed_cfg,
             scenes=scenes,
             active_scene_id=active_scene_id,
             viewer_metrics=viewer_layer_metrics(model, can_edit),
@@ -7287,6 +7313,7 @@ def register_routes(app: Flask) -> None:
             "backups",
             "blog",
             "institutions",
+            "inquiries",
             "analytics",
         }
         if admin_page not in admin_pages:
@@ -7939,6 +7966,13 @@ def register_routes(app: Flask) -> None:
                     row[0]: {"models": int(row[1] or 0), "bytes": int(row[2] or 0) + scene_ar_bytes.get(row[0], 0)}
                     for row in usage_rows
                 }
+        inquiries_pagination = (
+            AuditLog.query.filter_by(event_type="institution_inquiry_submitted")
+            .order_by(AuditLog.timestamp.desc())
+            .paginate(page=page, per_page=ADMIN_PER_PAGE, error_out=False)
+            if admin_page == "inquiries"
+            else None
+        )
         audit_event_types = audit_event_type_options() if admin_page == "logs" else []
         audit_rows = audit_row_views(audit_logs) if admin_page == "logs" else []
         audit_export_args = {k: v for k, v in request.args.items() if k != "page"}
@@ -8025,6 +8059,7 @@ def register_routes(app: Flask) -> None:
             institutions_pagination=institutions_pagination,
             institution_member_counts=institution_member_counts,
             institution_usage_map=institution_usage_map,
+            inquiries_pagination=inquiries_pagination,
             active_page=admin_page,
             analytics=analytics,
             filters={
