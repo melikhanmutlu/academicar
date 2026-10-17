@@ -553,6 +553,13 @@
     .layer-volume { display: block; font-size: 11px; color: rgba(255, 255, 255, 0.55); }
     .layer-count { flex: none; margin-left: 6px; font-size: 11px; color: rgba(255, 255, 255, 0.55); }
     .layer-opacity { width: 72px; accent-color: #ff682c; }
+    .layers-list.can-rename .layer-row { grid-template-columns: 28px 16px minmax(0, 1fr) 26px 72px; }
+    .layer-rename { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font-size: 16px; line-height: 1; color: rgba(255, 255, 255, 0.6); background: transparent; border: 0; cursor: pointer; }
+    .layer-rename:hover, .layer-rename:focus-visible { color: #fff; background: rgba(255, 255, 255, 0.1); }
+    .layer-name-input { min-width: 0; width: 100%; padding: 3px 8px; font-size: 14px; border-radius: 8px; color: #fff; background: rgba(255, 255, 255, 0.1); border: 1px solid #ff682c; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layer-rename { color: #6b6b6b; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layer-rename:hover { color: #202020; background: #f0f0f0; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layer-name-input { color: #202020; background: #fff; }
     .layers-note { padding: 8px 14px 12px; font-size: 11.5px; line-height: 1.45; color: rgba(255, 255, 255, 0.6); border-top: 1px solid rgba(255, 255, 255, 0.1); }
     .tour-mode .layers-panel { display: none !important; }
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .layers-panel { background: rgba(255, 255, 255, 0.96); color: #202020; border-color: #e8e8e8; }
@@ -715,6 +722,26 @@
        visible next to the native button (a duplicate AR button on iPad/tablet).
        Make `hidden` authoritative for the AR buttons across every viewport. */
     [data-ar-btn][hidden], [data-ios-ar-btn][hidden] { display: none !important; }
+    /* Feedback while AR starts: a pill with an indeterminate bar, and the AR button pulses. */
+    .ar-launch {
+      position: fixed; z-index: 70; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+      width: min(280px, calc(100vw - 32px)); padding: 12px 16px 14px; border-radius: 14px; color: #fff; text-align: center;
+      background: rgba(17, 17, 17, 0.92); border: 1px solid rgba(255, 255, 255, 0.14);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    }
+    .ar-launch[hidden] { display: none; }
+    .ar-launch-text { display: block; font-size: 13px; font-weight: 600; }
+    .ar-launch-bar { position: relative; display: block; height: 3px; margin-top: 10px; border-radius: 999px; overflow: hidden; background: rgba(255, 255, 255, 0.16); }
+    .ar-launch-bar::after { content: ""; position: absolute; top: 0; bottom: 0; width: 40%; border-radius: 999px; background: #ff682c; animation: ar-launch-slide 1.1s ease-in-out infinite; }
+    @keyframes ar-launch-slide { 0% { left: -40%; } 100% { left: 100%; } }
+    [data-ar-btn].is-busy, [data-ios-ar-btn].is-busy { animation: ar-launch-pulse 1s ease-in-out infinite; }
+    @keyframes ar-launch-pulse { 50% { opacity: 0.55; } }
+    @media (prefers-reduced-motion: reduce) {
+      .ar-launch-bar::after { animation: none; left: 0; width: 100%; }
+      [data-ar-btn].is-busy, [data-ios-ar-btn].is-busy { animation: none; }
+    }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .ar-launch { color: #202020; background: rgba(255, 255, 255, 0.96); border-color: #e8e8e8; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .ar-launch-bar { background: #e8e8e8; }
     .viewer-tool-heading {
       display: flex;
       align-items: center;
@@ -1302,8 +1329,19 @@
     .tour-mode .section-overlay { display: none !important; }
     /* 2D slice view (Slicer-like): the cross-section at the plane, with its own measure tool. */
     .section-panel { overflow-y: auto; }
-    .section-panel.is-wide { width: min(48vw, 720px); }
-    .slice-view { margin: 12px 14px 0; }
+    /* The three cross-sections sit in a dock under the model (desktop) or in
+       the bottom sheet under it (phones); the 3D view is shortened to match. */
+    :root { --slice-dock-h: min(38vh, 400px); }
+    .slice-dock {
+      position: absolute; z-index: 34; left: 0; right: 0; bottom: 0; height: var(--slice-dock-h);
+      display: flex; flex-direction: column; padding: 10px 14px 12px; color: #fff;
+      background: rgba(17, 17, 17, 0.96); border-top: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .slice-dock[hidden] { display: none; }
+    body:has(#controlPanel[data-collapsed="false"]) .slice-dock { left: 404px; }
+    body.has-slice-dock #viewer { bottom: var(--slice-dock-h); height: auto; }
+    body.has-slice-dock .section-overlay { bottom: var(--slice-dock-h); height: auto; }
+    .slice-view { display: flex; flex-direction: column; flex: 1; min-height: 0; margin: 0; }
     .slice-view[hidden] { display: none; }
     .slice-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
     .slice-title { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.6); }
@@ -1311,28 +1349,39 @@
     .slice-actions button { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; color: #fff; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.14); }
     .slice-actions button:hover { background: rgba(255, 255, 255, 0.18); }
     .slice-actions button[aria-pressed="true"] { background: #ff682c; border-color: #ff682c; }
-    .slice-stage { position: relative; border-radius: 10px; overflow: hidden; border: 2px solid rgba(255, 255, 255, 0.2); background: #0b0b0b; }
-    .slice-stage canvas { display: block; width: 100%; aspect-ratio: 1 / 1; max-height: 52vh; touch-action: none; cursor: grab; }
+    .slice-panels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; flex: 1; min-height: 0; }
+    .slice-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+    .slice-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 4px; min-width: 0; }
+    .slice-tab { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.7); }
+    .slice-panel.is-active .slice-tab { color: #fff; }
+    .slice-stage { position: relative; flex: 1; min-height: 0; border-radius: 10px; overflow: hidden; border: 2px solid rgba(255, 255, 255, 0.16); background: #0b0b0b; }
+    .slice-stage canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
     .slice-stage.is-measuring canvas { cursor: crosshair; }
     .slice-orient { position: absolute; font-size: 11px; font-weight: 700; color: rgba(255, 255, 255, 0.75); pointer-events: none; }
     .slice-orient.is-left { left: 6px; top: 50%; transform: translateY(-50%); }
     .slice-orient.is-right { right: 6px; top: 50%; transform: translateY(-50%); }
     .slice-orient.is-top { top: 4px; left: 50%; transform: translateX(-50%); }
     .slice-orient.is-bottom { bottom: 4px; left: 50%; transform: translateX(-50%); }
-    .slice-readout { margin: 6px 0 0; font-size: 12.5px; font-weight: 600; color: #fff; min-height: 1em; }
+    .slice-readout { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.85); }
     .slice-readout .is-distance { color: #ff9a6c; }
-    .slice-hint { margin: 2px 0 0; font-size: 11.5px; color: rgba(255, 255, 255, 0.5); }
-    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .slice-title,
-    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .slice-hint { color: #6b6b6b; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .slice-dock { color: #202020; background: rgba(255, 255, 255, 0.97); border-color: #e8e8e8; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .slice-title { color: #6b6b6b; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .slice-tab { color: #6b6b6b; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .slice-panel.is-active .slice-tab { color: #202020; }
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .slice-readout { color: #202020; }
-    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .slice-stage { background: #f5f5f5; }
+    html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .slice-stage { background: #f5f5f5; border-color: #e0e0e0; }
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .slice-orient { color: rgba(32, 32, 32, 0.7); }
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .slice-readout .is-distance { color: #c2410c; }
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .slice-actions button { color: #202020; background: #f5f5f5; border-color: #e8e8e8; }
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .slice-actions button[aria-pressed="true"] { color: #fff; background: #ff682c; border-color: #ff682c; }
+    /* Phones: the model on top, the active cross-section below it in the sheet. */
     @media (max-width: 640px) {
-      .section-panel.is-wide { width: auto; }
-      .slice-stage canvas { max-height: 30vh; }
+      body.slice-split .section-panel { left: 0; right: 0; bottom: 0; max-height: 70%; border-radius: 14px 14px 0 0; padding-bottom: env(safe-area-inset-bottom, 0px); }
+      body.slice-split .section-panel .layers-note { display: none; }
+      .slice-slot .slice-view { margin: 10px 14px 12px; }
+      .slice-panels { grid-template-columns: minmax(0, 1fr); }
+      .slice-panel:not(.is-active) { display: none; }
+      .slice-slot .slice-stage { flex: none; height: min(28vh, 250px); }
     }
     #figureModal:not(.hidden) { display: flex; align-items: center; justify-content: center; }
     .fig-layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 1rem; }
@@ -1582,6 +1631,12 @@
     </header>
     {% endif %}
 
+    {% if 'ar' in viewer_features %}
+    <div id="arLaunch" class="ar-launch" role="status" aria-live="polite" hidden>
+      <span class="ar-launch-text" data-ar-launch-text>Opening AR…</span>
+      <span class="ar-launch-bar" aria-hidden="true"></span>
+    </div>
+    {% endif %}
     <div id="viewerStatus" class="absolute left-1/2 top-1/2 z-40 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-white/10 bg-[#111111]/85 px-5 py-4 text-sm text-white/80 backdrop-blur-xl">
       <div class="flex items-center gap-3">
         <span class="h-2.5 w-2.5 rounded-full bg-white" style="animation: pulseDot 1.4s ease-in-out infinite;"></span>
@@ -1928,31 +1983,44 @@
         </label>
       </div>
       {% if 'slice_view' in viewer_features %}
-      <div class="slice-view" data-slice-view hidden>
-        <div class="slice-toolbar">
-          <span class="slice-title" data-slice-title>Slice</span>
-          <div class="slice-actions">
-            <button type="button" data-slice-measure aria-pressed="false" title="Measure a distance on this slice">Measure</button>
-            <button type="button" data-slice-fit title="Fit the slice to the view (or double-click it)">Fit</button>
-            <button type="button" data-slice-wide aria-pressed="false" aria-label="Enlarge the slice view" title="Enlarge">⤢</button>
-          </div>
-        </div>
-        <div class="slice-stage" data-slice-stage>
-          <canvas data-slice-canvas role="img" aria-label="Cross-section of the model at the section plane"></canvas>
-          <span class="slice-orient is-left" data-slice-orient="left"></span>
-          <span class="slice-orient is-right" data-slice-orient="right"></span>
-          <span class="slice-orient is-top" data-slice-orient="top"></span>
-          <span class="slice-orient is-bottom" data-slice-orient="bottom"></span>
-        </div>
-        <p class="slice-readout" data-slice-readout></p>
-        <p class="slice-hint" data-slice-hint>Scroll to zoom, drag to pan.</p>
-      </div>
+      <div class="slice-slot" data-slice-slot></div>
       {% endif %}
       {% if scenes_edit and 'scene_ar' in viewer_features and 'ar' in viewer_features %}
       <div class="scene-foot"><button type="button" data-section-save-scene title="Saves the cut, hidden layers and colours as a scene; its AR file is prepared in a minute">Save this view for AR</button></div>
       {% endif %}
       <p class="layers-note">{% if is_medical_model %}Planes follow the scan's patient orientation. For education and presentation only — not for diagnosis.{% else %}Cuts the model along a plane in its own axes; interior faces stay visible.{% endif %}</p>
     </section>
+    {% if 'slice_view' in viewer_features %}
+    {% set slice_axes = [('y', 'Axial'), ('z', 'Coronal'), ('x', 'Sagittal')] if is_medical_model else [('x', 'X'), ('y', 'Y'), ('z', 'Z')] %}
+    <div class="slice-dock" data-slice-dock hidden>
+      <div class="slice-view" data-slice-view hidden>
+        <div class="slice-toolbar">
+          <span class="slice-title" data-slice-title>Cross-sections</span>
+          <div class="slice-actions">
+            <button type="button" data-slice-measure aria-pressed="false" title="Measure a distance on a slice: click two points, they snap to the outlines">Measure</button>
+            <button type="button" data-slice-fit title="Fit every slice to its view (or double-click one)">Fit</button>
+          </div>
+        </div>
+        <div class="slice-panels">
+          {% for axis, label in slice_axes %}
+          <div class="slice-panel" data-slice-panel="{{ axis }}">
+            <div class="slice-panel-head">
+              <span class="slice-tab" data-slice-tab>{{ label }}</span>
+              <span class="slice-readout" data-slice-readout></span>
+            </div>
+            <div class="slice-stage" data-slice-stage>
+              <canvas data-slice-canvas role="img" aria-label="{{ label }} cross-section of the model"></canvas>
+              <span class="slice-orient is-left" data-slice-orient="left"></span>
+              <span class="slice-orient is-right" data-slice-orient="right"></span>
+              <span class="slice-orient is-top" data-slice-orient="top"></span>
+              <span class="slice-orient is-bottom" data-slice-orient="bottom"></span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
     {% endif %}
     {% if 'figure_export' in viewer_features %}
     <div id="figureModal" class="hidden fixed inset-0 z-50 bg-black/70 p-4 backdrop-blur-md" data-figure-modal role="dialog" aria-modal="true" aria-labelledby="figureModalTitle">
@@ -2887,6 +2955,11 @@
         }
       };
       const applyAll = () => { state.forEach((_, i) => apply(i, false)); syncMeshLayers(); };
+      // Editors can rename layers here too; names are saved with "Save layers".
+      const canRename = !!layersPanel.querySelector('[data-layers-save]');
+      const pendingNames = new Map(); // layer index -> new name, until saved
+      if (canRename) list.classList.add('can-rename');
+      const layerNameNow = (i) => pendingNames.has(i) ? pendingNames.get(i) : layerData[i].name;
       layerData.forEach((layer, i) => {
         const row = document.createElement('li');
         row.className = 'layer-row';
@@ -2911,6 +2984,51 @@
           vol.className = 'layer-volume';
           vol.textContent = sizeParts.join(' · ');
           nameLabel.appendChild(vol);
+        }
+        if (canRename) {
+          const renameBtn = document.createElement('button');
+          renameBtn.type = 'button';
+          renameBtn.className = 'layer-rename';
+          renameBtn.textContent = '✎';
+          renameBtn.title = 'Rename this layer';
+          renameBtn.setAttribute('aria-label', `Rename ${layer.name}`);
+          row.insertBefore(renameBtn, row.querySelector('.layer-opacity'));
+          renameBtn.addEventListener('click', () => {
+            const nameBtn = row.querySelector('.layer-name');
+            if (nameBtn.hidden) return;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'layer-name-input';
+            input.maxLength = 80;
+            input.value = layerNameNow(i);
+            input.setAttribute('aria-label', `New name of ${layer.name}`);
+            nameBtn.hidden = true;
+            nameBtn.after(input);
+            input.focus();
+            input.select();
+            let done = false;
+            const finish = (commit) => {
+              if (done) return;
+              done = true;
+              const value = input.value.trim();
+              input.remove();
+              nameBtn.hidden = false;
+              if (!commit || !value || value === layerNameNow(i)) return;
+              const clash = layerData.some((_, j) => j !== i && layerNameNow(j).toLowerCase() === value.toLowerCase());
+              if (clash) {
+                if (saveBox) { saveBox.hidden = false; saveBox.querySelector('[data-layers-save-status]').textContent = `Another layer is already called "${value}".`; }
+                return;
+              }
+              if (value === layer.name) pendingNames.delete(i); else pendingNames.set(i, value);
+              nameLabel.firstChild.nodeValue = value;
+              markDirty(false);
+            };
+            input.addEventListener('keydown', (event) => {
+              if (event.key === 'Enter') { event.preventDefault(); finish(true); }
+              else if (event.key === 'Escape') { event.preventDefault(); finish(false); }
+            });
+            input.addEventListener('blur', () => finish(true));
+          });
         }
         const swatchInput = row.querySelector('.layer-swatch');
         swatchInput.value = /^#[0-9a-f]{6}$/i.test(layer.color || '') ? layer.color.toLowerCase() : '#cccccc';
@@ -2992,7 +3110,7 @@
           const body = new FormData();
           body.append('csrf_token', csrfToken);
           layerData.forEach((layer, i) => {
-            body.append(`layer_name_${i}`, layer.name);
+            body.append(`layer_name_${i}`, colorsOnly ? layer.name : layerNameNow(i));
             if (layer.color) body.append(`layer_color_${i}`, pendingColors.get(i) || layer.color);
             const finish = colorsOnly ? null : pendingFinishes.get(i);
             if (finish) {
@@ -3017,7 +3135,7 @@
             pendingColors.clear();
             if (colorsOnly) {
               saveStatus.textContent = 'Colours saved. The AR file updates in a minute.';
-              if (!pendingFinishes.size && !visibilityEdited) saveBox.hidden = true;
+              if (!pendingFinishes.size && !visibilityEdited && !pendingNames.size) saveBox.hidden = true;
               return { ok: true, message: 'Colours saved to every layer. The AR file updates in a minute.' };
             }
             pendingFinishes.forEach((finish, i) => {
@@ -3030,6 +3148,12 @@
             syncFinishButtons();
             if (visibilityEdited) layerData.forEach((layer, i) => { layer.visible = state[i].visible; layer.opacity = state[i].opacity; });
             visibilityEdited = false;
+            if (pendingNames.size) {
+              // Saved scenes and views are keyed by layer name; reload so everything shows the new names.
+              saveStatus.textContent = 'Layers saved. Reloading to show the new names…';
+              setTimeout(() => window.location.reload(), 700);
+              return { ok: true, message: 'Layers saved.' };
+            }
             saveStatus.textContent = 'Layers saved. The AR file updates in a minute.';
             return { ok: true, message: 'Colours saved to every layer. The AR file updates in a minute.' };
           } catch (error) {
@@ -3046,7 +3170,7 @@
         previewAll: (hex) => layerData.forEach((layer, i) => { if (layer.color) setLayerColor(i, hex); }),
         resetColors: () => {
           layerData.forEach((layer, i) => { if (layer.color) { pendingColors.delete(i); paintLayer(i, layer.color); } });
-          if (saveBox && !pendingColors.size) saveBox.hidden = true;
+          if (saveBox && !pendingColors.size && !pendingNames.size) saveBox.hidden = true;
         },
         saveColors: () => saveLayers({ colorsOnly: true }),
       };
@@ -3118,7 +3242,7 @@
             if (indexes.every((i) => appliedFinish.get(i) === key)) {
               indexes.forEach(restoreFinish);
               syncFinishButtons();
-              if (!pendingColors.size && !pendingFinishes.size && !visibilityEdited && saveBox) saveBox.hidden = true;
+              if (!pendingColors.size && !pendingFinishes.size && !visibilityEdited && !pendingNames.size && saveBox) saveBox.hidden = true;
               return;
             }
             indexes.forEach((i) => {
@@ -3155,7 +3279,9 @@
           state[i].opacity = typeof layer.opacity === 'number' ? layer.opacity : 1;
           const input = list.children[i]?.querySelector('.layer-opacity');
           if (input) input.value = Math.round(state[i].opacity * 100);
+          if (pendingNames.has(i)) { list.children[i].querySelector('.layer-name span:last-child').firstChild.nodeValue = layer.name; }
         });
+        pendingNames.clear();
         pendingColors.clear();
         visibilityEdited = false;
         applyAll();
@@ -3549,7 +3675,26 @@
         /* no-op: window.open blocked or URL unavailable */
       }
     };
+    // Pressing AR can take a few seconds before the system AR view opens: show it
+    // (and pulse the button) until it starts, fails, the QR fallback opens, or 15 s pass.
+    const arLaunch = document.getElementById('arLaunch');
+    let arLaunchTimer = 0;
+    const hideArLaunch = () => {
+      clearTimeout(arLaunchTimer);
+      if (arLaunch) arLaunch.hidden = true;
+      [...arButtons, ...iosArButtons].forEach((button) => { button.classList.remove('is-busy'); button.removeAttribute('aria-busy'); });
+    };
+    const showArLaunch = () => {
+      if (!arLaunch || arOpensViewer) return;
+      arLaunch.hidden = false;
+      [...arButtons, ...iosArButtons].forEach((button) => { button.classList.add('is-busy'); button.setAttribute('aria-busy', 'true'); });
+      clearTimeout(arLaunchTimer);
+      arLaunchTimer = setTimeout(hideArLaunch, 15000);
+    };
+    [...arButtons, ...iosArButtons].forEach((button) => button.addEventListener('click', showArLaunch));
+    document.addEventListener('visibilitychange', () => { if (document.hidden) hideArLaunch(); });
     const showQrFallback = () => {
+      hideArLaunch();
       if (qrModal) {
         setQrMode(isPhone ? 'phone-no-ar' : 'handoff');
         openOverlay('qr', document.activeElement);
@@ -3621,6 +3766,7 @@
     // device (Scene Viewer missing/erroring, Quick Look refused), fall back to
     // the QR so the visitor still has a path onto an AR-capable phone.
     const onArStatus = (event) => {
+      if (event.detail && event.detail.status !== 'not-presenting') hideArLaunch();
       if (event.detail && event.detail.status === 'session-started') {
         fetch('/analytics/event', {
           method: 'POST',
@@ -3874,6 +4020,36 @@
       await waitFrame();
       if (modelAnimationPlaying && typeof viewer.play === 'function') viewer.play();
     };
+    // model-viewer re-centres on a tap. A tap on empty space re-frames the model
+    // from scratch, which on a portrait screen opens the field of view and shrinks
+    // it; keep the zoom the viewer had before the tap and only let it re-centre.
+    if (viewer) {
+      let tapDown = null;
+      const keepZoomAfterTap = (before) => {
+        const orbit = viewer.getCameraOrbit();
+        if (before.radius > 0 && Math.abs(orbit.radius - before.radius) / before.radius > 0.01) {
+          viewer.cameraOrbit = `${orbit.theta}rad ${orbit.phi}rad ${before.radius}m`;
+        }
+        if (Math.abs(parseFloat(framedFieldOfView()) - parseFloat(before.fov)) > 0.5) {
+          // The tap zoomed through the camera, so the property still holds its old text and
+          // writing the same text back would be a no-op; differ from it by a thousandth of a degree.
+          const restored = `${parseFloat(before.fov).toFixed(3)}deg`;
+          viewer.fieldOfView = restored === viewer.fieldOfView ? `${(parseFloat(before.fov) + 0.001).toFixed(3)}deg` : restored;
+        }
+      };
+      viewer.addEventListener('pointerdown', (event) => {
+        tapDown = event.isPrimary && viewer.getFieldOfView && viewer.getCameraOrbit
+          ? { x: event.clientX, y: event.clientY, at: performance.now(), fov: framedFieldOfView(), radius: viewer.getCameraOrbit().radius }
+          : null;
+      }, true);
+      viewer.addEventListener('pointerup', (event) => {
+        const before = tapDown;
+        tapDown = null;
+        if (!before || !event.isPrimary || performance.now() - before.at > 300) return;
+        if (Math.hypot(event.clientX - before.x, event.clientY - before.y) > 2) return;
+        [120, 500].forEach((delay) => setTimeout(() => keepZoomAfterTap(before), delay));
+      }, true);
+    }
     window.viewerView.register('camera', {
       get: cameraState,
       apply: (saved) => (saved && saved.orbit ? restoreCamera(saved) : undefined),
@@ -5675,7 +5851,7 @@
         button.setAttribute('aria-pressed', 'false');
         button.addEventListener('click', () => {
           if (section && section.axis === axis) return;
-          setSection({ axis, offset: 0, flip: section ? section.flip : false });
+          setSection({ axis, offset: crosshair[axis], flip: section ? section.flip : false });
         });
         axesEl.appendChild(button);
       });
@@ -5727,7 +5903,9 @@
         sectionBtn.setAttribute('aria-expanded', String(open));
         if (open && !wasOpen) openDialogFocus(sectionPanel, sectionPanel.querySelector('[data-section-close]'));
         if (!open && wasOpen) closeDialogFocus(sectionPanel);
-        onSectionChanged();
+        // With the cross-section panels there is always a cut to look at: start on the first axis.
+        if (open && !section && sectionPanel.querySelector('[data-slice-slot]')) setSection({ axis: SECTION_AXES[0][0], offset: 0, flip: false });
+        else onSectionChanged();
       };
       sectionBtn.addEventListener('click', () => setSectionOpen(sectionPanel.hidden));
       otherPanelToggles.forEach((toggle) => toggle.addEventListener('click', () => { if (!sectionPanel.hidden) setSectionOpen(false); }));
@@ -5756,7 +5934,7 @@
         ? { y: { h: ['x', 1], v: ['z', 1] }, z: { h: ['x', 1], v: ['y', 1] }, x: { h: ['z', -1], v: ['y', 1] } }
         : { x: { h: ['z', -1], v: ['y', 1] }, y: { h: ['x', 1], v: ['z', -1] }, z: { h: ['x', 1], v: ['y', 1] } };
       const overlay = document.getElementById('sectionOverlay');
-      const sliceView = sectionPanel.querySelector('[data-slice-view]');
+      const sliceView = document.querySelector('[data-slice-view]');
       const guidesOn = () => !!(section && sectionCtx && !sectionPanel.hidden);
       let guidesFrame = 0;
       const drawGuides = () => {
@@ -5769,12 +5947,13 @@
         } catch (e) { camera = null; }
         if (!guidesOn() || !camera) { overlay.setAttribute('hidden', ''); return; }
         const { root, min, max, centre, Vec3 } = sectionCtx;
-        const rect = overlay.getBoundingClientRect();
+        const rect = viewer.getBoundingClientRect();
+        const origin = overlay.getBoundingClientRect(); // the viewer can be inset (control panel, slice dock)
         root.updateMatrixWorld();
         camera.updateMatrixWorld();
         const project = (p) => {
           const v = new Vec3(p[0], p[1], p[2]).applyMatrix4(root.matrixWorld).project(camera);
-          return { x: ((v.x + 1) / 2) * rect.width, y: ((1 - v.y) / 2) * rect.height, ok: v.z > -1 && v.z < 1 };
+          return { x: rect.left - origin.left + ((v.x + 1) / 2) * rect.width, y: rect.top - origin.top + ((1 - v.y) / 2) * rect.height, ok: v.z > -1 && v.z < 1 };
         };
         const i = AXIS_INDEX[section.axis];
         const [a, b] = [0, 1, 2].filter((k) => k !== i);
@@ -5883,12 +6062,12 @@
       };
       // Plane-triangle intersections of every visible mesh, as 2D segments
       // [u1, v1, u2, v2, ...] in metres (u right, v up), grouped per material.
-      const computeSlice = () => {
-        const i = AXIS_INDEX[section.axis];
-        const layout = SLICE_LAYOUT[section.axis];
+      const computeSlice = (axis, offset) => {
+        const i = AXIS_INDEX[axis];
+        const layout = SLICE_LAYOUT[axis];
         const h = AXIS_INDEX[layout.h[0]]; const hs = layout.h[1];
         const w = AXIS_INDEX[layout.v[0]]; const ws = layout.v[1];
-        const c = sectionCtx.centre[i] + section.offset;
+        const c = sectionCtx.centre[i] + offset;
         const groups = new Map();
         sectionCtx.meshes.forEach((mesh) => {
           if (!meshShown(mesh)) return; // hidden layer
@@ -5963,27 +6142,34 @@
         return out;
       };
 
-      const sliceCanvas = sliceView && sliceView.querySelector('[data-slice-canvas]');
-      const sliceStage = sliceView && sliceView.querySelector('[data-slice-stage]');
-      const sliceReadout = sliceView && sliceView.querySelector('[data-slice-readout]');
+      // One panel per axis (axial / coronal / sagittal for scans, X / Y / Z
+      // otherwise). The shared crosshair holds each axis' position; the panel
+      // of the section's axis follows the 3D cut, clicking another one moves
+      // the crosshair there (and makes that axis the cut).
+      const crosshair = { x: 0, y: 0, z: 0 }; // metres from the model-space bbox centre
+      const panels = {};
+      if (sliceView) {
+        sliceView.querySelectorAll('[data-slice-panel]').forEach((el) => {
+          panels[el.dataset.slicePanel] = {
+            axis: el.dataset.slicePanel, el,
+            canvas: el.querySelector('[data-slice-canvas]'),
+            stage: el.querySelector('[data-slice-stage]'),
+            readout: el.querySelector('[data-slice-readout]'),
+            zoom: 1, pan: [0, 0], points: [], hover: null, slice: null, key: '', frame: 0,
+          };
+        });
+      }
+      const panelList = Object.values(panels);
       const sliceMeasureBtn = sliceView && sliceView.querySelector('[data-slice-measure]');
-      const sliceWideBtn = sliceView && sliceView.querySelector('[data-slice-wide]');
-      const sliceHint = sliceView && sliceView.querySelector('[data-slice-hint]');
-      let slice = null; // computeSlice() result for sliceKey
-      let sliceKey = '';
-      let sliceZoom = 1;
-      let slicePan = [0, 0]; // metres, added to the view centre
       let sliceMeasuring = false;
-      let slicePoints = []; // [[u, v], ...] in metres
-      let sliceHover = null; // { u, v, snapped }
-      let sliceFrame = 0;
+      const offsetOf = (axis) => (section && section.axis === axis ? section.offset : crosshair[axis]);
       const formatSliceLength = (metres) => {
         const mm = metres * 1000;
         return mm < 100 ? `${mm.toFixed(1)} mm` : `${(mm / 10).toFixed(1)} cm`;
       };
-      const sliceBounds = () => {
+      const sliceBounds = (P) => {
         // The model's extent in the slice's two axes, so the scale stays put while scrolling.
-        const layout = SLICE_LAYOUT[section.axis];
+        const layout = SLICE_LAYOUT[P.axis];
         return ['h', 'v'].map((dim) => {
           const [axis, sign] = layout[dim];
           const k = AXIS_INDEX[axis];
@@ -5991,15 +6177,15 @@
           return [Math.min(...ends), Math.max(...ends)];
         });
       };
-      const sliceTransform = () => {
+      const sliceTransform = (P) => {
         const dpr = window.devicePixelRatio || 1;
-        const width = sliceCanvas.width / dpr;
-        const height = sliceCanvas.height / dpr;
-        const [[u0, u1], [v0, v1]] = sliceBounds();
+        const width = P.canvas.width / dpr;
+        const height = P.canvas.height / dpr;
+        const [[u0, u1], [v0, v1]] = sliceBounds(P);
         const fit = Math.min(width / ((u1 - u0) || 1e-3), height / ((v1 - v0) || 1e-3)) * 0.86;
-        const scale = fit * sliceZoom;
-        const cu = (u0 + u1) / 2 + slicePan[0];
-        const cv = (v0 + v1) / 2 + slicePan[1];
+        const scale = fit * P.zoom;
+        const cu = (u0 + u1) / 2 + P.pan[0];
+        const cv = (v0 + v1) / 2 + P.pan[1];
         return {
           scale, width, height,
           toX: (u) => width / 2 + (u - cu) * scale,
@@ -6008,11 +6194,11 @@
           toV: (y) => cv - (y - height / 2) / scale,
         };
       };
-      const snapPoint = (u, v, tf) => {
+      const snapPoint = (P, u, v, tf) => {
         // Nearest point on any contour within 10 px, else the point itself.
         let best = null;
         let bestD = (10 / tf.scale) ** 2;
-        (slice || []).forEach(({ segs }) => {
+        (P.slice || []).forEach(({ segs }) => {
           for (let k = 0; k < segs.length; k += 4) {
             const ax = segs[k]; const ay = segs[k + 1];
             const dx = segs[k + 2] - ax; const dy = segs[k + 3] - ay;
@@ -6025,22 +6211,23 @@
         });
         return best ? { u: best[0], v: best[1], snapped: true } : { u, v, snapped: false };
       };
-      const drawSlice = () => {
-        sliceFrame = 0;
-        if (!sliceCanvas || !section || !sectionCtx || sliceView.hidden) return;
-        const key = `${section.axis}|${section.offset}`;
-        if (!slice || key !== sliceKey) {
-          if (key !== sliceKey) slicePoints = [];
-          try { slice = computeSlice(); sliceSignature = sliceStateSignature(); } catch (e) { slice = []; }
-          sliceKey = key;
+      const drawSlice = (P) => {
+        P.frame = 0;
+        if (!section || !sectionCtx || sliceView.hidden) return;
+        const offset = offsetOf(P.axis);
+        const key = String(offset);
+        if (!P.slice || key !== P.key) {
+          if (key !== P.key) P.points = [];
+          try { P.slice = computeSlice(P.axis, offset); sliceSignature = sliceStateSignature(); } catch (e) { P.slice = []; }
+          P.key = key;
         }
         const dpr = window.devicePixelRatio || 1;
-        const box = sliceCanvas.getBoundingClientRect();
+        const box = P.canvas.getBoundingClientRect();
         if (!box.width || !box.height) return;
         const w = Math.round(box.width * dpr); const hgt = Math.round(box.height * dpr);
-        if (sliceCanvas.width !== w || sliceCanvas.height !== hgt) { sliceCanvas.width = w; sliceCanvas.height = hgt; }
-        const ctx = sliceCanvas.getContext('2d');
-        const tf = sliceTransform();
+        if (P.canvas.width !== w || P.canvas.height !== hgt) { P.canvas.width = w; P.canvas.height = hgt; }
+        const ctx = P.canvas.getContext('2d');
+        const tf = sliceTransform(P);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         // Follows the viewer background (the panel's light variant is in the CSS).
         const light = /^(light|white)$/.test(document.documentElement.dataset.viewerBg || '');
@@ -6052,7 +6239,7 @@
           for (let k = 2; k < chain.length; k += 2) ctx.lineTo(tf.toX(chain[k]), tf.toY(chain[k + 1]));
           if (close) ctx.closePath();
         };
-        slice.forEach((group) => {
+        P.slice.forEach((group) => {
           ctx.beginPath();
           group.loops.forEach((chain) => trace(chain, true));
           ctx.globalAlpha = 0.5;
@@ -6064,6 +6251,18 @@
           ctx.lineWidth = 1.5;
           ctx.stroke();
         });
+        // Crosshair: where the other two planes cut this one, in their colours.
+        const layout = SLICE_LAYOUT[P.axis];
+        const [ha, hs] = layout.h; const [va, vs] = layout.v;
+        const lineU = tf.toX(hs * (sectionCtx.centre[AXIS_INDEX[ha]] + offsetOf(ha)));
+        const lineV = tf.toY(vs * (sectionCtx.centre[AXIS_INDEX[va]] + offsetOf(va)));
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.85;
+        ctx.strokeStyle = PLANE_COLORS[ha];
+        ctx.beginPath(); ctx.moveTo(lineU, 0); ctx.lineTo(lineU, tf.height); ctx.stroke();
+        ctx.strokeStyle = PLANE_COLORS[va];
+        ctx.beginPath(); ctx.moveTo(0, lineV); ctx.lineTo(tf.width, lineV); ctx.stroke();
+        ctx.globalAlpha = 1;
         // Scale bar: a round length about a fifth of the view wide.
         const target = (tf.width / 5) / tf.scale;
         const magnitude = 10 ** Math.floor(Math.log10(target));
@@ -6078,8 +6277,8 @@
         ctx.font = '600 11px Inter, system-ui, sans-serif';
         ctx.fillText(formatSliceLength(length), barX, barY - 8);
         // Measurement: the points placed so far, the hover preview and the distance.
-        const pts = slicePoints.slice();
-        if (sliceMeasuring && sliceHover && pts.length === 1) pts.push([sliceHover.u, sliceHover.v]);
+        const pts = P.points.slice();
+        if (sliceMeasuring && P.hover && pts.length === 1) pts.push([P.hover.u, P.hover.v]);
         if (pts.length === 2) {
           ctx.strokeStyle = '#ff682c';
           ctx.lineWidth = 2;
@@ -6108,52 +6307,70 @@
           ctx.lineWidth = 1.5;
           ctx.stroke();
         });
-        if (sliceMeasuring && sliceHover && sliceHover.snapped) {
+        if (sliceMeasuring && P.hover && P.hover.snapped) {
           ctx.beginPath();
-          ctx.arc(tf.toX(sliceHover.u), tf.toY(sliceHover.v), 7, 0, Math.PI * 2);
+          ctx.arc(tf.toX(P.hover.u), tf.toY(P.hover.v), 7, 0, Math.PI * 2);
           ctx.strokeStyle = '#ff682c';
           ctx.lineWidth = 1.5;
           ctx.stroke();
         }
-        // Readout: the plane, what it cuts and the measured distance.
-        const label = SECTION_AXES.find(([axis]) => axis === section.axis)[1];
-        const cut = slice.filter((group) => group.segs.length).map((group) => group.name).filter(Boolean);
-        sliceReadout.textContent = `${label} · ${formatOffset(section.offset)}${cut.length ? ` · ${cut.length} structure${cut.length > 1 ? 's' : ''}` : ' · nothing cut here'}`;
-        if (slicePoints.length === 2) {
+        // Readout: the plane position, what it cuts and the measured distance.
+        const cut = P.slice.filter((group) => group.segs.length).map((group) => group.name).filter(Boolean);
+        P.readout.textContent = `${formatOffset(offset)}${cut.length ? ` · ${cut.length} structure${cut.length > 1 ? 's' : ''}` : ' · nothing cut'}`;
+        if (P.points.length === 2) {
           const span = document.createElement('span');
           span.className = 'is-distance';
-          span.textContent = ` · ${formatSliceLength(Math.hypot(slicePoints[1][0] - slicePoints[0][0], slicePoints[1][1] - slicePoints[0][1]))}`;
-          sliceReadout.appendChild(span);
+          span.textContent = ` · ${formatSliceLength(Math.hypot(P.points[1][0] - P.points[0][0], P.points[1][1] - P.points[0][1]))}`;
+          P.readout.appendChild(span);
         }
       };
-      const requestSliceDraw = (recompute = false) => {
-        if (recompute) slice = null;
-        if (!sliceFrame && sliceCanvas) sliceFrame = requestAnimationFrame(drawSlice);
+      // One panel, or every panel (and recompute: their cached cuts are dropped).
+      const requestSliceDraw = (recompute = false, only = null) => {
+        (only ? [only] : panelList).forEach((P) => {
+          if (recompute) P.slice = null;
+          if (!P.frame) P.frame = requestAnimationFrame(() => drawSlice(P));
+        });
       };
       const setSliceMeasuring = (on) => {
         sliceMeasuring = on;
-        slicePoints = [];
-        sliceHover = null;
+        panelList.forEach((P) => { P.points = []; P.hover = null; P.stage.classList.toggle('is-measuring', on); });
         sliceMeasureBtn.setAttribute('aria-pressed', String(on));
-        sliceStage.classList.toggle('is-measuring', on);
-        sliceHint.textContent = on ? 'Click two points; they snap to the outlines. Scroll to zoom.' : 'Scroll to zoom, drag to pan.';
         requestSliceDraw();
       };
-      const resetSliceView = () => { sliceZoom = 1; slicePan = [0, 0]; requestSliceDraw(); };
-      // Zoom by `factor` about a canvas point, keeping the slice point under it in place.
-      const zoomSliceAt = (factor, x, y) => {
-        const before = sliceTransform();
-        const u = before.toU(x); const v = before.toV(y);
-        sliceZoom = Math.min(40, Math.max(0.5, sliceZoom * factor));
-        const after = sliceTransform();
-        slicePan = [slicePan[0] + u - after.toU(x), slicePan[1] + v - after.toV(y)];
+      const resetSliceView = (only = null) => {
+        (only ? [only] : panelList).forEach((P) => { P.zoom = 1; P.pan = [0, 0]; });
+        requestSliceDraw(false, only);
       };
-      if (sliceCanvas) {
+      // Zoom by `factor` about a canvas point, keeping the slice point under it in place.
+      const zoomSliceAt = (P, factor, x, y) => {
+        const before = sliceTransform(P);
+        const u = before.toU(x); const v = before.toV(y);
+        P.zoom = Math.min(40, Math.max(0.5, P.zoom * factor));
+        const after = sliceTransform(P);
+        P.pan = [P.pan[0] + u - after.toU(x), P.pan[1] + v - after.toV(y)];
+      };
+      // A click on a panel puts the crosshair there; the clicked panel's axis becomes the cut.
+      const clickSlice = (P, u, v) => {
+        const [ha, hs] = SLICE_LAYOUT[P.axis].h; const [va, vs] = SLICE_LAYOUT[P.axis].v;
+        [[ha, hs * u], [va, vs * v]].forEach(([axis, value]) => {
+          const [lo, hi] = axisRange(axis);
+          crosshair[axis] = Math.min(hi, Math.max(lo, value - sectionCtx.centre[AXIS_INDEX[axis]]));
+        });
+        if (section.axis !== P.axis) setSection({ axis: P.axis, offset: crosshair[P.axis], flip: section.flip });
+        else { crosshair[section.axis] = section.offset; requestSliceDraw(); }
+      };
+      panelList.forEach((P) => {
+        const { canvas } = P;
+        const layout = SLICE_LAYOUT[P.axis];
+        [['left', 'h', 0], ['right', 'h', 1], ['bottom', 'v', 0], ['top', 'v', 1]].forEach(([side, dim, end]) => {
+          const [axis, sign] = layout[dim];
+          P.el.querySelector(`[data-slice-orient="${side}"]`).textContent = AXIS_ENDS[axis][sign > 0 ? end : 1 - end];
+        });
         let press = null; // { x, y, pan, moved }
         const pointers = new Map(); // pointerId -> [x, y], for the two-finger pinch
         let pinch = null; // { x, y, distance } of the previous move
         const local = (event) => {
-          const box = sliceCanvas.getBoundingClientRect();
+          const box = canvas.getBoundingClientRect();
           return [event.clientX - box.left, event.clientY - box.top];
         };
         const pinchOf = () => {
@@ -6163,37 +6380,37 @@
             distance: Math.hypot(list[0][0] - list[1][0], list[0][1] - list[1][1]),
           };
         };
-        sliceCanvas.addEventListener('pointerdown', (event) => {
+        canvas.addEventListener('pointerdown', (event) => {
           const [x, y] = local(event);
           pointers.set(event.pointerId, [x, y]);
-          sliceCanvas.setPointerCapture(event.pointerId);
+          canvas.setPointerCapture(event.pointerId);
           if (pointers.size === 2) { press = null; pinch = pinchOf(); return; } // a second finger: pinch, never a measure point
-          press = { x, y, pan: slicePan.slice(), moved: false };
+          press = { x, y, pan: P.pan.slice(), moved: false };
         });
-        sliceCanvas.addEventListener('pointermove', (event) => {
+        canvas.addEventListener('pointermove', (event) => {
           if (!section) return;
           const [x, y] = local(event);
-          const tf = sliceTransform();
+          const tf = sliceTransform(P);
           if (pointers.has(event.pointerId)) pointers.set(event.pointerId, [x, y]);
           if (pinch && pointers.size === 2) {
             const next = pinchOf();
-            slicePan = [slicePan[0] - (next.x - pinch.x) / tf.scale, slicePan[1] + (next.y - pinch.y) / tf.scale];
-            if (pinch.distance) zoomSliceAt(next.distance / pinch.distance, next.x, next.y);
+            P.pan = [P.pan[0] - (next.x - pinch.x) / tf.scale, P.pan[1] + (next.y - pinch.y) / tf.scale];
+            if (pinch.distance) zoomSliceAt(P, next.distance / pinch.distance, next.x, next.y);
             pinch = next;
-            requestSliceDraw();
+            requestSliceDraw(false, P);
             return;
           }
           if (press) {
             if (Math.hypot(x - press.x, y - press.y) > 4) press.moved = true;
             if (press.moved) {
-              slicePan = [press.pan[0] - (x - press.x) / tf.scale, press.pan[1] + (y - press.y) / tf.scale];
-              requestSliceDraw();
+              P.pan = [press.pan[0] - (x - press.x) / tf.scale, press.pan[1] + (y - press.y) / tf.scale];
+              requestSliceDraw(false, P);
             }
             return;
           }
           if (sliceMeasuring) {
-            sliceHover = snapPoint(tf.toU(x), tf.toV(y), tf);
-            requestSliceDraw();
+            P.hover = snapPoint(P, tf.toU(x), tf.toV(y), tf);
+            requestSliceDraw(false, P);
           }
         });
         const release = (event) => {
@@ -6203,37 +6420,34 @@
           press = null;
           return wasPress;
         };
-        sliceCanvas.addEventListener('pointerup', (event) => {
+        canvas.addEventListener('pointerup', (event) => {
           const wasPress = release(event);
-          if (!wasPress || wasPress.moved || !sliceMeasuring || !section) return;
+          if (!wasPress || wasPress.moved || !section) return;
           const [x, y] = local(event);
-          const tf = sliceTransform();
-          const point = snapPoint(tf.toU(x), tf.toV(y), tf);
-          if (slicePoints.length >= 2) slicePoints = [];
-          slicePoints.push([point.u, point.v]);
-          requestSliceDraw();
+          const tf = sliceTransform(P);
+          if (!sliceMeasuring) { clickSlice(P, tf.toU(x), tf.toV(y)); return; }
+          const point = snapPoint(P, tf.toU(x), tf.toV(y), tf);
+          if (P.points.length >= 2) P.points = [];
+          P.points.push([point.u, point.v]);
+          requestSliceDraw(false, P);
         });
-        sliceCanvas.addEventListener('pointercancel', release);
-        sliceCanvas.addEventListener('pointerleave', () => { if (sliceHover) { sliceHover = null; requestSliceDraw(); } });
-        sliceCanvas.addEventListener('wheel', (event) => {
+        canvas.addEventListener('pointercancel', release);
+        canvas.addEventListener('pointerleave', () => { if (P.hover) { P.hover = null; requestSliceDraw(false, P); } });
+        canvas.addEventListener('wheel', (event) => {
           if (!section) return;
           event.preventDefault();
           const [x, y] = local(event);
-          zoomSliceAt(Math.exp(-event.deltaY * (event.deltaMode === 1 ? 0.05 : 0.0015)), x, y);
-          requestSliceDraw();
+          zoomSliceAt(P, Math.exp(-event.deltaY * (event.deltaMode === 1 ? 0.05 : 0.0015)), x, y);
+          requestSliceDraw(false, P);
         }, { passive: false });
-        sliceCanvas.addEventListener('dblclick', resetSliceView);
+        canvas.addEventListener('dblclick', () => resetSliceView(P));
+        // The canvas follows the dock (the window, an embed resize).
+        if ('ResizeObserver' in window) new ResizeObserver(() => requestSliceDraw(false, P)).observe(canvas);
+        else window.addEventListener('resize', () => requestSliceDraw(false, P));
+      });
+      if (sliceView) {
         sliceMeasureBtn.addEventListener('click', () => setSliceMeasuring(!sliceMeasuring));
-        sliceView.querySelector('[data-slice-fit]').addEventListener('click', resetSliceView);
-        sliceWideBtn.addEventListener('click', () => {
-          const wide = !sectionPanel.classList.contains('is-wide');
-          sectionPanel.classList.toggle('is-wide', wide);
-          sliceWideBtn.setAttribute('aria-pressed', String(wide));
-          requestSliceDraw();
-        });
-        // The canvas follows the panel (enlarge, the window, an embed resize).
-        if ('ResizeObserver' in window) new ResizeObserver(() => requestSliceDraw()).observe(sliceCanvas);
-        else window.addEventListener('resize', () => requestSliceDraw());
+        sliceView.querySelector('[data-slice-fit]').addEventListener('click', () => resetSliceView());
         // Showing, hiding or recolouring a layer changes what the slice cuts.
         viewer.addEventListener('viewer-layers-change', () => requestSliceDraw(true));
       }
@@ -6257,7 +6471,28 @@
         if (signature !== sliceSignature) { sliceSignature = signature; requestSliceDraw(true); }
       };
       const startSliceWatch = () => { if (!sliceWatch) sliceWatch = setInterval(watchSlice, 200); };
-      let lastSliceAxis = null;
+      // Desktop: a dock under the model. Phones: the sheet itself, with the
+      // model shortened to what is left above it (split view).
+      const sliceDock = document.querySelector('[data-slice-dock]');
+      const sliceSlot = sectionPanel.querySelector('[data-slice-slot]');
+      const phoneQuery = window.matchMedia('(max-width: 640px)');
+      const syncSheetHeight = () => {
+        if (document.body.classList.contains('slice-split')) {
+          document.documentElement.style.setProperty('--slice-dock-h', `${sectionPanel.offsetHeight}px`);
+        } else document.documentElement.style.removeProperty('--slice-dock-h');
+      };
+      const placeSlice = (show) => {
+        if (!sliceView || !sliceDock || !sliceSlot) return;
+        const phone = phoneQuery.matches;
+        const home = phone ? sliceSlot : sliceDock;
+        if (sliceView.parentNode !== home) home.appendChild(sliceView);
+        sliceDock.hidden = !show || phone;
+        document.body.classList.toggle('has-slice-dock', show);
+        document.body.classList.toggle('slice-split', show && phone);
+        syncSheetHeight();
+      };
+      if (sliceView && 'ResizeObserver' in window) new ResizeObserver(syncSheetHeight).observe(sectionPanel);
+      if (sliceView) phoneQuery.addEventListener('change', () => onSectionChanged());
       onSectionChanged = () => {
         if (guidesOn()) startGuides();
         else if (overlay) overlay.setAttribute('hidden', '');
@@ -6265,20 +6500,15 @@
         // Skinned meshes are posed on the GPU, so their triangles cannot be traced here.
         const show = guidesOn() && !sectionCtx.meshes.some((mesh) => mesh.isSkinnedMesh);
         sliceView.hidden = !show;
+        placeSlice(show);
         if (!show) return;
+        crosshair[section.axis] = section.offset;
         startSliceWatch();
-        if (section.axis !== lastSliceAxis) {
-          lastSliceAxis = section.axis;
-          slicePan = [0, 0];
-          sliceZoom = 1;
-          const layout = SLICE_LAYOUT[section.axis];
-          [['left', 'h', 0], ['right', 'h', 1], ['bottom', 'v', 0], ['top', 'v', 1]].forEach(([side, dim, end]) => {
-            const [axis, sign] = layout[dim];
-            sliceView.querySelector(`[data-slice-orient="${side}"]`).textContent = AXIS_ENDS[axis][sign > 0 ? end : 1 - end];
-          });
-          sliceStage.style.borderColor = PLANE_COLORS[section.axis];
-          sliceView.querySelector('[data-slice-title]').textContent = `${SECTION_AXES.find(([axis]) => axis === section.axis)[1]} slice`;
-        }
+        panelList.forEach((P) => {
+          const active = P.axis === section.axis;
+          P.el.classList.toggle('is-active', active);
+          P.stage.style.borderColor = active ? PLANE_COLORS[P.axis] : '';
+        });
         requestSliceDraw();
       };
 
@@ -6305,8 +6535,8 @@
         sectionSides.clear();
         patchedMeshes.clear();
         sectionCtx = prepareSection();
-        slice = null; // new meshes: the slice view recomputes
-        lastSliceAxis = null;
+        crosshair.x = 0; crosshair.y = 0; crosshair.z = 0;
+        panelList.forEach((P) => { P.slice = null; P.zoom = 1; P.pan = [0, 0]; }); // new meshes: the slices recompute
         sectionBtn.hidden = !sectionCtx; // internals differ -> the feature hides
         if (!sectionCtx) { section = null; syncSectionUi(); return; }
         const next = pendingSection !== undefined ? pendingSection : section;
