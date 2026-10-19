@@ -76,6 +76,7 @@ from licensing import (
 from blog_content import (
     code_post_slugs,
     cover_image_path,
+    faq_items,
     get_all_posts,
     get_post,
     related_posts,
@@ -5923,6 +5924,7 @@ def register_routes(app: Flask) -> None:
             body_html=render_body(post["body"], cache_key=cache_key),
             cover_url=urljoin(public_url("landing"), cover.lstrip("/")) if cover else None,
             date_modified=blog_post_modified_date(post),
+            faq=faq_items(post["body"]),
             related=related_posts(post, merged_blog_posts()),
         )
 

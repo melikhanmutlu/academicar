@@ -95,11 +95,14 @@ POSTS: list[dict] = [
         "title": "How to Add Interactive 3D Models to Your Research Paper",
         "description": "A step-by-step guide to embedding interactive 3D models and AR in academic papers, theses, and posters using a QR code — no coding required.",
         "date": "2026-06-02",
+        "updated": "2026-10-19",
         "author": "AcademicAR Team",
         "tags": ["3D publishing", "how-to", "QR codes"],
         "persona": "Researchers & PhD students",
         "read_minutes": 6,
         "body": """\
+![A research article figure lifting off the page as an interactive 3D bone model](/static/images/blog/covers/how-to-add-3d-models-to-research-papers.webp)
+
 Static figures flatten three-dimensional data. A micrograph, a reconstructed
 fossil, a protein, an engineered part — all lose information the moment they
 become a 2D image on a page. Interactive 3D fixes that: readers rotate, zoom,
@@ -108,18 +111,25 @@ in augmented reality. Here's how to add that to your next publication.
 
 ## 1. Export a clean 3D model
 
-Start from whatever your pipeline produces — a CT/MRI segmentation, a
-photogrammetry scan, a CAD assembly, or a molecular surface — and export to one
-of the common interchange formats: **GLB/glTF, STL, OBJ, or FBX**. Decimate
-extreme polygon counts (a few hundred thousand triangles is plenty for the web)
-and make sure the model is watertight and correctly scaled.
+Start from whatever your pipeline produces — a CT/MRI scan or segmentation, a
+photogrammetry scan, a CAD assembly, or a molecular surface. AcademicAR accepts
+**GLB/glTF, STL, OBJ, FBX, STEP/STP**, a **DICOM series** (as a ZIP), and
+segmentations in **NIfTI, NRRD, or DICOM-SEG**, so you often don't need to
+convert anything yourself. If you export a mesh, decimate extreme polygon counts
+(a few hundred thousand triangles is plenty for the web) and check the scale.
+
+Not sure which format to export? See
+[GLB vs STL vs glTF vs OBJ](/blog/glb-stl-gltf-obj-3d-format-guide). Starting
+from a scan? Our [DICOM to 3D guide](/blog/dicom-to-3d-model-guide) covers it.
 
 ## 2. Upload and let it convert
 
-Upload the file to AcademicAR. It is automatically converted to web-optimized
+Upload the file to a project. It is converted in the background to web-optimized
 **GLB** with Draco geometry compression and compressed textures, and a companion
-**USDZ** is generated so iPhones and iPads can launch AR directly. You don't need
-a 3D engineer or a custom WebGL build.
+**USDZ** is generated so iPhones and iPads can launch AR directly. Multi-part
+models (assemblies, segmentations with several structures) get one **layer** per
+part, so readers can hide, isolate, and recolour them. You don't need a 3D
+engineer or a custom WebGL build.
 
 ## 3. Get your viewer link and QR code
 
@@ -131,21 +141,51 @@ will not rot.
 ## 4. Place it in your paper, thesis, or poster
 
 - **Journal/PDF:** add a figure note such as *"Interactive 3D model available at
-  [link] — scan the QR code"* and drop the QR image next to the figure.
-- **Conference poster:** put the QR in the corner of the relevant panel; ~half of
-  attendees will scan a poster QR, turning a static panel into a hands-on demo.
+  [link] — scan the QR code"* and drop the QR image next to the figure. Many
+  journals accept a QR inside the figure panel; check the author guidelines.
+- **Conference poster:** put the QR next to the relevant panel; our
+  [poster QR guide](/blog/qr-codes-on-academic-posters-guide) covers size and
+  placement.
 - **Thesis:** link from the figure caption; examiners can explore the geometry
   while they read.
-- **Website/repository:** embed the viewer as a lightweight iframe widget.
+- **Website, LMS, or repository:** [embed the viewer](/blog/embed-3d-model-website)
+  as a lightweight iframe.
 
-## 5. Keep it compliant
+## 5. Make the figure itself from the model
+
+The same model can produce the static figure that goes into the PDF. Save a
+view (camera, visible layers, labels) and export a
+[publication-ready figure](/blog/publication-ready-3d-figures-comparisons) with a
+scale bar and a QR card, so the printed image and the interactive model always
+match. Saved **scenes** let you link straight to the view a figure shows.
+
+## 6. Keep it compliant
 
 Before sharing, confirm the model is anonymized where required and that you hold
 the rights to publish it. Responsible sharing is part of good scholarship, and
-the upload step makes that confirmation explicit.
+the upload step makes that confirmation explicit. Medical scans need an extra
+confirmation, and the raw scan is deleted after conversion.
 
 That's it — one upload turns a 3D asset into an interactive, AR-ready figure your
 readers can actually explore.
+
+## Frequently asked questions
+
+### Can I put an interactive 3D model in a PDF paper?
+
+A PDF can't reliably show interactive 3D in every reader, but it can carry a link
+and a QR code. Readers open the model in their browser from the link, and on a
+phone the QR code opens it in 3D and AR.
+
+### Will the link still work if I update the model after publication?
+
+Yes. The viewer link and QR code point to a permanent identifier, so replacing
+the file, changing colours, or upgrading the plan keeps the same link.
+
+### Which 3D formats can I upload?
+
+GLB/glTF, STL, OBJ (with its MTL and textures), FBX, STEP/STP, a DICOM series as
+a ZIP, and segmentations in NIfTI, NRRD, or DICOM-SEG.
 
 *Ready to try it? [Create a free account](/auth/register) and publish your first
 interactive model.*
@@ -156,11 +196,14 @@ interactive model.*
         "title": "The Complete Guide to QR Codes on Academic Posters",
         "description": "Best practices for putting QR codes on conference posters: what to link, where to place them, sizing, and how to turn a static poster into an interactive demo.",
         "date": "2026-06-03",
+        "updated": "2026-10-19",
         "author": "AcademicAR Team",
         "tags": ["QR codes", "conference posters", "how-to"],
         "persona": "Conference presenters",
-        "read_minutes": 5,
+        "read_minutes": 6,
         "body": """\
+![A conference poster with a QR code being scanned by a phone that shows a 3D model](/static/images/blog/covers/qr-codes-on-academic-posters-guide.webp)
+
 A poster has minutes to make an impression, and wall space is scarce. A QR code
 is the cheapest way to extend a poster beyond its borders — linking to your data,
 your paper, or, increasingly, an **interactive 3D model** of whatever you're
@@ -174,15 +217,18 @@ presenting. Here's how to do it well.
 - Supplementary data, code, or a short video.
 
 Avoid linking to a generic lab homepage; make the destination specific to the
-poster.
+poster. If you have several models, one QR per model next to its figure works
+better than one QR to a list.
 
 ## Placement and sizing
 
 - Put the QR **near the relevant figure**, not just in a footer, so the link has
   obvious context.
 - Make it **at least 3–4 cm square** on a printed poster so phones lock on from a
-  comfortable standing distance.
-- Keep a quiet margin of white space around the code.
+  comfortable standing distance; 5 cm or more if people will scan from across an
+  aisle.
+- Keep a quiet margin of white space around the code, and print it dark on light.
+  Inverted or low-contrast QR codes fail on many phones.
 - Add a one-line call to action: *"Scan to explore the model in 3D & AR."*
 
 ## Make it durable
@@ -190,23 +236,60 @@ poster.
 Use a QR that points to a **stable resolver URL**, not a raw file path that might
 move. AcademicAR's model QR codes resolve through a permanent identifier, so the
 same printed poster keeps working after you replace or upgrade the model later.
+That matters because posters get photographed, shared, and pinned on lab walls for
+years.
+
+## Design the landing experience
+
+The scan is only half of it. What opens should work on a phone held at arm's
+length, on conference Wi-Fi:
+
+- **Keep the model light.** Decimate dense scans so it loads quickly.
+- **Start from a good view.** Save a default view or a scene so the first thing
+  people see is the part your poster discusses.
+- **Offer AR.** Many visitors will tap *View in AR* and place the model on the
+  floor in front of the poster. That moment is what people remember.
+
+The same QR can go on a slide at your talk; see
+[how to add a 3D model to PowerPoint](/blog/add-3d-model-to-powerpoint).
 
 ## Measure it (optional)
 
-If you want to know whether people scanned, link through a destination you control
-so you can see views over the conference. Even rough numbers help you justify the
-effort next time.
+If you want to know whether people scanned, link through a destination you
+control. AcademicAR shows each model's **views, QR scans, and AR starts**, so you
+can see what the poster session actually produced and justify the effort next
+time.
 
 ## A quick checklist
 
 1. One specific, valuable destination per QR.
 2. Placed next to the figure it explains.
-3. 3–4 cm minimum, with margin.
+3. 3–4 cm minimum, with margin and strong contrast.
 4. A short call to action.
 5. A stable URL that won't break.
+6. A light model and a good first view on a phone.
 
 Done right, a QR turns a poster from something people glance at into something they
 hold in their hands.
+
+## Frequently asked questions
+
+### How big should a QR code be on a poster?
+
+At least 3–4 cm square for scanning from a normal standing distance, and larger
+(5 cm or more) if people will scan from further away. Leave a white margin around
+it.
+
+### What should a poster QR code link to?
+
+Something specific to the poster: an interactive 3D model of the specimen or
+device, the paper or preprint, or the dataset. A 3D model is the most engaging
+because visitors can explore it and place it in AR.
+
+### Will my poster QR code still work after the conference?
+
+It will if it points to a stable link. AcademicAR's QR codes resolve through a
+permanent identifier, so they keep working when you replace or update the model.
 
 *[Generate a stable QR code for your 3D model](/auth/register) in a couple of
 minutes.*
@@ -217,50 +300,102 @@ minutes.*
         "title": "GLB vs STL vs glTF vs OBJ: Choosing a 3D Format for the Web",
         "description": "A practical comparison of GLB, glTF, STL, OBJ, and FBX for sharing research 3D models online — which to use, and why GLB usually wins for the web.",
         "date": "2026-06-04",
+        "updated": "2026-10-19",
         "author": "AcademicAR Team",
         "tags": ["3D formats", "glTF", "comparison"],
         "persona": "Technical researchers",
         "read_minutes": 6,
         "body": """\
+![Four 3D file types, each with the kind of model it holds](/static/images/blog/covers/glb-stl-gltf-obj-3d-format-guide.webp)
+
 "What format should I export?" is the first question when you want to share a 3D
 model online. Here's a researcher-friendly comparison of the formats you'll meet.
 
 ## STL — geometry only
 
 STL is the lingua franca of 3D printing and many segmentation tools. It stores
-**triangles and nothing else**: no color, no texture, no material. It's perfect as
-a *source* format from CT/MRI or CAD, but on its own a web viewer can only show it
-as a plain gray shape.
+**triangles and nothing else**: no units, no color, no texture, no material, no
+separate parts. It's perfect as a *source* format from CT/MRI or CAD, but on its
+own a web viewer can only show it as a plain gray shape, and you have to say
+whether it was made in millimetres or metres.
 
 ## OBJ — geometry plus simple materials
 
 OBJ adds UV coordinates and references an `.mtl` material file plus texture images.
 It's widely supported and human-readable, but it's verbose and splits a model
-across several files, which is awkward to host.
+across several files, which is awkward to host. Like STL, it has no units.
 
 ## FBX — rich but proprietary
 
-FBX (from Autodesk) carries geometry, materials, rigs, and animation. It's common
-in CAD and animation pipelines but is a proprietary binary that needs conversion
-for the open web.
+FBX (from Autodesk) carries geometry, materials, a hierarchy of parts, the
+modelling unit, rigs, and animation. It's common in CAD and animation pipelines
+but is a proprietary binary that needs conversion for the open web.
+
+## STEP — exact CAD geometry
+
+STEP (`.step`, `.stp`) is the neutral exchange format of mechanical CAD. It
+stores exact surfaces (not triangles) and the assembly structure, so it must be
+tessellated into a mesh before any viewer can draw it. See
+[what a STEP file is and how to open it](/blog/open-step-stp-file-online).
 
 ## glTF / GLB — built for the web
 
 glTF is the "JPEG of 3D": an open standard designed for efficient delivery and
 real-time rendering. **GLB** is its single-file binary form — geometry, materials,
-textures, and animation all in one `.glb`. It supports physically based rendering
-(PBR) so materials look right, and it compresses well.
+textures, named parts, and animation all in one `.glb`, in metres. It supports
+physically based rendering (PBR) so materials look right, and it compresses well
+with Draco.
+
+## USDZ — Apple's AR format
+
+USDZ is the packaged form of Pixar's Universal Scene Description and is what iPhone
+and iPad **AR Quick Look** opens. You rarely author it directly: you convert from
+GLB. See [GLB to USDZ](/blog/glb-to-usdz-iphone-ar).
+
+## At a glance
+
+| Format | Colour & textures | Parts | Units | Web-ready |
+| --- | --- | --- | --- | --- |
+| STL | No | No | No | Needs conversion |
+| OBJ | Yes (MTL + images) | Groups | No | Needs conversion |
+| FBX | Yes | Yes | Yes | Needs conversion |
+| STEP | Colours only | Yes | Yes | Needs tessellation |
+| GLB | Yes | Yes | Metres | Yes |
+| USDZ | Yes | Yes | Yes | iPhone/iPad AR |
 
 ## So which should you use?
 
-- **Working/source format:** keep your STL, OBJ, or FBX from the original pipeline.
+- **Working/source format:** keep your STL, OBJ, FBX, or STEP from the original
+  pipeline.
 - **Sharing on the web:** convert to **GLB**. It's one file, renders fast, supports
-  real materials, and is what browser viewers and AR expect.
+  real materials, and is what browser viewers and Android AR expect.
+- **iPhone AR:** add a **USDZ** generated from the GLB.
 
-The good news: you don't have to convert by hand. Upload STL, OBJ, FBX, or GLB to
-AcademicAR and it produces an optimized GLB (Draco-compressed geometry, compressed
-textures) plus a USDZ for iOS AR — so your readers get a fast, correct model
-regardless of what you started from.
+The good news: you don't have to convert by hand. Upload STL, OBJ, FBX, STEP, or
+GLB to AcademicAR and it produces an optimized GLB (Draco-compressed geometry,
+compressed textures) plus a USDZ for iOS AR — so your readers get a fast, correct
+model regardless of what you started from. Step-by-step guides:
+[STL to GLB](/blog/convert-stl-to-glb) and
+[OBJ and FBX to GLB](/blog/convert-obj-fbx-to-glb).
+
+## Frequently asked questions
+
+### What is the difference between glTF and GLB?
+
+They are the same format in two packagings. glTF is a JSON file that can
+reference separate binary and image files; GLB packs everything into one binary
+file, which is easier to host and share.
+
+### Is GLB better than STL?
+
+For viewing and sharing, yes: GLB carries colours, materials, parts, and real
+units, and it compresses well. STL is still the standard for 3D printing, so keep
+it for the printer.
+
+### Which 3D format is best for the web?
+
+GLB. It is the format browsers, web viewers such as model-viewer, and Android AR
+load directly. Add USDZ for AR on iPhone and iPad.
 
 *[Upload any format and get a web-ready GLB](/auth/register) automatically.*
 """,
@@ -270,11 +405,14 @@ regardless of what you started from.
         "title": "How Augmented Reality Is Transforming Anatomy Education",
         "description": "Why AR and interactive 3D models are reshaping how anatomy is taught — spatial understanding, accessibility, and lower lab costs.",
         "date": "2026-06-05",
+        "updated": "2026-10-19",
         "author": "AcademicAR Team",
         "tags": ["anatomy", "education", "augmented reality"],
         "persona": "Medical & anatomy educators",
         "read_minutes": 5,
         "body": """\
+![Two students looking at a skull and spine model in augmented reality above a tablet](/static/images/blog/covers/augmented-reality-anatomy-education.webp)
+
 Anatomy is inherently three-dimensional, yet it is still often taught from 2D
 atlases. Augmented reality and interactive 3D models close that gap, letting
 students manipulate structures in space rather than memorizing flat cross-sections.
@@ -296,6 +434,27 @@ model into the room, so students walk around it and view it from any angle.
 - **Accessibility:** remote and distance learners get the same hands-on object as
   those in the lab.
 
+## Features that matter for anatomy teaching
+
+- **Layers.** A model built from a segmentation keeps each structure separate:
+  students hide the ribs to see the lungs, or isolate one vessel. See
+  [sharing medical segmentations](/blog/medical-image-segmentation-to-3d-viewer).
+- **Cross-sections.** A section plane and a colour-coded
+  [2D slice view](/blog/section-plane-slice-view-cross-sections) connect the 3D
+  model to the CT and MRI planes students learn to read.
+- **Guided tours.** Save a sequence of views with labels and play it as a
+  [tour](/blog/saved-scenes-guided-tours-3d-teaching), so a lecture walks through
+  the anatomy in order.
+- **Measurements.** [Structure dimensions and distances](/blog/measuring-anatomy-3d-layer-metrics)
+  make size relationships concrete.
+
+## Where the models come from
+
+You can start from a licensed anatomy library, from anonymized patient scans with
+the right approvals, or from your own specimens. A CT series can be uploaded
+directly and turned into bone, skin, and vessel layers; our
+[DICOM to 3D guide](/blog/dicom-to-3d-model-guide) explains how.
+
 ## The cost and access angle
 
 Cadaveric and physical model resources are expensive and limited. Digital 3D
@@ -304,16 +463,36 @@ with a phone has the structure in their pocket, available any time.
 
 ## How to add it to your course
 
-You don't need a development team. Take a 3D anatomical model (from a scan or a
-licensed library), upload it, and share the viewer link or QR code in your LMS,
-slides, or handouts. Students open it in a browser; on a phone they can switch to
-AR with a tap — no app to install.
+You don't need a development team. Take a 3D anatomical model, upload it, and
+share the viewer link or QR code in your LMS, slides, or handouts, or
+[embed it in a course page](/blog/embed-3d-model-website). Students open it in a
+browser; on a phone they can switch to AR with a tap — no app to install. More
+ideas for clinical teaching are in
+[3D in medical education and case reports](/blog/3d-models-surgical-education-case-reports).
 
 Interactive 3D won't replace the dissection room, but it makes the spatial
 reasoning at the heart of anatomy visible to every student, every time.
 
+## Frequently asked questions
+
+### Do students need an app to view anatomy models in AR?
+
+No. The model opens in the phone's browser, and the View in AR button uses the
+AR viewer built into iOS and Android.
+
+### Can I use patient CT scans for teaching models?
+
+Only with the approvals your institution requires and after full anonymization.
+Medical uploads to AcademicAR need an explicit anonymization confirmation, and the
+raw scan is deleted after conversion.
+
+### Can students see inside a 3D anatomy model?
+
+Yes. Layers let them hide outer structures, and the section plane cuts through the
+model to show cross-sections like a CT or MRI slice.
+
 *[Publish an interactive anatomy model](/auth/register) and share it with your
-class today.*
+class today. See also [AR for anatomy teaching](/ar-for-anatomy).*
 """,
     },
     {
@@ -321,11 +500,14 @@ class today.*
         "title": "Why Interactive 3D Figures Belong in Scientific Publishing",
         "description": "Static figures lose information. Interactive 3D figures improve comprehension, reproducibility, and engagement — and they're easier to add than you think.",
         "date": "2026-06-05",
+        "updated": "2026-10-19",
         "author": "AcademicAR Team",
         "tags": ["scientific publishing", "open science", "3D figures"],
         "persona": "Researchers & editors",
         "read_minutes": 5,
         "body": """\
+![A flat lattice figure unfolding into an interactive 3D lattice](/static/images/blog/covers/interactive-3d-figures-scientific-publishing.webp)
+
 Most scientific results that are three-dimensional are still communicated in two
 dimensions. We render a chosen viewpoint, flatten it, and hope the reader
 reconstructs the rest. Interactive 3D figures remove that compromise.
@@ -334,13 +516,16 @@ reconstructs the rest. Interactive 3D figures remove that compromise.
 
 A single rendered angle hides occluded structures, makes spatial relationships
 ambiguous, and forces authors to pick one viewpoint among many. Reviewers and
-readers can't check the parts the author didn't show.
+readers can't check the parts the author didn't show, and they can't measure
+anything the figure doesn't label.
 
 ## What interactive 3D adds
 
 - **Comprehension:** readers explore the geometry themselves, from any angle.
 - **Reproducibility:** the actual model — not a screenshot of it — travels with the
   paper, supporting the move toward FAIR, open research objects.
+- **Verification:** reviewers can cut through the model with a section plane and
+  check dimensions instead of trusting a caption.
 - **Engagement:** an interactive figure is memorable, and on mobile it becomes an
   AR object the reader can place in front of them.
 
@@ -351,16 +536,56 @@ Three forces are converging: journals increasingly **mandate data availability**
 and open web standards (glTF/GLB, USDZ, WebXR) make interactive 3D render anywhere
 without plugins. The infrastructure to publish 3D well finally exists.
 
+## What a good interactive figure looks like
+
+- **It opens on the view the paper discusses.** Save that view as a scene and
+  link to it directly, so the reader doesn't start from an arbitrary angle.
+- **It keeps parts separate.** Structures, components, or phases are layers the
+  reader can hide and isolate.
+- **It matches the printed figure.** Export the static figure from the same model
+  so the two never drift apart; see
+  [publication-ready figures and comparisons](/blog/publication-ready-3d-figures-comparisons).
+- **It has a stable link** that still works after you correct or replace the model.
+- **It is light enough for a phone**, because many readers will scan the QR code.
+
 ## The friction problem — and the fix
 
 Historically, embedding interactive 3D meant custom web work that most authors
 won't do. That's the gap AcademicAR fills: upload your model, get an optimized,
 AR-ready viewer and a stable QR code, and link it from your figure caption. The
 interactive object lives alongside your paper instead of dying as a static image.
+For the practical steps, see
+[how to add interactive 3D models to your research paper](/blog/how-to-add-3d-models-to-research-papers).
+
+## Deposit and display
+
+Interactive viewing doesn't replace archiving. Deposit the underlying data in a
+repository with a persistent identifier, cite it, and use the interactive viewer
+as the readable layer on top. Our
+[guide to research 3D platforms](/blog/sketchfab-alternative-researchers) compares
+the options.
 
 Interactive 3D figures aren't a gimmick — they're a more honest way to communicate
 three-dimensional results. As tooling removes the friction, they'll become an
 expected part of the record.
+
+## Frequently asked questions
+
+### Do journals accept interactive 3D figures?
+
+Most journals publish a static figure in the article and accept links to
+supplementary material. A common approach is a static figure with a caption link
+and QR code to the interactive model.
+
+### How do I cite an interactive 3D model in a paper?
+
+Cite the archived dataset by its DOI, and add the viewer link or QR code in the
+figure caption or data availability statement.
+
+### What makes an interactive figure reproducible?
+
+The actual geometry is shared, not only a rendering, and it stays available at a
+stable link. Archiving the source data in a repository completes it.
 
 *[Turn your next figure into an interactive 3D object](/auth/register).*
 """,
@@ -370,11 +595,14 @@ expected part of the record.
         "title": "AR for Archaeology: Bringing Artifacts to Life in 3D",
         "description": "How 3D scanning and augmented reality help archaeologists share, study, and teach with fragile artifacts — without risking the originals.",
         "date": "2026-06-06",
+        "updated": "2026-10-19",
         "author": "AcademicAR Team",
         "tags": ["archaeology", "museums", "3D scanning"],
         "persona": "Archaeologists & curators",
         "read_minutes": 5,
         "body": """\
+![An amphora on a museum plinth surrounded by photogrammetry camera positions, with a phone showing its 3D scan](/static/images/blog/covers/ar-for-archaeology-3d-artifacts.webp)
+
 Artifacts are fragile, irreplaceable, and often locked away in storage. 3D scanning
 plus augmented reality lets archaeologists and museums share them widely while the
 originals stay safe.
@@ -391,18 +619,38 @@ originals stay safe.
 ## From scan to shareable model
 
 Photogrammetry (many overlapping photos) or structured-light scanning produces a
-detailed mesh with color. After cleanup and decimation, export to a web format and
-publish it as an interactive viewer. Add **annotations** to point out tool marks,
-inscriptions, or repairs, turning the model into a guided object lesson.
+detailed mesh with color. A few habits make the result far better:
+
+- **Shoot with diffuse light** and plenty of overlap (60–80% between photos), and
+  include a **scale bar** in the scene so the model has real dimensions.
+- **Clean and decimate.** Remove the turntable and background, and reduce the
+  triangle count for the web; keep the full-resolution scan as your archive copy.
+- **Export with textures**, as GLB, or OBJ with its MTL and images, or FBX. See
+  [how to convert OBJ and FBX to GLB](/blog/convert-obj-fbx-to-glb).
+
+Then publish it as an interactive viewer. Add **annotations** to point out tool
+marks, inscriptions, or repairs, turning the model into a guided object lesson.
+
+## Look closer than the display case allows
+
+- **Section planes** cut through a vessel to show wall thickness or a profile,
+  the 3D equivalent of a drawn section.
+- **Measurements** give dimensions and distances between parts.
+- **Saved scenes and tours** walk students through an object step by step; see
+  [teaching with guided tours](/blog/saved-scenes-guided-tours-3d-teaching).
+- **Side-by-side comparisons** show an object before and after conservation, or
+  two related finds next to each other.
 
 ## Putting it in publications and exhibits
 
 - **Papers:** link the 3D model from your figures so reviewers can inspect the
-  surface themselves.
+  surface themselves; see
+  [interactive 3D figures in publishing](/blog/interactive-3d-figures-scientific-publishing).
 - **Posters and labels:** a QR code next to an artifact label lets visitors explore
-  it in 3D and AR on their own phones.
-- **Online collections:** embed the viewer in a catalog page to bring a static
-  record to life.
+  it in 3D and AR on their own phones; our
+  [QR code guide](/blog/qr-codes-on-academic-posters-guide) covers sizing.
+- **Online collections:** [embed the viewer](/blog/embed-3d-model-website) in a
+  catalog page to bring a static record to life.
 
 ## Responsible sharing
 
@@ -413,8 +661,28 @@ source communities — good practice that AcademicAR's upload step makes explici
 3D and AR let an artifact be studied by everyone, everywhere, while the original
 rests safely in its case.
 
+## Frequently asked questions
+
+### What is the best way to 3D scan an artifact?
+
+Photogrammetry with a camera and good, even light works for most objects and is
+inexpensive. Structured-light scanners give higher accuracy for small, detailed
+pieces. Include a scale bar either way.
+
+### Can museum visitors view artifacts in AR without an app?
+
+Yes. A QR code on the label opens the model in the phone's browser, and the View
+in AR button uses the AR viewer built into iOS and Android.
+
+### How large can a 3D scan be for web sharing?
+
+Keep the full-resolution scan as the archive copy and publish a decimated version
+of a few hundred thousand triangles with compressed textures, so it loads quickly
+on phones.
+
 *[Publish a 3D artifact with annotations](/auth/register) and share it via a QR
-code.*
+code. See also [AR for archaeology](/ar-for-archaeology) and
+[AR for museums](/ar-for-museums).*
 """,
     },
     {
@@ -422,6 +690,7 @@ code.*
         "title": "From DICOM to Interactive 3D: A Practical Guide for Researchers",
         "description": "How to turn a CT or MRI DICOM series into an interactive, layered 3D model with AR — what to export, how anonymization works, and what happens to the raw scan.",
         "date": "2026-09-24",
+        "updated": "2026-10-19",
         "author": "AcademicAR Team",
         "tags": ["DICOM", "medical imaging", "how-to"],
         "persona": "Clinician-researchers & radiology teams",
@@ -478,6 +747,8 @@ you can pick one or more **threshold presets**:
 | Custom range | Your own minimum (and optional maximum) in HU | CT |
 
 Each preset you select becomes its own **layer** in the viewer, with its own colour.
+Why the presets sit where they do is explained in
+[Hounsfield units explained](/blog/hounsfield-units-ct-thresholding-3d).
 If the presets aren't precise enough — for example, you need individual organs —
 segment the scan first and upload the segmentation instead (see our
 [guide to sharing segmentations](/blog/medical-image-segmentation-to-3d-viewer)).
@@ -501,7 +772,27 @@ paper, poster, or lecture slides.
 
 These models are for **research communication and education**. They are surface
 reconstructions, not diagnostic images, and they should not be used for clinical
-decisions.
+decisions. If you need a physical model instead, see
+[DICOM to STL for 3D printing](/blog/dicom-to-stl-3d-printing).
+
+## Frequently asked questions
+
+### Do I need to upload every DICOM file in the series?
+
+Yes. The volume can only be rebuilt from all of its slices, so put the whole
+series in a single ZIP and upload that one file.
+
+### Which compressed DICOM files are supported?
+
+Uncompressed series and the common compressed transfer syntaxes: JPEG Lossless,
+JPEG-LS, JPEG 2000, and RLE. Exports straight from a PACS or a research archive
+usually work as they are.
+
+### Is the original scan kept after conversion?
+
+No. The raw scan is deleted after conversion, whether it succeeds or fails, and
+only the surface mesh is kept. Medical source files are never archived or
+mirrored, and patient identifiers are never written to logs.
 
 *[Create a free account](/auth/register) and turn your next anonymized scan into
 an interactive figure.*
@@ -512,6 +803,7 @@ an interactive figure.*
         "title": "Hounsfield Units Explained: Choosing CT Thresholds for 3D Models",
         "description": "What Hounsfield units are, why bone, skin, and contrast-filled vessels separate at different HU values, and how to pick a preset or custom HU range for a clean 3D model.",
         "date": "2026-09-25",
+        "updated": "2026-10-19",
         "author": "AcademicAR Team",
         "tags": ["DICOM", "CT", "Hounsfield units"],
         "persona": "Medical imaging researchers & students",
@@ -575,7 +867,32 @@ coloured layer, so you can compare bands side by side in the viewer.
 3. **Metal artefacts** from implants show up as streaks at very high HU — a maximum
    in your custom range can trim them.
 4. **Need organs, not densities?** Thresholds separate densities, not anatomy.
-   Segment first and upload the segmentation for organ-level layers.
+   Segment first and upload the
+   [segmentation](/blog/medical-image-segmentation-to-3d-viewer) for organ-level layers.
+
+For the whole route from scan to shared model, see
+[From DICOM to interactive 3D](/blog/dicom-to-3d-model-guide), and for a printed model,
+[DICOM to STL for 3D printing](/blog/dicom-to-stl-3d-printing).
+
+## Frequently asked questions
+
+### What HU threshold should I use for bone?
+
+The bone preset keeps everything at 250 HU and above, which excludes soft tissue
+while keeping thinner cortical bone. If thin structures such as orbital walls
+disappear, try a custom range with a slightly lower minimum.
+
+### Can I use Hounsfield thresholds on MRI?
+
+No. MRI has no absolute intensity scale, so HU values do not apply. Use the auto
+threshold (Otsu) preset for a quick surface, or segment the MRI and upload the
+segmentation.
+
+### Why does my vessel model include bone?
+
+Contrast-filled vessels and bone have similar HU values, so a threshold alone
+cannot separate them. Select the Bone preset as well, and bone is subtracted from
+the vessel layer.
 
 *[Upload an anonymized CT series](/auth/register) and try the presets on your own
 data.*
@@ -586,6 +903,7 @@ data.*
         "title": "Sharing Medical Segmentations in 3D: NIfTI, NRRD, and DICOM-SEG",
         "description": "Publish segmentations from 3D Slicer, ITK-SNAP, or TotalSegmentator as an interactive, layered 3D model — one colour-coded layer per structure, ready for papers and teaching.",
         "date": "2026-09-26",
+        "updated": "2026-10-19",
         "author": "AcademicAR Team",
         "tags": ["segmentation", "medical imaging", "3D Slicer"],
         "persona": "Medical imaging & AI researchers",
@@ -605,7 +923,8 @@ AcademicAR reads the segmentation formats your tools already write:
 - **NIfTI** (`.nii`, `.nii.gz`) — the default for most research pipelines and AI
   models such as TotalSegmentator or nnU-Net.
 - **NRRD**, including 3D Slicer's **`.seg.nrrd`** — segment names and colours are
-  carried over from Slicer.
+  carried over from Slicer (see our
+  [3D Slicer export guide](/blog/3d-slicer-export-share)).
 - **DICOM-SEG** — the standard segmentation object used by PACS-connected tools.
 - **A ZIP of masks** — one binary mask per structure, as many pipelines export them.
 
@@ -634,7 +953,8 @@ TotalSegmentator result does not need special preparation.
 ## Why share the segmentation, not just a render
 
 - **Reviewers can check it.** Over- and under-segmentation is obvious when you can
-  cut through the model with the section plane.
+  cut through the model with the
+  [section plane](/blog/section-plane-slice-view-cross-sections).
 - **AI papers become tangible.** Readers see what the model actually segments,
   in 3D, on their own phone.
 - **Teaching gets a new resource.** A single labelled segmentation becomes an
@@ -653,6 +973,25 @@ For layered models, AcademicAR computes per-structure **dimensions** and the
 **distances between neighbouring structures** — see our post on
 [layer measurements](/blog/measuring-anatomy-3d-layer-metrics).
 
+## Frequently asked questions
+
+### Which segmentation formats can I upload?
+
+NIfTI (.nii and .nii.gz), NRRD including 3D Slicer's .seg.nrrd, DICOM-SEG, and a
+ZIP with one binary mask per structure.
+
+### How many structures can one model have?
+
+Each non-empty label becomes its own layer, up to 64 layers per model. Large
+multi-structure outputs, such as a full-body TotalSegmentator result, need no
+special preparation.
+
+### Are segment names and colours kept?
+
+Yes, where the format provides them. A .seg.nrrd from 3D Slicer carries its
+segment names and colours, so the legend reads "left kidney" rather than "label
+7".
+
 *[Publish your segmentation](/auth/register) as an interactive, layered 3D model.*
 """,
     },
@@ -661,6 +1000,7 @@ For layered models, AcademicAR computes per-structure **dimensions** and the
         "title": "Reading Cross-Sections in 3D: Section Planes and Colour-Coded Slice Views",
         "description": "How the section plane and the 2D slice view let readers cut through a 3D model, see every structure in its own colour, and measure on the cut — for anatomy and engineering alike.",
         "date": "2026-09-28",
+        "updated": "2026-10-19",
         "author": "AcademicAR Team",
         "tags": ["section plane", "slice view", "cross-sections"],
         "persona": "Medical educators, engineers & architects",
@@ -715,7 +1055,8 @@ A two-point **measure** on the slice view snaps to the contours, so you measure
 wall thickness, a canal diameter, or the gap between two parts precisely on the
 section, not on an arbitrary surface point. Points that fall outside the solid —
 in a gap between parts or inside a hollow — are refused, so you don't accidentally
-measure empty space.
+measure empty space. For automatic dimensions and distances between
+structures, see [layer measurements](/blog/measuring-anatomy-3d-layer-metrics).
 
 ## Where it helps
 
@@ -724,8 +1065,28 @@ measure empty space.
 - **Medical research:** show the relationship of a lesion to surrounding
   structures at the exact level you discuss in the text.
 - **Engineering:** inspect wall thicknesses, internal channels, and fits in an
-  assembly without a CAD licence.
-- **Architecture:** cut a building model to produce live plans and sections.
+  assembly without a CAD licence ([STEP assemblies in AR](/blog/step-cad-assemblies-ar-engineering)).
+- **Architecture:** cut a building model to produce live plans and sections
+  ([architecture models with sections](/blog/architecture-3d-models-sections-ar)).
+
+## Frequently asked questions
+
+### Do I need software to cut through a 3D model?
+
+No. The section plane and the 2D slice view run in the browser, on the same viewer
+link you share with readers.
+
+### What do the colours in the slice view mean?
+
+Each structure is drawn in its own layer colour. For scans, the plane colours
+follow 3D Slicer (axial red, coronal green, sagittal yellow); for CAD and
+architectural models, X is red, Y green, and Z blue.
+
+### Can I measure on the cross-section?
+
+Yes. The two-point measure on the slice view snaps to the contours, and points
+that fall outside the solid are refused, so you measure the material rather than
+empty space.
 
 *[Upload a layered model](/auth/register) and cut through it in the browser.*
 """,
@@ -735,6 +1096,7 @@ measure empty space.
         "title": "Measuring in 3D: Structure Dimensions and Distances Between Layers",
         "description": "Layered 3D models come with automatic measurements: oriented dimensions, maximum diameter, and the closest distance between neighbouring structures — useful in anatomy, morphology, and engineering.",
         "date": "2026-09-29",
+        "updated": "2026-10-19",
         "author": "AcademicAR Team",
         "tags": ["measurement", "morphometrics", "segmentation"],
         "persona": "Researchers working with segmented or multi-part models",
@@ -775,14 +1137,16 @@ before compression. Layer measurements are included in the paid model plans
 
 - **Tumour-to-vessel distance** is central to resectability discussions; showing it
   on an interactive model makes the spatial relationship obvious.
-- **Organ and lesion dimensions** support case reports and teaching cases.
+- **Organ and lesion dimensions** support
+  [case reports and teaching cases](/blog/3d-models-surgical-education-case-reports).
 - **Anatomical variation** studies can present the measured structure and the
   number together.
 
 ## And in engineering and the sciences
 
 - **Clearances in assemblies:** the minimum distance between two parts is a
-  clearance check readers can inspect.
+  clearance check readers can inspect (see
+  [STEP assemblies in AR](/blog/step-cad-assemblies-ar-engineering)).
 - **Morphometrics** in biology, palaeontology, and archaeology: oriented dimensions
   and maximum diameter are standard descriptors of specimens.
 
@@ -796,6 +1160,25 @@ the model is meant for orientation rather than quantification.
 For precise point-to-point checks at a specific level, combine these with the
 snapping measure in the [slice view](/blog/section-plane-slice-view-cross-sections).
 
+## Frequently asked questions
+
+### Which models get layer measurements?
+
+Models with more than one layer: structures from a segmentation, presets from a
+CT, or parts of a CAD assembly. Layer measurements are included in the paid model
+plans.
+
+### What units are the measurements in?
+
+Millimetres, computed from the full-resolution geometry before compression. They
+depend on the model's scale, so check the units after upload; rescaling the model
+recomputes them.
+
+### Can I hide the measurements from public viewers?
+
+Yes. The owner can hide them, which is useful when numbers are preliminary or the
+model is meant for orientation rather than quantification.
+
 *[Publish a layered model](/auth/register) and let readers see the numbers in 3D.*
 """,
     },
@@ -804,6 +1187,7 @@ snapping measure in the [slice view](/blog/section-plane-slice-view-cross-sectio
         "title": "Interactive 3D in Medical Education and Case Reports",
         "description": "How educators and clinician-researchers use layered 3D models, guided tours, and AR to teach anatomy, discuss complex cases, and enrich case reports — responsibly.",
         "date": "2026-09-30",
+        "updated": "2026-10-19",
         "author": "AcademicAR Team",
         "tags": ["medical education", "case reports", "augmented reality"],
         "persona": "Medical educators & clinician-researchers",
@@ -819,12 +1203,14 @@ literature.
 ## In the classroom and the skills lab
 
 - **From slices to anatomy.** Students struggle to connect axial CT slices to 3D
-  anatomy. A model with a moving section plane and a colour-coded slice view lets
-  them see both at once.
+  anatomy. A model with a moving
+  [section plane and a colour-coded slice view](/blog/section-plane-slice-view-cross-sections)
+  lets them see both at once.
 - **Layered dissection.** With one layer per structure, students peel away skin,
   muscle, and bone in order — and rebuild them — as often as they like.
 - **AR at the bedside of the textbook.** On a phone or tablet, the model can be
-  placed on the desk and walked around, with no app to install.
+  placed on the desk and walked around, with no app to install (more in
+  [AR for anatomy education](/blog/augmented-reality-anatomy-education)).
 - **Guided tours.** Save up to 12 views — each with its own camera, visible layers,
   colours, and section cut — and play them as a step-by-step tour. Each view gets
   its own link and QR code for handouts. (More in our post on
@@ -838,7 +1224,7 @@ figures. Linking an interactive model from the figure caption lets readers:
 
 - rotate the anatomy and view it from the surgical approach,
 - toggle structures to see what lies behind them,
-- check dimensions and distances that the text refers to.
+- check [dimensions and distances](/blog/measuring-anatomy-3d-layer-metrics) that the text refers to.
 
 A QR code next to the figure brings the same model to readers of the printed
 journal or a conference poster.
@@ -863,6 +1249,24 @@ Institutional plans let a department or faculty fund models for all its members
 from a shared quota, with a public showcase page for its teaching collection.
 [Learn more about institutional plans](/institutional).
 
+## Frequently asked questions
+
+### How do I add a 3D model to a case report?
+
+Upload the model, link its viewer page from the figure caption, and place its QR
+code next to the printed figure. Our guide to [adding 3D models to research papers](/blog/how-to-add-3d-models-to-research-papers)
+covers the details.
+
+### Do students need an app to see the model in AR?
+
+No. On a phone or tablet, the model opens in the browser and can be placed in AR
+with the device's built-in viewer.
+
+### Can these models be used for surgical planning?
+
+No. They are communication and teaching tools built from surface reconstructions,
+not diagnostic or planning software.
+
 *[Create your first teaching model](/auth/register) from an anonymized scan or a
 segmentation.*
 """,
@@ -872,6 +1276,7 @@ segmentation.*
         "title": "From STEP to AR: Sharing CAD Assemblies in Engineering Research",
         "description": "Upload STEP/STP, FBX, or OBJ assemblies and share them as interactive 3D with one layer per part, cross-sections, clearances, and AR — for engineering papers, theses, and teaching.",
         "date": "2026-10-01",
+        "updated": "2026-10-19",
         "author": "AcademicAR Team",
         "tags": ["engineering", "STEP", "CAD"],
         "persona": "Engineering researchers & educators",
@@ -889,7 +1294,8 @@ share the assembly instead.
 
 **STEP (`.step`/`.stp`)** is the neutral exchange format every CAD package can
 export, from SolidWorks and Fusion to CATIA, Creo, Inventor, and FreeCAD.
-AcademicAR converts STEP with OpenCascade:
+AcademicAR converts STEP with OpenCascade (new to the format? see
+[how to open a STEP file online](/blog/open-step-stp-file-online)):
 
 - Each part becomes its own node, and **STEP colours** are carried over.
 - Geometry is tessellated finely enough that holes and fillets stay smooth on small
@@ -898,7 +1304,7 @@ AcademicAR converts STEP with OpenCascade:
 - The output is a compressed GLB plus a USDZ for iOS AR.
 
 FBX, OBJ, STL, and GLB are accepted too, so meshes from simulation post-processing
-or 3D scanning work the same way.
+or 3D scanning work the same way (see [OBJ and FBX to GLB](/blog/convert-obj-fbx-to-glb)).
 
 ## One part, one layer
 
@@ -944,6 +1350,23 @@ Confirm you have the rights to publish a design before uploading, especially for
 work done with industry partners. A simplified or envelope model is often enough
 for communication.
 
+## Frequently asked questions
+
+### Which CAD programs can export STEP?
+
+Practically all of them, including SolidWorks, Fusion, CATIA, Creo, Inventor, and
+FreeCAD. STEP is the neutral exchange format every CAD package can write.
+
+### Are part colours and the assembly structure kept?
+
+Yes. Each part becomes its own node and layer, STEP colours carry over, and
+repeated parts such as a set of bolts are grouped into one layer.
+
+### Do readers need a CAD licence to view the assembly?
+
+No. The converted model opens in any modern browser and in AR on a phone, from a
+link or a QR code.
+
 *[Upload a STEP assembly](/auth/register) and share it as an interactive, layered
 model. See also [AR for engineering](/ar-for-engineering).*
 """,
@@ -953,6 +1376,7 @@ model. See also [AR for engineering](/ar-for-engineering).*
         "title": "Architecture in 3D and AR: Sharing Building Models, Plans, and Sections",
         "description": "How architecture researchers, studios, and students can share building and heritage models online — with live sections, layer-by-layer exploration, saved views, and AR placement.",
         "date": "2026-10-02",
+        "updated": "2026-10-19",
         "author": "AcademicAR Team",
         "tags": ["architecture", "heritage", "augmented reality"],
         "persona": "Architecture researchers, instructors & students",
@@ -970,7 +1394,8 @@ walk around — and through — the building themselves.
 Most architecture tools export at least one format AcademicAR accepts:
 
 - **Rhino, SketchUp, Blender, 3ds Max:** export **GLB/glTF**, **FBX**, or **OBJ**.
-- **Revit and ArchiCAD:** export FBX or OBJ (directly or via a plug-in).
+- **Revit and ArchiCAD:** export FBX or OBJ (directly or via a plug-in); see
+  [OBJ and FBX to GLB](/blog/convert-obj-fbx-to-glb) for what happens on upload.
 - **Photogrammetry and laser-scan meshes** of existing buildings and heritage sites:
   export OBJ or GLB with textures.
 - **Fabrication-oriented models** from CAD tools: **STEP**.
@@ -992,7 +1417,8 @@ The **section plane** is a natural fit for architecture. Cut horizontally for a
 live **plan**, vertically for a live **section**, and slide the plane to move
 through the building floor by floor. The **2D slice view** shows the cut as a flat
 drawing with a scale bar, and the snapping measure reads wall thicknesses and room
-widths directly on the section.
+widths directly on the section. More in our post on
+[section planes and slice views](/blog/section-plane-slice-view-cross-sections).
 
 ![A horizontal cut gives a live plan and a vertical cut gives a live section of a building model](/static/images/blog/architecture-cuts.svg)
 *A horizontal plane gives a live plan, a vertical plane a live section, with a scale bar and a snapping measure.*
@@ -1002,7 +1428,7 @@ widths directly on the section.
 Save up to 12 **scenes** — each with its own camera, visible layers, colours, and
 section — and play them as a **tour**. A design review, a studio jury, or a
 heritage-documentation walkthrough becomes a guided sequence anyone can open from
-a link or a QR code.
+a link or a QR code (see [scenes and tours](/blog/saved-scenes-guided-tours-3d-teaching)).
 
 ## AR on site and on the table
 
@@ -1013,13 +1439,33 @@ the courtyard where it will stand.
 ## Uses in research and teaching
 
 - **Heritage and conservation:** publish scanned buildings and fragments with
-  sections that reveal construction layers.
+  sections that reveal construction layers (see also
+  [AR for archaeology](/blog/ar-for-archaeology-3d-artifacts)).
 - **Design research:** attach the actual model to a paper on form, structure, or
   performance.
 - **Studio teaching:** students submit an interactive model with their boards; the
   jury scans a QR code on the poster.
 - **Building technology courses:** explode a façade or a structural system layer
   by layer.
+
+## Frequently asked questions
+
+### How do I view a Revit or SketchUp model in AR?
+
+Export it as GLB, FBX, or OBJ (Revit via FBX or OBJ), upload it, and open the
+viewer link or QR code on a phone. Tap View in AR to place the model on the table
+or on site.
+
+### Why is my building the wrong size in AR?
+
+Usually a unit mismatch: a model in centimetres read as metres appears a hundred
+times too big. Check the units before export; models can also be rescaled after
+upload.
+
+### Can I get a floor plan from the 3D model?
+
+Yes. A horizontal section plane gives a live plan and a vertical one a live
+section. The 2D slice view shows the cut as a flat drawing with a scale bar.
 
 *[Upload your building model](/auth/register) and share it with live sections and
 AR.*
@@ -1030,6 +1476,7 @@ AR.*
         "title": "Saved Scenes and Guided Tours: Teaching with 3D Models Step by Step",
         "description": "Save up to 12 views of a 3D model — each with camera, layers, colours, and section cut — share each with its own link and QR code, and play them as a guided tour in class or in AR.",
         "date": "2026-10-03",
+        "updated": "2026-10-19",
         "author": "AcademicAR Team",
         "tags": ["teaching", "scenes", "guided tours"],
         "persona": "Educators in medicine, engineering & architecture",
@@ -1047,7 +1494,8 @@ A scene is a saved view of a model. It captures:
 
 - the **camera** position and orientation,
 - which **layers** are visible, their colours and transparency,
-- the **section cut**, if one is active,
+- the **section cut**, if one is active (see
+  [section planes and slice views](/blog/section-plane-slice-view-cross-sections)),
 - the background, orientation, and **lighting**.
 
 You can save up to **12 scenes per model** and give each a name, such as "1. Skull —
@@ -1064,7 +1512,9 @@ visible and the right cut in place — and can then explore freely from there.
 
 The **tour** plays your scenes in order, moving smoothly from one to the next. In a
 lecture it replaces a series of static screenshots with one live model; for
-self-study, students step through the sequence at their own pace.
+self-study, students step through the sequence at their own pace. To bring the
+model into the slides themselves, see
+[how to add a 3D model to PowerPoint](/blog/add-3d-model-to-powerpoint).
 
 ![Four saved scenes of a skull model played as a guided tour](/static/images/blog/scenes-tour.svg)
 *A tour plays saved scenes in order; each scene also has its own link and QR code.*
@@ -1095,6 +1545,23 @@ floor, then a longitudinal section.
 4. **Pair each scene with a question** in your handout: "What structure lies
    directly anterior to ...?"
 
+## Frequently asked questions
+
+### How many scenes can a model have?
+
+Up to 12 saved scenes per model, each with its own name, camera, visible layers,
+colours, section cut, background, and lighting.
+
+### Can students open a single scene directly?
+
+Yes. Each scene has its own link and QR code, so readers land on exactly that view
+and can explore freely from there.
+
+### Does AR show the scene or the whole model?
+
+The scene. AR opens with only the scene's visible layers, its colours, and its
+section cut.
+
 *[Create your first tour](/auth/register) on any model you have uploaded.*
 """,
     },
@@ -1103,6 +1570,7 @@ floor, then a longitudinal section.
         "title": "Publication-Ready Figures and Side-by-Side Comparisons from 3D Models",
         "description": "Export high-resolution figures from an interactive 3D model with a title, layer legend, scale bar, and QR code, and pair two models in a synchronized comparison for before/after and design studies.",
         "date": "2026-10-05",
+        "updated": "2026-10-19",
         "author": "AcademicAR Team",
         "tags": ["scientific figures", "comparison", "publishing"],
         "persona": "Researchers preparing papers & posters",
@@ -1137,7 +1605,8 @@ from a saved scene if a reviewer asks for a different angle.
 
 A printed figure is a single viewpoint. The QR card in the corner turns it into a
 door to the full model: readers of the PDF or the printed poster scan it and
-explore the geometry themselves. That is the most direct way to make a 3D result
+explore the geometry themselves (tips for sizing and placing it are in our
+[poster QR guide](/blog/qr-codes-on-academic-posters-guide)). That is the most direct way to make a 3D result
 both citable as a figure and explorable as data.
 
 ## Side-by-side comparisons
@@ -1163,11 +1632,33 @@ Figure export and comparisons are included in the paid model plans — see
 ## A workflow that holds up in peer review
 
 1. Upload the models and organise layers and colours.
-2. Save the key views as **scenes**.
+2. Save the key views as [scenes](/blog/saved-scenes-guided-tours-3d-teaching).
 3. Export figures from those scenes with a legend, scale bar, and QR card.
 4. Link the interactive model or **comparison** from the caption.
 5. When a reviewer asks for another angle, open the scene, adjust, and export
    again — the figure and the model stay consistent.
+
+For how this compares with general-purpose 3D hosting, see
+[a Sketchfab alternative for researchers](/blog/sketchfab-alternative-researchers).
+
+## Frequently asked questions
+
+### What resolution are exported figures?
+
+2000, 3000, or 4000 pixels wide, well beyond a screenshot, with a white or
+transparent background.
+
+### What can an exported figure include?
+
+Optionally a title, a legend of the visible layers with their colours, a scale bar
+from the model's real dimensions, and a QR card that links to the interactive
+model.
+
+### Which models can be compared side by side?
+
+Any two models from projects you are allowed to edit. The comparison gets its own
+public link and QR code. Figure export and comparisons are included in the paid
+model plans.
 
 *[Create a free account](/auth/register) and export your first publication figure
 from a 3D model.*
@@ -1178,6 +1669,7 @@ from a 3D model.*
         "title": "How to Convert STL to GLB (and Why It Matters for Sharing)",
         "description": "Convert STL to GLB for the web: set units and colour, keep the file small with Draco, and get a viewer link, AR, and a QR code in one step.",
         "date": "2026-10-08",
+        "updated": "2026-10-19",
         "author": "AcademicAR Team",
         "tags": ["STL", "GLB", "3D formats", "how-to"],
         "persona": "Researchers, engineers & makers",
@@ -1203,7 +1695,8 @@ scene of named parts, and it supports compression. Browser viewers such as
 Google's `<model-viewer>` and Android's AR viewer load GLB directly.
 
 For a longer comparison with OBJ, FBX, and glTF, see our
-[3D format guide](/blog/glb-stl-gltf-obj-3d-format-guide).
+[3D format guide](/blog/glb-stl-gltf-obj-3d-format-guide). Starting from OBJ or FBX
+instead? See [OBJ and FBX to GLB](/blog/convert-obj-fbx-to-glb).
 
 ## What a good STL to GLB conversion does
 
@@ -1237,7 +1730,8 @@ with a model that looks right and loads fast, it should:
 Conversion runs in the background. When it finishes you get:
 
 - an optimized **GLB** with Draco-compressed geometry,
-- a **USDZ** companion, so iPhones and iPads can open the model in AR,
+- a **USDZ** companion, so iPhones and iPads can open the model in AR
+  ([why iPhone needs USDZ](/blog/glb-to-usdz-iphone-ar)),
 - a public **viewer link** that works in any modern browser,
 - a **QR code** that opens the same model on a phone.
 
@@ -1261,7 +1755,25 @@ You can attach an STL to a paper's supplementary material, and you should if
 readers might 3D print it. But very few readers will download it, find software
 that opens it, and set up the view. A GLB in a web viewer turns the same geometry
 into something they can rotate in a second, on any device, and place on their desk
-in AR.
+in AR. How sharing works is covered in
+[how to view an STL online](/blog/view-stl-online-share-link).
+
+## Frequently asked questions
+
+### Does an STL file have units?
+
+No. STL stores only triangles, so the same numbers can mean millimetres or metres.
+Choose the source unit on upload so the model appears at its real size in AR.
+
+### Can I convert STL to GLB without installing software?
+
+Yes. Upload the STL in the browser; conversion runs in the background and returns
+an optimized GLB, a USDZ for iPhone AR, a viewer link, and a QR code.
+
+### Will the GLB have colour?
+
+STL carries no material, so you can set a model colour on upload. Without one, the
+model is shown in a neutral material.
 
 *[Create a free account](/auth/register) and convert your first STL to a shareable
 GLB with a viewer link and QR code.*
@@ -1272,6 +1784,7 @@ GLB with a viewer link and QR code.*
         "title": "How to View and Share an STL File Online (No Software Needed)",
         "description": "Open an STL file in your browser and share it as a link and QR code that opens in 3D and AR on any phone. No CAD or slicer software needed.",
         "date": "2026-10-09",
+        "updated": "2026-10-19",
         "author": "AcademicAR Team",
         "tags": ["STL", "3D viewer", "sharing", "how-to"],
         "persona": "Researchers, teachers & students",
@@ -1301,7 +1814,8 @@ in 3D without downloading anything.
 
 With AcademicAR the steps are:
 
-1. Upload the `.stl` and choose its unit (mm, cm, or m) and, optionally, a colour.
+1. Upload the `.stl` and choose its unit (mm, cm, or m) and, optionally, a colour
+   (what the conversion does is explained in [STL to GLB](/blog/convert-stl-to-glb)).
 2. The file is converted to an optimized GLB (plus a USDZ for iPhone AR).
 3. Copy the **viewer link** or download the **QR code**.
 
@@ -1335,7 +1849,8 @@ shows a clear notice instead of an error page.
 ## Where this helps
 
 - **Papers and theses:** put the link or QR code in the figure caption.
-- **Teaching:** share one link with a whole class instead of a file per student.
+- **Teaching:** share one link with a whole class instead of a file per student,
+  or [embed the viewer](/blog/embed-3d-model-website) in a course page.
 - **Posters and talks:** a QR code turns a still image into a model the audience
   can explore on their phones (see our
   [poster QR guide](/blog/qr-codes-on-academic-posters-guide)).
@@ -1348,6 +1863,23 @@ If the STL comes from patient imaging, make sure it is anonymised and that you h
 consent and ethics approval to publish it. Faces reconstructed from head CT or MRI
 can be identifying even without any metadata.
 
+## Frequently asked questions
+
+### Can I view an STL file online without installing software?
+
+Yes. A browser-based viewer previews the file on your own computer, and a hosted
+viewer gives you a link that anyone can open in a browser.
+
+### Do people need an account to open the link?
+
+No. The public viewer opens without signing in, in any modern browser, and in AR
+on a phone.
+
+### What happens to the link if I fix the model?
+
+Replace the model and the link and QR code stay the same, so printed QR codes keep
+pointing at the current version.
+
 *[Create a free account](/auth/register) to share your STL as a link and QR code.*
 """,
     },
@@ -1356,6 +1888,7 @@ can be identifying even without any metadata.
         "title": "What Is a STEP (.stp) File and How to Open It Without CAD",
         "description": "STEP and STP files explained: what's inside, which programs open them, and how to view and share a STEP assembly in your browser and AR without CAD.",
         "date": "2026-10-10",
+        "updated": "2026-10-19",
         "author": "AcademicAR Team",
         "tags": ["STEP", "CAD", "3D viewer", "how-to"],
         "persona": "Engineers, students & collaborators",
@@ -1372,7 +1905,7 @@ guide covers what the file is and the easiest ways to open it.
 
 **STEP** (Standard for the Exchange of Product model data, ISO 10303) is a neutral
 CAD format. The `.step` and `.stp` extensions are the same thing. Unlike mesh
-formats such as STL, a STEP file describes **exact geometry**: surfaces, edges,
+formats such as STL (see our [3D format guide](/blog/glb-stl-gltf-obj-3d-format-guide)), a STEP file describes **exact geometry**: surfaces, edges,
 and solids defined mathematically, organised into an **assembly tree** of parts,
 often with colours and part names.
 
@@ -1405,7 +1938,7 @@ the open-source CAD kernel, and runs in the background:
   small mechanical parts, with a cap on triangle count so the model still loads on
   a phone.
 - The result is a compressed **GLB** for browsers and Android AR and a **USDZ**
-  for iPhone and iPad AR.
+  for iPhone and iPad AR ([why both](/blog/glb-to-usdz-iphone-ar)).
 - STEP units are kept as authored, so the model appears at its real size in AR.
 
 You get a viewer link and a QR code. Anyone can open the assembly in their
@@ -1430,6 +1963,24 @@ engineering use, see [From STEP to AR](/blog/step-cad-assemblies-ar-engineering)
   before uploading, especially for work with industry partners. An envelope or
   simplified model is often enough.
 
+## Frequently asked questions
+
+### Is a .stp file different from a .step file?
+
+No. Both extensions are the same STEP format (ISO 10303) and open in the same
+tools.
+
+### Can I open a STEP file on a phone?
+
+Not directly, because phones need triangle meshes. Convert the STEP to GLB and
+USDZ, for example by uploading it to a hosted viewer, and open the link or QR code
+on the phone.
+
+### Why are the colours missing from my STEP model?
+
+The CAD export probably didn't include them. Most CAD tools have an option to
+export colours or appearance with STEP; re-export with it switched on.
+
 *[Upload a STEP file](/auth/register) and open it in your browser and in AR,
 without CAD software.*
 """,
@@ -1439,6 +1990,7 @@ without CAD software.*
         "title": "How to Open a GLB File on Desktop, iPhone, and Android",
         "description": "What a GLB file is and how to open it on Windows, Mac, iPhone, and Android, why iPhones need USDZ for AR, and how to share a GLB as a link.",
         "date": "2026-10-12",
+        "updated": "2026-10-19",
         "author": "AcademicAR Team",
         "tags": ["GLB", "glTF", "augmented reality", "how-to"],
         "persona": "Anyone sharing 3D models",
@@ -1456,12 +2008,14 @@ A **GLB** file is the binary, single-file version of **glTF 2.0**, an open stand
 from the Khronos Group often called "the JPEG of 3D". One `.glb` contains the
 model's geometry, materials, textures, and, where present, animations and a tree
 of named parts. It is designed to load quickly in real-time viewers, which is why
-browsers, game engines, and AR tools support it.
+browsers, game engines, and AR tools support it. For how it compares with STL,
+OBJ, and FBX, see our [3D format guide](/blog/glb-stl-gltf-obj-3d-format-guide).
 
 ## Opening a GLB on Windows and Mac
 
 - **Windows:** Microsoft's **3D Viewer** app opens GLB where it is installed, and
-  Microsoft 365 apps such as PowerPoint can insert GLB files as 3D models.
+  Microsoft 365 apps such as PowerPoint can insert GLB files as 3D models
+  (see [how to add a 3D model to PowerPoint](/blog/add-3d-model-to-powerpoint)).
 - **Mac:** Apple's built-in previews are built around USDZ rather than GLB, so use
   a browser-based viewer or a 3D app such as Blender, which imports glTF/GLB.
 - **Any computer:** drag the file into a browser-based glTF viewer. This is the
@@ -1477,7 +2031,8 @@ model to Scene Viewer when you tap the AR button.
 
 This is where most people get stuck. iOS **AR Quick Look** does not use GLB: it
 expects **USDZ**, Apple's format. A GLB will display in a web viewer on an iPhone,
-but to place it in your room in AR you need a USDZ version of the same model.
+but to place it in your room in AR you need a USDZ version of the same model
+(see [GLB to USDZ for iPhone AR](/blog/glb-to-usdz-iphone-ar)).
 
 ![Which file a desktop browser, Android and iPhone use from one viewer link](/static/images/blog/glb-devices.svg)
 *One link serves GLB to browsers and Android, and USDZ to iPhone AR.*
@@ -1507,6 +2062,23 @@ GLB units are kept as authored, so AR shows the model at the size it was modelle
 - **The file is too large to share:** compress geometry with Draco and textures
   with webp or KTX2, or let the upload optimizer do it.
 
+## Frequently asked questions
+
+### What is the difference between GLB and glTF?
+
+They are the same standard. A .gltf file references external files such as images,
+while a .glb packs everything into one binary file, which is easier to share.
+
+### Can I open a GLB on an iPhone?
+
+In a web viewer, yes. For AR, iOS needs a USDZ version of the model; AcademicAR
+generates one automatically when you upload a GLB.
+
+### Why is my GLB huge or tiny in AR?
+
+glTF is defined in metres, so a model exported in millimetres appears 1000 times
+too large. Fix the scale in the source application and export again.
+
 *[Upload a GLB](/auth/register) and get a link that opens in 3D and AR on every
 device.*
 """,
@@ -1516,6 +2088,7 @@ device.*
         "title": "3D Slicer: Export Models and Share Them as Interactive 3D",
         "description": "Export segmentations from 3D Slicer as STL, OBJ, or .seg.nrrd and share them as a layered 3D viewer link with AR and a QR code, step by step.",
         "date": "2026-10-13",
+        "updated": "2026-10-19",
         "author": "AcademicAR Team",
         "tags": ["3D Slicer", "segmentation", "medical imaging", "how-to"],
         "persona": "Medical imaging researchers & clinicians",
@@ -1539,7 +2112,8 @@ There are two good ways to move a Slicer segmentation to a shareable viewer:
 
 Route 2 is usually better for multi-structure segmentations, because segment names
 and colours travel with the file. Route 1 is useful when you have already
-smoothed, decimated, or edited the surfaces in Slicer.
+smoothed, decimated, or edited the surfaces in Slicer. If the goal is a 3D print
+rather than a viewer, see [DICOM to STL for 3D printing](/blog/dicom-to-stl-3d-printing).
 
 ![Two routes from a 3D Slicer segmentation to a shareable 3D viewer link](/static/images/blog/slicer-export-routes.svg)
 *Export surface models, or save the segmentation itself.*
@@ -1601,6 +2175,23 @@ and [Hounsfield units explained](/blog/hounsfield-units-ct-thresholding-3d).
 - Name your segments clearly in Slicer: those names become the legend your readers
   see.
 
+## Frequently asked questions
+
+### What is the best format to export from 3D Slicer?
+
+For sharing a multi-structure segmentation, save it as .seg.nrrd: segment names
+and colours travel with the file and each segment becomes its own layer. Export
+STL or OBJ when you have already edited the surfaces in Slicer.
+
+### Which unit should I choose for a Slicer STL?
+
+Millimetres. Slicer works in millimetres, so set the source unit to mm on upload.
+
+### Can readers toggle segments in a merged STL?
+
+No. A single STL becomes one mesh. Use OBJ or the .seg.nrrd route if readers
+should show and hide structures separately.
+
 *[Create a free account](/auth/register) and share your first Slicer segmentation
 as an interactive 3D model.*
 """,
@@ -1610,6 +2201,7 @@ as an interactive 3D model.*
         "title": "How to Embed a 3D Model on a Website, LMS, or Lab Page",
         "description": "Two ways to embed an interactive 3D model on a web page: self-host with model-viewer, or paste a hosted viewer iframe into WordPress, Moodle, or Canvas.",
         "date": "2026-10-14",
+        "updated": "2026-10-19",
         "author": "AcademicAR Team",
         "tags": ["embedding", "3D viewer", "teaching", "how-to"],
         "persona": "Lab website owners & educators",
@@ -1625,7 +2217,7 @@ pick which.
 ## Option 1: self-host with model-viewer
 
 Google's open-source **`<model-viewer>`** web component is the standard way to show
-a GLB on a web page. The minimal version is two lines:
+a [GLB](/blog/how-to-open-glb-file) on a web page. The minimal version is two lines:
 
 ```html
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.3.0/model-viewer.min.js"></script>
@@ -1678,7 +2270,8 @@ embeds it shows the new version, with no edits on your side.
 
 Self-hosting gives full control over look and code. A hosted embed is faster and
 easier to maintain, especially when the same model also appears in a paper, a
-poster QR code, and a course page.
+poster QR code, and a course page, or in your slides (see
+[3D models in PowerPoint](/blog/add-3d-model-to-powerpoint)).
 
 ## Tips for embeds that work well
 
@@ -1690,8 +2283,547 @@ poster QR code, and a course page.
   gives readers more room.
 - **Add a short caption** with what the reader should look for, just like a figure.
 
+## Frequently asked questions
+
+### Can I embed a 3D model in Moodle or Canvas?
+
+Yes. Learning platforms usually block scripts but accept an iframe, so paste the
+copied embed code into an HTML or embed block.
+
+### Does AR work in an embedded viewer?
+
+Yes. Visitors can rotate and zoom in the page, open it full screen, and open the
+model in AR on their phones.
+
+### Do I need to update the embed when the model changes?
+
+No. Replace the model once and every page that embeds it shows the new version.
+
 *[Create a free account](/auth/register), upload a model, and copy its embed code.
 See also [AR for STEM education](/ar-for-stem-education).*
+""",
+    },
+    {
+        "slug": "convert-obj-fbx-to-glb",
+        "title": "How to Convert OBJ and FBX to GLB Without Losing Textures",
+        "description": "Convert OBJ (with its MTL and textures) and FBX to GLB for the web: what each format carries, the free tools, and how to keep materials, units, and parts intact.",
+        "date": "2026-10-15",
+        "author": "AcademicAR Team",
+        "tags": ["OBJ", "FBX", "GLB", "3D formats", "how-to"],
+        "persona": "Researchers, 3D artists & engineers",
+        "read_minutes": 7,
+        "body": """\
+![Loose OBJ mesh, texture tiles and material sheet merging into one GLB model](/static/images/blog/covers/convert-obj-fbx-to-glb.webp)
+
+OBJ and FBX are two of the most common formats you'll get out of scanners, modelling
+tools, and CAD exports. Neither is what a browser or phone wants to load: the web
+runs on **GLB**, the single-file form of glTF 2.0. Converting is easy to get
+*almost* right, and the usual failures are the same every time: missing textures,
+a model the size of a building, or a multi-part object welded into one grey lump.
+Here's how to avoid all three.
+
+## What OBJ and FBX actually carry
+
+**OBJ** is a plain-text mesh format. The `.obj` file holds geometry and texture
+coordinates, but its colours and materials live in a separate **`.mtl`** file, and
+the images that file points to (`.png`, `.jpg`) sit next to it. Lose any of those
+and the model arrives untextured. OBJ also has **no units**.
+
+**FBX** (Autodesk) is a binary scene format. It can hold several meshes, a
+hierarchy of parts, materials, textures (embedded or referenced), and the unit the
+scene was modelled in. That makes it richer than OBJ, but it is proprietary, so
+web viewers can't read it directly.
+
+![What an OBJ and an FBX bring into a GLB: separate files versus one file with units](/static/images/blog/obj-fbx-to-glb.svg)
+*An OBJ needs its MTL and textures alongside it; an FBX brings its own units.*
+
+For a side-by-side of all the common formats, see
+[GLB vs STL vs glTF vs OBJ](/blog/glb-stl-gltf-obj-3d-format-guide).
+
+## Free tools that convert OBJ and FBX to GLB
+
+- **Blender.** Import the OBJ or FBX, check the scale and materials, then
+  *File → Export → glTF 2.0* and choose the binary `.glb` option. The most
+  control, and the most clicks.
+- **obj2gltf.** An open-source command-line converter from Cesium for OBJ. Point
+  it at the `.obj` and it picks up the `.mtl` and textures from the same folder.
+- **FBX2glTF.** An open-source command-line converter for FBX that writes glTF
+  materials (physically based rendering) from FBX materials.
+
+All three work. What they don't do is host the result, make it open in AR on an
+iPhone, or give you a link to send.
+
+## Converting OBJ and FBX with AcademicAR
+
+AcademicAR runs the same open-source converters for you and then does the web
+work on top:
+
+1. Create a project and choose **Upload model**.
+2. **For OBJ:** select the `.obj`, then add its **companion files** (the `.mtl` and
+   the texture images it references) in the field that appears. Pick the
+   **source unit** (mm, cm, or m), because OBJ can't tell us.
+3. **For FBX:** select the `.fbx`. The unit is read from the file, so
+   **Embedded** is selected for you; you can override it if the exporter got it
+   wrong.
+4. Confirm the compliance checkbox and upload.
+
+The result is an optimized **GLB** (Draco-compressed geometry, WebP textures), a
+**USDZ** for iPhone AR, a viewer link, and a stable QR code.
+
+## Keep parts separate
+
+If your OBJ or FBX contains several named objects, they become separate
+**layers** in the viewer: readers can hide, isolate, and recolour each part. Name
+the parts in your modelling tool before exporting ("housing", "rotor", "left
+kidney"), because those names become the layer names. One merged object stays
+one layer.
+
+## Troubleshooting
+
+- **The model is untextured.** For OBJ, the `.mtl` or the images weren't uploaded,
+  or the `.mtl` refers to them by an absolute path from the author's computer.
+  Open the `.mtl` in a text editor and make the texture paths plain file names.
+- **The model is huge or tiny.** The unit was wrong. You can change it later on
+  the model's edit page without re-uploading.
+- **Everything is one colour.** The source had no materials, or all parts shared
+  one. Recolour layers in the viewer, or assign distinct materials before export.
+
+## Frequently asked questions
+
+### Can I convert OBJ to GLB without losing textures?
+
+Yes, as long as the converter can find the `.mtl` file and every texture image it
+references. Keep them in the same folder (or upload them as companion files) and
+make sure the `.mtl` uses relative file names rather than absolute paths.
+
+### Does FBX to GLB keep the original units?
+
+FBX stores the unit the scene was modelled in, and good converters bake it into
+the GLB in metres, which is what glTF expects. If the exporter wrote the wrong
+unit, override it rather than rescaling the mesh by hand.
+
+### Is GLB better than OBJ for sharing?
+
+For the web, yes. A GLB is one compact file with geometry, materials, textures,
+and named parts, and it loads directly in browsers and Android AR. OBJ is fine as
+a working format but splits a model across several files.
+
+*[Create a free account](/auth/register) and upload an OBJ or FBX to get a GLB,
+AR, and a shareable link in one step.*
+""",
+    },
+    {
+        "slug": "glb-to-usdz-iphone-ar",
+        "title": "GLB to USDZ: How to Show a 3D Model in AR on iPhone",
+        "description": "Why iPhone AR needs USDZ instead of GLB, the free ways to convert GLB to USDZ, and how to share one link that opens AR on both iPhone and Android.",
+        "date": "2026-10-16",
+        "author": "AcademicAR Team",
+        "tags": ["USDZ", "GLB", "augmented reality", "how-to"],
+        "persona": "Anyone sharing 3D models in AR",
+        "read_minutes": 6,
+        "body": """\
+![An iPhone showing an anatomical heart model placed on a desk in augmented reality](/static/images/blog/covers/glb-to-usdz-iphone-ar.webp)
+
+You have a GLB that opens in the browser and in AR on Android, and on an iPhone
+the **View in AR** button does nothing useful. That's not a bug in your model:
+Apple's AR viewer, **AR Quick Look**, uses a different file format, **USDZ**. To
+reach both platforms you need both files, or a viewer that serves the right one to
+each device.
+
+## Why iPhone needs USDZ
+
+**GLB** (glTF 2.0) is the open standard used by browsers, Android's **Scene
+Viewer**, and most web 3D tools. **USDZ** is Apple's packaged version of Pixar's
+Universal Scene Description, and it is what AR Quick Look opens on iPhone and
+iPad. Quick Look launches straight from Safari (and from other browsers on iOS
+when the page links the USDZ properly), with no app to install.
+
+Some web viewers can generate a USDZ in the browser on the fly, but that only
+works in Safari and fails in in-app browsers, which is exactly where people open
+links from email and messaging apps. A real USDZ file next to the GLB is the
+reliable route.
+
+![One upload produces a GLB for browsers and Android and a USDZ for iPhone AR](/static/images/blog/glb-usdz-ar.svg)
+*One link, two files: GLB for browsers and Android, USDZ for iPhone AR.*
+
+## Free ways to convert GLB to USDZ
+
+- **Reality Converter** (free, macOS). Drag in a GLB, check the preview and the
+  materials, and export a USDZ.
+- **Blender.** Import the GLB (*File → Import → glTF 2.0*) and export with the
+  USD exporter, choosing `.usdz`.
+- **A hosted viewer that does it for you**, so you never handle two files.
+
+Whichever you use, open the USDZ on an iPhone before you share it. The two
+problems you'll see are scale (the model appears at the wrong size) and
+materials that don't carry over exactly.
+
+## Automatic USDZ with AcademicAR
+
+When you upload a model (GLB, STL, OBJ, FBX, STEP, or a medical scan), AcademicAR
+builds the web GLB and a **USDZ companion** from it automatically, with the
+real-world scale written into the file. The public viewer link then does the
+right thing on every device:
+
+- in a desktop browser, the model is interactive in 3D;
+- on Android, **View in AR** hands the GLB to Scene Viewer;
+- on iPhone and iPad, **View in AR** opens the USDZ in AR Quick Look.
+
+If you recolour the model, change its layers, or replace the file, the USDZ is
+rebuilt so iPhone AR stays in step with what the browser shows. The QR code
+doesn't change.
+
+## Tips for good AR on iPhone
+
+- **Get the units right first.** A model exported in millimetres but read as
+  metres appears a thousand times too big. Fix the unit before converting.
+- **Keep it light.** AR runs on a phone. Decimate dense scans to a few hundred
+  thousand triangles; nobody can see more on a 6-inch screen.
+- **Test in the place you'll use it.** AR needs a textured, well-lit surface to
+  find the floor or table. A plain white desk under dim light is the hardest
+  case.
+
+For the other direction, opening a GLB on every device, see
+[How to open a GLB file](/blog/how-to-open-glb-file).
+
+## Frequently asked questions
+
+### Can an iPhone open a GLB file?
+
+Not in AR Quick Look, which needs USDZ. A web viewer can show a GLB in 3D in
+Safari, but to place the model in your room on an iPhone you need a USDZ version
+of it.
+
+### Is USDZ the same as USD?
+
+USDZ is a zipped, single-file package of a USD scene and its textures. Apple's AR
+Quick Look opens USDZ, not loose USD files.
+
+### Do I need an app to view USDZ on iPhone?
+
+No. AR Quick Look is built into iOS and iPadOS. Tapping a properly linked USDZ in
+Safari opens the model in AR directly.
+
+*[Create a free account](/auth/register) and upload a model to get a GLB, a USDZ,
+and one link that opens AR on any phone.*
+""",
+    },
+    {
+        "slug": "add-3d-model-to-powerpoint",
+        "title": "How to Add a 3D Model to PowerPoint (and Let the Audience Explore It)",
+        "description": "Four ways to put a 3D model in a PowerPoint presentation: native 3D models, rendered images, video, and a QR code that opens the model in 3D and AR on every phone.",
+        "date": "2026-10-17",
+        "author": "AcademicAR Team",
+        "tags": ["PowerPoint", "teaching", "presentations", "how-to"],
+        "persona": "Lecturers, researchers & conference speakers",
+        "read_minutes": 7,
+        "body": """\
+![A slide with a 3D molecular model and a QR code, shown on a screen and a laptop](/static/images/blog/covers/add-3d-model-to-powerpoint.webp)
+
+A 3D model makes a lecture or conference talk easier to follow: one rotating
+object explains what three static views can't. PowerPoint gives you more than one
+way to bring it in, and they suit different situations. Here are the four routes,
+what each is good at, and when to combine them.
+
+![Four ways to bring a 3D model into a slide deck and what each one keeps](/static/images/blog/powerpoint-3d-options.svg)
+*Native 3D, images, video, or a live link: what each route keeps.*
+
+## 1. Insert the model natively
+
+PowerPoint for Microsoft 365 (Windows and Mac) can insert 3D files directly:
+**Insert → 3D Models → This Device**. It accepts common formats including
+**GLB, FBX, OBJ, STL, PLY, and 3MF**. You can rotate the model on the slide, use
+the **Morph** transition to animate between two orientations, and add 3D
+animations such as a turntable.
+
+**Good for:** a single, light model you want to turn live on stage.
+**Watch out for:** file size (dense scans make the deck slow and huge), limited
+material quality, no layers or sections, and older PowerPoint versions or other
+presentation tools that won't show it.
+
+## 2. Use rendered images
+
+A still is the most robust option: it works in every version of PowerPoint,
+Keynote, Google Slides, and the PDF handout. From the AcademicAR viewer you can
+take **screenshots** of the current view, or, on paid plans, export a
+**publication figure** with a scale bar, labels, and a QR card in one image.
+
+**Good for:** handouts, posters made from slides, and anything printed.
+
+## 3. Insert a short video
+
+A turntable or a guided move through a model is often clearer than live
+rotation, and it plays reliably. Record the view from the viewer's **video
+recording** tool (it records MP4 in browsers that support it, which PowerPoint
+and Keynote play), then **Insert → Video**. The owner's browser also generates
+short showcase videos of a model automatically, saved with the project's media.
+
+**Good for:** talks where you can't risk live interaction, and recorded lectures.
+
+## 4. Put a QR code and link on the slide
+
+This is the only route that lets the **audience** explore the model: they scan the
+QR code, the model opens in their phone's browser, and one tap places it on their
+desk in **AR**. Every AcademicAR model has a stable viewer link and QR code, so
+the slide keeps working after you update the model, and you can see how many
+people scanned it.
+
+**Good for:** teaching, conference talks, and any slide where you want people to
+look at the model themselves. Make the QR at least a fifth of the slide height
+so it scans from the back of the room.
+
+## Combine them
+
+The strongest decks use two routes: a video or image on the slide for everyone,
+and a QR code in the corner for anyone who wants to explore. For teaching, save
+**scenes** (fixed views with labels and visible layers) and play them as a
+[guided tour](/blog/saved-scenes-guided-tours-3d-teaching) from the viewer
+instead of a slide sequence. You can also attach the deck itself to the
+project, so students find the slides and the model on one page.
+
+To put the same model on a course page or lab website, see
+[how to embed a 3D model](/blog/embed-3d-model-website).
+
+## Frequently asked questions
+
+### Which 3D formats can PowerPoint insert?
+
+PowerPoint for Microsoft 365 inserts GLB, FBX, OBJ, STL, PLY, and 3MF files via
+Insert, 3D Models. Very large or highly detailed files are best simplified first.
+
+### Can the audience interact with a 3D model in a PowerPoint slide?
+
+Only the presenter can rotate a model inserted into the slide. To let the
+audience explore it themselves, add a QR code that opens the model in their
+phone's browser and in AR.
+
+### Will a 3D model in PowerPoint work in Google Slides or Keynote?
+
+Native PowerPoint 3D models don't carry over to other tools. Images, MP4 video,
+and a QR code with a link work everywhere.
+
+*[Create a free account](/auth/register), upload a model, and put its QR code on
+your next slide.*
+""",
+    },
+    {
+        "slug": "dicom-to-stl-3d-printing",
+        "title": "DICOM to STL: How to Turn a CT Scan into a 3D Printable Model",
+        "description": "Convert DICOM CT or MRI to STL for 3D printing with free tools: anonymize, segment by Hounsfield threshold, clean the mesh, export, and share it interactively.",
+        "date": "2026-10-18",
+        "author": "AcademicAR Team",
+        "tags": ["DICOM", "STL", "medical imaging", "3D printing", "how-to"],
+        "persona": "Clinicians, medical researchers & students",
+        "read_minutes": 8,
+        "body": """\
+![CT slices turned into a 3D printed vertebra](/static/images/blog/covers/dicom-to-stl-3d-printing.webp)
+
+A CT scan is a stack of images; a 3D printer needs a closed surface. Getting from
+one to the other, **DICOM to STL**, takes four steps whatever software you use:
+prepare the data, segment the structure, turn it into a mesh, and clean that mesh
+for printing. This guide walks through them with free tools, and shows how to
+share the same model interactively with people who will never hold the print.
+
+## Step 1: Prepare and anonymize the DICOM
+
+Export the series from your PACS or scanner as DICOM files, one folder per
+series. **Anonymize before the data leaves the clinical environment**: patient
+name, ID, birth date, and institution live in the DICOM headers, and some scans
+also have burned-in text. Use your institution's anonymization tool, and follow
+its ethics and data protection rules for any research use.
+
+Thin slices give better models. A 0.5–1 mm slice thickness is ideal for bone;
+5 mm slices produce visible stair-steps.
+
+## Step 2: Segment the structure
+
+Segmentation decides which voxels belong to the model. For bone on CT, a
+**threshold** on the Hounsfield scale does most of the work: bone sits above
+roughly 250 HU, soft tissue well below. Our
+[Hounsfield units guide](/blog/hounsfield-units-ct-thresholding-3d) explains how
+to choose the value.
+
+- **3D Slicer** (free, open source): load the series with the DICOM module, then
+  in **Segment Editor** use *Threshold*, then *Islands* to keep the largest
+  connected piece, and *Scissors* to cut away the table or neighbouring bones.
+- **InVesalius** (free, open source): built for CT, with bone presets and a
+  direct surface export.
+
+MRI has no absolute intensity scale, so thresholds work poorly; expect to paint or
+use region-growing tools instead.
+
+![From DICOM slices to a printed model: segment, mesh, clean, export STL](/static/images/blog/dicom-to-stl-steps.svg)
+*The four steps from a CT series to a printable STL, and the branch for sharing.*
+
+## Step 3: Make the surface and export STL
+
+In 3D Slicer, *Show 3D* turns the segment into a surface; apply light
+**smoothing** to remove voxel steps without erasing real anatomy. Then use
+**Segmentations → Export to files**, choose STL, and keep the coordinate system
+and units (millimetres) consistent with your printer software. InVesalius exports
+STL straight from the surface it builds.
+
+Our [3D Slicer export guide](/blog/3d-slicer-export-share) covers the export
+options in more detail.
+
+## Step 4: Clean the mesh for printing
+
+A model that looks fine on screen can still fail on a printer. Before slicing:
+
+- **Make it watertight.** Holes and non-manifold edges confuse slicers. Blender's
+  3D-Print Toolbox or Meshmixer can find and repair them.
+- **Check wall thickness.** Thin cortical bone, orbital walls, and small vessels
+  may be thinner than your printer can produce.
+- **Reduce the triangle count.** Scans export millions of triangles; a few hundred
+  thousand is plenty for printing at anatomical scale.
+- **Orient and support** the model in your slicer, and print a small test piece
+  first.
+
+## Share the model before (or instead of) printing
+
+A print reaches the people in the room. For colleagues, students, reviewers, and
+patients' care teams elsewhere, an interactive model is faster and free to copy.
+You can upload either file to AcademicAR:
+
+- **The STL you just made**, with the unit set to millimetres.
+- **The anonymized DICOM series as a ZIP.** AcademicAR builds the 3D model itself
+  with **Bone, Skin, Contrast, and Auto** presets or a custom HU range, each as its
+  own layer. Medical uploads need an extra confirmation that the data is
+  anonymized, and the raw scan is deleted after conversion.
+
+Either way you get a viewer link, AR on phones, and a QR code to put next to the
+printed model or in the paper. AcademicAR is for viewing and sharing; it does not
+produce printable STL files, so keep the STL from your segmentation software for
+the printer.
+
+For the full DICOM-to-viewer workflow, see
+[From DICOM to interactive 3D](/blog/dicom-to-3d-model-guide).
+
+## Frequently asked questions
+
+### What is the best free software to convert DICOM to STL?
+
+3D Slicer and InVesalius are both free and open source. 3D Slicer is the more
+flexible of the two and handles CT and MRI; InVesalius is simpler and focused on
+CT, with presets for bone and a direct STL export.
+
+### What threshold should I use for bone?
+
+On CT, around 250 HU and above separates bone from soft tissue in most scans.
+Thin or osteoporotic bone may need a lower value; check the result against the
+slices before exporting.
+
+### Can I 3D print directly from DICOM?
+
+No. A printer needs a closed surface mesh such as STL or 3MF. The DICOM series has
+to be segmented and converted to a mesh first, then sliced for your printer.
+
+*[Create a free account](/auth/register) and share your segmented model as an
+interactive 3D link alongside the print.*
+""",
+    },
+    {
+        "slug": "sketchfab-alternative-researchers",
+        "title": "A Sketchfab Alternative for Researchers: What Academic 3D Sharing Needs",
+        "description": "Sketchfab is a great general 3D platform. Here's what researchers need on top of it, from stable QR codes and medical uploads to sections and measurements, and how the options compare.",
+        "date": "2026-10-19",
+        "author": "AcademicAR Team",
+        "tags": ["3D viewer", "scientific publishing", "comparison", "sharing"],
+        "persona": "Researchers, labs & institutions",
+        "read_minutes": 7,
+        "body": """\
+![A journal page with a QR code and a fossil skull model cut by a section plane](/static/images/blog/covers/sketchfab-alternative-researchers.webp)
+
+**Sketchfab** is the best-known place to publish 3D models online, and for good
+reason: it has a polished viewer, embeds, annotations, AR, and a large community.
+Plenty of museums and labs use it. But it was built as a general platform for
+3D creators, and research has needs it wasn't designed around. If you're looking
+for a Sketchfab alternative for academic work, here's what to check, and where
+each kind of tool fits.
+
+## What research sharing needs
+
+**A link that outlives the paper.** A figure caption or poster QR code is printed
+once and read for years. The link must keep pointing at the right model after you
+replace the file, fix the colours, or move it to another project.
+
+**Your input formats.** Research models start as CT and MRI scans, segmentations,
+STEP assemblies from CAD, and photogrammetry. Converting each of these by hand
+before upload is where most of the time goes.
+
+**Compliance built in.** Medical and human-subject data needs anonymization, and
+authors must confirm they have the right to publish. The platform should make
+that explicit and handle raw scans carefully.
+
+**Scientific tools, not only display.** Readers want to look *inside* (section
+planes, cross-sections), measure, compare two states side by side, and export a
+figure for the paper.
+
+**Teaching and presenting.** Saved views, guided tours, and AR that works on the
+students' own phones.
+
+![Checklist of what research 3D sharing needs, grouped by link, inputs, compliance and tools](/static/images/blog/research-3d-sharing-checklist.svg)
+*What to check before choosing where to host research models.*
+
+## How the options fit
+
+- **General 3D platforms (such as Sketchfab).** Excellent viewer and reach. A good
+  fit for portfolios, cultural heritage showcases, and public outreach to a broad
+  audience. You convert medical and CAD data yourself first.
+- **Research repositories (such as MorphoSource or Zenodo).** Built for archiving
+  files with persistent identifiers and metadata. The right place to deposit the
+  raw data; less focused on an interactive viewing experience for readers.
+- **AcademicAR.** Built for putting interactive 3D *into* publications, posters,
+  and teaching. Use it alongside a repository: deposit the data there, and share
+  the readable, interactive version here.
+
+## What AcademicAR does differently
+
+- **Stable QR codes and viewer links** that survive replacements, recolours, and
+  plan upgrades.
+- **Direct uploads** of GLB, STL, OBJ, FBX, **STEP/STP**, **DICOM series** (with
+  bone, skin, contrast and custom HU thresholds), and **segmentations** (NIfTI,
+  NRRD, DICOM-SEG), with every part or structure as its own layer.
+- **Compliance confirmation** on every upload, an extra check for medical data,
+  and raw scans deleted after conversion.
+- **Research tools in the viewer:** a section plane and
+  [2D slice view](/blog/section-plane-slice-view-cross-sections),
+  [structure measurements](/blog/measuring-anatomy-3d-layer-metrics), side-by-side
+  comparisons, and
+  [publication figure export](/blog/publication-ready-3d-figures-comparisons).
+- **Teaching:** saved scenes, guided tours, and AR on iPhone and Android with no
+  app.
+- **Licensing per model**, with institutional contracts for departments that
+  publish many models.
+
+## Choosing
+
+If your audience is the general public and the model is already a clean mesh, a
+general platform may be all you need. If the model comes from a scanner or CAD,
+goes into a paper or a poster, or carries patient data, choose a tool built for
+that workflow, and keep depositing your raw data in a repository either way.
+
+## Frequently asked questions
+
+### Is there a free alternative to Sketchfab for academic use?
+
+AcademicAR has a free plan to try a model in the viewer and in AR, and paid
+plans are priced per model rather than as a monthly subscription. Research repositories
+such as Zenodo are free for depositing files but are not interactive viewers.
+
+### Can I upload DICOM or STEP files instead of a mesh?
+
+Yes. AcademicAR converts DICOM series (as a ZIP), segmentations, and STEP/STP
+assemblies on upload, so you don't have to make a mesh in other software first.
+
+### Should I still deposit my 3D data in a repository?
+
+Yes. A repository gives your data a persistent identifier and long-term
+archiving. Link to it from the paper, and use an interactive viewer so readers can
+actually explore the model.
+
+*[Compare plans](/pricing) or [create a free account](/auth/register) to try your
+own model.*
 """,
     },
 ]
@@ -1738,3 +2870,44 @@ def related_posts(post: dict, posts: list[dict], limit: int = 3) -> list[dict]:
     ]
     scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
     return [p for _score, _date, p in scored[:limit]]
+
+
+_FAQ_HEADING_RE = re.compile(
+    r"^##[ \t]+(?:frequently asked questions|faqs?)[ \t]*#*[ \t]*$", re.IGNORECASE | re.MULTILINE
+)
+
+
+def _markdown_to_text(markdown_text: str) -> str:
+    """Plain text for structured data: drop images, keep link text, strip
+    emphasis/code markers and join lines."""
+    text = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", markdown_text)
+    text = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text)
+    text = re.sub(r"(\*\*|\*|`)", "", text)
+    text = re.sub(r"^\s*(?:[-*+]|\d+\.)\s+", "", text, flags=re.MULTILINE)
+    return " ".join(text.split())
+
+
+def faq_items(body: str) -> list[dict]:
+    """Question/answer pairs from the post's "## Frequently asked questions"
+    section (each question a ``###`` heading, its answer the text up to the
+    next heading), for the FAQPage schema. Empty when the post has none."""
+    match = _FAQ_HEADING_RE.search(body or "")
+    if not match:
+        return []
+    section = body[match.end():]
+    next_h2 = re.search(r"^##[ \t]", section, re.MULTILINE)
+    if next_h2:
+        section = section[: next_h2.start()]
+    items = []
+    for block in re.split(r"^###[ \t]+", section, flags=re.MULTILINE)[1:]:
+        question, _, answer = block.partition("\n")
+        # A closing call-to-action (an all-italic paragraph) after the last
+        # answer is not part of it.
+        paragraphs = [p.strip() for p in re.split(r"\n\s*\n", answer) if p.strip()]
+        while paragraphs and re.fullmatch(r"\*[^*].*[^*]\*", paragraphs[-1], re.DOTALL):
+            paragraphs.pop()
+        answer = "\n\n".join(paragraphs)
+        question, answer = _markdown_to_text(question), _markdown_to_text(answer)
+        if question and answer:
+            items.append({"question": question, "answer": answer})
+    return items

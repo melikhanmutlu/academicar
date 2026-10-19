@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 360" width="960" height="360" role="img" aria-labelledby="t d">
+  <title id="t">Four ways to bring a 3D model into a slide deck</title>
+  <desc id="d">Native 3D model: the presenter can rotate it, but the file must be light and it only works in recent PowerPoint. Images: work everywhere and print, but are static. Video: a reliable turntable or guided move, not interactive. QR code and link: the audience explores the model on their own phones, in 3D and AR, and the link keeps working after updates. The strongest decks combine a video or image with a QR code.</desc>
+  <style>
+    .box { fill: #f5f5f5; stroke: #bdbdbd; stroke-width: 1.2; }
+    .hi { fill: #fff4ee; stroke: #ff682c; stroke-width: 1.5; }
+    .lbl { font: 600 15px Inter, system-ui, sans-serif; fill: #202020; }
+    .sub { font: 400 13px Inter, system-ui, sans-serif; fill: #6b6b6b; }
+    .yes { font: 600 13px Inter, system-ui, sans-serif; fill: #202020; }
+    .acc { font: 700 13px Inter, system-ui, sans-serif; fill: #c2410c; }
+    .num { font: 700 13px Inter, system-ui, sans-serif; fill: #ffffff; }
+  </style>
+  <rect width="960" height="360" fill="#ffffff"/>
+
+  <rect class="box" x="30" y="30" width="210" height="250" rx="10"/>
+  <circle cx="58" cy="60" r="13" fill="#202020"/><text class="num" x="54" y="65">1</text>
+  <text class="lbl" x="80" y="65">Native 3D model</text>
+  <text class="sub" x="50" y="102">Insert → 3D Models</text>
+  <text class="yes" x="50" y="140">+ rotate live on stage</text>
+  <text class="yes" x="50" y="164">+ Morph animations</text>
+  <text class="sub" x="50" y="202">− heavy files, basic</text>
+  <text class="sub" x="50" y="222">   materials</text>
+  <text class="sub" x="50" y="246">− recent PowerPoint only</text>
+
+  <rect class="box" x="258" y="30" width="210" height="250" rx="10"/>
+  <circle cx="286" cy="60" r="13" fill="#202020"/><text class="num" x="282" y="65">2</text>
+  <text class="lbl" x="308" y="65">Images</text>
+  <text class="sub" x="278" y="102">screenshots, figures</text>
+  <text class="yes" x="278" y="140">+ works in every tool</text>
+  <text class="yes" x="278" y="164">+ prints in handouts</text>
+  <text class="sub" x="278" y="202">− one fixed view</text>
+
+  <rect class="box" x="486" y="30" width="210" height="250" rx="10"/>
+  <circle cx="514" cy="60" r="13" fill="#202020"/><text class="num" x="510" y="65">3</text>
+  <text class="lbl" x="536" y="65">Video</text>
+  <text class="sub" x="506" y="102">turntable or guided move</text>
+  <text class="yes" x="506" y="140">+ plays reliably</text>
+  <text class="yes" x="506" y="164">+ good for recordings</text>
+  <text class="sub" x="506" y="202">− not interactive</text>
+
+  <rect class="hi" x="714" y="30" width="216" height="250" rx="10"/>
+  <circle cx="742" cy="60" r="13" fill="#ff682c"/><text class="num" x="738" y="65">4</text>
+  <text class="lbl" x="764" y="65">QR code + link</text>
+  <text class="sub" x="734" y="102">opens on every phone</text>
+  <text class="yes" x="734" y="140">+ audience explores it</text>
+  <text class="yes" x="734" y="164">+ AR on their desk</text>
+  <text class="yes" x="734" y="188">+ survives updates</text>
+  <text class="acc" x="734" y="226">the only route the</text>
+  <text class="acc" x="734" y="246">audience can touch</text>
+
+  <text class="sub" x="30" y="322">Best of both: put a video or image on the slide for everyone, and the QR code in the corner for</text>
+  <text class="sub" x="30" y="342">anyone who wants to explore the model themselves.</text>
+</svg>

@@ -90,8 +90,13 @@ def test_blog_post_share_tags_use_post_title_and_cover(client):
     assert posting["keywords"]
 
 
-def test_blog_post_without_cover_falls_back_to_default_share_image(client):
-    body = client.get("/blog/how-to-add-3d-models-to-research-papers").get_data(as_text=True)
+def test_blog_post_without_cover_falls_back_to_default_share_image(app, client):
+    from models import BlogPost, db
+
+    with app.app_context():
+        db.session.add(BlogPost(slug="no-cover", title="No cover", body="Just text."))
+        db.session.commit()
+    body = client.get("/blog/no-cover").get_data(as_text=True)
     assert "clinical-spatial-hero.png" in body.split('property="og:image"')[1].split(">")[0]
 
 
@@ -103,7 +108,7 @@ def test_blog_post_links_related_guides(client):
 
 def test_sitemap_blog_posts_have_lastmod(client):
     body = client.get("/sitemap.xml").get_data(as_text=True)
-    assert "/blog/dicom-to-3d-model-guide</loc><lastmod>2026-09-24</lastmod>" in body
+    assert "/blog/dicom-to-3d-model-guide</loc><lastmod>2026-10-19</lastmod>" in body
 
 
 def test_blog_post_admin_uploaded_image_is_the_cover(app, client):
@@ -132,3 +137,64 @@ def test_refreshed_builtin_post_reports_its_updated_date(app, client, monkeypatc
     assert '"dateModified": "2026-10-20"' in body
     sitemap = client.get("/sitemap.xml").get_data(as_text=True)
     assert f"/blog/{slug}</loc><lastmod>2026-10-20</lastmod>" in sitemap
+
+
+def test_faq_items_parse_questions_and_skip_the_closing_cta():
+    from blog_content import faq_items
+
+    body = (
+        "Intro.\n\n## Frequently asked questions\n\n"
+        "### Does **GLB** keep `file_names`?\n\nYes, see [the guide](/blog/x).\n\n"
+        "### Second?\n\n- One\n- Two\n\n"
+        "*[Create a free account](/auth/register) today.*\n"
+    )
+    assert faq_items(body) == [
+        {"question": "Does GLB keep file_names?", "answer": "Yes, see the guide."},
+        {"question": "Second?", "answer": "One Two"},
+    ]
+    assert faq_items("## Other heading\n\n### Q?\n\nA.") == []
+
+
+def test_faq_section_stops_at_the_next_h2():
+    from blog_content import faq_items
+
+    body = "## FAQ\n\n### Q?\n\nA.\n\n## More\n\n### Not a question\n\nText."
+    assert faq_items(body) == [{"question": "Q?", "answer": "A."}]
+
+
+def test_blog_post_with_faq_has_faqpage_schema(client):
+    body = client.get("/blog/convert-obj-fbx-to-glb").get_data(as_text=True)
+    blocks = [json.loads(b) for b in re.findall(r'<script type="application/ld\+json">(.*?)</script>', body, re.S)]
+    faq = next(b for b in blocks if b.get("@type") == "FAQPage")
+    assert len(faq["mainEntity"]) >= 3
+    first = faq["mainEntity"][0]
+    assert first["@type"] == "Question" and first["acceptedAnswer"]["text"]
+
+
+def test_blog_post_without_faq_has_no_faqpage_schema(app, client):
+    from models import BlogPost, db
+
+    with app.app_context():
+        db.session.add(BlogPost(slug="plain-post", title="Plain", body="## Heading\n\nText."))
+        db.session.commit()
+    body = client.get("/blog/plain-post").get_data(as_text=True)
+    assert "FAQPage" not in body
+
+
+def test_builtin_posts_have_cover_faq_and_valid_internal_links():
+    import os
+
+    from blog_content import POSTS, faq_items
+
+    slugs = {p["slug"] for p in POSTS}
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    for post in POSTS:
+        cover = f"/static/images/blog/covers/{post['slug']}.webp"
+        assert cover in post["body"], post["slug"]
+        assert os.path.exists(os.path.join(root, cover.lstrip("/"))), post["slug"]
+        assert len(faq_items(post["body"])) >= 3, post["slug"]
+        for target in re.findall(r"\]\(/blog/([^)#?]+)\)", post["body"]):
+            assert target in slugs, (post["slug"], target)
+        for image in re.findall(r"\]\((/static/images/blog/[^)]+)\)", post["body"]):
+            assert os.path.exists(os.path.join(root, image.lstrip("/"))), (post["slug"], image)
+

@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 330" width="960" height="330" role="img" aria-labelledby="t d">
+  <title id="t">One upload, a GLB and a USDZ</title>
+  <desc id="d">A model uploaded in any supported format is converted to a GLB, used by browsers and by Android Scene Viewer for AR, and to a USDZ with its real-world scale, used by AR Quick Look on iPhone and iPad. Recolouring, changing layers or replacing the model rebuilds the USDZ; the link and QR code stay the same.</desc>
+  <style>
+    .box { fill: #f5f5f5; stroke: #bdbdbd; stroke-width: 1.2; }
+    .hi { fill: #fff4ee; stroke: #ff682c; stroke-width: 1.5; }
+    .lbl { font: 600 15px Inter, system-ui, sans-serif; fill: #202020; }
+    .sub { font: 400 13px Inter, system-ui, sans-serif; fill: #6b6b6b; }
+    .acc { font: 700 13px Inter, system-ui, sans-serif; fill: #c2410c; }
+    .arr { stroke: #202020; stroke-width: 1.4; fill: none; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#202020"/>
+    </marker>
+  </defs>
+  <rect width="960" height="330" fill="#ffffff"/>
+
+  <rect class="box" x="40" y="110" width="200" height="90" rx="10"/>
+  <text class="lbl" x="60" y="144">Your upload</text>
+  <text class="sub" x="60" y="168">GLB, STL, OBJ, FBX,</text>
+  <text class="sub" x="60" y="186">STEP or a scan</text>
+
+  <path class="arr" d="M246 140 C300 140, 300 84, 352 80" marker-end="url(#a)"/>
+  <path class="arr" d="M246 170 C300 170, 300 226, 352 230" marker-end="url(#a)"/>
+
+  <rect class="box" x="358" y="36" width="250" height="90" rx="10"/>
+  <text class="lbl" x="378" y="70">GLB</text>
+  <text class="sub" x="378" y="94">web viewer in any browser</text>
+  <text class="acc" x="378" y="114">Android: Scene Viewer AR</text>
+
+  <rect class="hi" x="358" y="186" width="250" height="90" rx="10"/>
+  <text class="lbl" x="378" y="220">USDZ</text>
+  <text class="sub" x="378" y="244">real-world scale written in</text>
+  <text class="acc" x="378" y="264">iPhone / iPad: AR Quick Look</text>
+
+  <path class="arr" d="M614 80 C680 80, 690 150, 724 152" marker-end="url(#a)"/>
+  <path class="arr" d="M614 230 C680 230, 690 166, 724 164" marker-end="url(#a)"/>
+
+  <rect class="box" x="730" y="110" width="190" height="90" rx="10"/>
+  <text class="lbl" x="750" y="144">One link + QR</text>
+  <text class="sub" x="750" y="168">right file for</text>
+  <text class="sub" x="750" y="186">each device</text>
+
+  <text class="sub" x="40" y="314">Recolour, change layers or replace the model: the USDZ is rebuilt, the link and QR stay the same.</text>
+</svg>

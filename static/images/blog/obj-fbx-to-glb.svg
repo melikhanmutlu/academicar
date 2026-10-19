@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 340" width="960" height="340" role="img" aria-labelledby="t d">
+  <title id="t">What an OBJ and an FBX bring into a GLB</title>
+  <desc id="d">An OBJ arrives as three kinds of file: the .obj geometry, the .mtl material file and texture images, and it has no units, so you choose the unit. An FBX is one file that carries its parts, materials, textures and unit. Both are converted into a single GLB with compressed geometry, WebP textures and one layer per named part.</desc>
+  <style>
+    .box { fill: #f5f5f5; stroke: #bdbdbd; stroke-width: 1.2; }
+    .hi { fill: #fff4ee; stroke: #ff682c; stroke-width: 1.5; }
+    .file { fill: #ffffff; stroke: #6b6b6b; stroke-width: 1.2; }
+    .lbl { font: 600 15px Inter, system-ui, sans-serif; fill: #202020; }
+    .sub { font: 400 13px Inter, system-ui, sans-serif; fill: #6b6b6b; }
+    .acc { font: 700 13px Inter, system-ui, sans-serif; fill: #c2410c; }
+    .tag { font: 600 12px Inter, system-ui, sans-serif; fill: #202020; }
+    .cap { font: 600 12px Inter, system-ui, sans-serif; fill: #6b6b6b; letter-spacing: .08em; }
+    .arr { stroke: #202020; stroke-width: 1.4; fill: none; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#202020"/>
+    </marker>
+  </defs>
+  <rect width="960" height="340" fill="#ffffff"/>
+
+  <text class="cap" x="40" y="34">OBJ: SEVERAL FILES, NO UNITS</text>
+  <rect class="box" x="40" y="48" width="430" height="120" rx="10"/>
+  <rect class="file" x="60" y="66" width="80" height="44" rx="4"/><text class="tag" x="80" y="93">.obj</text>
+  <rect class="file" x="152" y="66" width="80" height="44" rx="4"/><text class="tag" x="171" y="93">.mtl</text>
+  <rect class="file" x="244" y="66" width="96" height="44" rx="4"/><text class="tag" x="256" y="93">.png / .jpg</text>
+  <text class="sub" x="60" y="134">geometry · materials · textures, kept together</text>
+  <text class="acc" x="60" y="154">you choose the unit: mm, cm or m</text>
+
+  <text class="cap" x="40" y="204">FBX: ONE FILE WITH UNITS</text>
+  <rect class="box" x="40" y="218" width="430" height="100" rx="10"/>
+  <rect class="file" x="60" y="236" width="80" height="44" rx="4"/><text class="tag" x="81" y="263">.fbx</text>
+  <text class="sub" x="160" y="254">parts, materials, textures</text>
+  <text class="sub" x="160" y="274">and the modelling unit</text>
+  <text class="acc" x="60" y="304">unit read from the file ("Embedded")</text>
+
+  <path class="arr" d="M480 108 C560 108, 560 170, 618 176" marker-end="url(#a)"/>
+  <path class="arr" d="M480 268 C560 268, 560 196, 618 190" marker-end="url(#a)"/>
+
+  <rect class="hi" x="624" y="110" width="296" height="146" rx="10"/>
+  <text class="lbl" x="644" y="142">One GLB</text>
+  <text class="sub" x="644" y="168">Draco geometry · WebP textures</text>
+  <text class="sub" x="644" y="190">named parts become layers</text>
+  <text class="sub" x="644" y="212">+ USDZ for iPhone AR</text>
+  <text class="acc" x="644" y="238">viewer link and QR code</text>
+</svg>

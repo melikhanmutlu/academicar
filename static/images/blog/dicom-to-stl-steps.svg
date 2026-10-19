@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 330" width="960" height="330" role="img" aria-labelledby="t d">
+  <title id="t">From a CT series to a printable STL</title>
+  <desc id="d">Four steps: prepare and anonymize the DICOM series; segment the structure, for bone a threshold of about 250 Hounsfield units; make and smooth the surface and export STL in millimetres; clean the mesh by making it watertight, checking wall thickness and reducing triangles, then slice and print. A branch shares the model interactively: upload the STL or the anonymized DICOM ZIP for a viewer link, AR and a QR code.</desc>
+  <style>
+    .box { fill: #f5f5f5; stroke: #bdbdbd; stroke-width: 1.2; }
+    .hi { fill: #fff4ee; stroke: #ff682c; stroke-width: 1.5; }
+    .lbl { font: 600 15px Inter, system-ui, sans-serif; fill: #202020; }
+    .sub { font: 400 13px Inter, system-ui, sans-serif; fill: #6b6b6b; }
+    .acc { font: 700 13px Inter, system-ui, sans-serif; fill: #c2410c; }
+    .num { font: 700 13px Inter, system-ui, sans-serif; fill: #ffffff; }
+    .arr { stroke: #202020; stroke-width: 1.4; fill: none; }
+    .dash { stroke: #ff682c; stroke-width: 1.4; fill: none; stroke-dasharray: 5 4; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#202020"/>
+    </marker>
+    <marker id="o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#ff682c"/>
+    </marker>
+  </defs>
+  <rect width="960" height="330" fill="#ffffff"/>
+
+  <rect class="box" x="30" y="30" width="200" height="120" rx="10"/>
+  <circle cx="56" cy="58" r="13" fill="#202020"/><text class="num" x="52" y="63">1</text>
+  <text class="lbl" x="78" y="63">DICOM series</text>
+  <text class="sub" x="50" y="96">export one series</text>
+  <text class="acc" x="50" y="122">anonymize first</text>
+
+  <rect class="box" x="264" y="30" width="200" height="120" rx="10"/>
+  <circle cx="290" cy="58" r="13" fill="#202020"/><text class="num" x="286" y="63">2</text>
+  <text class="lbl" x="312" y="63">Segment</text>
+  <text class="sub" x="284" y="96">bone: ≥ ~250 HU</text>
+  <text class="sub" x="284" y="118">keep largest island</text>
+
+  <rect class="box" x="498" y="30" width="200" height="120" rx="10"/>
+  <circle cx="524" cy="58" r="13" fill="#202020"/><text class="num" x="520" y="63">3</text>
+  <text class="lbl" x="546" y="63">Surface → STL</text>
+  <text class="sub" x="518" y="96">smooth lightly</text>
+  <text class="sub" x="518" y="118">export in mm</text>
+
+  <rect class="box" x="732" y="30" width="200" height="120" rx="10"/>
+  <circle cx="758" cy="58" r="13" fill="#202020"/><text class="num" x="754" y="63">4</text>
+  <text class="lbl" x="780" y="63">Clean + print</text>
+  <text class="sub" x="752" y="96">watertight, walls,</text>
+  <text class="sub" x="752" y="118">fewer triangles</text>
+
+  <path class="arr" d="M232 90 H258" marker-end="url(#a)"/>
+  <path class="arr" d="M466 90 H492" marker-end="url(#a)"/>
+  <path class="arr" d="M700 90 H726" marker-end="url(#a)"/>
+
+  <path class="dash" d="M130 152 V248 H300" marker-end="url(#o)"/>
+  <path class="dash" d="M560 152 V190" marker-end="url(#o)"/>
+  <rect class="hi" x="306" y="196" width="300" height="104" rx="10"/>
+  <text class="lbl" x="326" y="228">Share it interactively</text>
+  <text class="sub" x="326" y="252">upload the STL, or the anonymized</text>
+  <text class="sub" x="326" y="272">DICOM as a ZIP</text>
+  <text class="acc" x="326" y="292">viewer link · AR · QR code</text>
+</svg>

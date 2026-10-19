@@ -27,6 +27,17 @@
   "mainEntityOfPage": "{{ canonical_url() }}"
 }
 </script>
+{% if faq %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [{% for item in faq %}
+    { "@type": "Question", "name": {{ item.question | tojson }}, "acceptedAnswer": { "@type": "Answer", "text": {{ item.answer | tojson }} } }{{ "," if not loop.last }}{% endfor %}
+  ]
+}
+</script>
+{% endif %}
 {% if post.date %}<meta property="article:published_time" content="{{ post.date }}">{% endif %}
 <meta property="article:modified_time" content="{{ date_modified }}">
 <script type="application/ld+json">

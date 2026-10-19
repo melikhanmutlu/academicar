@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 262" width="960" height="262" role="img" aria-labelledby="t d">
+  <title id="t">What research 3D sharing needs</title>
+  <desc id="d">A checklist in four groups. The link: a stable QR code and viewer URL that survive replacing the file, and views you can count. Inputs: scans, segmentations, STEP assemblies and meshes uploaded directly, with parts as layers. Compliance: anonymization and rights confirmed on upload, and raw scans deleted after conversion. Tools: sections and slices, measurements, comparisons, figure export, saved scenes and tours, and AR on any phone.</desc>
+  <style>
+    .box { fill: #f5f5f5; stroke: #bdbdbd; stroke-width: 1.2; }
+    .hi { fill: #fff4ee; stroke: #ff682c; stroke-width: 1.5; }
+    .lbl { font: 600 15px Inter, system-ui, sans-serif; fill: #202020; }
+    .sub { font: 400 13px Inter, system-ui, sans-serif; fill: #6b6b6b; }
+    .cap { font: 600 12px Inter, system-ui, sans-serif; fill: #c2410c; letter-spacing: .08em; }
+    .tick { stroke: #ff682c; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <path id="k" class="tick" d="M0 5 L4 9 L11 1"/>
+  </defs>
+  <rect width="960" height="262" fill="#ffffff"/>
+
+  <rect class="box" x="30" y="30" width="210" height="210" rx="10"/>
+  <text class="cap" x="50" y="60">THE LINK</text>
+  <use href="#k" x="50" y="80"/><text class="sub" x="70" y="90">stable QR code</text>
+  <use href="#k" x="50" y="106"/><text class="sub" x="70" y="116">survives replacing</text>
+  <text class="sub" x="70" y="134">the file</text>
+  <use href="#k" x="50" y="150"/><text class="sub" x="70" y="160">views and scans</text>
+  <text class="sub" x="70" y="178">you can count</text>
+
+  <rect class="box" x="258" y="30" width="210" height="210" rx="10"/>
+  <text class="cap" x="278" y="60">YOUR INPUTS</text>
+  <use href="#k" x="278" y="80"/><text class="sub" x="298" y="90">CT / MRI series</text>
+  <use href="#k" x="278" y="106"/><text class="sub" x="298" y="116">segmentations</text>
+  <use href="#k" x="278" y="132"/><text class="sub" x="298" y="142">STEP assemblies</text>
+  <use href="#k" x="278" y="158"/><text class="sub" x="298" y="168">STL, OBJ, FBX, GLB</text>
+  <use href="#k" x="278" y="184"/><text class="sub" x="298" y="194">parts as layers</text>
+
+  <rect class="box" x="486" y="30" width="210" height="210" rx="10"/>
+  <text class="cap" x="506" y="60">COMPLIANCE</text>
+  <use href="#k" x="506" y="80"/><text class="sub" x="526" y="90">anonymization</text>
+  <text class="sub" x="526" y="108">confirmed</text>
+  <use href="#k" x="506" y="124"/><text class="sub" x="526" y="134">rights confirmed</text>
+  <use href="#k" x="506" y="150"/><text class="sub" x="526" y="160">raw scans deleted</text>
+  <text class="sub" x="526" y="178">after conversion</text>
+
+  <rect class="hi" x="714" y="30" width="216" height="210" rx="10"/>
+  <text class="cap" x="734" y="60">SCIENCE TOOLS</text>
+  <use href="#k" x="734" y="80"/><text class="sub" x="754" y="90">sections and slices</text>
+  <use href="#k" x="734" y="106"/><text class="sub" x="754" y="116">measurements</text>
+  <use href="#k" x="734" y="132"/><text class="sub" x="754" y="142">side-by-side compare</text>
+  <use href="#k" x="734" y="158"/><text class="sub" x="754" y="168">figure export</text>
+  <use href="#k" x="734" y="184"/><text class="sub" x="754" y="194">scenes and tours</text>
+  <use href="#k" x="734" y="210"/><text class="sub" x="754" y="220">AR on any phone</text>
+</svg>
