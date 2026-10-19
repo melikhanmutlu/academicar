@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Anasayfa tasarım önizlemeleri - AcademicAR{% endblock %}
+{% block head %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block content %}
+<section style="max-width:960px;margin:0 auto;padding:64px 24px 96px;">
+  <h1 style="font-family:Montserrat,sans-serif;font-size:32px;letter-spacing:-0.02em;margin:0 0 8px;">Anasayfa için 5 alternatif</h1>
+  <p style="color:#4d4d4d;margin:0 0 32px;">Önizleme sayfaları; arama motorlarına kapalı, sitede bağlantısı yok. Mevcut anasayfa değişmedi.</p>
+  <ol style="list-style:none;padding:0;margin:0;display:grid;gap:12px;">
+    {% for key, d in designs.items() %}
+    <li style="border:1px solid #e1e1e1;border-radius:8px;padding:20px 24px;">
+      <a href="{{ url_for('home_design', variant=key) }}" style="font-weight:600;color:#202020;">{{ key|upper }} · {{ d.name }}</a>
+      <p style="margin:6px 0 0;color:#4d4d4d;font-size:14px;">{{ d.summary }}</p>
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+{% endblock %}

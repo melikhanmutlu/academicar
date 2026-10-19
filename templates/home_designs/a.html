@@ -1,0 +1,279 @@
+{% extends "home_designs/_base.html" %}
+
+{% block hd_head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/home-designs/a.css', v=asset_version) }}">
+{% endblock %}
+
+{% block hd_content %}
+{% set clip_base = url_for('static', filename='videos/home/') %}
+{% set still_base = url_for('static', filename='images/home/') %}
+
+<!-- ===================== HERO: scroll-driven dissection ===================== -->
+<section class="a-dissect" data-a-dissect aria-label="AcademicAR viewer, explained on a mitochondrion model">
+  <div class="a-stage">
+    <div class="a-stage-grid" aria-hidden="true"></div>
+
+    <div class="a-hero-copy">
+      <p class="a-kicker">3D and AR for research, teaching and publishing</p>
+      <h1 class="a-title">Publish the model, not a screenshot of it.</h1>
+      <p class="a-lead">
+        Upload GLB, STL, OBJ, FBX, STEP or a CT/MR scan. AcademicAR turns it into a browser viewer, an AR view and a stable QR code for your paper, poster or thesis.
+      </p>
+      <div class="a-actions">
+        <a href="{{ url_for('auth.register') }}" class="a-btn a-btn-dark">Start publishing</a>
+        <a href="{{ url_for('demo_mitochondria_ar', source='home_a') }}" class="a-btn a-btn-line">Open the live example</a>
+      </div>
+    </div>
+
+    <div class="a-specimen">
+      <model-viewer
+        class="a-model"
+        data-a-model
+        src="{{ url_for('static', filename='models/model.compressed.glb') }}"
+        alt="Interactive 3D model of a mitochondrion"
+        camera-controls
+        touch-action="pan-y"
+        disable-zoom
+        disable-pan
+        interaction-prompt="none"
+        camera-orbit="20deg 70deg 9.5m"
+        field-of-view="30deg"
+        interpolation-decay="80"
+        exposure="1.0"
+        shadow-intensity="0"
+        tone-mapping="neutral"
+        environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
+        loading="eager"
+        reveal="auto">
+        <div slot="poster" class="a-model-poster" aria-hidden="true"></div>
+      </model-viewer>
+      <div class="a-plane" aria-hidden="true"><span></span></div>
+    </div>
+
+    <svg class="a-leaders" data-a-leaders aria-hidden="true"></svg>
+
+    <ol class="a-callouts">
+      <li class="a-callout" data-callout="0">
+        <span class="a-callout-step">Orbit</span>
+        <h2>Rotate it in any browser</h2>
+        <p>Orbit, zoom and inspect from every side. No login, no app, no plug-in for your readers.</p>
+      </li>
+      <li class="a-callout" data-callout="1">
+        <span class="a-callout-step">AR</span>
+        <h2>Scan the QR, place it on the desk</h2>
+        <p>Every model gets a stable QR code. Phones open it in AR straight from the browser.</p>
+        <img class="a-callout-qr" src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code that opens this model in AR" width="72" height="72" loading="lazy">
+      </li>
+      <li class="a-callout" data-callout="2">
+        <span class="a-callout-step">Section</span>
+        <h2>Cut a section, read the slice</h2>
+        <p>Move a section plane along any axis and read the 2D cross-section with a snapping measure.</p>
+      </li>
+      <li class="a-callout" data-callout="3">
+        <span class="a-callout-step">Figure</span>
+        <h2>Measure, label, export the figure</h2>
+        <p>Add distances and labels, then export a PNG figure with a layer legend, scale bar and QR.</p>
+      </li>
+    </ol>
+
+    <div class="a-rail" aria-hidden="true">
+      <span class="a-rail-fill"></span>
+      <span class="a-rail-hint">Scroll to dissect</span>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== TOOLS: scrollytelling with real clips ===================== -->
+<section class="a-tools" id="tools">
+  <div class="a-wrap">
+    <header class="a-head">
+      <h2 class="a-h2">The viewer your readers get</h2>
+      <p class="a-sub">Recorded in the AcademicAR viewer. Every tool works in a phone or desktop browser.</p>
+    </header>
+
+    {% set tools = [
+      ('orbit',   'Orbit and zoom',            'Open the link and the model is already turning. Drag to rotate, pinch to zoom, double-tap to frame a detail.'),
+      ('layers',  'Layers for every part',     'Multi-part models get a Layers panel: hide, isolate, recolour or X-ray each structure, then save the view as the default.'),
+      ('section', 'Section planes',            "Cut through X, Y or Z with guides that show where the plane sits. The cut follows the scan's patient orientation for medical data."),
+      ('slice',   'Slice view',                'Read axial, coronal and sagittal cross-sections in 2D, side by side with the 3D model, and measure across them.'),
+      ('measure', 'Measure and label',         "Pin labels to structures and measure point to point in real units. Layer metrics list each structure's dimensions."),
+      ('scenes',  'Scenes and guided tours',   'Save up to 12 views per model. Each scene gets its own link, QR and AR file, and a tour plays them in order.'),
+      ('figure',  'Figure export',             'Export a publication-ready PNG from any angle with a title, layer legend, scale bar and QR code.')
+    ] %}
+
+    <div class="a-tools-grid">
+      <div class="a-screen" aria-hidden="true">
+        <div class="a-screen-frame">
+          {% for t in tools %}
+          <video class="a-screen-video{% if loop.first %} is-active{% endif %}" data-screen="{{ loop.index0 }}"
+                 muted playsinline loop preload="none" poster="{{ still_base }}{{ t[0] }}.webp" width="960" height="540">
+            <source src="{{ clip_base }}{{ t[0] }}.mp4" type="video/mp4">
+          </video>
+          {% endfor %}
+        </div>
+        <div class="a-screen-meta">
+          <span class="a-screen-count"><b data-screen-count>1</b> of {{ tools|length }}</span>
+          <span class="a-screen-name" data-screen-name>{{ tools[0][1] }}</span>
+        </div>
+      </div>
+
+      <ol class="a-steps">
+        {% for t in tools %}
+        <li class="a-step" data-step="{{ loop.index0 }}" data-name="{{ t[1] }}">
+          <div class="a-step-media">
+            <video muted playsinline loop preload="none" poster="{{ still_base }}{{ t[0] }}.webp" width="960" height="540" data-inline-clip>
+              <source src="{{ clip_base }}{{ t[0] }}.mp4" type="video/mp4">
+            </video>
+          </div>
+          <h3>{{ t[1] }}</h3>
+          <p>{{ t[2] }}</p>
+        </li>
+        {% endfor %}
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== FORMATS: in → out, partial parallax ===================== -->
+<section class="a-formats" data-a-formats>
+  <div class="a-drift" aria-hidden="true">
+    <div class="a-drift-row" data-drift="-1">GLB&nbsp;&nbsp;STL&nbsp;&nbsp;OBJ&nbsp;&nbsp;FBX&nbsp;&nbsp;STEP&nbsp;&nbsp;STP&nbsp;&nbsp;DICOM&nbsp;&nbsp;NIfTI&nbsp;&nbsp;NRRD&nbsp;&nbsp;DICOM-SEG&nbsp;&nbsp;GLB&nbsp;&nbsp;STL&nbsp;&nbsp;OBJ&nbsp;&nbsp;FBX&nbsp;&nbsp;STEP</div>
+    <div class="a-drift-row a-drift-row-alt" data-drift="1">viewer link&nbsp;&nbsp;AR&nbsp;&nbsp;QR code&nbsp;&nbsp;embed&nbsp;&nbsp;scenes&nbsp;&nbsp;figures&nbsp;&nbsp;viewer link&nbsp;&nbsp;AR&nbsp;&nbsp;QR code&nbsp;&nbsp;embed</div>
+  </div>
+
+  <div class="a-wrap a-flow">
+    <div class="a-flow-col">
+      <h2 class="a-h2 a-h2-left">Bring the file you already have</h2>
+      <dl class="a-spec">
+        <div><dt>Meshes</dt><dd>GLB, STL, OBJ, FBX</dd></div>
+        <div><dt>CAD</dt><dd>STEP / STP assemblies, one layer per part</dd></div>
+        <div><dt>CT and MR</dt><dd>DICOM series as ZIP, thresholded with bone and tissue presets or your own HU range</dd></div>
+        <div><dt>Segmentations</dt><dd>NIfTI, NRRD, DICOM-SEG or a ZIP of masks, one layer per structure</dd></div>
+      </dl>
+    </div>
+
+    <div class="a-flow-core" aria-hidden="true">
+      <span class="a-flow-dot"></span>
+      <span class="a-flow-line"></span>
+      <span class="a-flow-chip">GLB + USDZ, compressed for the web</span>
+      <span class="a-flow-line"></span>
+      <span class="a-flow-dot"></span>
+    </div>
+
+    <div class="a-flow-col">
+      <h2 class="a-h2 a-h2-left">Share one link that keeps working</h2>
+      <dl class="a-spec">
+        <div><dt>Viewer</dt><dd>A public or private viewer page that runs in any modern browser</dd></div>
+        <div><dt>AR</dt><dd>WebXR on Android, Quick Look on iPhone and iPad</dd></div>
+        <div><dt>QR</dt><dd>A short /m/ link that survives replacements, recolours and upgrades</dd></div>
+        <div><dt>Embed</dt><dd>An iframe for your lab site, course page or online article</dd></div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== DISCIPLINES ===================== -->
+<section class="a-fields">
+  <div class="a-wrap">
+    <header class="a-head a-head-split">
+      <h2 class="a-h2 a-h2-left">Made for fields that think in three dimensions</h2>
+      <a class="a-textlink" href="{{ url_for('ar_for_index') }}">All fields</a>
+    </header>
+    <ul class="a-field-list">
+      {% for d in disciplines %}
+      <li>
+        <a href="{{ url_for('ar_for', discipline=d.slug) }}">
+          <span class="a-field-name">{{ d.name }}</span>
+          <span class="a-field-sub">{{ d.subhead }}</span>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<!-- ===================== SHOWREEL ===================== -->
+<section class="a-reel" id="showreel">
+  <div class="a-wrap">
+    <div class="a-reel-layout">
+      <div class="a-reel-copy">
+        <h2 class="a-h2 a-h2-left">Every viewer tool in one minute</h2>
+        <p class="a-sub a-sub-left">Orbit, layers, finishes, sections, measurements, lighting, scenes, slice view, figure export and AR, as they appear to your readers.</p>
+      </div>
+      <div class="a-reel-frame" data-a-reel>
+        <img class="a-reel-poster" src="{{ url_for('static', filename='images/showreel-poster.webp') }}"
+             alt="AcademicAR showreel: a 3D model orbiting in the viewer" loading="lazy" decoding="async" width="1600" height="900">
+        <video class="a-reel-video" preload="none" playsinline width="1920" height="1080" hidden>
+          <source src="{{ url_for('static', filename='videos/academicar-showreel.mp4') }}" type="video/mp4">
+        </video>
+        <button type="button" class="a-reel-play" aria-label="Play the AcademicAR showreel (1:00)">
+          <span class="a-reel-play-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></span>
+          <span>Play showreel <span class="a-reel-time">1:00</span></span>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== INSTITUTIONS ===================== -->
+<section class="a-inst">
+  <div class="a-wrap a-inst-grid">
+    <div class="a-inst-copy">
+      <h2 class="a-h2 a-h2-left">For departments, libraries and faculties</h2>
+      <p class="a-sub a-sub-left">An institutional contract funds your members' models from one shared quota, with a panel to manage who publishes.</p>
+      <div class="a-actions">
+        <a href="{{ url_for('institutional_inquiry') }}" class="a-btn a-btn-dark">Talk to us about a contract</a>
+        <a href="{{ url_for('demo_institution', source='home_a') }}" class="a-btn a-btn-line">See the institution dashboard</a>
+      </div>
+    </div>
+    <ul class="a-inst-list">
+      <li><h3>Shared quota</h3><p>Model count and storage set by contract, used by every member's uploads.</p></li>
+      <li><h3>Invite links</h3><p>Members join through a link, optionally limited to your university email domain.</p></li>
+      <li><h3>Public showcase</h3><p>A page at /i/your-institution lists the models your members publish.</p></li>
+      <li><h3>"Supported by" in the viewer</h3><p>Funded models show your institution's name to every reader.</p></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===================== GUIDES ===================== -->
+{% if posts %}
+<section class="a-guides">
+  <div class="a-wrap">
+    <header class="a-head a-head-split">
+      <h2 class="a-h2 a-h2-left">Recent guides</h2>
+      <a class="a-textlink" href="{{ url_for('blog_index') }}">All guides</a>
+    </header>
+    <ul class="a-guide-list">
+      {% for p in posts[:3] %}
+      <li>
+        <a href="{{ url_for('blog_post', slug=p.slug) }}">
+          <span class="a-guide-cover">
+            {% if p.cover %}<img src="{{ p.cover }}" alt="" loading="lazy" decoding="async" width="640" height="360">{% endif %}
+          </span>
+          <span class="a-guide-title">{{ p.title }}</span>
+          {% if p.description %}<span class="a-guide-desc">{{ p.description }}</span>{% endif %}
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+{% endif %}
+
+<!-- ===================== CTA ===================== -->
+<section class="a-cta">
+  <div class="a-wrap a-cta-inner">
+    <h2 class="a-cta-title">Give your next figure a third dimension.</h2>
+    <p class="a-cta-sub">Project pages are free. Give a model a 3-year Academic or 10-year Extended Archive access window when it needs one.</p>
+    <div class="a-actions a-actions-center">
+      <a href="{{ url_for('auth.register') }}" class="a-btn a-btn-light">Start publishing</a>
+      <a href="{{ url_for('pricing') }}" class="a-btn a-btn-ghost-light">See pricing</a>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block hd_scripts %}
+<script type="module" src="https://unpkg.com/@google/model-viewer@4.3.0/dist/model-viewer.min.js" crossorigin="anonymous"></script>
+<script src="{{ url_for('static', filename='js/home-designs/a.js', v=asset_version) }}" defer></script>
+{% endblock %}

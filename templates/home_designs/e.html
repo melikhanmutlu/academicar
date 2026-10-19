@@ -1,0 +1,386 @@
+{% extends "home_designs/_base.html" %}
+{#- Design E · Baskı — from the printed page to a live 3D model. Preview only. -#}
+{% block hd_head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/home-designs/e.css', v=asset_version) }}">
+{% endblock %}
+
+{% block hd_content %}
+{% set qr_src = url_for('demo_mitochondria_qr') %}
+
+<!-- ============================= HERO: print → scan → model ============================= -->
+<section class="e-hero" data-e-hero>
+  <div class="e-hero-pin">
+    <div class="e-hero-inner">
+      <div class="e-hero-copy">
+        <p class="e-kicker">QR codes and AR for printed research</p>
+        <h1 class="e-hero-title">From the printed page to a model in your&nbsp;hand.</h1>
+        <p class="e-hero-lead">
+          Every model you publish gets a QR code for posters, theses, slides and handouts.
+          Readers scan it with their phone camera and the figure opens in 3D or AR. No app, no login.
+        </p>
+        <div class="e-hero-actions">
+          <a href="{{ url_for('auth.register') }}" class="e-btn e-btn-dark">Start publishing</a>
+          <a href="{{ url_for('demo_mitochondria_ar', source='home_e_hero') }}" class="e-btn e-btn-line">Open the demo model</a>
+        </div>
+        <ol class="e-hero-steps" aria-label="What happens">
+          <li data-e-step="1"><span class="e-step-dot" aria-hidden="true"></span>Print the QR next to your figure</li>
+          <li data-e-step="2"><span class="e-step-dot" aria-hidden="true"></span>A reader scans it with any phone</li>
+          <li data-e-step="3"><span class="e-step-dot" aria-hidden="true"></span>The model opens in 3D, or on the desk in AR</li>
+        </ol>
+      </div>
+
+      <div class="e-desk" data-e-desk>
+        <div class="e-stage" data-e-stage>
+          <!-- printed poster -->
+          <article class="e-sheet" data-e-layer="0.5" aria-label="Example of a printed poster with a QR code">
+            <div class="e-sheet-inner">
+              <header class="e-sheet-head">
+                <p class="e-sheet-title">Inner-membrane cristae of a mitochondrion: a cross-section model</p>
+                <p class="e-sheet-authors">A. Researcher, B. Colleague</p>
+                <p class="e-sheet-aff">Department of Cell Biology</p>
+              </header>
+              <div class="e-sheet-body">
+                <div class="e-sheet-col">
+                  <p class="e-sheet-h">Abstract</p>
+                  <span class="e-bar"></span><span class="e-bar"></span><span class="e-bar e-bar-s"></span>
+                  <span class="e-bar"></span><span class="e-bar e-bar-m"></span>
+                  <p class="e-sheet-h">Methods</p>
+                  <span class="e-bar"></span><span class="e-bar e-bar-s"></span><span class="e-bar"></span>
+                  <span class="e-bar e-bar-m"></span>
+                  <p class="e-sheet-h">Results</p>
+                  <span class="e-bar"></span><span class="e-bar"></span><span class="e-bar e-bar-s"></span>
+                  <span class="e-bar"></span><span class="e-bar e-bar-m"></span>
+                </div>
+                <figure class="e-sheet-fig">
+                  <div class="e-fig-frame" data-e-figure>
+                    <img class="e-fig-print" data-e-print src="{{ url_for('static', filename='images/home/e/mito-print.webp') }}" alt="" width="523" height="289">
+                  </div>
+                  <figcaption class="e-fig-cap">
+                    <span><b>Fig. 1</b> Mitochondrion, cut open to show the cristae. Scan the code for the 3D model.</span>
+                    <span class="e-qr" data-e-qr>
+                      <img src="{{ qr_src }}" alt="QR code that opens the demo model in 3D and AR" width="120" height="120">
+                    </span>
+                  </figcaption>
+                  <div class="e-fig2" aria-hidden="true">
+                    <div class="e-fig2-plot"><i style="height:38%"></i><i style="height:56%"></i><i style="height:47%"></i><i style="height:88%"></i><i style="height:62%"></i><i style="height:30%"></i></div>
+                    <p><b>Fig. 2</b> Cristae density by region.</p>
+                  </div>
+                  <p class="e-sheet-h e-sheet-h-gap">Conclusions</p>
+                  <span class="e-bar"></span><span class="e-bar e-bar-m"></span>
+                </figure>
+              </div>
+            </div>
+          </article>
+
+          <!-- live model rising out of the figure -->
+          <div class="e-rise" data-e-rise>
+            <model-viewer class="e-rise-model"
+              src="{{ url_for('static', filename='models/model.compressed.glb') }}"
+              alt="Live 3D model of a mitochondrion"
+              camera-controls disable-zoom auto-rotate
+              rotation-per-second="18deg"
+              camera-orbit="35deg 65deg 9m" field-of-view="30deg"
+              interaction-prompt="none"
+              exposure="1.0" shadow-intensity="0" tone-mapping="neutral"
+              environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
+              loading="lazy" reveal="auto">
+            </model-viewer>
+            <span class="e-rise-shadow" aria-hidden="true"></span>
+            <span class="e-rise-tag">Live model. Drag to rotate.</span>
+          </div>
+
+          <!-- phone -->
+          <div class="e-phone" data-e-phone aria-hidden="true">
+            <div class="e-phone-screen">
+              <div class="e-cam">
+                <img class="e-cam-qr" src="{{ qr_src }}" alt="" width="120" height="120">
+                <span class="e-cam-corners"></span>
+                <span class="e-cam-line"></span>
+                <span class="e-cam-hint">Point at the code</span>
+              </div>
+              <img class="e-phone-ar" src="{{ url_for('static', filename='images/home/e/ar-screen.webp') }}" alt="" width="562" height="1233">
+              <span class="e-phone-island"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= EVERY PRINTED SURFACE ============================= -->
+<section class="e-section e-surfaces" id="surfaces">
+  <div class="e-wrap">
+    <div class="e-head">
+      <h2 class="e-h2">Wherever your work is printed, the model is one scan away.</h2>
+      <p class="e-sub">The same QR code and short link work on every surface. Here is how people use them.</p>
+    </div>
+
+    <ul class="e-surface-list">
+      {% set surfaces = [
+        ('poster', 'Conference poster', 'Print the code beside the figure. Visitors open the model on their phone while they stand at your board.', url_for('blog_post', slug='qr-codes-on-academic-posters-guide'), 'Poster QR guide'),
+        ('thesis', 'Thesis and dissertation', 'Add a code and short link for each model to the printed copy, so examiners can rotate the specimen instead of reading three fixed views.', url_for('blog_post', slug='how-to-add-3d-models-to-research-papers'), 'Adding models to papers'),
+        ('journal', 'Journal article', 'Put the viewer link in the figure caption or supplementary material. Reviewers inspect the geometry, not a screenshot of it.', url_for('blog_post', slug='interactive-3d-figures-scientific-publishing'), 'Interactive figures'),
+        ('slide', 'Lecture slide', 'Place the code on the slide and students open the exact structure you are describing, during class or after it.', url_for('blog_post', slug='add-3d-model-to-powerpoint'), '3D in PowerPoint'),
+        ('label', 'Lab station or museum label', 'Pair a printed label with its model. Tap-to-place AR shows the object at true scale on the bench or in the gallery.', url_for('ar_for', discipline='museums'), 'AR for museums'),
+        ('web', 'Lab or project website', 'Embed the same viewer in a web page with an iframe. Updating the model updates every place it appears.', url_for('blog_post', slug='embed-3d-model-website'), 'Embedding guide')
+      ] %}
+      {% for key, title, text, href, link in surfaces %}
+      <li class="e-surface">
+        <div class="e-mini e-mini-{{ key }}" aria-hidden="true">
+          {% if key == 'poster' %}
+            <span class="e-m-sheet"><i></i><i></i><i class="e-m-fig"></i><i></i><b class="e-m-qr"></b></span>
+          {% elif key == 'thesis' %}
+            <span class="e-m-book"><span class="e-m-page"><i></i><i></i><i></i><i></i></span><span class="e-m-page"><i class="e-m-fig"></i><i></i><b class="e-m-qr"></b></span></span>
+          {% elif key == 'journal' %}
+            <span class="e-m-sheet e-m-journal"><i class="e-m-title"></i><i></i><i></i><i class="e-m-fig"></i><i></i><b class="e-m-qr"></b></span>
+          {% elif key == 'slide' %}
+            <span class="e-m-slide"><i class="e-m-title"></i><i class="e-m-fig"></i><b class="e-m-qr"></b></span>
+          {% elif key == 'label' %}
+            <span class="e-m-label"><i class="e-m-title"></i><i></i><i></i><b class="e-m-qr"></b></span>
+          {% else %}
+            <span class="e-m-browser"><span class="e-m-bar"><i></i><i></i><i></i></span><i class="e-m-fig"></i><i></i></span>
+          {% endif %}
+        </div>
+        <div class="e-surface-text">
+          <h3>{{ title }}</h3>
+          <p>{{ text }}</p>
+        </div>
+        <a class="e-surface-link" href="{{ href }}">{{ link }}</a>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<!-- ============================= THE QR NEVER BREAKS ============================= -->
+<section class="e-section e-stable" id="stable-qr">
+  <div class="e-wrap e-stable-grid">
+    <div class="e-stable-copy">
+      <h2 class="e-h2">The printed code outlives the file behind it.</h2>
+      <p>
+        Your QR code points to a stable address, not to a file. Replace the model with a new scan,
+        recolour it, rescale it or move it to another plan, and the code on every printout keeps
+        opening the current version.
+      </p>
+      <p>
+        If a model's access window ends, the same link shows a clear page that says so, never a dead link.
+      </p>
+      <dl class="e-stable-facts">
+        <div><dt>Address</dt><dd>academicar.com/m/&hellip; for each model</dd></div>
+        <div><dt>History</dt><dd>Every replacement is kept as a model version</dd></div>
+        <div><dt>Print</dt><dd>PNG and print-ready QR files from the dashboard</dd></div>
+      </dl>
+    </div>
+
+    <div class="e-versions" aria-label="One printed QR code, three versions of the model">
+      <div class="e-versions-qr">
+        <span class="e-paper-scrap">
+          <img src="{{ qr_src }}" alt="" width="120" height="120" loading="lazy">
+          <span>Printed in March</span>
+        </span>
+      </div>
+      <svg class="e-versions-lines" viewBox="0 0 100 300" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0 150 C 50 150, 50 40, 100 40" />
+        <path d="M0 150 C 50 150, 50 150, 100 150" />
+        <path class="e-line-now" d="M0 150 C 50 150, 50 260, 100 260" />
+      </svg>
+      <ol class="e-versions-list">
+        <li>
+          <img src="{{ url_for('static', filename='images/home/orbit.webp') }}" alt="" loading="lazy" width="960" height="540">
+          <div><b>Version 1</b><span>First upload, plain finish</span></div>
+        </li>
+        <li>
+          <img src="{{ url_for('static', filename='images/home/layers.webp') }}" alt="" loading="lazy" width="960" height="540">
+          <div><b>Version 2</b><span>Layers renamed and recoloured</span></div>
+        </li>
+        <li class="is-now">
+          <img src="{{ url_for('static', filename='images/home/section.webp') }}" alt="" loading="lazy" width="960" height="540">
+          <div><b>Version 3</b><span>Replaced with a new scan. The code still opens it.</span></div>
+        </li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= WHAT OPENS AFTER THE SCAN ============================= -->
+<section class="e-section e-tools" id="viewer">
+  <div class="e-wrap">
+    <div class="e-head e-head-row">
+      <div>
+        <h2 class="e-h2">What your reader gets after the scan.</h2>
+        <p class="e-sub">A full 3D viewer in the browser, with the tools you chose to show.</p>
+      </div>
+      <p class="e-tools-hint" aria-hidden="true">Scroll sideways</p>
+    </div>
+  </div>
+  <div class="e-tools-track" tabindex="0" aria-label="Viewer tools, scrollable">
+    {% set tools = [
+      ('orbit', 'Rotate in any browser', 'No login and nothing to install.'),
+      ('layers', 'Layers', 'Hide, x-ray and recolour each part of the model.'),
+      ('section', 'Section plane', 'Cut along any axis and look inside.'),
+      ('measure', 'Measure and label', 'Distances in real units, with labelled points.'),
+      ('slice', 'Slice view', '2D cross-sections with a snapping two-point measure.'),
+      ('scenes', 'Scenes and tours', 'Saved views, each with its own link, QR code and AR file.'),
+      ('figure', 'Figure export', 'A PNG with legend, scale bar and QR code for your next paper.'),
+      ('scan', 'AR on the desk', 'WebXR on Android and Quick Look on iPhone.')
+    ] %}
+    {% for key, title, text in tools %}
+    <figure class="e-tool">
+      <div class="e-tool-screen">
+        <video class="e-clip" muted playsinline loop preload="none" width="960" height="540"
+               poster="{{ url_for('static', filename='images/home/' ~ key ~ '.webp') }}">
+          <source src="{{ url_for('static', filename='videos/home/' ~ key ~ '.mp4') }}" type="video/mp4">
+        </video>
+      </div>
+      <figcaption><b>{{ title }}</b><span>{{ text }}</span></figcaption>
+    </figure>
+    {% endfor %}
+  </div>
+</section>
+
+<!-- ============================= AUDIENCES ============================= -->
+<section class="e-section e-aud" id="audiences">
+  <div class="e-wrap">
+    <div class="e-head">
+      <h2 class="e-h2">Made for the people who print things.</h2>
+    </div>
+    <div class="e-aud-tabs" role="tablist" aria-label="Who uses AcademicAR">
+      <button type="button" role="tab" id="e-tab-res" aria-controls="e-panel-res" aria-selected="true">Researchers</button>
+      <button type="button" role="tab" id="e-tab-edu" aria-controls="e-panel-edu" aria-selected="false" tabindex="-1">Educators</button>
+      <button type="button" role="tab" id="e-tab-inst" aria-controls="e-panel-inst" aria-selected="false" tabindex="-1">Institutions</button>
+      <button type="button" role="tab" id="e-tab-mus" aria-controls="e-panel-mus" aria-selected="false" tabindex="-1">Museums and heritage</button>
+    </div>
+
+    <div class="e-aud-panel" role="tabpanel" id="e-panel-res" aria-labelledby="e-tab-res">
+      <img src="{{ url_for('static', filename='images/use-scientific-publication.png') }}" alt="A printed scientific article with an interactive 3D model beside it" loading="lazy">
+      <div>
+        <h3>Attach a model to the paper, poster or thesis.</h3>
+        <p>Upload GLB, STL, OBJ, FBX, STEP or a CT/MR scan. AcademicAR converts it for the web, generates the QR code and keeps it private until you share a review link or publish.</p>
+        <ul class="e-aud-links">
+          <li><a href="{{ url_for('auth.register') }}">Create a free account</a></li>
+          <li><a href="{{ url_for('demo_dashboard', source='home_e') }}">See a researcher dashboard</a></li>
+          <li><a href="{{ url_for('blog_post', slug='dicom-to-3d-model-guide') }}">From DICOM to an interactive model</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="e-aud-panel" role="tabpanel" id="e-panel-edu" aria-labelledby="e-tab-edu" hidden>
+      <img src="{{ url_for('static', filename='images/use-medical-education.png') }}" alt="Students exploring an anatomy model on a phone" loading="lazy">
+      <div>
+        <h3>Put a structure on every handout and slide.</h3>
+        <p>Students scan the code during class and keep the model afterwards. Saved scenes walk them through it step by step, each with its own link and QR code.</p>
+        <ul class="e-aud-links">
+          <li><a href="{{ url_for('ar_for', discipline='anatomy') }}">AR for anatomy</a></li>
+          <li><a href="{{ url_for('ar_for', discipline='stem-education') }}">AR for STEM education</a></li>
+          <li><a href="{{ url_for('blog_post', slug='saved-scenes-guided-tours-3d-teaching') }}">Teaching with saved scenes</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="e-aud-panel" role="tabpanel" id="e-panel-inst" aria-labelledby="e-tab-inst" hidden>
+      <img src="{{ url_for('static', filename='images/use-research-projects.png') }}" alt="A department's research projects with their 3D models" loading="lazy">
+      <div>
+        <h3>Fund models for a whole department.</h3>
+        <p>An institutional contract covers members' models within a model and storage quota. Invite people with a link, limit it to your email domain, and show the work on a public showcase page. Viewers see who supported it.</p>
+        <ul class="e-aud-links">
+          <li><a href="{{ url_for('demo_institution', source='home_e') }}">See an institution dashboard</a></li>
+          <li><a href="{{ url_for('institutional_inquiry') }}">Ask about an institutional plan</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="e-aud-panel" role="tabpanel" id="e-panel-mus" aria-labelledby="e-tab-mus" hidden>
+      <img src="{{ url_for('static', filename='images/blog/covers/ar-for-archaeology-3d-artifacts.webp') }}" alt="An archaeological artefact shown as a 3D model" loading="lazy">
+      <div>
+        <h3>Let visitors take the object off the label.</h3>
+        <p>A QR code on the gallery label opens the scanned object in 3D. Visitors turn it over, look underneath and place it at true scale on the floor in AR.</p>
+        <ul class="e-aud-links">
+          <li><a href="{{ url_for('ar_for', discipline='museums') }}">AR for museums and heritage</a></li>
+          <li><a href="{{ url_for('ar_for', discipline='archaeology') }}">AR for archaeology</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= LECTURE HALL SCREEN ============================= -->
+<section class="e-section e-hall" id="showreel">
+  <div class="e-wrap">
+    <div class="e-head">
+      <h2 class="e-h2">Every viewer feature in one minute.</h2>
+      <p class="e-sub">The showreel, with sound. It loads only when you press play.</p>
+    </div>
+    <div class="e-screen" data-e-showreel>
+      <span class="e-screen-roller" aria-hidden="true"></span>
+      <div class="e-screen-canvas">
+        <img class="e-screen-poster" src="{{ url_for('static', filename='images/showreel-poster.webp') }}"
+             alt="AcademicAR showreel: a 3D model orbiting in the viewer" loading="lazy" decoding="async" width="1600" height="900">
+        <video class="e-screen-video" preload="none" playsinline width="1920" height="1080" hidden>
+          <source src="{{ url_for('static', filename='videos/academicar-showreel.mp4') }}" type="video/mp4">
+        </video>
+        <button type="button" class="e-screen-play" aria-label="Play the AcademicAR showreel (1:00)">
+          <span class="e-play-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></span>
+          <span>Play the showreel <span class="e-play-time">1:00</span></span>
+        </button>
+      </div>
+      <span class="e-screen-pull" aria-hidden="true"></span>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= INSTITUTIONS ============================= -->
+<section class="e-section e-inst" id="institutions">
+  <div class="e-wrap e-inst-grid">
+    <div class="e-inst-copy">
+      <h2 class="e-h2">For departments, libraries and journals.</h2>
+      <ul class="e-inst-list">
+        <li>A contract with a model and storage quota, and an end date you control</li>
+        <li>Invite links for members, optionally limited to your email domain</li>
+        <li>A public showcase page for the work your institution funded</li>
+        <li>"Supported by" attribution in every funded viewer</li>
+        <li>Monthly usage reports and a reminder before renewal</li>
+      </ul>
+      <div class="e-hero-actions">
+        <a href="{{ url_for('institutional_inquiry') }}" class="e-btn e-btn-dark">Talk to us about a plan</a>
+        <a href="{{ url_for('demo_institution', source='home_e_inst') }}" class="e-btn e-btn-line">Open the demo dashboard</a>
+      </div>
+    </div>
+    <div class="e-inst-card" aria-hidden="true">
+      <div class="e-label-card">
+        <div class="e-label-top">
+          <span class="e-label-logo"><img src="{{ url_for('static', filename='images/demo-institution-logo.svg') }}" alt="" width="40" height="40"></span>
+          <span><b>Supported by</b><span>Your institution</span></span>
+        </div>
+        <p class="e-label-title">Specimen 14: calcaneus with lateral plate</p>
+        <div class="e-label-row">
+          <img src="{{ qr_src }}" alt="" width="120" height="120" loading="lazy">
+          <span>Scan to view this specimen in 3D and AR</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= CLOSING CTA ============================= -->
+<section class="e-section e-cta">
+  <div class="e-wrap">
+    <div class="e-cta-box">
+      <div>
+        <h2 class="e-cta-title">Put a model on your next printout.</h2>
+        <p>Free to start. Upload a model, print the QR code, and see it open on your own phone.</p>
+      </div>
+      <div class="e-hero-actions">
+        <a href="{{ url_for('auth.register') }}" class="e-btn e-btn-light">Start publishing</a>
+        <a href="{{ url_for('pricing') }}" class="e-btn e-btn-ghost-light">See pricing</a>
+      </div>
+    </div>
+    <nav class="e-fields" aria-label="AR by field">
+      <span>By field:</span>
+      {% for d in disciplines %}<a href="{{ url_for('ar_for', discipline=d.slug) }}">{{ d.name }}</a>{% endfor %}
+    </nav>
+  </div>
+</section>
+{% endblock %}
+
+{% block hd_scripts %}
+<script type="module" src="https://unpkg.com/@google/model-viewer@4.3.0/dist/model-viewer.min.js" crossorigin="anonymous"></script>
+<script src="{{ url_for('static', filename='js/home-designs/e.js', v=asset_version) }}" defer></script>
+{% endblock %}

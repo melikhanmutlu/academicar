@@ -1,0 +1,358 @@
+{% extends "home_designs/_base.html" %}
+
+{% block hd_head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/home-designs/d.css', v=asset_version) }}">
+{% endblock %}
+
+{#- Pipeline data: only steps the real converters perform (see CLAUDE.md). -#}
+{% set d_inputs = [
+  {'key': 'glb', 'label': 'GLB', 'kind': '3D', 'note': 'glTF binary',
+   'layers': 'As exported', 'medical': 'No', 'steps': [
+     ['Validate', 'Checked as a glTF binary'],
+     ['Optimise', 'Draco geometry, webp textures'],
+     ['AR files', 'USDZ companion for iPhone and iPad'],
+     ['Publish', 'Viewer link and stable QR']]},
+  {'key': 'stl', 'label': 'STL', 'kind': '3D', 'note': 'Mesh from CAD or a slicer',
+   'layers': 'Single part', 'medical': 'No', 'steps': [
+     ['Validate', 'Mesh checked with trimesh'],
+     ['Convert', 'STL to GLB'],
+     ['Optimise', 'Draco geometry compression'],
+     ['AR files', 'USDZ companion for iPhone and iPad'],
+     ['Publish', 'Viewer link and stable QR']]},
+  {'key': 'obj', 'label': 'OBJ', 'kind': '3D', 'note': 'With materials and textures',
+   'layers': 'As exported', 'medical': 'No', 'steps': [
+     ['Convert', 'obj2gltf wrapper'],
+     ['Textures', 'Re-encoded as webp'],
+     ['Optimise', 'Draco geometry compression'],
+     ['AR files', 'USDZ companion for iPhone and iPad'],
+     ['Publish', 'Viewer link and stable QR']]},
+  {'key': 'fbx', 'label': 'FBX', 'kind': '3D', 'note': 'From Blender, Maya, 3ds Max',
+   'layers': 'As exported', 'medical': 'No', 'steps': [
+     ['Convert', 'FBX2glTF wrapper'],
+     ['Textures', 'Re-encoded as webp'],
+     ['Optimise', 'Draco geometry compression'],
+     ['AR files', 'USDZ companion for iPhone and iPad'],
+     ['Publish', 'Viewer link and stable QR']]},
+  {'key': 'step', 'label': 'STEP / STP', 'kind': 'CAD', 'note': 'Exact CAD assemblies',
+   'layers': 'One per part', 'medical': 'No', 'steps': [
+     ['Tessellate', 'OpenCascade turns exact CAD into a mesh'],
+     ['Layers', 'One named layer per part'],
+     ['Optimise', 'Draco only, so parts stay separate'],
+     ['AR files', 'USDZ companion for iPhone and iPad'],
+     ['Publish', 'Viewer link and stable QR']]},
+  {'key': 'dicom', 'label': 'DICOM series', 'kind': 'CT / MR', 'note': 'Uploaded as a ZIP',
+   'layers': 'One per structure', 'medical': 'Required', 'steps': [
+     ['Decode', 'Uncompressed, JPEG Lossless, JPEG-LS, JPEG 2000, RLE'],
+     ['Threshold', 'Bone, skin, contrast vessels, auto, or your own HU range'],
+     ['Mesh', 'One layer per structure, up to 64'],
+     ['Optimise', 'Draco only, so layers stay separate'],
+     ['Clean up', 'Raw scan deleted after conversion']]},
+  {'key': 'seg', 'label': 'Segmentation', 'kind': 'Labels', 'note': 'NIfTI, NRRD, DICOM-SEG, mask ZIP',
+   'layers': 'One per structure', 'medical': 'Required', 'steps': [
+     ['Read labels', 'NIfTI, NRRD or .seg.nrrd, DICOM-SEG, ZIP of masks'],
+     ['Mesh', 'One named layer per structure'],
+     ['Optimise', 'Draco only, so layers stay separate'],
+     ['AR files', 'USDZ companion for iPhone and iPad'],
+     ['Clean up', 'Raw scan deleted after conversion']]},
+] %}
+
+{% block hd_content %}
+<div class="d-root">
+  <div class="d-grid-bg" aria-hidden="true"></div>
+
+  <!-- ============================ HERO: PIPELINE ============================ -->
+  <section class="d-hero" aria-labelledby="d-hero-title">
+    <div class="d-wrap">
+      <div class="d-hero-head">
+        <h1 id="d-hero-title" class="d-h1"><span>Any 3D file in.</span> <span>A live viewer, AR and a QR code out.</span></h1>
+        <div class="d-hero-side">
+          <p class="d-lead">Upload a mesh, a CAD assembly or a CT scan. AcademicAR converts and compresses it in the background, then gives you a viewer link and a QR code that keep working when you replace the model.</p>
+          <div class="d-actions">
+            <a class="d-btn d-btn-dark" href="{{ url_for('auth.register') }}">Start publishing</a>
+            <a class="d-btn d-btn-line" href="{{ url_for('demo_mitochondria_ar', source='home_d') }}">Open the demo model</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-panel" data-pipeline>
+        <div class="d-panel-bar">
+          <span class="d-panel-title">Conversion pipeline</span>
+          <span class="d-panel-status"><span class="d-led" aria-hidden="true"></span><span data-status>Showing each input in turn</span></span>
+          <button type="button" class="d-panel-toggle" data-cycle-toggle aria-pressed="true">Pause</button>
+        </div>
+
+        <div class="d-panel-body">
+          <fieldset class="d-inputs">
+            <legend class="d-col-label">Input</legend>
+            <div class="d-inputs-list" role="radiogroup" aria-label="Input format">
+              {% for item in d_inputs %}
+              <label class="d-input" data-input-key="{{ item.key }}">
+                <input type="radio" name="d-input" value="{{ item.key }}"{% if loop.first %} checked{% endif %}>
+                <span class="d-input-label">{{ item.label }}</span>
+                <span class="d-input-kind">{{ item.kind }}</span>
+                <span class="d-port" aria-hidden="true"></span>
+              </label>
+              {% endfor %}
+            </div>
+          </fieldset>
+
+          <div class="d-stage">
+            <p class="d-col-label">Processing <span class="d-col-note">in the background worker</span></p>
+            <ol class="d-steps" data-steps aria-live="polite">
+              {% for step in d_inputs[0].steps %}
+              <li class="d-step"><span class="d-node" aria-hidden="true"></span><strong>{{ step[0] }}</strong><span>{{ step[1] }}</span></li>
+              {% endfor %}
+            </ol>
+          </div>
+
+          <div class="d-outputs">
+            <p class="d-col-label">Output</p>
+            <ul class="d-outputs-list">
+              <li class="d-output" data-output><span class="d-port d-port-in" aria-hidden="true"></span><strong>Viewer link</strong><span>Any modern browser, no login</span></li>
+              <li class="d-output" data-output><span class="d-port d-port-in" aria-hidden="true"></span><strong>Mobile AR</strong><span>Android WebXR, iOS Quick Look</span></li>
+              <li class="d-output" data-output><span class="d-port d-port-in" aria-hidden="true"></span><strong>Stable QR</strong><span>Survives replacements and recolours</span></li>
+              <li class="d-output" data-output><span class="d-port d-port-in" aria-hidden="true"></span><strong>Embed</strong><span>One iframe, settings update everywhere</span></li>
+            </ul>
+          </div>
+
+          <svg class="d-wires" data-wires aria-hidden="true" focusable="false"></svg>
+        </div>
+
+        <dl class="d-readout" data-readout>
+          <div><dt>Source</dt><dd data-r="note">{{ d_inputs[0].note }}</dd></div>
+          <div><dt>Layers</dt><dd data-r="layers">{{ d_inputs[0].layers }}</dd></div>
+          <div><dt>Medical confirmation</dt><dd data-r="medical">{{ d_inputs[0].medical }}</dd></div>
+          <div><dt>Steps</dt><dd data-r="count">{{ d_inputs[0].steps|length }}</dd></div>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ LIVE READOUT ============================ -->
+  <section class="d-sec" aria-labelledby="d-live-title">
+    <div class="d-wrap d-live">
+      <div class="d-live-copy">
+        <h2 id="d-live-title" class="d-h2">This is the output. Turn it.</h2>
+        <p class="d-p">The model on the right is a published AcademicAR file: a mitochondrion, Draco-compressed with webp textures. Drag to orbit it; the readout follows your camera. On a phone, scan the code to place it on your desk.</p>
+        <div class="d-live-qr">
+          <img src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code that opens the mitochondria model in AR" width="112" height="112" loading="lazy">
+          <p>Scan with a phone camera. No app needed.<br><a href="{{ url_for('demo_mitochondria_ar', source='home_d_qr') }}">Open the AR page</a></p>
+        </div>
+      </div>
+
+      <figure class="d-scope">
+        <div class="d-scope-view">
+          <model-viewer
+            data-live-model
+            src="{{ url_for('static', filename='models/model.compressed.glb') }}"
+            alt="Mitochondria 3D model in the AcademicAR viewer"
+            camera-controls
+            disable-zoom
+            auto-rotate
+            auto-rotate-delay="0"
+            rotation-per-second="14deg"
+            camera-orbit="35deg 65deg 9m"
+            field-of-view="32deg"
+            interaction-prompt="none"
+            shadow-intensity="0"
+            tone-mapping="neutral"
+            environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
+            loading="lazy"
+            reveal="auto"></model-viewer>
+          <span class="d-scope-cross" aria-hidden="true"></span>
+        </div>
+        <dl class="d-scope-data">
+          <div><dt>File</dt><dd>GLB, 1.5 MB</dd></div>
+          <div><dt>Compression</dt><dd>Draco + webp</dd></div>
+          <div><dt>Azimuth</dt><dd data-cam="theta">35.0°</dd></div>
+          <div><dt>Elevation</dt><dd data-cam="phi">65.0°</dd></div>
+          <div><dt>AR</dt><dd>iOS and Android</dd></div>
+          <div><dt>Status</dt><dd data-cam="status">Loading</dd></div>
+        </dl>
+        <figcaption class="d-cap">Live <code>&lt;model-viewer&gt;</code> render of the demo model, the same viewer your readers get.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ============================ TOOLS SPEC SHEET ============================ -->
+  {% set d_tools = [
+    ['orbit', 'Orbit and zoom', 'Turn the model in 3D, in any browser, with no login.', 'Free'],
+    ['layers', 'Layers', 'Show, hide, recolour, rename and fade each part or structure.', 'Free'],
+    ['finishes', 'Finishes and lighting', 'Matte to chrome finishes, lighting presets saved per model.', 'Free'],
+    ['section', 'Section plane', 'Cut through any axis and look inside.', 'Free'],
+    ['slice', 'Slice view', '2D cross-sections of every layer, with a snapping two-point measure.', 'Free'],
+    ['measure', 'Measure and label', 'Annotations on the model; structure sizes and distances between layers.', 'Labels free · measurements on paid plans'],
+    ['scenes', 'Scenes and tours', 'Up to 12 saved views, each with its own link, QR and AR file.', 'Free'],
+    ['figure', 'Figure export', 'PNG with title, layer legend, scale bar and QR card.', 'Paid plans'],
+  ] %}
+  <section class="d-sec d-sec-tools" aria-labelledby="d-tools-title">
+    <div class="d-wrap">
+      <div class="d-sec-head">
+        <h2 id="d-tools-title" class="d-h2">Viewer tools, as specified</h2>
+        <p class="d-p">Pick a row to see the tool on the monitor. Plan column shows the default; admins can change it, and <a href="{{ url_for('pricing') }}">pricing</a> lists the current plans.</p>
+      </div>
+
+      <div class="d-tools" data-tools>
+        <div class="d-monitor-col">
+        <div class="d-monitor">
+          <div class="d-monitor-screen">
+            <video class="d-monitor-video" data-monitor muted playsinline loop preload="none"
+                   poster="{{ url_for('static', filename='images/home/orbit.webp') }}"
+                   width="960" height="540">
+              <source src="{{ url_for('static', filename='videos/home/orbit.mp4') }}" type="video/mp4">
+            </video>
+            <video class="d-monitor-reel" data-reel playsinline preload="none" width="1920" height="1080" hidden>
+              <source src="{{ url_for('static', filename='videos/academicar-showreel.mp4') }}" type="video/mp4">
+            </video>
+          </div>
+          <div class="d-monitor-foot">
+            <span data-monitor-label>Orbit and zoom</span>
+            <button type="button" class="d-reel-btn" data-reel-play>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg>
+              Watch all tools, 1:00 with sound
+            </button>
+          </div>
+        </div>
+          <figure class="d-shot">
+            <img src="{{ url_for('static', filename='images/home/slicer-ui.webp') }}" alt="The AcademicAR viewer with the slice view open: axial, coronal and sagittal cross-sections of a calcaneus" width="1440" height="900" loading="lazy" decoding="async">
+            <figcaption>Screenshot of the slice view: three cross-sections with scale bars, next to the 3D section plane.</figcaption>
+          </figure>
+        </div>
+
+        <table class="d-spec">
+          <caption class="d-visually-hidden">Viewer tools and their default plan</caption>
+          <thead><tr><th scope="col">Tool</th><th scope="col">What it does</th><th scope="col">Plan</th></tr></thead>
+          <tbody>
+            {% for t in d_tools %}
+            <tr class="d-spec-row{% if loop.first %} is-active{% endif %}" data-clip="{{ t[0] }}" data-label="{{ t[1] }}">
+              <th scope="row"><button type="button" class="d-spec-btn" aria-pressed="{{ 'true' if loop.first else 'false' }}">{{ t[1] }}<span class="d-spec-desc">{{ t[2] }}</span></button></th>
+              <td>{{ t[2] }}</td>
+              <td class="d-plan{% if t[3] == 'Free' %} is-free{% endif %}">{{ t[3] }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="d-spec-row is-static">
+              <th scope="row"><span class="d-spec-static">Comparison<span class="d-spec-desc">Two models side by side, synced, on one shareable link.</span></span></th>
+              <td>Two models side by side, synced, on one shareable link.</td>
+              <td class="d-plan">Paid plans</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ MEDICAL DATA INTERLOCKS ============================ -->
+  <section class="d-sec d-sec-safety" aria-labelledby="d-safety-title">
+    <div class="d-wrap d-safety">
+      <div>
+        <h2 id="d-safety-title" class="d-h2">Interlocks for patient-derived data</h2>
+        <p class="d-p">Scans are handled differently from other uploads. These rules are built into the upload and conversion flow, not left to a setting.</p>
+        <a class="d-text-link" href="{{ url_for('blog_post', slug='dicom-to-3d-model-guide') }}">Read the DICOM to 3D guide</a>
+      </div>
+      <ul class="d-locks">
+        <li><span class="d-lock" aria-hidden="true"></span><div><strong>Confirmation on every upload</strong><span>Anonymisation, rights and ethics are confirmed for every model and every replacement, with an audit record.</span></div></li>
+        <li><span class="d-lock" aria-hidden="true"></span><div><strong>An extra check for scans</strong><span>DICOM and segmentation uploads need a second, medical-specific confirmation.</span></div></li>
+        <li><span class="d-lock" aria-hidden="true"></span><div><strong>Raw scan deleted</strong><span>The uploaded scan is removed after conversion, whether it succeeds or fails. Medical uploads are never archived or mirrored.</span></div></li>
+        <li><span class="d-lock" aria-hidden="true"></span><div><strong>No identifiers in logs</strong><span>Patient identifiers are never written to logs. Models are for education and presentation, not diagnosis.</span></div></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============================ INSTITUTIONS ============================ -->
+  <section class="d-sec" aria-labelledby="d-inst-title">
+    <div class="d-wrap d-inst">
+      <div class="d-inst-gauge" aria-hidden="true">
+        <div class="d-gauge">
+          <span class="d-gauge-label">Model quota</span>
+          <span class="d-gauge-track"><span class="d-gauge-fill" style="--fill:.62"></span></span>
+        </div>
+        <div class="d-gauge">
+          <span class="d-gauge-label">Storage quota</span>
+          <span class="d-gauge-track"><span class="d-gauge-fill" style="--fill:.38"></span></span>
+        </div>
+        <div class="d-gauge">
+          <span class="d-gauge-label">Contract window</span>
+          <span class="d-gauge-track"><span class="d-gauge-fill d-gauge-fill-gold" style="--fill:.8"></span></span>
+        </div>
+        <p class="d-gauge-note">Illustration of the institution panel</p>
+      </div>
+      <div class="d-inst-copy">
+        <h2 id="d-inst-title" class="d-h2">One contract for a department or a whole university</h2>
+        <ul class="d-ticks">
+          <li>Model and storage quotas funded by the contract</li>
+          <li>Invite links, optionally limited to your email domain</li>
+          <li>A public showcase page and “Supported by” credit in the viewer</li>
+          <li>Monthly usage reports and a reminder 30 days before renewal</li>
+        </ul>
+        <div class="d-actions">
+          <a class="d-btn d-btn-dark" href="{{ url_for('institutional_inquiry') }}">Talk to us about a contract</a>
+          <a class="d-btn d-btn-line" href="{{ url_for('demo_institution', source='home_d') }}">See the institution dashboard</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ FIELDS + GUIDES ============================ -->
+  <section class="d-sec" aria-labelledby="d-fields-title">
+    <div class="d-wrap">
+      <div class="d-sec-head">
+        <h2 id="d-fields-title" class="d-h2">Calibrated for your field</h2>
+        <p class="d-p">Each field has its own page with typical inputs, uses and answers to common questions.</p>
+      </div>
+      <ul class="d-fields">
+        {% for d in disciplines %}
+        <li><a href="{{ url_for('ar_for', discipline=d.slug) }}"><strong>{{ d.name }}</strong>
+          <ul class="d-field-uses">{% for u in d.use_cases[:3] %}<li>{{ u.title }}</li>{% endfor %}</ul></a></li>
+        {% endfor %}
+      </ul>
+
+      {% if posts %}
+      <div class="d-guides-head">
+        <h3 class="d-h3">Guides</h3>
+        <a class="d-text-link" href="{{ url_for('blog_index') }}">All guides</a>
+      </div>
+      <ul class="d-guides">
+        {% for post in posts %}
+        <li>
+          <a href="{{ url_for('blog_post', slug=post.slug) }}">
+            {% if post.cover %}<img src="{{ post.cover }}" alt="" loading="lazy" decoding="async" width="160" height="90">{% else %}<span class="d-guide-blank" aria-hidden="true"></span>{% endif %}
+            <span class="d-guide-title">{{ post.title }}</span>
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- ============================ CTA ============================ -->
+  <section class="d-sec d-sec-cta">
+    <div class="d-wrap">
+      <div class="d-cta">
+        <div>
+          <h2 class="d-h2">Run your first file through it</h2>
+          <p class="d-p">Free to start. Your model gets a viewer link and a QR code as soon as conversion finishes.</p>
+          <div class="d-actions">
+            <a class="d-btn d-btn-light" href="{{ url_for('auth.register') }}">Create a free account</a>
+            <a class="d-btn d-btn-ghost-light" href="{{ url_for('demo_dashboard', source='home_d') }}">Explore the researcher dashboard</a>
+          </div>
+        </div>
+        <div class="d-cta-formats">
+          <p>Accepted inputs</p>
+          <ul>{% for item in d_inputs %}<li>{{ item.label }}</li>{% endfor %}</ul>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block hd_scripts %}
+  <script type="module" src="https://unpkg.com/@google/model-viewer@4.3.0/dist/model-viewer.min.js" crossorigin="anonymous"></script>
+  <script>
+    window.D_INPUTS = {{ d_inputs|tojson }};
+    window.D_CLIP_BASE = {{ url_for('static', filename='videos/home/')|tojson }};
+    window.D_POSTER_BASE = {{ url_for('static', filename='images/home/')|tojson }};
+  </script>
+  <script src="{{ url_for('static', filename='js/home-designs/d.js', v=asset_version) }}" defer></script>
+{% endblock %}

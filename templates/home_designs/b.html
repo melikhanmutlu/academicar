@@ -1,0 +1,397 @@
+{% extends "home_designs/_base.html" %}
+
+{% block hd_head %}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/home-designs/b.css', v=asset_version) }}">
+{% endblock %}
+
+{% block hd_content %}
+<div class="b-desk">
+  <article class="b-paper" aria-labelledby="b-title">
+
+    <!-- Running head -->
+    <header class="b-runhead">
+      <span>Research article</span>
+      <span class="b-runhead-right"><span class="b-oa" aria-hidden="true"></span>Open access, interactive figures</span>
+    </header>
+
+    <!-- Title block -->
+    <div class="b-row b-titleblock">
+      <div class="b-main">
+        <h1 id="b-title" class="b-title">Interactive 3D figures for every paper, poster and thesis</h1>
+        <p class="b-byline">For researchers, educators and institutions who publish work in three dimensions.</p>
+        <div class="b-actions">
+          <a href="{{ url_for('auth.register') }}" class="b-btn b-btn-dark">Start publishing</a>
+          <a href="{{ url_for('demo_mitochondria_ar', source='home_b') }}" class="b-btn b-btn-ghost">Open the AR example</a>
+        </div>
+      </div>
+      <aside class="b-side b-abstract" aria-label="Abstract">
+        <h2 class="b-abstract-label">Abstract</h2>
+        <p>Upload a GLB, STL, OBJ, FBX or STEP file, or a CT/MR scan, and AcademicAR returns a browser-based 3D viewer, a mobile AR view and a stable QR code. Readers need no app and no account.</p>
+      </aside>
+    </div>
+
+    <!-- Fig. 1: printed vs live (signature moment) -->
+    <figure class="b-fig b-fig-wide b-fig1" aria-labelledby="b-fig1-cap">
+      <div class="b-compare" data-compare style="--pos: 50%;">
+        <model-viewer
+          class="b-compare-live"
+          src="{{ url_for('static', filename='models/model.compressed.glb') }}"
+          alt="Live 3D model of a mitochondrion that you can rotate"
+          camera-controls
+          disable-zoom
+          interaction-prompt="none"
+          rotation-per-second="14deg"
+          camera-orbit="35deg 65deg 3.0m"
+          max-camera-orbit="auto auto 8m"
+          field-of-view="30deg"
+          exposure="1.0"
+          shadow-intensity="0"
+          tone-mapping="neutral"
+          environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
+          loading="eager">
+        </model-viewer>
+        <div class="b-compare-static" aria-hidden="true">
+          <picture>
+            <source media="(max-width: 719px)" srcset="{{ url_for('static', filename='images/home/b/fig1-print-tall.webp') }}">
+            <img src="{{ url_for('static', filename='images/home/b/fig1-print-wide.webp') }}" alt="" width="1600" height="900" decoding="async">
+          </picture>
+          <span class="b-lbl b-lbl-up b-lbl-cristae">Cristae</span>
+          <span class="b-lbl b-lbl-left b-lbl-inner">Inner membrane</span>
+          <span class="b-lbl b-lbl-down b-lbl-outer">Outer membrane</span>
+        </div>
+        <span class="b-compare-tag b-compare-tag-left" aria-hidden="true">As printed</span>
+        <span class="b-compare-tag b-compare-tag-right" aria-hidden="true">As published with AcademicAR</span>
+        <div class="b-compare-handle" role="slider" tabindex="0"
+             aria-label="Compare the printed figure with the live 3D model"
+             aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">
+          <span class="b-compare-grip" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18"><path d="M9 6l-5 6 5 6M15 6l5 6-5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+        </div>
+      </div>
+      <figcaption id="b-fig1-cap" class="b-caption">
+        <strong>Fig. 1.</strong> The same mitochondrion as a printed figure (left) and as a live model (right). Drag the divider, then rotate the model. On a phone, the QR code opens it in augmented reality on your desk.
+      </figcaption>
+      <aside class="b-fig1-qr">
+        <a href="{{ url_for('demo_mitochondria_ar', source='home_b_qr') }}">
+          <img src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code that opens the mitochondrion in AR" width="112" height="112" loading="lazy">
+        </a>
+        <p>Scan to place this model in AR. Works in the phone's browser.</p>
+      </aside>
+    </figure>
+
+    <!-- Keywords -->
+    <p class="b-keywords">
+      <span class="b-keywords-label">Keywords</span>
+      {% for d in disciplines %}<a href="{{ url_for('ar_for', discipline=d.slug) }}">{{ d.name|lower|replace('stem ', 'STEM ') }}</a>{% if not loop.last %}; {% endif %}{% endfor %}
+    </p>
+
+    <!-- 1 Introduction -->
+    <section class="b-section" aria-labelledby="b-s1">
+      <h2 id="b-s1" class="b-h2"><span class="b-num">1</span>Introduction</h2>
+      <div class="b-row">
+        <div class="b-main b-prose">
+          <p>Most three-dimensional research still reaches its readers as a flat screenshot. A segmented heart, a fossil scan or a gearbox assembly is rotated once in specialist software, captured at a single angle and pasted into a PDF. Depth, scale and the relationship between parts are left for the reader to imagine.<sup class="b-ref">1</sup></p>
+          <p>When the original files are shared at all, they sit in a supplementary archive that needs the right application to open, and the link tends to break when a repository moves. We built AcademicAR so the model itself can travel with the work: one link, one QR code, opened in any modern browser.</p>
+        </div>
+        <aside class="b-side b-note" data-parallax="0.35">
+          <p><span class="b-note-num">1</span>Static figures show one angle. Readers cannot check a structure from behind, cut through it or measure it.</p>
+        </aside>
+      </div>
+    </section>
+
+    <!-- 2 Methods -->
+    <section class="b-section" aria-labelledby="b-s2">
+      <h2 id="b-s2" class="b-h2"><span class="b-num">2</span>Methods</h2>
+      <div class="b-row">
+        <div class="b-main b-prose">
+          <h3 class="b-h3"><span class="b-num-sm">2.1</span>Upload</h3>
+          <p>Add a model to a project and confirm that it is anonymised, that you hold the rights and that ethics responsibilities are met. Medical scans ask for one more confirmation, and the raw scan is deleted once conversion finishes.<sup class="b-ref">2</sup></p>
+
+          <h3 class="b-h3"><span class="b-num-sm">2.2</span>Conversion</h3>
+          <p>A background worker converts every input to an optimised GLB with compressed geometry, builds a USDZ companion for iPhone AR, and keeps multi-part models as named layers. CT and MR series are thresholded with presets or your own Hounsfield range.</p>
+
+          <h3 class="b-h3"><span class="b-num-sm">2.3</span>Stable link and QR code</h3>
+          <p>Each model gets a short resolver link and a QR code. Replace the file, rescale it or change its colours and the printed code keeps pointing at the current version.</p>
+
+          <h3 class="b-h3"><span class="b-num-sm">2.4</span>Sharing</h3>
+          <p>Keep a model private while you work, send a review link to co-authors or examiners, or make it public when the paper is out.</p>
+        </div>
+        <aside class="b-side b-note" data-parallax="0.35">
+          <p><span class="b-note-num">2</span>Compliance confirmation is mandatory for every upload and replacement. Patient identifiers are never logged.</p>
+        </aside>
+      </div>
+
+      <div class="b-tablewrap">
+        <table class="b-table">
+          <caption><strong>Table 1.</strong> Inputs AcademicAR converts to a web and AR model.</caption>
+          <thead>
+            <tr><th scope="col">Input</th><th scope="col">Typical source</th><th scope="col">What you get</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">GLB, glTF</th><td>Blender, photogrammetry, web exports</td><td>Optimised as uploaded</td></tr>
+            <tr><th scope="row">STL, OBJ, FBX</th><td>3D printing, scanners, modelling tools</td><td>Converted to GLB with colours kept</td></tr>
+            <tr><th scope="row">STEP, STP</th><td>CAD assemblies</td><td>One layer per part</td></tr>
+            <tr><th scope="row">DICOM series (ZIP)</th><td>CT and MR scanners</td><td>Surface from a preset or custom HU range</td></tr>
+            <tr><th scope="row">NIfTI, NRRD, DICOM-SEG</th><td>3D Slicer and other segmentation tools</td><td>One layer per labelled structure</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 3 Results -->
+    <section class="b-section" aria-labelledby="b-s3">
+      <h2 id="b-s3" class="b-h2"><span class="b-num">3</span>Results</h2>
+      <div class="b-row">
+        <div class="b-main b-prose">
+          <p>The viewer gives readers the tools they would otherwise need desktop software for. Every tool runs in the browser, and owners can save what a reader should see first as a named scene.</p>
+        </div>
+      </div>
+
+      <figure class="b-fig b-fig-wide" aria-labelledby="b-fig2-cap">
+        <div class="b-panels">
+          {% for key, letter, alt in [
+            ('layers', 'a', 'Layers panel hiding and recolouring the parts of a calcaneus model'),
+            ('section', 'b', 'A section plane cutting through a bone model'),
+            ('slice', 'c', 'Slice view showing a 2D cross-section with a measurement'),
+            ('measure', 'd', 'Distance measurements and labels placed on a model'),
+            ('scenes', 'e', 'Stepping through saved scenes of a model'),
+            ('figure', 'f', 'Exported publication figures with a caption')
+          ] %}
+          <div class="b-panel">
+            <video class="b-clip" muted playsinline loop preload="none"
+                   poster="{{ url_for('static', filename='images/home/' ~ key ~ '.webp') }}"
+                   aria-label="{{ alt }}" width="960" height="540">
+              <source src="{{ url_for('static', filename='videos/home/' ~ key ~ '.mp4') }}" type="video/mp4">
+            </video>
+            <span class="b-panel-letter" aria-hidden="true">{{ letter }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        <figcaption id="b-fig2-cap" class="b-caption">
+          <strong>Fig. 2.</strong> Viewer tools, recorded in the product.<span class="b-swipe-hint"> Swipe for all six panels.</span>
+          <b>(a)</b> Layers: show, hide, recolour or X-ray each part.
+          <b>(b)</b> Section plane through any axis.
+          <b>(c)</b> Slice view with 2D cross-sections and a snapping measure.
+          <b>(d)</b> Measurements and labels on the surface.
+          <b>(e)</b> Saved scenes and guided tours, each with its own link and QR code.
+          <b>(f)</b> Figure export with a legend, scale bar and QR card.
+        </figcaption>
+      </figure>
+
+      <figure class="b-fig b-fig-wide" aria-labelledby="b-fig3-cap">
+        <div class="b-strip" tabindex="0" role="group" aria-label="Fig. 3, scrollable">
+          <img class="b-shot" src="{{ url_for('static', filename='images/home/b/slice-panels.webp') }}" alt="Three cross-section panels from the viewer's slice view: axial, coronal and sagittal outlines of a bone, each with a scale bar" width="1440" height="338" loading="lazy" decoding="async">
+        </div>
+        <figcaption id="b-fig3-cap" class="b-caption">
+          <strong>Fig. 3.</strong> Slice view, as it appears under the 3D model in the viewer.<span class="b-swipe-hint"> Scroll sideways for all three planes.</span> Axial, coronal and sagittal cross-sections follow the scan's patient orientation, carry their own scale bars and take a snapping two-point measure.
+        </figcaption>
+      </figure>
+
+      <figure class="b-fig b-row b-supp" aria-labelledby="b-s1-cap">
+        <div class="b-main">
+        <div class="b-video" data-showreel>
+          <img class="b-video-poster" src="{{ url_for('static', filename='images/showreel-poster.webp') }}" alt="AcademicAR showreel: a 3D model orbiting in the viewer" loading="lazy" decoding="async" width="1600" height="900">
+          <video preload="none" playsinline width="1920" height="1080" hidden>
+            <source src="{{ url_for('static', filename='videos/academicar-showreel.mp4') }}" type="video/mp4">
+          </video>
+          <button type="button" class="b-video-play" aria-label="Play the AcademicAR showreel (1:00)">
+            <span class="b-video-play-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></span>
+            <span>Play video S1, 1:00</span>
+          </button>
+        </div>
+        </div>
+        <figcaption id="b-s1-cap" class="b-caption b-side">
+          <strong>Supplementary video S1.</strong> Every viewer tool in sixty seconds, with sound.
+        </figcaption>
+      </figure>
+    </section>
+
+    <!-- 4 Availability -->
+    <section class="b-section" aria-labelledby="b-s4">
+      <h2 id="b-s4" class="b-h2"><span class="b-num">4</span>Availability</h2>
+      <div class="b-row">
+        <div class="b-main">
+          <dl class="b-avail">
+            <div>
+              <dt>Readers</dt>
+              <dd>Open the viewer from a link or a QR code on a poster, slide or thesis page. Augmented reality works on recent iPhones, iPads and Android phones without an app, through iOS Quick Look and WebXR.</dd>
+            </div>
+            <div>
+              <dt>Websites</dt>
+              <dd>Embed the viewer on a lab page, course site or online article. <a href="{{ url_for('blog_post', slug='embed-3d-model-website') }}">How embedding works</a></dd>
+            </div>
+            <div>
+              <dt>Institutions</dt>
+              <dd>Universities and departments fund their members' models from a shared quota, invite people by link, manage them from an institution panel and get a public showcase page. <a href="{{ url_for('demo_institution', source='home_b') }}">See the institution dashboard</a></dd>
+            </div>
+            <div>
+              <dt>Licensing</dt>
+              <dd>Plans are per model, so each model carries its own access period and storage. Start on the free plan and upgrade only the models that need it. <a href="{{ url_for('pricing') }}">Compare plans</a></dd>
+            </div>
+          </dl>
+        </div>
+        <aside class="b-side b-margin-fig" data-parallax="0.25">
+          <picture>
+            <source srcset="{{ url_for('static', filename='images/ar-phone-mockup.webp') }}" type="image/webp">
+            <img src="{{ url_for('static', filename='images/ar-phone-mockup.png') }}" alt="A mitochondrion model placed in augmented reality on a desk, seen through a phone" width="941" height="1672" loading="lazy" decoding="async">
+          </picture>
+          <p class="b-caption"><strong>Fig. 4.</strong> The model from Fig. 1, placed on a desk with a phone's camera.</p>
+        </aside>
+      </div>
+    </section>
+
+    <!-- References -->
+    {% if posts %}
+    <section class="b-section b-refs" aria-labelledby="b-refs">
+      <h2 id="b-refs" class="b-h2">References</h2>
+      <ol class="b-reflist">
+        {% for post in posts %}
+        <li>
+          <a href="{{ url_for('blog_post', slug=post.slug) }}" class="b-cite">
+            <span class="b-cite-text">{{ post.author or 'AcademicAR' }} ({{ (post.date|string)[:4] }}). <span class="b-cite-title">{{ post.title }}</span>. <em>AcademicAR Guides</em>.</span>
+            {% if post.cover %}<img src="{{ post.cover }}" alt="" width="120" height="68" loading="lazy" decoding="async">{% endif %}
+          </a>
+        </li>
+        {% endfor %}
+      </ol>
+      <p class="b-refs-more"><a href="{{ url_for('blog_index') }}">All guides</a></p>
+    </section>
+    {% endif %}
+
+    <!-- Acknowledgements / CTA -->
+    <section class="b-section b-ack" aria-labelledby="b-ack">
+      <h2 id="b-ack" class="b-h2">Acknowledgements</h2>
+      <div class="b-row">
+        <div class="b-main b-prose">
+          <p>This page was set in a browser, with a live figure. Your next paper can be too. Create an account, upload a model and print the QR code on your poster before the conference.</p>
+          <div class="b-actions">
+            <a href="{{ url_for('auth.register') }}" class="b-btn b-btn-dark">Start publishing</a>
+            <a href="{{ url_for('pricing') }}" class="b-btn b-btn-ghost">View pricing</a>
+          </div>
+        </div>
+        <aside class="b-side b-cite-box">
+          <h3>How readers cite your model</h3>
+          <p>Your name ({{ (posts[0].date|string)[:4] if posts else '2026' }}). <em>Title of your model</em>. AcademicAR. Stable link with QR code.</p>
+          <p class="b-cite-box-foot">Correspondence: <a href="{{ url_for('contact') }}">contact us</a></p>
+        </aside>
+      </div>
+    </section>
+
+  </article>
+</div>
+{% endblock %}
+
+{% block hd_scripts %}
+  <script type="module" src="https://unpkg.com/@google/model-viewer@4.3.0/dist/model-viewer.min.js" crossorigin="anonymous"></script>
+  <script>
+  (() => {
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // Fig. 1: draggable divider between the printed figure and the live model.
+    const compare = document.querySelector('[data-compare]');
+    if (compare) {
+      const handle = compare.querySelector('.b-compare-handle');
+      const viewer = compare.querySelector('model-viewer');
+      let pos = 50;
+      // Match the framing of the printed still for each layout.
+      const narrow = window.matchMedia('(max-width: 719px)');
+      const frame = () => {
+        viewer.setAttribute('camera-orbit', narrow.matches ? '35deg 65deg 5.0m' : '35deg 65deg 3.0m');
+      };
+      frame();
+      narrow.addEventListener('change', frame);
+      const setPos = (value) => {
+        pos = Math.max(0, Math.min(100, value));
+        compare.style.setProperty('--pos', pos + '%');
+        handle.setAttribute('aria-valuenow', Math.round(pos));
+        handle.setAttribute('aria-valuetext', Math.round(100 - pos) + '% live model');
+      };
+      const fromPointer = (event) => {
+        const rect = compare.getBoundingClientRect();
+        setPos(((event.clientX - rect.left) / rect.width) * 100);
+      };
+      handle.addEventListener('pointerdown', (event) => {
+        event.preventDefault();
+        handle.setPointerCapture(event.pointerId);
+        compare.classList.add('is-dragging');
+        compare.classList.remove('is-sweeping');
+        const move = (e) => fromPointer(e);
+        const up = () => {
+          compare.classList.remove('is-dragging');
+          handle.removeEventListener('pointermove', move);
+          handle.removeEventListener('pointerup', up);
+        };
+        handle.addEventListener('pointermove', move);
+        handle.addEventListener('pointerup', up);
+      });
+      handle.addEventListener('keydown', (event) => {
+        const step = event.shiftKey ? 10 : 2;
+        if (event.key === 'ArrowLeft') setPos(pos - step);
+        else if (event.key === 'ArrowRight') setPos(pos + step);
+        else if (event.key === 'Home') setPos(0);
+        else if (event.key === 'End') setPos(100);
+        else return;
+        event.preventDefault();
+      });
+
+      // Signature moment: the figure starts fully printed and "comes alive"
+      // once the model has loaded and the figure is on screen.
+      const startRotate = () => { viewer.setAttribute('auto-rotate', ''); };
+      if (reduceMotion) {
+        setPos(50);
+      } else {
+        setPos(100);
+        let loaded = false, seen = false, done = false;
+        const sweep = () => {
+          if (done || !loaded || !seen) return;
+          done = true;
+          compare.classList.add('is-sweeping');
+          requestAnimationFrame(() => setPos(narrow.matches ? 58 : 42));
+          setTimeout(() => { compare.classList.remove('is-sweeping'); startRotate(); }, 1700);
+        };
+        viewer.addEventListener('load', () => { loaded = true; sweep(); }, { once: true });
+        new IntersectionObserver((entries, obs) => {
+          if (entries.some((e) => e.isIntersecting)) { seen = true; obs.disconnect(); setTimeout(sweep, 300); }
+        }, { threshold: 0.45 }).observe(compare);
+        // If the model never loads (offline, no WebGL), still reveal the live side.
+        setTimeout(() => { loaded = true; sweep(); }, 6000);
+      }
+    }
+
+    // Fig. 2 clips play only while on screen.
+    const clips = document.querySelectorAll('.b-clip');
+    if ('IntersectionObserver' in window && !reduceMotion) {
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          const video = entry.target;
+          if (entry.isIntersecting) video.play().catch(() => {});
+          else video.pause();
+        });
+      }, { threshold: 0.35 });
+      clips.forEach((video) => io.observe(video));
+    } else {
+      clips.forEach((video) => { video.controls = true; });
+    }
+
+    // Supplementary video S1 loads only when asked to play.
+    const reel = document.querySelector('[data-showreel]');
+    if (reel) {
+      const video = reel.querySelector('video');
+      const poster = reel.querySelector('.b-video-poster');
+      reel.querySelector('.b-video-play').addEventListener('click', (event) => {
+        video.poster = poster.currentSrc || poster.src;
+        video.hidden = false;
+        video.controls = true;
+        reel.classList.add('is-playing');
+        event.currentTarget.remove();
+        video.play().catch(() => {});
+        video.focus();
+      });
+    }
+  })();
+  </script>
+{% endblock %}

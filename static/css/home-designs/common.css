@@ -1,0 +1,45 @@
+/* Preview switcher shared by the alternative homepage designs (/design/home/*). */
+.hd-switcher {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  max-width: calc(100vw - 24px);
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 4px;
+  border-radius: 200px;
+  background: rgba(32, 32, 32, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  font: 500 12px/1 Inter, system-ui, sans-serif;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+}
+.hd-switcher::-webkit-scrollbar { display: none; }
+.hd-switcher-label { color: #828282; padding: 0 10px 0 12px; white-space: nowrap; }
+.hd-switcher a {
+  color: #efefef;
+  text-decoration: none;
+  white-space: nowrap;
+  padding: 8px 12px;
+  border-radius: 200px;
+}
+.hd-switcher a:hover { background: rgba(255, 255, 255, 0.1); }
+.hd-switcher a[aria-current="page"] { background: #fff; color: #202020; }
+.hd-switcher a:focus-visible { outline: 2px solid #ff682c; outline-offset: 1px; }
+@media (max-width: 640px) {
+  .hd-switcher-label { display: none; }
+  .hd-switcher { bottom: 10px; }
+}
+
+/* style.css sets overflow-x: hidden on html/body, which breaks position: sticky.
+   clip still hides sideways overflow without creating a scroll container. */
+html:has(body.hd-page),
+body.hd-page { overflow-x: clip; }
+
+/* model-viewer's default grey loading bar reads as a stray line in these layouts. */
+.hd-page model-viewer::part(default-progress-bar) { display: none; }

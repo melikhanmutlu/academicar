@@ -2578,6 +2578,16 @@ def _builtin_blog_fallback_blocked() -> set[str]:
     return {slug for (slug,) in db.session.query(BlogPost.slug).all()} | deleted_builtin_blog_slugs()
 
 
+# Alternative homepage designs served at /design/home/<key> for review.
+HOME_DESIGNS: dict[str, dict[str, str]] = {
+    "a": {"name": "Kesit", "summary": "Scroll-driven 3D hero and a scrollytelling tour of the viewer tools."},
+    "b": {"name": "Makale", "summary": "The page reads like a journal article with a live Fig. 1."},
+    "c": {"name": "Sahne", "summary": "Dark cinematic stage in the viewer's own look, with a horizontal feature reel."},
+    "d": {"name": "Hat", "summary": "Interactive conversion pipeline from file formats to viewer, AR and QR."},
+    "e": {"name": "Baskı", "summary": "From a printed poster to AR: a desk scene with parallax layers."},
+}
+
+
 def merged_blog_posts() -> list[dict]:
     """Published DB posts + built-in code posts, newest first (DB wins on slug)."""
     db_views = [_db_blogpost_to_view(b) for b in BlogPost.query.filter_by(is_published=True).all()]
@@ -5474,6 +5484,26 @@ def register_routes(app: Flask) -> None:
     @app.route("/")
     def landing():
         return render_template("landing.html")
+
+    # Alternative homepage designs for review (preview only, noindex, not linked
+    # from the site). The live homepage stays templates/landing.html.
+    @app.route("/design/home")
+    @app.route("/design/home/<variant>")
+    def home_design(variant=None):
+        if variant is None:
+            return render_template("home_designs/index.html", designs=HOME_DESIGNS)
+        if variant not in HOME_DESIGNS:
+            abort(404)
+        posts = []
+        for post in merged_blog_posts()[:6]:
+            posts.append({**post, "cover": cover_image_path(post.get("body") or "")})
+        return render_template(
+            f"home_designs/{variant}.html",
+            designs=HOME_DESIGNS,
+            design_key=variant,
+            disciplines=all_disciplines(),
+            posts=posts,
+        )
 
     @app.route("/pricing")
     def pricing():

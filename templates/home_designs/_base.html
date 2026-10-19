@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{#- Shared frame for the alternative homepage designs (preview only). -#}
+{% block title %}AcademicAR - Publish interactive 3D models with your research{% endblock %}
+{% block head %}
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/home-designs/common.css', v=asset_version) }}">
+  {% block hd_head %}{% endblock %}
+{% endblock %}
+{% block body_class %}hd-page hd-{{ design_key }} {% block hd_body_class %}{% endblock %}{% endblock %}
+
+{% block content %}
+  {% block hd_content %}{% endblock %}
+
+  <nav class="hd-switcher" aria-label="Tasarım önizleme">
+    <span class="hd-switcher-label">Tasarım önizleme</span>
+    <a href="{{ url_for('landing') }}">Mevcut</a>
+    {% for key, d in designs.items() %}
+      <a href="{{ url_for('home_design', variant=key) }}"{% if key == design_key %} aria-current="page"{% endif %}>{{ key|upper }} · {{ d.name }}</a>
+    {% endfor %}
+  </nav>
+{% endblock %}
+
+{% block scripts %}
+  {% block hd_scripts %}{% endblock %}
+{% endblock %}
