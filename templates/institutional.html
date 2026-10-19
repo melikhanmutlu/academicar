@@ -1,23 +1,446 @@
 {% extends "base.html" %}
 {% block title %}Institutional licensing - AcademicAR{% endblock %}
-{% block meta_description %}Bring your university, lab, or institute to AcademicAR: contract-based institutional licensing with member invites, quota-funded 3D/AR model publishing, and procurement-friendly invoicing.{% endblock %}
+{% block meta_description %}Bring your university, lab, or institute to AcademicAR: one annual contract covers your members' 3D/AR model uploads, with invite links, an admin panel, a public showcase, and invoice billing.{% endblock %}
+
+{% block head %}
+<style>
+  /* Page-only styles for /institutional. Builds on the landing page's lp-* system. */
+  .ip-hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 56px; align-items: center; padding-top: 16px; }
+  .ip-hero-copy { min-width: 0; }
+  .ip-hero-note { font-family: var(--font-inter); font-size: 13px; color: var(--color-silver-ash); margin: -16px 0 0; }
+  .ip-frame { background: var(--color-canvas-white); border: 1px solid var(--color-light-pearl); border-radius: 12px; overflow: hidden; box-shadow: 0 24px 60px -32px rgba(32,32,32,0.35); }
+  .ip-frame-bar { display: flex; align-items: center; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--color-light-pearl); background: var(--color-cloud-whisper); }
+  .ip-frame-bar i { width: 9px; height: 9px; border-radius: 50%; background: #d9d9d9; display: block; }
+  .ip-frame-url { margin-left: 10px; flex: 1; min-width: 0; font-family: var(--font-inter); font-size: 12px; color: var(--color-silver-ash); background: var(--color-canvas-white); border: 1px solid var(--color-light-pearl); border-radius: 999px; padding: 3px 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ip-frame img { display: block; width: 100%; height: auto; }
+  .ip-frame-dark { background: #111; border-color: #2a2a2a; }
+
+  .ip-facts { padding: 8px 0 0; }
+  .ip-facts-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--color-light-pearl); border-bottom: 1px solid var(--color-light-pearl); }
+  .ip-fact { padding: 22px 20px; border-left: 1px solid var(--color-light-pearl); }
+  .ip-fact:first-child { border-left: 0; padding-left: 0; }
+  .ip-fact strong { display: block; font-family: var(--font-polysans); font-size: 18px; font-weight: 700; color: var(--color-midnight-graphite); margin-bottom: 4px; }
+  .ip-fact span { font-family: var(--font-inter); font-size: 14px; color: var(--color-dark-shale); line-height: 1.45; }
+
+  .ip-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; counter-reset: ipstep; }
+  .ip-step { background: var(--color-cloud-whisper); border-radius: 8px; padding: 28px 24px; }
+  .ip-step-num { font-family: var(--font-inter); font-size: 12px; font-weight: 700; letter-spacing: 0.12em; color: var(--color-sunset-orange); }
+  .ip-step h3 { font-family: var(--font-polysans); font-size: 18px; font-weight: 700; color: var(--color-midnight-graphite); margin: 10px 0 8px; line-height: 1.25; }
+  .ip-step p { font-family: var(--font-inter); font-size: 14px; color: var(--color-dark-shale); line-height: 1.55; margin: 0; }
+
+  .ip-tour { display: grid; gap: 88px; }
+  .ip-row { display: grid; grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr); gap: 56px; align-items: center; }
+  .ip-row.is-flipped .ip-row-copy { order: 2; }
+  .ip-row-copy { min-width: 0; }
+  .ip-row-copy h3 { font-family: var(--font-polysans); font-size: clamp(22px, 2.6vw, 28px); font-weight: 700; letter-spacing: -0.01em; color: var(--color-midnight-graphite); margin: 0 0 12px; line-height: 1.2; }
+  .ip-row-copy > p { font-family: var(--font-inter); font-size: 16px; color: var(--color-dark-shale); line-height: 1.6; margin: 0 0 20px; }
+  .ip-checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+  .ip-checks li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 10px; font-family: var(--font-inter); font-size: 15px; color: var(--color-midnight-graphite); line-height: 1.5; }
+  .ip-checks svg { width: 18px; height: 18px; margin-top: 2px; color: var(--color-sunset-orange); }
+  .ip-row-visual { min-width: 0; display: grid; gap: 16px; }
+  .ip-zoom { position: relative; padding-bottom: 56px; }
+  .ip-zoom-detail { position: absolute; right: -16px; bottom: 0; width: 58%; border-color: #3a3a3a; box-shadow: 0 24px 50px -20px rgba(0,0,0,0.55); }
+
+  .ip-tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+  .ip-tool { border: 1px solid var(--color-light-pearl); border-radius: 8px; padding: 24px; background: var(--color-canvas-white); }
+  .ip-tool svg { width: 22px; height: 22px; color: var(--color-midnight-graphite); }
+  .ip-tool h3 { font-family: var(--font-inter); font-size: 16px; font-weight: 600; color: var(--color-midnight-graphite); margin: 14px 0 6px; }
+  .ip-tool p { font-family: var(--font-inter); font-size: 14px; color: var(--color-dark-shale); line-height: 1.55; margin: 0; }
+
+  .ip-audience { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+  .ip-aud { background: var(--color-canvas-white); border: 1px solid var(--color-light-pearl); border-radius: 8px; overflow: hidden; }
+  .ip-aud img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: var(--color-slate-mist); }
+  .ip-aud div { padding: 20px 22px 24px; }
+  .ip-aud h3 { font-family: var(--font-inter); font-size: 16px; font-weight: 600; color: var(--color-midnight-graphite); margin: 0 0 6px; }
+  .ip-aud p { font-family: var(--font-inter); font-size: 14px; color: var(--color-dark-shale); line-height: 1.55; margin: 0; }
+
+  .ip-faq { max-width: 760px; margin: 0 auto; border-top: 1px solid var(--color-light-pearl); }
+  .ip-faq details { border-bottom: 1px solid var(--color-light-pearl); }
+  .ip-faq summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; gap: 16px; padding: 20px 0; font-family: var(--font-inter); font-size: 16px; font-weight: 600; color: var(--color-midnight-graphite); }
+  .ip-faq summary::-webkit-details-marker { display: none; }
+  .ip-faq summary::after { content: '+'; font-weight: 400; font-size: 20px; line-height: 1; color: var(--color-silver-ash); }
+  .ip-faq details[open] summary::after { content: '\2212'; }
+  .ip-faq summary:focus-visible { outline: 2px solid var(--color-sunset-orange); outline-offset: 2px; }
+  .ip-faq p { font-family: var(--font-inter); font-size: 15px; color: var(--color-dark-shale); line-height: 1.6; margin: 0 0 20px; padding-right: 32px; }
+
+  .ip-inquiry { padding: 92px 0; background: var(--color-cloud-whisper); scroll-margin-top: 24px; }
+  .ip-inquiry-grid { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 56px; align-items: start; }
+  .ip-inquiry-copy h2 { text-align: left; }
+  .ip-inquiry-copy > p { font-family: var(--font-inter); font-size: 16px; color: var(--color-dark-shale); line-height: 1.6; margin: 0 0 28px; }
+  .ip-next { list-style: none; margin: 0 0 28px; padding: 0; display: grid; gap: 16px; }
+  .ip-next li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; font-family: var(--font-inter); font-size: 15px; color: var(--color-midnight-graphite); line-height: 1.5; }
+  .ip-next b { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--color-light-pearl); background: var(--color-canvas-white); font-size: 12px; font-weight: 600; }
+  .ip-next span { padding-top: 3px; }
+  .ip-mail { font-family: var(--font-inter); font-size: 14px; color: var(--color-dark-shale); margin: 0; }
+  .ip-mail a, .ip-link { color: var(--color-midnight-graphite); text-decoration: underline; text-underline-offset: 4px; }
+  .ip-form-card { background: var(--color-canvas-white); border: 1px solid var(--color-light-pearl); border-radius: 12px; padding: 40px; box-shadow: 0 24px 60px -36px rgba(32,32,32,0.3); }
+  .ip-form-card h3 { font-family: var(--font-polysans); font-size: 22px; font-weight: 700; color: var(--color-midnight-graphite); margin: 0 0 6px; }
+  .ip-form-card > p { font-family: var(--font-inter); font-size: 14px; color: var(--color-silver-ash); margin: 0 0 24px; }
+  .ip-form-card .flash-stack { max-width: none; margin: 0 0 16px; padding: 0; }
+  .ip-form-card .lp-btn { width: 100%; padding-top: 14px; padding-bottom: 14px; }
+
+  @media (max-width: 1024px) {
+    .ip-hero-grid, .ip-row, .ip-inquiry-grid { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+    .ip-row.is-flipped .ip-row-copy { order: 0; }
+    .ip-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ip-tools, .ip-audience { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ip-tour { gap: 72px; }
+    .ip-zoom-detail { right: 0; }
+  }
+  @media (max-width: 640px) {
+    .lp-section.ip-section, .ip-inquiry { padding: 64px 0; }
+    .ip-facts-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ip-fact { padding: 18px 16px; }
+    .ip-fact:nth-child(odd) { border-left: 0; padding-left: 0; }
+    .ip-fact:nth-child(n+3) { border-top: 1px solid var(--color-light-pearl); }
+    .ip-steps, .ip-tools, .ip-audience { grid-template-columns: minmax(0, 1fr); }
+    .ip-form-card { padding: 24px 20px; }
+    .ip-hero-actions { flex-wrap: wrap; }
+    .ip-hero-actions .lp-btn { flex: 1 1 100%; }
+  }
+</style>
+{% endblock %}
+
+{% set check_icon %}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>{% endset %}
 
 {% block content %}
-<div class="auth-shell">
-  <div class="max-w-2xl mx-auto w-full">
-    <section class="surface rounded-xl p-6 sm:p-8 lg:p-10">
-      <span class="landing-eyebrow">Institutional</span>
-      <h1 class="font-serif text-4xl font-bold text-[#111827] mt-3">Bring your institution to AcademicAR.</h1>
-      <p class="text-[#5c6473] mt-3 mb-7">
-        Universities, labs, and institutes run on an annual contract: members join with an invite link
-        (optionally restricted to your email domain), and their 3D/AR model uploads are covered by the
-        institutional license within your contract quota. Offline invoicing and procurement workflows supported.
+<!-- ============================= HERO ============================= -->
+<section class="lp-hero">
+  <div class="lp-container ip-hero-grid">
+    <div class="ip-hero-copy">
+      <span class="lp-hero-badge">
+        <span class="lp-hero-badge-dot" aria-hidden="true"></span>
+        For universities, departments and labs
+      </span>
+      <h1 class="lp-hero-title">Bring your institution's <span class="lp-accent">3D research</span> to AcademicAR</h1>
+      <p class="lp-hero-lead">
+        One annual contract covers your members' model uploads. Invite researchers with a link, follow usage
+        against your model and storage quota, and show your work on a public institution page.
       </p>
-      <p class="mb-7">
-        <a href="{{ url_for('demo_institution', source='institutional') }}" class="underline underline-offset-4 text-[#111827]">See a live institution dashboard &rarr;</a>
-      </p>
+      <div class="lp-hero-actions ip-hero-actions">
+        <a href="#inquiry" class="lp-btn lp-btn-dark">Request a proposal</a>
+        <a href="{{ url_for('demo_institution', source='institutional') }}" class="lp-btn lp-btn-ghost">Explore the demo institution</a>
+      </div>
+      <p class="ip-hero-note">The demo is a live institution panel with sample data. No sign-in needed.</p>
+    </div>
+    <div class="ip-frame">
+      <div class="ip-frame-bar" aria-hidden="true"><i></i><i></i><i></i><span class="ip-frame-url">academicar.com/institution</span></div>
+      <picture>
+        <source media="(max-width: 640px)" srcset="{{ url_for('static', filename='images/institutional/panel-overview-mobile.webp') }}" width="960" height="680">
+        <img src="{{ url_for('static', filename='images/institutional/panel-overview.webp') }}"
+           alt="Institution panel overview: members, funded models against quota, storage used and active invites"
+           width="1600" height="1038" decoding="async">
+      </picture>
+    </div>
+  </div>
+</section>
 
-      <form method="POST" class="space-y-5">
+<!-- ============================= FACTS ============================= -->
+<section class="ip-facts">
+  <div class="lp-container">
+    <div class="ip-facts-row">
+      <div class="ip-fact"><strong>Annual contract</strong><span>Fixed start and end dates, renewed in one step.</span></div>
+      <div class="ip-fact"><strong>Shared quota</strong><span>A model count and storage pool for all members.</span></div>
+      <div class="ip-fact"><strong>Invite links</strong><span>Optionally limited to your email domains.</span></div>
+      <div class="ip-fact"><strong>Paid by invoice</strong><span>Works with your procurement process.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= HOW IT WORKS ============================= -->
+<section class="lp-section ip-section" id="how-it-works">
+  <div class="lp-container">
+    <div class="lp-head">
+      <span class="lp-eyebrow">How it works</span>
+      <h2 class="lp-h2">From first message to your first funded model</h2>
+      <p class="lp-sub">We set up the contract with you. After that your team runs everything from the institution panel.</p>
+    </div>
+    <div class="ip-steps">
+      <div class="ip-step">
+        <span class="ip-step-num">01</span>
+        <h3>Tell us what you need</h3>
+        <p>Send the form at the bottom of this page. We reply with contract terms, quota options and onboarding steps.</p>
+      </div>
+      <div class="ip-step">
+        <span class="ip-step-num">02</span>
+        <h3>We set up your institution</h3>
+        <p>Contract dates, model and storage quota, optional email domains, your logo and your first panel admin.</p>
+      </div>
+      <div class="ip-step">
+        <span class="ip-step-num">03</span>
+        <h3>Invite your members</h3>
+        <p>Admins create invite links in the panel or email them directly. Members join with their own account.</p>
+      </div>
+      <div class="ip-step">
+        <span class="ip-step-num">04</span>
+        <h3>Members publish</h3>
+        <p>Every model a member uploads is covered by the institutional license for the contract term, within your quota.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= FEATURE TOUR ============================= -->
+<section class="lp-section lp-alt ip-section" id="features">
+  <div class="lp-container">
+    <div class="lp-head">
+      <span class="lp-eyebrow">What you get</span>
+      <h2 class="lp-h2">Everything an institution needs to run 3D publishing</h2>
+      <p class="lp-sub">These screenshots come from the institution panel and the public viewer.</p>
+    </div>
+
+    <div class="ip-tour">
+      <div class="ip-row">
+        <div class="ip-row-copy">
+          <span class="lp-eyebrow">Institution panel</span>
+          <h3>See every funded model in one place</h3>
+          <p>Panel admins see who uploaded what, to which project, how much storage it uses and how long its access runs.</p>
+          <ul class="ip-checks">
+            <li>{{ check_icon }}<span>Members list with member and admin roles, plus a CSV export.</span></li>
+            <li>{{ check_icon }}<span>Funded models with uploader, project, size, status and access date.</span></li>
+            <li>{{ check_icon }}<span>Private models stay private. They count toward the quota but never appear publicly.</span></li>
+          </ul>
+        </div>
+        <div class="ip-row-visual">
+          <div class="ip-frame">
+            <picture>
+              <source media="(max-width: 640px)" srcset="{{ url_for('static', filename='images/institutional/panel-models-mobile.webp') }}" width="928" height="1230">
+              <img src="{{ url_for('static', filename='images/institutional/panel-models.webp') }}"
+                 alt="Funded models table listing each model's uploader, project, size, status and access date"
+                 width="1600" height="842" loading="lazy" decoding="async">
+            </picture>
+          </div>
+        </div>
+      </div>
+
+      <div class="ip-row is-flipped">
+        <div class="ip-row-copy">
+          <span class="lp-eyebrow">Membership</span>
+          <h3>Invite links you control</h3>
+          <p>Admins decide who can join and for how long a link works. No manual account setup on your side.</p>
+          <ul class="ip-checks">
+            <li>{{ check_icon }}<span>Set how many days a link stays valid and how many people can use it.</span></li>
+            <li>{{ check_icon }}<span>Limit joining to your email domains. Members must confirm that address first.</span></li>
+            <li>{{ check_icon }}<span>Email an invite directly, or revoke a link at any time.</span></li>
+          </ul>
+        </div>
+        <div class="ip-row-visual">
+          <div class="ip-frame">
+            <picture>
+              <source media="(max-width: 640px)" srcset="{{ url_for('static', filename='images/institutional/panel-invites-mobile.webp') }}" width="928" height="642">
+              <img src="{{ url_for('static', filename='images/institutional/panel-invites.webp') }}"
+                 alt="Create invite link form with validity in days, maximum uses and an optional email address"
+                 width="1600" height="531" loading="lazy" decoding="async">
+            </picture>
+          </div>
+        </div>
+      </div>
+
+      <div class="ip-row">
+        <div class="ip-row-copy">
+          <span class="lp-eyebrow">Visibility</span>
+          <h3>Your name on every model</h3>
+          <p>Each funded model shows "Supported by" with your institution's name and logo in the 3D viewer, linking to your public institution page.</p>
+          <ul class="ip-checks">
+            <li>{{ check_icon }}<span>A public showcase page lists your members' public projects and funded models.</span></li>
+            <li>{{ check_icon }}<span>Publications are grouped by department, with DOI and PDF links.</span></li>
+            <li>{{ check_icon }}<span>Admins write the showcase description themselves.</span></li>
+          </ul>
+        </div>
+        <div class="ip-row-visual">
+          <div class="ip-zoom">
+            <div class="ip-frame ip-frame-dark">
+              <img src="{{ url_for('static', filename='images/institutional/viewer-supported-by.webp') }}"
+                   alt="AcademicAR 3D viewer showing a mitochondrion model with Supported by Northfield University under the title"
+                   width="1600" height="1013" loading="lazy" decoding="async">
+            </div>
+            <div class="ip-zoom-detail ip-frame ip-frame-dark" aria-hidden="true">
+              <img src="{{ url_for('static', filename='images/institutional/viewer-supported-by-detail.webp') }}"
+                   alt="" width="800" height="288" loading="lazy" decoding="async">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ip-row is-flipped">
+        <div class="ip-row-copy">
+          <span class="lp-eyebrow">Contract and usage</span>
+          <h3>Usage and renewal without surprises</h3>
+          <p>The panel shows your contract window and quota usage live, and admins get the same numbers by email.</p>
+          <ul class="ip-checks">
+            <li>{{ check_icon }}<span>A monthly usage report: members, funded models, storage and new uploads.</span></li>
+            <li>{{ check_icon }}<span>A reminder 30 days before the contract ends.</span></li>
+            <li>{{ check_icon }}<span>Renewing extends every funded model at once. Links and QR codes stay the same.</span></li>
+          </ul>
+        </div>
+        <div class="ip-row-visual">
+          <div class="ip-frame">
+            <picture>
+              <source media="(max-width: 640px)" srcset="{{ url_for('static', filename='images/institutional/panel-contract-mobile.webp') }}" width="928" height="754">
+              <img src="{{ url_for('static', filename='images/institutional/panel-contract.webp') }}"
+                 alt="Contract card with status, contract window and allowed email domains"
+                 width="1600" height="513" loading="lazy" decoding="async">
+            </picture>
+          </div>
+          <div class="ip-frame">
+            <picture>
+              <source media="(max-width: 640px)" srcset="{{ url_for('static', filename='images/institutional/panel-quota-mobile.webp') }}" width="928" height="352">
+              <img src="{{ url_for('static', filename='images/institutional/panel-quota.webp') }}"
+                 alt="Quota usage bars for models and storage"
+                 width="1600" height="350" loading="lazy" decoding="async">
+            </picture>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= RESEARCHER TOOLS ============================= -->
+<section class="lp-section ip-section" id="tools">
+  <div class="lp-container">
+    <div class="lp-head">
+      <span class="lp-eyebrow">For your researchers</span>
+      <h2 class="lp-h2">What members can do with a funded model</h2>
+      <p class="lp-sub">Institutional models include the viewer tools of our paid plans, for the whole contract term.</p>
+    </div>
+    <div class="ip-tools">
+      <div class="ip-tool">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>
+        <h3>Upload almost any format</h3>
+        <p>GLB, STL, OBJ, FBX and STEP, plus CT/MR scans as DICOM and segmentations, converted for the web.</p>
+      </div>
+      <div class="ip-tool">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v6H4z"/><path d="M14 4h6v6h-6z"/><path d="M4 14h6v6H4z"/><path d="M15 15h2"/><path d="M19 15v4"/><path d="M15 19h4"/></svg>
+        <h3>QR codes and mobile AR</h3>
+        <p>Every model gets a stable link and QR code that opens it in AR on iOS and Android, without an app.</p>
+      </div>
+      <div class="ip-tool">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7L12 12l8.7-5"/><path d="M12 22V12"/></svg>
+        <h3>Layers, sections and slices</h3>
+        <p>Named layers, a section plane, a 2D slice view with measurement, and layer measurements.</p>
+      </div>
+      <div class="ip-tool">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+        <h3>Saved scenes and tours</h3>
+        <p>Up to 12 saved views per model, each with its own link, QR code and AR version.</p>
+      </div>
+      <div class="ip-tool">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 14l5-4 4 3 3-2 6 4"/><path d="M8 21h8"/></svg>
+        <h3>Figures and comparisons</h3>
+        <p>Export publication figures and put two models side by side on a shareable comparison page.</p>
+      </div>
+      <div class="ip-tool">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 7l-5 5 5 5"/><path d="M16 7l5 5-5 5"/><path d="M13.5 4l-3 16"/></svg>
+        <h3>Embeds on your own site</h3>
+        <p>Embed the viewer on department or lab websites, with the full viewer layout and the option to hide AcademicAR branding.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= AUDIENCE ============================= -->
+<section class="lp-section lp-alt ip-section" id="who">
+  <div class="lp-container">
+    <div class="lp-head">
+      <span class="lp-eyebrow">Who it's for</span>
+      <h2 class="lp-h2">Built for groups that publish in 3D</h2>
+    </div>
+    <div class="ip-audience">
+      <article class="ip-aud">
+        <img src="{{ url_for('static', filename='images/use-medical-education.png') }}" alt="" loading="lazy" decoding="async">
+        <div>
+          <h3>Medical and dental faculties</h3>
+          <p>Anatomy, imaging and surgical planning models for teaching and case reports, from CT/MR data.</p>
+        </div>
+      </article>
+      <article class="ip-aud">
+        <img src="{{ url_for('static', filename='images/use-research-projects.png') }}" alt="" loading="lazy" decoding="async">
+        <div>
+          <h3>Research groups and core facilities</h3>
+          <p>One quota for every lab member, with each model linked to its project and publication.</p>
+        </div>
+      </article>
+      <article class="ip-aud">
+        <img src="{{ url_for('static', filename='images/use-theses-dissertations.png') }}" alt="" loading="lazy" decoding="async">
+        <div>
+          <h3>Graduate schools and libraries</h3>
+          <p>Stable links and QR codes for theses and dissertations, gathered on one public institution page.</p>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= DEMO BAND ============================= -->
+<section class="lp-section lp-cta-section">
+  <div class="lp-container">
+    <div class="lp-cta">
+      <div class="lp-cta-copy">
+        <h2 class="lp-cta-title">See a live institution panel</h2>
+        <p class="lp-cta-sub">Browse the overview, members, invites and funded models of a sample university. No sign-in needed.</p>
+      </div>
+      <div class="lp-cta-actions">
+        <a href="{{ url_for('demo_institution', source='institutional_band') }}" class="lp-btn lp-btn-orange">Open the demo institution</a>
+        <a href="#inquiry" class="lp-btn lp-btn-ghost-light">Request a proposal &darr;</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= FAQ ============================= -->
+<section class="lp-section ip-section" id="faq" style="padding-top: 48px;">
+  <div class="lp-container">
+    <div class="lp-head">
+      <span class="lp-eyebrow">Questions</span>
+      <h2 class="lp-h2">Frequently asked</h2>
+    </div>
+    <div class="ip-faq">
+      <details>
+        <summary>How is the price set?</summary>
+        <p>Each contract is quoted for your institution: how many models and how much storage your members need for the year. You pay the annual contract by invoice.</p>
+      </details>
+      <details>
+        <summary>Who can join our institution?</summary>
+        <p>Anyone your panel admins invite with a link. If you give us your email domains, only accounts with a confirmed address on those domains can accept. Each account belongs to one institution.</p>
+      </details>
+      <details>
+        <summary>Can members keep their models private?</summary>
+        <p>Yes. A model follows its project's visibility. Private models count toward your quota and appear in your panel, but never on the public showcase.</p>
+      </details>
+      <details>
+        <summary>What happens when the contract ends?</summary>
+        <p>Viewers and QR codes show a clear notice instead of a broken link. When you renew, every funded model is extended at once, with the same links and QR codes.</p>
+      </details>
+      <details>
+        <summary>Can we try it before we sign?</summary>
+        <p>You can explore the <a class="ip-link" href="{{ url_for('demo_institution', source='institutional_faq') }}">demo institution panel</a> right now.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= INQUIRY FORM ============================= -->
+<section class="ip-inquiry" id="inquiry">
+  <div class="lp-container ip-inquiry-grid">
+    <div class="ip-inquiry-copy">
+      <span class="lp-eyebrow">Get started</span>
+      <h2 class="lp-h2">Request a proposal for your institution</h2>
+      <p>Tell us a little about your team. Your request goes straight to our team.</p>
+      <ol class="ip-next">
+        <li><b>1</b><span>We reply with contract terms, quota options and onboarding steps.</span></li>
+        <li><b>2</b><span>We agree on dates and quota, and set up your institution and first admin.</span></li>
+        <li><b>3</b><span>Your admins invite members and uploads start counting toward your contract.</span></li>
+      </ol>
+      {% set sales_email = config.get('CONTACT_EMAIL') or 'info@academicar.com' %}
+      <p class="ip-mail">Prefer email? Write to <a href="mailto:{{ sales_email }}">{{ sales_email }}</a></p>
+    </div>
+
+    <div class="ip-form-card">
+      <h3>Institutional inquiry</h3>
+      <p>Fields marked optional can be left blank.</p>
+      <div data-inquiry-flash></div>
+      <form method="POST" action="{{ url_for('institutional_inquiry') }}#inquiry" class="space-y-5">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div>
           <label class="field-label" for="institution_name">Institution name</label>
@@ -41,13 +464,28 @@
           <label class="field-label" for="message">What do you need? (optional)</label>
           <textarea class="field-input" id="message" name="message" rows="4" maxlength="5000" placeholder="Disciplines, expected model volume, procurement requirements...">{{ inquiry.get('message', '') if inquiry is defined else '' }}</textarea>
         </div>
-        <button type="submit" class="btn-primary w-full">Request institutional licensing</button>
+        <button type="submit" class="lp-btn lp-btn-dark">Request institutional licensing</button>
       </form>
-      <p class="text-xs text-[#6b6b6b] mt-4">
-        We reply with contract terms, quota options, and onboarding steps. Prefer email?
-        {% set sales_email = config.get('CONTACT_EMAIL') or 'info@academicar.com' %}<a href="mailto:{{ sales_email }}" class="underline">{{ sales_email }}</a>
-      </p>
-    </section>
+    </div>
   </div>
-</div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Show form messages (sent / validation errors) next to the form, where the
+  // visitor is after submitting, instead of at the top of the long page.
+  (() => {
+    const stack = document.querySelector('.flash-stack');
+    const slot = document.querySelector('[data-inquiry-flash]');
+    if (!stack || !slot || !document.querySelector('.flash-stack [data-flash]')) return;
+    slot.appendChild(stack);
+    // On one-column layouts the form sits below the intro, so jump to the card itself.
+    const target = window.matchMedia('(max-width: 1024px)').matches
+      ? document.querySelector('.ip-form-card')
+      : document.getElementById('inquiry');
+    target.scrollIntoView();
+    window.addEventListener('load', () => target.scrollIntoView());
+  })();
+</script>
 {% endblock %}
