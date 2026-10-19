@@ -197,4 +197,15 @@ def test_builtin_posts_have_cover_faq_and_valid_internal_links():
             assert target in slugs, (post["slug"], target)
         for image in re.findall(r"\]\((/static/images/blog/[^)]+)\)", post["body"]):
             assert os.path.exists(os.path.join(root, image.lstrip("/"))), (post["slug"], image)
+        inline = re.findall(r"\]\(/static/images/blog/inline/[^)]+\)", post["body"])
+        assert len(inline) >= 2, post["slug"]
+
+
+def test_inline_blog_images_render_lazy_with_reserved_size(client):
+    html = client.get("/blog/how-to-add-3d-models-to-research-papers").get_data(as_text=True)
+    inline = re.findall(r"<img [^>]*blog/inline/[^>]*>", html)
+    assert len(inline) >= 2
+    for tag in inline:
+        assert 'loading="lazy"' in tag and 'width="1600"' in tag and 'height="800"' in tag
+        assert 'alt="' in tag and 'alt=""' not in tag
 

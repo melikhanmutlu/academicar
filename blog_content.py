@@ -37,6 +37,7 @@ _ALLOWED_ATTRS = {
     "code": ["class"],
 }
 _ALLOWED_PROTOCOLS = ["http", "https", "mailto"]
+_INLINE_IMG_RE = re.compile(r'<img ([^>]*src="/static/images/blog/inline/[^"]*"[^>]*?)\s*/?>')
 
 
 def _sanitize_html(html: str) -> str:
@@ -78,6 +79,9 @@ def render_body(text: str, cache_key: str | None = None) -> str:
         html = "".join(f"<p>{escape(p.strip())}</p>" for p in text.split("\n\n") if p.strip())
     # Sanitize BEFORE the table-wrap below so the wrapper div we add is kept.
     html = _sanitize_html(html)
+    # Interior illustrations load lazily and reserve their 2:1 box so the page
+    # doesn't jump as they arrive.
+    html = _INLINE_IMG_RE.sub(r'<img \1 width="1600" height="800" loading="lazy" decoding="async">', html)
     # Wrap tables so a wide one scrolls inside its own box instead of forcing
     # the whole page to scroll horizontally on mobile.
     if "<table>" in html:
@@ -131,6 +135,8 @@ models (assemblies, segmentations with several structures) get one **layer** per
 part, so readers can hide, isolate, and recolour them. You don't need a 3D
 engineer or a custom WebGL build.
 
+![A converted bone model with its viewer link and QR code](/static/images/blog/inline/how-to-add-3d-models-to-research-papers-a.webp)
+
 ## 3. Get your viewer link and QR code
 
 Every model gets a stable public viewer URL and a **stable QR code**. Because
@@ -150,6 +156,8 @@ will not rot.
   while they read.
 - **Website, LMS, or repository:** [embed the viewer](/blog/embed-3d-model-website)
   as a lightweight iframe.
+
+![A printed figure and its interactive 3D model side by side](/static/images/blog/inline/how-to-add-3d-models-to-research-papers-b.webp)
 
 ## 5. Make the figure itself from the model
 
@@ -231,6 +239,8 @@ better than one QR to a list.
   Inverted or low-contrast QR codes fail on many phones.
 - Add a one-line call to action: *"Scan to explore the model in 3D & AR."*
 
+![Sizing a QR code on a poster with a ruler](/static/images/blog/inline/qr-codes-on-academic-posters-guide-a.webp)
+
 ## Make it durable
 
 Use a QR that points to a **stable resolver URL**, not a raw file path that might
@@ -259,6 +269,8 @@ If you want to know whether people scanned, link through a destination you
 control. AcademicAR shows each model's **views, QR scans, and AR starts**, so you
 can see what the poster session actually produced and justify the effort next
 time.
+
+![The mobile landing experience after scanning a poster QR code](/static/images/blog/inline/qr-codes-on-academic-posters-guide-b.webp)
 
 ## A quick checklist
 
@@ -325,6 +337,8 @@ OBJ adds UV coordinates and references an `.mtl` material file plus texture imag
 It's widely supported and human-readable, but it's verbose and splits a model
 across several files, which is awkward to host. Like STL, it has no units.
 
+![A bare triangle mesh next to the same part with materials](/static/images/blog/inline/glb-stl-gltf-obj-3d-format-guide-a.webp)
+
 ## FBX — rich but proprietary
 
 FBX (from Autodesk) carries geometry, materials, a hierarchy of parts, the
@@ -351,6 +365,8 @@ with Draco.
 USDZ is the packaged form of Pixar's Universal Scene Description and is what iPhone
 and iPad **AR Quick Look** opens. You rarely author it directly: you convert from
 GLB. See [GLB to USDZ](/blog/glb-to-usdz-iphone-ar).
+
+![One GLB file opening in a browser and on a phone](/static/images/blog/inline/glb-stl-gltf-obj-3d-format-guide-b.webp)
 
 ## At a glance
 
@@ -434,6 +450,8 @@ model into the room, so students walk around it and view it from any angle.
 - **Accessibility:** remote and distance learners get the same hands-on object as
   those in the lab.
 
+![Students exploring a floating hand skeleton in AR](/static/images/blog/inline/augmented-reality-anatomy-education-a.webp)
+
 ## Features that matter for anatomy teaching
 
 - **Layers.** A model built from a segmentation keeps each structure separate:
@@ -454,6 +472,8 @@ You can start from a licensed anatomy library, from anonymized patient scans wit
 the right approvals, or from your own specimens. A CT series can be uploaded
 directly and turned into bone, skin, and vessel layers; our
 [DICOM to 3D guide](/blog/dicom-to-3d-model-guide) explains how.
+
+![A layered heart model in AR with parts pulled apart](/static/images/blog/inline/augmented-reality-anatomy-education-b.webp)
 
 ## The cost and access angle
 
@@ -529,6 +549,8 @@ anything the figure doesn't label.
 - **Engagement:** an interactive figure is memorable, and on mobile it becomes an
   AR object the reader can place in front of them.
 
+![A static paper figure compared with an interactive 3D structure](/static/images/blog/inline/interactive-3d-figures-scientific-publishing-a.webp)
+
 ## Why now
 
 Three forces are converging: journals increasingly **mandate data availability**;
@@ -556,6 +578,8 @@ AR-ready viewer and a stable QR code, and link it from your figure caption. The
 interactive object lives alongside your paper instead of dying as a static image.
 For the practical steps, see
 [how to add interactive 3D models to your research paper](/blog/how-to-add-3d-models-to-research-papers).
+
+![A repository record linked to an interactive 3D model viewer](/static/images/blog/inline/interactive-3d-figures-scientific-publishing-b.webp)
 
 ## Deposit and display
 
@@ -631,6 +655,8 @@ detailed mesh with color. A few habits make the result far better:
 Then publish it as an interactive viewer. Add **annotations** to point out tool
 marks, inscriptions, or repairs, turning the model into a guided object lesson.
 
+![Zooming into surface detail on a scanned pot](/static/images/blog/inline/ar-for-archaeology-3d-artifacts-a.webp)
+
 ## Look closer than the display case allows
 
 - **Section planes** cut through a vessel to show wall thickness or a profile,
@@ -651,6 +677,8 @@ marks, inscriptions, or repairs, turning the model into a guided object lesson.
   [QR code guide](/blog/qr-codes-on-academic-posters-guide) covers sizing.
 - **Online collections:** [embed the viewer](/blog/embed-3d-model-website) in a
   catalog page to bring a static record to life.
+
+![A museum display case with a QR plaque linking to the 3D model](/static/images/blog/inline/ar-for-archaeology-3d-artifacts-b.webp)
 
 ## Responsible sharing
 
@@ -733,6 +761,8 @@ Two further safeguards are built in:
 - Medical uploads are never archived or mirrored as source files, and patient
   identifiers are never written to logs.
 
+![A CT slice stack and a threshold selecting bone](/static/images/blog/inline/dicom-to-3d-model-guide-a.webp)
+
 ## Step 2: Choose what to extract
 
 A volume becomes a 3D model by deciding which voxels belong to a structure. For CT
@@ -767,6 +797,8 @@ or recolour bone, skin, and vessels independently), a **section plane** to cut
 through it, and a **2D slice view** that shows the cut in the familiar axial,
 coronal, and sagittal conventions. Share it with a stable link or QR code in your
 paper, poster, or lecture slides.
+
+![A layered skull model with a section plane in the viewer](/static/images/blog/inline/dicom-to-3d-model-guide-b.webp)
 
 ## A note on scope
 
@@ -850,6 +882,8 @@ absolute intensity scale, so HU thresholds do not apply to it.
   automatically. It is the only preset that makes sense for **MR**, and a quick
   first look for unfamiliar CT data.
 
+![A custom density band highlighted on a vertebra slice](/static/images/blog/inline/hounsfield-units-ct-thresholding-3d-a.webp)
+
 ## When to use a custom range
 
 Presets cover the common cases; research questions often don't. A **custom HU
@@ -857,6 +891,8 @@ range** lets you set your own minimum and, optionally, a maximum — for instanc
 band that isolates dense calcifications, a bone-density window for a specific
 specimen, or a soft-tissue band in a contrast study. Each range becomes its own
 coloured layer, so you can compare bands side by side in the viewer.
+
+![Thin bone lost at a high threshold and kept at a lower one](/static/images/blog/inline/hounsfield-units-ct-thresholding-3d-b.webp)
 
 ## Practical tips
 
@@ -950,6 +986,8 @@ layers per model. That matters for readers:
 Large multi-structure outputs are handled one mask at a time, so a full-body
 TotalSegmentator result does not need special preparation.
 
+![Segmented organs separated into individual layers](/static/images/blog/inline/medical-image-segmentation-to-3d-viewer-a.webp)
+
 ## Why share the segmentation, not just a render
 
 - **Reviewers can check it.** Over- and under-segmentation is obvious when you can
@@ -966,6 +1004,8 @@ A segmentation can carry identifying metadata, and a skin surface can be
 recognisable. Use de-identified data, follow your ethics approval, and avoid face
 surfaces unless you have consent. The uploaded source file is deleted after
 conversion; only the mesh is kept.
+
+![Shortest distance between two segmented structures](/static/images/blog/inline/medical-image-segmentation-to-3d-viewer-b.webp)
 
 ## Measurements come built in
 
@@ -1026,6 +1066,8 @@ the interior. A few details make it practical:
 - The cut respects the **Layers panel**: hide the skin and cut only the skeleton,
   or keep a faded outer shell for context.
 
+![A section plane cutting through a head model](/static/images/blog/inline/section-plane-slice-view-cross-sections-a.webp)
+
 ## The 2D slice view
 
 Next to the 3D cut, the **slice view** draws the cross-section as a flat 2D image.
@@ -1057,6 +1099,8 @@ section, not on an arbitrary surface point. Points that fall outside the solid �
 in a gap between parts or inside a hollow — are refused, so you don't accidentally
 measure empty space. For automatic dimensions and distances between
 structures, see [layer measurements](/blog/measuring-anatomy-3d-layer-metrics).
+
+![Measuring a wall thickness on a cut assembly](/static/images/blog/inline/section-plane-slice-view-cross-sections-b.webp)
 
 ## Where it helps
 
@@ -1133,6 +1177,8 @@ before compression. Layer measurements are included in the paid model plans
 ![Oriented dimensions and maximum diameter of one layer, and the minimum distance between two layers](/static/images/blog/layer-metrics.svg)
 *What is measured per layer and between neighbouring layers.*
 
+![Oriented dimensions of a structure inside its bounding box](/static/images/blog/inline/measuring-anatomy-3d-layer-metrics-a.webp)
+
 ## Why this matters in medicine
 
 - **Tumour-to-vessel distance** is central to resectability discussions; showing it
@@ -1141,6 +1187,8 @@ before compression. Layer measurements are included in the paid model plans
   [case reports and teaching cases](/blog/3d-models-surgical-education-case-reports).
 - **Anatomical variation** studies can present the measured structure and the
   number together.
+
+![Clearance between two parts](/static/images/blog/inline/measuring-anatomy-3d-layer-metrics-b.webp)
 
 ## And in engineering and the sciences
 
@@ -1216,6 +1264,8 @@ literature.
   its own link and QR code for handouts. (More in our post on
   [scenes and tours](/blog/saved-scenes-guided-tours-3d-teaching).)
 
+![A seminar table with a pelvis model and a tablet showing it in AR](/static/images/blog/inline/3d-models-surgical-education-case-reports-a.webp)
+
 ## In case reports and clinical research papers
 
 Complex anatomy — congenital heart disease, craniofacial deformities, pelvic
@@ -1228,6 +1278,8 @@ figures. Linking an interactive model from the figure caption lets readers:
 
 A QR code next to the figure brings the same model to readers of the printed
 journal or a conference poster.
+
+![A case report page with a figure and a QR code in the caption](/static/images/blog/inline/3d-models-surgical-education-case-reports-b.webp)
 
 ## Doing it responsibly
 
@@ -1318,6 +1370,8 @@ such as a set of bolts, are grouped into one layer. Readers can:
 ![A STEP assembly tree converted into one viewer layer per part, with repeated parts grouped](/static/images/blog/step-assembly-layers.svg)
 *Every part becomes a layer; repeated parts, such as bolts, are grouped.*
 
+![A gearbox exploded into its parts](/static/images/blog/inline/step-cad-assemblies-ar-engineering-a.webp)
+
 ## Look inside with sections
 
 The **section plane** cuts through the assembly along any axis, and the **2D slice
@@ -1331,6 +1385,8 @@ thicknesses, bore diameters, and gaps directly. (More in our post on
 For layered models, the worker computes each part's oriented dimensions and the
 **minimum distance between neighbouring parts** — a quick, visible clearance
 check that readers can explore themselves.
+
+![The same assembly on a laptop, a phone and a project poster](/static/images/blog/inline/step-cad-assemblies-ar-engineering-b.webp)
 
 ## Where engineers use it
 
@@ -1404,6 +1460,8 @@ Keep it light: simplify furniture and entourage, merge tiny details, and check t
 units — a model in centimetres shown as metres will look a hundred times too big in
 AR. Models can be rescaled after upload.
 
+![A building exploded into systems](/static/images/blog/inline/architecture-3d-models-sections-ar-a.webp)
+
 ## Layers as building systems
 
 When a model has multiple named parts, each becomes a **layer**. Organise your
@@ -1429,6 +1487,8 @@ Save up to 12 **scenes** — each with its own camera, visible layers, colours, 
 section — and play them as a **tour**. A design review, a studio jury, or a
 heritage-documentation walkthrough becomes a guided sequence anyone can open from
 a link or a QR code (see [scenes and tours](/blog/saved-scenes-guided-tours-3d-teaching)).
+
+![A pavilion placed in AR on a table](/static/images/blog/inline/architecture-3d-models-sections-ar-b.webp)
 
 ## AR on site and on the table
 
@@ -1501,6 +1561,8 @@ A scene is a saved view of a model. It captures:
 You can save up to **12 scenes per model** and give each a name, such as "1. Skull —
 lateral view", "2. Remove the mandible", or "3. Axial cut at the orbits".
 
+![Three saved views of the same model](/static/images/blog/inline/saved-scenes-guided-tours-3d-teaching-a.webp)
+
 ## Share a scene on its own
 
 Each scene has its own **link and QR code**. Put scene 3's QR code next to the
@@ -1524,6 +1586,8 @@ model into the slides themselves, see
 A scene can also be opened in AR with **only its visible layers, its colours, and
 its section cut**, so a student placing "the heart, opened at the four-chamber
 plane" on their desk sees exactly that — not the whole model.
+
+![A projected 3D heart with step markers](/static/images/blog/inline/saved-scenes-guided-tours-3d-teaching-b.webp)
 
 ## Example sequences
 
@@ -1601,6 +1665,8 @@ from a saved scene if a reviewer asks for a different angle.
 ![An exported figure with title, model render, layer legend, scale bar and QR card](/static/images/blog/figure-export-anatomy.svg)
 *The parts of an exported figure.*
 
+![A composed figure with legend, scale bar and QR card](/static/images/blog/inline/publication-ready-3d-figures-comparisons-a.webp)
+
 ## Why the QR card matters
 
 A printed figure is a single viewpoint. The QR card in the corner turns it into a
@@ -1628,6 +1694,8 @@ comparison link or QR code in your paper or poster just like a single model.
 
 Figure export and comparisons are included in the paid model plans — see
 [pricing](/pricing) for details.
+
+![Pre- and post-operative models side by side](/static/images/blog/inline/publication-ready-3d-figures-comparisons-b.webp)
 
 ## A workflow that holds up in peer review
 
@@ -1717,6 +1785,8 @@ with a model that looks right and loads fast, it should:
 ![The four conversion steps from an STL to a GLB, USDZ, viewer link and QR code](/static/images/blog/stl-to-glb-pipeline.svg)
 *What the conversion adds to an STL, and what comes out.*
 
+![A large STL shrinking into a small GLB](/static/images/blog/inline/convert-stl-to-glb-a.webp)
+
 ## Converting STL to GLB with AcademicAR
 
 1. Create a project and choose **Upload model**.
@@ -1748,6 +1818,8 @@ There is nothing to install and no command line involved.
   keeps one label per structure.
 - **Check that the mesh is closed.** Holes and flipped faces in an STL often come
   from the original export and are easiest to fix at the source.
+
+![A 3D printer and a browser viewer showing the same part](/static/images/blog/inline/convert-stl-to-glb-b.webp)
 
 ## Why not just share the STL?
 
@@ -1825,6 +1897,8 @@ real size.
 ![A local STL preview compared with a hosted viewer link and QR code](/static/images/blog/stl-share-link.svg)
 *A local preview is for you; a hosted link is for everyone else.*
 
+![Viewer tools around a 3D model](/static/images/blog/inline/view-stl-online-share-link-a.webp)
+
 ## What readers can do in the viewer
 
 Beyond turning the model around, the viewer includes tools that are useful for
@@ -1845,6 +1919,8 @@ everyone has is now outdated. On AcademicAR you can **replace the model** while
 the link and QR code stay the same, so a QR printed on a poster or in a thesis
 keeps pointing at the current version. If a model's access window ends, the link
 shows a clear notice instead of an error page.
+
+![One 3D model reached from a thesis, a link and a phone](/static/images/blog/inline/view-stl-online-share-link-b.webp)
 
 ## Where this helps
 
@@ -1916,6 +1992,8 @@ be turned into triangles (tessellated) before a 3D viewer or AR app can draw the
 ![Exact STEP surfaces tessellated into a triangle mesh](/static/images/blog/step-exact-vs-mesh.svg)
 *Exact surfaces are tessellated into triangles before a browser or AR app can draw them.*
 
+![An assembly tree and its parts](/static/images/blog/inline/open-step-stp-file-online-a.webp)
+
 ## Ways to open a STEP file
 
 - **Desktop CAD:** any major CAD package imports STEP. Free options include
@@ -1951,6 +2029,8 @@ parts such as a set of bolts are grouped. Viewers can hide the housing to see th
 mechanism, fade a cover, or recolour parts. The **section plane** and **2D slice
 view** cut through the assembly like a section view on a drawing. For more on
 engineering use, see [From STEP to AR](/blog/step-cad-assemblies-ar-engineering).
+
+![Simplifying a large assembly](/static/images/blog/inline/open-step-stp-file-online-b.webp)
 
 ## Troubleshooting large STEP files
 
@@ -2011,6 +2091,8 @@ of named parts. It is designed to load quickly in real-time viewers, which is wh
 browsers, game engines, and AR tools support it. For how it compares with STL,
 OBJ, and FBX, see our [3D format guide](/blog/glb-stl-gltf-obj-3d-format-guide).
 
+![A GLB file and the model it contains](/static/images/blog/inline/how-to-open-glb-file-a.webp)
+
 ## Opening a GLB on Windows and Mac
 
 - **Windows:** Microsoft's **3D Viewer** app opens GLB where it is installed, and
@@ -2051,6 +2133,8 @@ and you get:
 - for multi-part GLBs, a **Layers panel** with one layer per part.
 
 GLB units are kept as authored, so AR shows the model at the size it was modelled.
+
+![The same model exported at the wrong scale](/static/images/blog/inline/how-to-open-glb-file-b.webp)
 
 ## Common GLB problems
 
@@ -2118,6 +2202,8 @@ rather than a viewer, see [DICOM to STL for 3D printing](/blog/dicom-to-stl-3d-p
 ![Two routes from a 3D Slicer segmentation to a shareable 3D viewer link](/static/images/blog/slicer-export-routes.svg)
 *Export surface models, or save the segmentation itself.*
 
+![A segmented model with three export files](/static/images/blog/inline/3d-slicer-export-share-a.webp)
+
 ## Route 1: export STL or OBJ from Slicer
 
 1. Open the **Segmentations** module and select your segmentation.
@@ -2167,6 +2253,8 @@ If you haven't segmented yet and only need bone or skin surfaces, you can skip
 Slicer and upload the DICOM series as a ZIP with a threshold preset or a custom
 Hounsfield range. See [From DICOM to Interactive 3D](/blog/dicom-to-3d-model-guide)
 and [Hounsfield units explained](/blog/hounsfield-units-ct-thresholding-3d).
+
+![Removing identifying facial features before publishing](/static/images/blog/inline/3d-slicer-export-share-b.webp)
 
 ## Before you publish
 
@@ -2232,6 +2320,8 @@ then responsible for:
 - **Hosting** the files with the right content types and caching,
 - **Updating** every page by hand when the model changes.
 
+![A web page with an embedded 3D viewer](/static/images/blog/inline/embed-3d-model-website-a.webp)
+
 ## Option 2: embed a hosted viewer
 
 If your site is WordPress, Squarespace, Google Sites, a university CMS, or an LMS
@@ -2272,6 +2362,8 @@ Self-hosting gives full control over look and code. A hosted embed is faster and
 easier to maintain, especially when the same model also appears in a paper, a
 poster QR code, and a course page, or in your slides (see
 [3D models in PowerPoint](/blog/add-3d-model-to-powerpoint)).
+
+![A course page with an embedded 3D skeleton](/static/images/blog/inline/embed-3d-model-website-b.webp)
 
 ## Tips for embeds that work well
 
@@ -2340,6 +2432,8 @@ web viewers can't read it directly.
 For a side-by-side of all the common formats, see
 [GLB vs STL vs glTF vs OBJ](/blog/glb-stl-gltf-obj-3d-format-guide).
 
+![Textures merging back onto a model](/static/images/blog/inline/convert-obj-fbx-to-glb-a.webp)
+
 ## Free tools that convert OBJ and FBX to GLB
 
 - **Blender.** Import the OBJ or FBX, check the scale and materials, then
@@ -2377,6 +2471,8 @@ If your OBJ or FBX contains several named objects, they become separate
 the parts in your modelling tool before exporting ("housing", "rotor", "left
 kidney"), because those names become the layer names. One merged object stays
 one layer.
+
+![A robot arm split into named layers](/static/images/blog/inline/convert-obj-fbx-to-glb-b.webp)
 
 ## Troubleshooting
 
@@ -2446,6 +2542,8 @@ reliable route.
 ![One upload produces a GLB for browsers and Android and a USDZ for iPhone AR](/static/images/blog/glb-usdz-ar.svg)
 *One link, two files: GLB for browsers and Android, USDZ for iPhone AR.*
 
+![An iPhone and an Android phone showing AR](/static/images/blog/inline/glb-to-usdz-iphone-ar-a.webp)
+
 ## Free ways to convert GLB to USDZ
 
 - **Reality Converter** (free, macOS). Drag in a GLB, check the preview and the
@@ -2472,6 +2570,8 @@ right thing on every device:
 If you recolour the model, change its layers, or replace the file, the USDZ is
 rebuilt so iPhone AR stays in step with what the browser shows. The QR code
 doesn't change.
+
+![A figurine in AR beside a ruler for scale](/static/images/blog/inline/glb-to-usdz-iphone-ar-b.webp)
 
 ## Tips for good AR on iPhone
 
@@ -2541,6 +2641,8 @@ animations such as a turntable.
 material quality, no layers or sections, and older PowerPoint versions or other
 presentation tools that won't show it.
 
+![A slide with a 3D model and rotation handles](/static/images/blog/inline/add-3d-model-to-powerpoint-a.webp)
+
 ## 2. Use rendered images
 
 A still is the most robust option: it works in every version of PowerPoint,
@@ -2559,6 +2661,8 @@ and Keynote play), then **Insert → Video**. The owner's browser also generates
 short showcase videos of a model automatically, saved with the project's media.
 
 **Good for:** talks where you can't risk live interaction, and recorded lectures.
+
+![Phones scanning a QR code on a projected slide](/static/images/blog/inline/add-3d-model-to-powerpoint-b.webp)
 
 ## 4. Put a QR code and link on the slide
 
@@ -2655,6 +2759,8 @@ use region-growing tools instead.
 ![From DICOM slices to a printed model: segment, mesh, clean, export STL](/static/images/blog/dicom-to-stl-steps.svg)
 *The four steps from a CT series to a printable STL, and the branch for sharing.*
 
+![A segmented volume becoming a smooth surface mesh](/static/images/blog/inline/dicom-to-stl-3d-printing-a.webp)
+
 ## Step 3: Make the surface and export STL
 
 In 3D Slicer, *Show 3D* turns the segment into a surface; apply light
@@ -2678,6 +2784,8 @@ A model that looks fine on screen can still fail on a printer. Before slicing:
   thousand is plenty for printing at anatomical scale.
 - **Orient and support** the model in your slicer, and print a small test piece
   first.
+
+![A printed vertebra beside a laptop showing it](/static/images/blog/inline/dicom-to-stl-3d-printing-b.webp)
 
 ## Share the model before (or instead of) printing
 
@@ -2765,6 +2873,8 @@ students' own phones.
 ![Checklist of what research 3D sharing needs, grouped by link, inputs, compliance and tools](/static/images/blog/research-3d-sharing-checklist.svg)
 *What to check before choosing where to host research models.*
 
+![A paper, a dataset and a 3D model linked together](/static/images/blog/inline/sketchfab-alternative-researchers-a.webp)
+
 ## How the options fit
 
 - **General 3D platforms (such as Sketchfab).** Excellent viewer and reach. A good
@@ -2795,6 +2905,8 @@ students' own phones.
   app.
 - **Licensing per model**, with institutional contracts for departments that
   publish many models.
+
+![Views and QR scans for a shared model](/static/images/blog/inline/sketchfab-alternative-researchers-b.webp)
 
 ## Choosing
 
