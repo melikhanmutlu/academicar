@@ -101,3 +101,15 @@ def test_owner_visits_do_not_count_as_model_views(client, app):
     client.get(f"/view/{model_id}")
     with app.app_context():
         assert AnalyticsEvent.query.filter_by(model_id=model_id, event_name="model_viewed").count() == 1
+
+
+def test_signed_in_header_keeps_product_links_and_groups_account_links(client):
+    register(client)
+    html = client.get("/blog").get_data(as_text=True)
+    header = html.split('<header class="site-header">', 1)[1].split("</header>", 1)[0]
+    for label in ("Use cases", "Pricing", "Institutional", "Blog", "Dashboard"):
+        assert label in header
+    menu = header.split('class="nav-account-menu"', 1)[1]
+    for label in ("New project", "Insights", "Profile settings", "Log out"):
+        assert label in menu
+    assert "Log in" not in header and "Sign up" not in header

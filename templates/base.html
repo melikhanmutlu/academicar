@@ -68,36 +68,52 @@
         </svg>
       </button>
 
-      <div class="site-nav-actions">
+      <div class="site-nav-actions{% if current_user.is_authenticated %} is-signed-in{% endif %}">
+        <a href="{{ url_for('ar_for_index') }}" class="nav-link-muted">Use cases</a>
+        <a href="{{ url_for('pricing') }}" class="nav-link-muted">Pricing</a>
+        <a href="{{ url_for('institutional_inquiry') }}" class="nav-link-muted">Institutional</a>
+        <a href="{{ url_for('blog_index') }}" class="nav-link-muted">Blog</a>
+        <span class="site-nav-sep" aria-hidden="true"></span>
         {% if current_user.is_authenticated %}
-          <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
-          <a href="{{ url_for('insights') }}" class="nav-link">Insights</a>
-          <a href="{{ url_for('project_new') }}" class="nav-link">+ New Project</a>
-          {% set _membership = current_user.institution_membership %}
-          {% if _membership and _membership.role == 'admin' %}
-            <a href="{{ url_for('institution.overview') }}" class="nav-link">Institution</a>
-          {% endif %}
-          {% if current_user.is_admin %}
-            <a href="{{ url_for('admin_dashboard') }}" class="nav-link">Admin</a>
-          {% endif %}
-          <a href="{{ url_for('profile') }}" title="Profile" style="display: inline-flex; align-items: center;">
-            {% if current_user.avatar_url %}
-              <img src="{{ current_user.avatar_url }}" style="width: 28px; height: 28px; border-radius: 200px;" alt="{{ current_user.username }}">
-            {% else %}
-              <div style="width: 28px; height: 28px; border-radius: 200px; background: var(--color-midnight-graphite); color: var(--color-canvas-white); display: grid; place-items: center; font-family: var(--font-inter); font-size: 13px; font-weight: 600;">
-                {{ current_user.username[0]|upper }}
+          <a href="{{ url_for('dashboard') }}" class="nav-link nav-dashboard-link">Dashboard</a>
+          <div class="nav-account">
+            <button type="button" class="nav-account-toggle" aria-haspopup="true" aria-expanded="false" aria-controls="nav-account-menu" aria-label="Account menu">
+              {% if current_user.avatar_url %}
+                <img src="{{ current_user.avatar_url }}" class="nav-avatar" alt="">
+              {% else %}
+                <span class="nav-avatar">{{ current_user.username[0]|upper }}</span>
+              {% endif %}
+              <svg class="nav-account-chevron" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+            <div class="nav-account-menu" id="nav-account-menu">
+              <div class="nav-account-head">
+                {% if current_user.avatar_url %}
+                  <img src="{{ current_user.avatar_url }}" class="nav-avatar" alt="">
+                {% else %}
+                  <span class="nav-avatar" aria-hidden="true">{{ current_user.username[0]|upper }}</span>
+                {% endif %}
+                <span class="nav-account-who">
+                  <span class="nav-account-name">{{ current_user.username }}</span>
+                  <span class="nav-account-email">{{ current_user.email }}</span>
+                </span>
               </div>
-            {% endif %}
-          </a>
-          <form method="POST" action="{{ url_for('auth.logout') }}" style="margin: 0;">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="nav-link-muted" style="background: transparent; border: none; cursor: pointer; padding: 0;">Log out</button>
-          </form>
+              <a href="{{ url_for('project_new') }}" class="nav-menu-item">New project</a>
+              <a href="{{ url_for('insights') }}" class="nav-menu-item">Insights</a>
+              {% set _membership = current_user.institution_membership %}
+              {% if _membership and _membership.role == 'admin' %}
+                <a href="{{ url_for('institution.overview') }}" class="nav-menu-item">Institution</a>
+              {% endif %}
+              {% if current_user.is_admin %}
+                <a href="{{ url_for('admin_dashboard') }}" class="nav-menu-item">Admin</a>
+              {% endif %}
+              <a href="{{ url_for('profile') }}" class="nav-menu-item">Profile settings</a>
+              <form method="POST" action="{{ url_for('auth.logout') }}" class="nav-menu-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="nav-menu-item">Log out</button>
+              </form>
+            </div>
+          </div>
         {% else %}
-          <a href="{{ url_for('ar_for_index') }}" class="nav-link-muted">Use cases</a>
-          <a href="{{ url_for('pricing') }}" class="nav-link-muted">Pricing</a>
-          <a href="{{ url_for('institutional_inquiry') }}" class="nav-link-muted">Institutional</a>
-          <a href="{{ url_for('blog_index') }}" class="nav-link-muted">Blog</a>
           <a href="{{ url_for('auth.login') }}" class="nav-link-muted">Log in</a>
           <a href="{{ url_for('auth.register') }}" class="nav-link">Sign up</a>
         {% endif %}
@@ -214,6 +230,29 @@
         updateParallax();
         window.addEventListener("scroll", requestTick, { passive: true });
         window.addEventListener("resize", requestTick);
+      }
+
+      // Account menu (desktop dropdown; shown inline in the mobile drawer)
+      const accountToggle = document.querySelector('.nav-account-toggle');
+      const account = accountToggle && accountToggle.closest('.nav-account');
+      if (account) {
+        const setAccount = (open) => {
+          account.classList.toggle('is-open', open);
+          accountToggle.setAttribute('aria-expanded', open);
+        };
+        accountToggle.addEventListener('click', () => setAccount(!account.classList.contains('is-open')));
+        document.addEventListener('click', (event) => {
+          if (!account.contains(event.target)) setAccount(false);
+        });
+        account.addEventListener('focusout', (event) => {
+          if (!account.contains(event.relatedTarget)) setAccount(false);
+        });
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape' && account.classList.contains('is-open')) {
+            setAccount(false);
+            accountToggle.focus();
+          }
+        });
       }
 
       // Mobile Nav Drawer Toggle Logic
