@@ -7423,6 +7423,55 @@
     if (params.get('split')) setSplit(true, params.get('split'));
   })();
 </script>
+<script>
+  // Design B on phones: the right rail folds into one menu button that opens a
+  // labelled list (there is no hover on touch). Desktop keeps the hover rail.
+  (function () {
+    var toolbar = document.querySelector('.viewer-toolbar');
+    if (!toolbar) return;
+    var mq = window.matchMedia('(max-width: 640px)');
+    var toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.id = 'menuBtn';
+    toggle.className = 'viewer-tool-btn b-menu-toggle';
+    toggle.setAttribute('aria-label', 'Menu');
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.setAttribute('aria-controls', 'viewerRail');
+    toggle.innerHTML = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">'
+      + '<line class="b-l1" x1="3" y1="5" x2="15" y2="5"/><line class="b-l2" x1="3" y1="9" x2="15" y2="9"/><line class="b-l3" x1="3" y1="13" x2="15" y2="13"/></svg>'
+      + '<span>Menu</span>';
+    toolbar.id = toolbar.id || 'viewerRail';
+    toggle.setAttribute('aria-controls', toolbar.id);
+    toolbar.insertBefore(toggle, toolbar.firstChild);
+    var label = toggle.querySelector('span');
+    var setOpen = function (open) {
+      toolbar.setAttribute('data-menu', open ? 'open' : 'closed');
+      toggle.setAttribute('aria-expanded', String(open));
+      label.textContent = open ? 'Close' : 'Menu';
+    };
+    var index = function () {
+      var n = 0;
+      [].forEach.call(toolbar.querySelectorAll('.viewer-tool-btn:not(.b-menu-toggle)'), function (b) {
+        if (!b.hidden) b.style.setProperty('--b-i', n++);
+      });
+    };
+    setOpen(false);
+    index();
+    new MutationObserver(index).observe(toolbar, { subtree: true, attributes: true, attributeFilter: ['hidden'], childList: true });
+    toggle.addEventListener('click', function () { index(); setOpen(toolbar.getAttribute('data-menu') !== 'open'); });
+    toolbar.addEventListener('click', function (e) {
+      var b = e.target.closest && e.target.closest('.viewer-tool-btn');
+      if (!mq.matches || !b || b === toggle) return;
+      setTimeout(function () { setOpen(false); }, 140);
+    });
+    document.addEventListener('pointerdown', function (e) {
+      if (mq.matches && toolbar.getAttribute('data-menu') === 'open' && !toolbar.contains(e.target)) setOpen(false);
+    }, true);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && toolbar.getAttribute('data-menu') === 'open') setOpen(false);
+    });
+  })();
+</script>
 {% endif %}
 </body>
 </html>

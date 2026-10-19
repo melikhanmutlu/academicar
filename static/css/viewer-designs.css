@@ -710,6 +710,40 @@ html[data-embed] main > header .viewer-tool-btn.primary { background: var(--b-ct
 html[data-embed-nobrand] main > header > :is(div:first-child, a[href="/"]) { visibility: hidden; }
 html[data-embed-nobrand] :is(.viewer-free-watermark, .viewer-publish-cta, .viewer-inline-qr) { display: none !important; }
 
+/* Phones: the rail is one menu button that opens a labelled list (no hover on touch). */
+.viewer-toolbar .b-menu-toggle { display: none; }
+@media (max-width: 640px) {
+  html[data-design="b"] .viewer-toolbar { width: 50px; overflow: hidden; align-items: stretch; transition: width 0.34s var(--b-ease), border-radius 0.34s var(--b-ease), background-color 0.2s; }
+  html[data-design="b"] .viewer-toolbar[data-menu="closed"] { gap: 0 !important; }
+  html[data-design="b"] .viewer-toolbar[data-menu="open"] { width: min(210px, calc(100vw - 20px)); border-radius: 26px; }
+  html[data-design="b"] .viewer-toolbar .b-menu-toggle { display: flex; order: -3; position: sticky; top: 0; z-index: 1; margin-bottom: 0; background: transparent; color: var(--b-ink); }
+  html[data-design="b"] .viewer-toolbar .b-menu-toggle .b-l1, html[data-design="b"] .viewer-toolbar .b-menu-toggle .b-l2, html[data-design="b"] .viewer-toolbar .b-menu-toggle .b-l3 {
+    transform-box: fill-box; transform-origin: center; transition: transform 0.3s var(--b-ease), opacity 0.2s ease;
+  }
+  html[data-design="b"] .viewer-toolbar[data-menu="open"] .b-menu-toggle .b-l1 { transform: translateY(4px) rotate(45deg); }
+  html[data-design="b"] .viewer-toolbar[data-menu="open"] .b-menu-toggle .b-l2 { opacity: 0; }
+  html[data-design="b"] .viewer-toolbar[data-menu="open"] .b-menu-toggle .b-l3 { transform: translateY(-4px) rotate(-45deg); }
+  html[data-design="b"] .viewer-toolbar .viewer-tool-btn:not(.b-menu-toggle) {
+    width: 100%; transition: height 0.32s var(--b-ease), min-height 0.32s var(--b-ease), opacity 0.22s ease, transform 0.32s var(--b-ease), background-color 0.15s ease;
+    transition-delay: 0s;
+  }
+  html[data-design="b"] .viewer-toolbar[data-menu="closed"] .viewer-tool-btn:not(.b-menu-toggle) {
+    height: 0; min-height: 0; opacity: 0; transform: translateY(-8px) scale(0.96); pointer-events: none; margin: 0;
+  }
+  html[data-design="b"] .viewer-toolbar[data-menu="open"] .viewer-tool-btn:not(.b-menu-toggle) {
+    transition-delay: calc(var(--b-i, 0) * 22ms + 60ms);
+  }
+  html[data-design="b"] .viewer-toolbar[data-menu="open"] .viewer-tool-btn > span {
+    display: block !important; font-size: 13px; opacity: 1; transition-delay: calc(var(--b-i, 0) * 22ms + 120ms);
+  }
+  html[data-design="b"] .viewer-toolbar .b-menu-toggle > span { display: none !important; }
+  html[data-design="b"] .viewer-toolbar[data-menu="open"] .b-menu-toggle > span { display: block !important; opacity: 1; }
+  html[data-design="b"] .viewer-toolbar .viewer-tool-btn.primary { margin-bottom: 0; }
+}
+@media (max-width: 640px) and (prefers-reduced-motion: reduce) {
+  html[data-design="b"] .viewer-toolbar, html[data-design="b"] .viewer-toolbar * { transition: none !important; }
+}
+
 /* =====================================================================
    C — LEVHA: ivory page, framed figure plate, caption column, bottom dock
    ===================================================================== */
