@@ -1467,8 +1467,9 @@
       touch-action="{{ 'pan-y' if is_embed else 'none' }}"
       camera-orbit="0deg 90deg auto"
       field-of-view="28deg"
-      min-field-of-view="10deg"
+      min-field-of-view="3deg"
       max-field-of-view="60deg"
+      min-camera-orbit="auto auto 5%"
       bounds="tight"
       interaction-prompt="auto"
       autoplay
@@ -5738,8 +5739,8 @@
           section = null;
           releaseSection();
           // Face widens the polar limits to look straight down an axis; restore them.
-          if (viewer.hasAttribute('min-camera-orbit')) {
-            viewer.removeAttribute('min-camera-orbit');
+          if (viewer.hasAttribute('max-camera-orbit')) {
+            viewer.setAttribute('min-camera-orbit', 'auto auto 5%');
             viewer.removeAttribute('max-camera-orbit');
           }
         }
@@ -5881,7 +5882,7 @@
         const theta = Math.abs(dy) > 0.999 && current ? current.theta : Math.atan2(dx, dz);
         const phi = Math.min(Math.PI - 0.001, Math.max(0.001, Math.acos(Math.max(-1, Math.min(1, dy)))));
         setAutoRotateState(false);
-        viewer.setAttribute('min-camera-orbit', 'auto 0deg auto');
+        viewer.setAttribute('min-camera-orbit', 'auto 0deg 5%');
         viewer.setAttribute('max-camera-orbit', 'auto 180deg auto');
         viewer.cameraOrbit = `${theta}rad ${phi}rad auto`;
       });
