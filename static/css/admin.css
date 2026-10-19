@@ -901,6 +901,8 @@ a.admin-metric:hover, a.admin-metric:focus-visible { border-color: var(--color-s
 .admin-metric small { overflow-wrap: anywhere; }
 /* "Project deleted" stands in for the Viewer button: a neutral chip that wraps. */
 .models-offline { align-self: flex-start; white-space: normal; text-align: left; line-height: 1.3; }
+/* Long conversion errors wrap inside Status instead of widening it. */
+@media (min-width: 761px) { .models-status-cell { max-width: 280px; } }
 /* == end page:models == */
 
 /* == page:jobs == */

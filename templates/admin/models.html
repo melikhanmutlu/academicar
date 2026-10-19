@@ -87,6 +87,7 @@
             <th class="admin-hide-sm">User</th>
             <th class="admin-hide-sm">License</th>
             <th>Status</th>
+            <th>Uploaded</th>
             <th class="admin-hide-sm">Size</th>
             <th>Actions</th>
           </tr>
@@ -106,11 +107,12 @@
                 {% endif %}
               </td>
               <td class="admin-hide-sm">{{ get_license_plan(model.license_type).label }}</td>
-              <td>
+              <td class="models-status-cell">
                 <span class="status-chip {{ admin_chip_class(model.processing_status or 'ready') }}">{{ (model.processing_status or "ready")|replace("_", " ")|capitalize }}</span>
                 {% if model_access_status(model) == "expired" %}<span class="status-chip {{ admin_chip_class('expired') }}">Expired</span>{% endif %}
                 {% if model.processing_error or model.replacement_error %}<small title="{{ model.processing_error or model.replacement_error }}">{{ (model.processing_error or model.replacement_error)|truncate(90) }}</small>{% endif %}
               </td>
+              <td class="admin-nowrap">{{ model.created_at.strftime("%Y-%m-%d %H:%M") if model.created_at else "-" }}</td>
               <td class="admin-hide-sm admin-nowrap">{{ format_file_size(model.file_size) }}</td>
               <td>
                 <div class="admin-actions">
@@ -120,7 +122,7 @@
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="6">{{ "No models match these filters." if (filters.model_q or filters.model_status != "all") else "No models yet." }}</td></tr>
+            <tr><td colspan="7">{{ "No models match these filters." if (filters.model_q or filters.model_status != "all") else "No models yet." }}</td></tr>
           {% endfor %}
         </tbody>
       </table>

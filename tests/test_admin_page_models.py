@@ -69,3 +69,11 @@ def test_force_rebuild_skips_recently_queued_and_deleted_projects(client):
     assert queued == set(ids)  # ids[0] had its own recent job; deleted skipped
     assert gone not in queued
     assert len(queued) == 3
+
+
+def test_models_table_shows_upload_date_and_time(client):
+    _make_admin(client)
+    _seed_model(client, "m-dated", created_at=datetime(2026, 10, 19, 20, 5))
+    html = client.get("/admin/models").get_data(as_text=True)
+    assert "<th>Uploaded</th>" in html
+    assert "2026-10-19 20:05" in html
