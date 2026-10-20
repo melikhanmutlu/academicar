@@ -101,7 +101,7 @@
       </p>
 
       <div class="pr-span" role="img" aria-label="Online for {{ access_window_label(days) }}">
-        <div class="pr-span-track"><span class="pr-span-fill{% if days is none %} is-open{% endif %}" style="width: {{ '%.1f'|format(span) }}%"></span></div>
+        <div class="pr-span-track"><span class="pr-span-fill{% if plan.key in ('academic', 'extended_archive') %} is-accent{% endif %}{% if days is none %} is-open{% endif %}" style="width: {{ '%.1f'|format(span) }}%"></span></div>
         <p class="pr-span-label">Online for <strong>{{ access_window_label(days) }}</strong></p>
       </div>
 

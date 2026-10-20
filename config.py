@@ -132,7 +132,7 @@ class Config:
 
     # Upload limits.
     # Room for a raw medical scan (MEDICAL_UPLOAD_MAX_BYTES, 500 MB by default);
-    # meshes stay capped at MAX_MODEL_FILE_BYTES (260 MB) in converters and by
+    # meshes stay capped at MAX_MODEL_FILE_BYTES (300 MB) in converters and by
     # each plan's per-model limit.
     MAX_CONTENT_LENGTH = int(os.environ.get("MAX_CONTENT_LENGTH", 520 * 1024 * 1024))
     ALLOWED_STL_EXTENSIONS = {"stl"}

@@ -110,7 +110,7 @@ _DEFAULT_LICENSE_PLANS: dict[str, LicensePlan] = {
         label="Extended Archive",
         price_usd=24.90,
         duration_days=365 * 10,
-        storage_limit_bytes=200 * MB,
+        storage_limit_bytes=300 * MB,
         feature_summary=(
             "Priority archival storage",
             "Guided viewing",

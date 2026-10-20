@@ -53,7 +53,7 @@
 .pr-span { margin: 28px 0 8px; }
 .pr-span-track { height: 10px; border-radius: 200px; background: var(--pr-surface); box-shadow: inset 0 0 0 1px var(--pr-line); overflow: hidden; }
 .pr-span-fill { display: block; height: 100%; min-width: 6px; border-radius: 200px; background: var(--pr-ink); transform-origin: left; animation: pr-grow 0.9s cubic-bezier(.2,.7,.2,1) both; }
-.pr-plan.is-primary .pr-span-fill { background: var(--pr-accent); }
+.pr-span-fill.is-accent { background-color: var(--pr-accent); }
 .pr-span-fill.is-open { background-image: linear-gradient(90deg, transparent 85%, rgba(255,255,255,.7)); }
 .pr-plan:nth-child(2) .pr-span-fill { animation-delay: .12s; }
 .pr-plan:nth-child(3) .pr-span-fill { animation-delay: .24s; }

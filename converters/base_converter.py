@@ -13,7 +13,7 @@ from typing import Dict, Optional
 # clear error instead. 0 disables the check. Kept in sync with the Flask
 # Config.MAX_MODEL_FILE_BYTES default.
 MAX_MODEL_FILE_BYTES = int(
-    os.environ.get("MAX_MODEL_FILE_BYTES", os.environ.get("MAX_CONTENT_LENGTH", 260 * 1024 * 1024))
+    os.environ.get("MAX_MODEL_FILE_BYTES", os.environ.get("MAX_CONTENT_LENGTH", 300 * 1024 * 1024))
 )
 
 
