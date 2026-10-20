@@ -8,101 +8,61 @@
 {% set clip_base = url_for('static', filename='videos/home/') %}
 {% set still_base = url_for('static', filename='images/home/') %}
 
-<!-- ===================== HERO: scroll-driven dissection ===================== -->
-<section class="a-dissect" data-a-dissect aria-label="AcademicAR viewer, explained on a mitochondrion model">
-  <div class="a-stage">
-    <div class="a-stage-grid" aria-hidden="true"></div>
+<!-- ===================== HERO: what it is + the four-step route ===================== -->
+<section class="a-hero" aria-labelledby="a-hero-title">
+  <div class="a-hero-grid" aria-hidden="true"></div>
+  <div class="a-wrap">
+    <div class="a-hero-top">
+      <div class="a-hero-copy">
+        <h1 class="a-title" id="a-hero-title">Put the 3D model in your paper, not a screenshot of it.</h1>
+        <p class="a-lead">
+          Upload a 3D file or a CT/MR scan. Readers rotate it, cut it and open it in AR from a QR code on your paper, poster, thesis or slide.
+        </p>
+        <div class="a-actions">
+          <a href="{{ url_for('auth.register') }}" class="a-btn a-btn-dark">Start publishing</a>
+          <a href="{{ url_for('demo_mitochondria_ar', source='home_a') }}" class="a-btn a-btn-line">Open the live example</a>
+        </div>
+        <p class="a-price">Free to start. Pay per model only when it needs to stay online.</p>
+      </div>
 
-    <div class="a-hero-copy">
-      <p class="a-kicker">3D and AR for research, teaching and publishing</p>
-      <h1 class="a-title">Publish the model, not a screenshot of it.</h1>
-      <p class="a-lead">
-        Upload a 3D file or a CT/MR scan. Get a browser viewer, AR and a stable QR code for your paper, poster or thesis.
-      </p>
-      <div class="a-actions">
-        <a href="{{ url_for('auth.register') }}" class="a-btn a-btn-dark">Start publishing</a>
-        <a href="{{ url_for('demo_mitochondria_ar', source='home_a') }}" class="a-btn a-btn-line">Open the live example</a>
+      <div class="a-hero-specimen">
+        <model-viewer
+          class="a-model"
+          data-a-hero-model
+          src="{{ url_for('static', filename='models/model.compressed.glb') }}"
+          alt="Interactive 3D model of a mitochondrion"
+          camera-controls
+          touch-action="pan-y"
+          disable-zoom
+          disable-pan
+          interaction-prompt="none"
+          camera-orbit="20deg 70deg 9.5m"
+          field-of-view="30deg"
+          interpolation-decay="80"
+          rotation-per-second="10deg"
+          auto-rotate-delay="0"
+          exposure="1.0"
+          shadow-intensity="0"
+          tone-mapping="neutral"
+          environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
+          loading="eager"
+          reveal="auto">
+          <div slot="poster" class="a-model-poster" aria-hidden="true"></div>
+        </model-viewer>
+        <span class="a-specimen-note">Live model. Drag to rotate.</span>
       </div>
     </div>
 
-    <div class="a-specimen">
-      <model-viewer
-        class="a-model"
-        data-a-model
-        src="{{ url_for('static', filename='models/model.compressed.glb') }}"
-        alt="Interactive 3D model of a mitochondrion"
-        camera-controls
-        touch-action="pan-y"
-        disable-zoom
-        disable-pan
-        interaction-prompt="none"
-        camera-orbit="20deg 70deg 9.5m"
-        field-of-view="30deg"
-        interpolation-decay="80"
-        exposure="1.0"
-        shadow-intensity="0"
-        tone-mapping="neutral"
-        environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
-        loading="eager"
-        reveal="auto">
-        <div slot="poster" class="a-model-poster" aria-hidden="true"></div>
-      </model-viewer>
-      <div class="a-plane" aria-hidden="true"><span></span></div>
-    </div>
-
-    <svg class="a-leaders" data-a-leaders aria-hidden="true"></svg>
-
-    <ol class="a-callouts">
-      <li class="a-callout" data-callout="0">
-        <span class="a-callout-step">Orbit</span>
-        <h2>Rotate it in any browser</h2>
-        <p>No login, no app, no plug-in.</p>
-      </li>
-      <li class="a-callout" data-callout="1">
-        <span class="a-callout-step">AR</span>
-        <h2>Scan the QR, place it on the desk</h2>
-        <p>Phones open it in AR from the browser.</p>
-        <img class="a-callout-qr" src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code that opens this model in AR" width="72" height="72" loading="lazy">
-      </li>
-      <li class="a-callout" data-callout="2">
-        <span class="a-callout-step">Section</span>
-        <h2>Cut a section, read the slice</h2>
-        <p>Slice along any axis and measure the cut.</p>
-      </li>
-      <li class="a-callout" data-callout="3">
-        <span class="a-callout-step">Figure</span>
-        <h2>Measure, label, export the figure</h2>
-        <p>PNG with legend, scale bar and QR.</p>
-      </li>
-    </ol>
-
-    <div class="a-rail" aria-hidden="true">
-      <span class="a-rail-fill"></span>
-      <span class="a-rail-hint">Scroll to dissect</span>
-    </div>
-  </div>
-</section>
-
-
-<!-- ===================== ROUTE: make → upload → explore → print ===================== -->
-<section class="a-route" data-a-route aria-labelledby="a-route-title">
-  <div class="a-wrap">
-    <header class="a-head">
-      <h2 class="a-h2" id="a-route-title">From your model to a QR on the page</h2>
-      <p class="a-sub">Four steps. The middle two take minutes.</p>
-    </header>
-
-    <ol class="a-route-list">
+    <ol class="a-route-list" data-a-route aria-label="From your model to a QR on the page">
       <li class="a-route-step">
         <div class="a-route-visual a-route-make">
-          <img src="{{ url_for('static', filename='images/blog/covers/3d-slicer-export-share.webp') }}" alt="A CT segmentation exported from 3D Slicer as a 3D mesh" loading="lazy" decoding="async" width="640" height="360">
+          <img src="{{ url_for('static', filename='images/blog/covers/3d-slicer-export-share.webp') }}" alt="A CT segmentation exported from 3D Slicer as a 3D mesh" decoding="async" width="640" height="360">
           <ul class="a-route-tags" aria-label="Typical sources">
             <li>3D Slicer</li><li>CAD</li><li>Scanner</li>
           </ul>
         </div>
-        <span class="a-route-num" aria-hidden="true">1</span>
-        <h3>Make the model</h3>
-        <p>Segment a CT/MR scan, export from CAD or scan an object. <a href="{{ url_for('blog_post', slug='dicom-to-3d-model-guide') }}">DICOM to 3D guide</a></p>
+        <h2><span class="a-route-num" aria-hidden="true">1</span>Make the model</h2>
+        <p>Segment a scan, export from CAD or scan an object. <a href="{{ url_for('blog_post', slug='dicom-to-3d-model-guide') }}">DICOM to 3D guide</a></p>
       </li>
 
       <li class="a-route-step">
@@ -115,21 +75,16 @@
               Converted to GLB + USDZ
             </span>
           </div>
-          <span class="a-drop-formats">GLB STL OBJ FBX STEP DICOM NIfTI</span>
         </div>
-        <span class="a-route-num" aria-hidden="true">2</span>
-        <h3>Upload to AcademicAR</h3>
-        <p>Converted and compressed for you.</p>
+        <h2><span class="a-route-num" aria-hidden="true">2</span>Upload to AcademicAR</h2>
+        <p>Converted and compressed for the web and AR.</p>
       </li>
 
       <li class="a-route-step">
         <div class="a-route-visual a-route-view">
-          <video muted playsinline loop preload="none" poster="{{ still_base }}layers.webp" width="960" height="540" data-inline-clip aria-label="The Layers panel in the AcademicAR viewer">
-            <source src="{{ clip_base }}layers.mp4" type="video/mp4">
-          </video>
+          <img src="{{ still_base }}layers.webp" alt="The Layers panel in the AcademicAR viewer, listing calcaneus, lateral plate and screws" decoding="async" width="960" height="540">
         </div>
-        <span class="a-route-num" aria-hidden="true">3</span>
-        <h3>Explore it in the viewer</h3>
+        <h2><span class="a-route-num" aria-hidden="true">3</span>Explore it in the viewer</h2>
         <p>Rotate, cut, measure and save views.</p>
       </li>
 
@@ -142,64 +97,110 @@
             <span class="a-sheet-fig"></span>
             <span class="a-sheet-line"></span>
           </div>
-          <img class="a-sheet-qr" src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code printed on a poster, opening the model in AR" width="96" height="96" loading="lazy">
-          <span class="a-sheet-link">/m/… stays the same</span>
+          <img class="a-sheet-qr" src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code printed on a poster, opening the model in AR" width="96" height="96">
         </div>
-        <span class="a-route-num" aria-hidden="true">4</span>
-        <h3>Add the QR to your work</h3>
-        <p>Paper, poster or slide. <a href="{{ url_for('demo_mitochondria_ar', source='home_a_route') }}">Try the scan</a></p>
+        <h2><span class="a-route-num" aria-hidden="true">4</span>Add the QR to your work</h2>
+        <p>The link stays the same when you replace the model.</p>
       </li>
     </ol>
   </div>
 </section>
 
-<!-- ===================== TOOLS: scrollytelling with real clips ===================== -->
-<section class="a-tools" id="tools">
+<!-- ===================== DISSECTION: sticky model, three short steps ===================== -->
+<section class="a-dissect" data-a-dissect aria-labelledby="a-dissect-title">
+  <div class="a-wrap a-dissect-grid">
+    <div class="a-dissect-steps">
+      <h2 class="a-h2 a-h2-left" id="a-dissect-title">What a reader can do with it</h2>
+      <ol class="a-callouts">
+        <li class="a-callout" data-callout="0">
+          <span class="a-callout-step">Orbit</span>
+          <h3>Turn it in any browser</h3>
+          <p>Drag to rotate. No login, no app, no plug-in.</p>
+        </li>
+        <li class="a-callout" data-callout="1">
+          <span class="a-callout-step">Section</span>
+          <h3>Cut it to see inside</h3>
+          <p>A section plane on any axis, and a 2D slice you can measure.</p>
+        </li>
+        <li class="a-callout" data-callout="2">
+          <span class="a-callout-step">AR</span>
+          <h3>Scan the QR, place it on the desk</h3>
+          <p>Phones open it in AR straight from the browser. Try this one.</p>
+          <img class="a-callout-qr" src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code that opens this mitochondrion in AR" width="88" height="88" loading="lazy">
+        </li>
+      </ol>
+    </div>
+
+    <div class="a-dissect-stage">
+      <div class="a-specimen">
+        <div class="a-stage-grid" aria-hidden="true"></div>
+        <model-viewer
+          class="a-model"
+          data-a-model
+          src="{{ url_for('static', filename='models/model.compressed.glb') }}"
+          alt="The same mitochondrion, turning and cut by a section plane as you scroll"
+          camera-controls
+          touch-action="pan-y"
+          disable-zoom
+          disable-pan
+          interaction-prompt="none"
+          camera-orbit="20deg 70deg 9.5m"
+          field-of-view="30deg"
+          interpolation-decay="80"
+          exposure="1.0"
+          shadow-intensity="0"
+          tone-mapping="neutral"
+          environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
+          loading="lazy"
+          reveal="auto">
+          <div slot="poster" class="a-model-poster" aria-hidden="true"></div>
+        </model-viewer>
+        <div class="a-plane" aria-hidden="true"><span></span></div>
+        <div class="a-rail" aria-hidden="true"><span class="a-rail-fill"></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== TOOLS: pick a tool, watch the recording ===================== -->
+<section class="a-tools" id="tools" data-a-tools>
   <div class="a-wrap">
     <header class="a-head">
-      <h2 class="a-h2">The viewer your readers get</h2>
-      <p class="a-sub">Recorded in the viewer. Works on phones and desktops.</p>
+      <h2 class="a-h2">The rest of the viewer</h2>
+      <p class="a-sub">Recorded in the product. Pick a tool.</p>
     </header>
 
     {% set tools = [
-      ('orbit',   'Orbit and zoom',            'Drag to rotate, pinch to zoom.'),
       ('layers',  'Layers for every part',     'Hide, recolour or X-ray each structure.'),
-      ('section', 'Section planes',            'Cut through X, Y or Z, with guides.'),
-      ('slice',   'Slice view',                'Axial, coronal and sagittal slices in 2D, with a measure.'),
-      ('measure', 'Measure and label',         'Labels and point-to-point distances in real units.'),
+      ('slice',   'Slice view',                'Axial, coronal and sagittal slices with a measure.'),
+      ('measure', 'Measure and label',         'Labels and distances in real units.'),
       ('scenes',  'Scenes and guided tours',   'Up to 12 saved views, each with its own link and QR.'),
       ('figure',  'Figure export',             'A PNG with legend, scale bar and QR code.')
     ] %}
 
     <div class="a-tools-grid">
-      <div class="a-screen" aria-hidden="true">
+      <div class="a-screen">
         <div class="a-screen-frame">
           {% for t in tools %}
           <video class="a-screen-video{% if loop.first %} is-active{% endif %}" data-screen="{{ loop.index0 }}"
-                 muted playsinline loop preload="none" poster="{{ still_base }}{{ t[0] }}.webp" width="960" height="540">
+                 muted playsinline loop preload="none" poster="{{ still_base }}{{ t[0] }}.webp" width="960" height="540"
+                 aria-label="{{ t[1] }}, recorded in the AcademicAR viewer">
             <source src="{{ clip_base }}{{ t[0] }}.mp4" type="video/mp4">
           </video>
           {% endfor %}
         </div>
-        <div class="a-screen-meta">
-          <span class="a-screen-count"><b data-screen-count>1</b> of {{ tools|length }}</span>
-          <span class="a-screen-name" data-screen-name>{{ tools[0][1] }}</span>
-        </div>
       </div>
 
-      <ol class="a-steps">
+      <ul class="a-steps" role="list">
         {% for t in tools %}
-        <li class="a-step" data-step="{{ loop.index0 }}" data-name="{{ t[1] }}">
-          <div class="a-step-media">
-            <video muted playsinline loop preload="none" poster="{{ still_base }}{{ t[0] }}.webp" width="960" height="540" data-inline-clip>
-              <source src="{{ clip_base }}{{ t[0] }}.mp4" type="video/mp4">
-            </video>
-          </div>
-          <h3>{{ t[1] }}</h3>
-          <p>{{ t[2] }}</p>
+        <li>
+          <button type="button" class="a-step{% if loop.first %} is-active{% endif %}" data-step="{{ loop.index0 }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">
+            <span class="a-step-name">{{ t[1] }}</span>
+            <span class="a-step-text">{{ t[2] }}</span>
+          </button>
         </li>
         {% endfor %}
-      </ol>
+      </ul>
     </div>
   </div>
 </section>
@@ -242,22 +243,34 @@
   </div>
 </section>
 
-<!-- ===================== DISCIPLINES ===================== -->
-<section class="a-fields">
+<!-- ===================== TRY IT: real demos only ===================== -->
+<section class="a-try" aria-labelledby="a-try-title">
   <div class="a-wrap">
-    <header class="a-head a-head-split">
-      <h2 class="a-h2 a-h2-left">Made for fields that think in three dimensions</h2>
-      <a class="a-textlink" href="{{ url_for('ar_for_index') }}">All fields</a>
-    </header>
-    <ul class="a-field-list">
-      {% for d in disciplines %}
+    <h2 class="a-h2 a-h2-left" id="a-try-title">Try it before you sign up</h2>
+    <ul class="a-try-list">
       <li>
-        <a href="{{ url_for('ar_for', discipline=d.slug) }}">
-          <span class="a-field-name">{{ d.name }}</span>
+        <a href="{{ url_for('demo_mitochondria_ar', source='home_a_try') }}">
+          <span class="a-try-name">The mitochondrion, live</span>
+          <span class="a-try-text">The model from this page in the viewer, with AR on your phone.</span>
         </a>
       </li>
-      {% endfor %}
+      <li>
+        <a href="{{ url_for('demo_dashboard', source='home_a') }}">
+          <span class="a-try-name">A researcher's dashboard</span>
+          <span class="a-try-text">Projects, models, QR codes and access dates, with sample data.</span>
+        </a>
+      </li>
+      <li>
+        <a href="{{ url_for('demo_institution', source='home_a') }}">
+          <span class="a-try-name">An institution's panel</span>
+          <span class="a-try-text">Quota, members and funded models for a department.</span>
+        </a>
+      </li>
     </ul>
+    <p class="a-fieldline">
+      <span>By field:</span>
+      {% for d in disciplines %}<a href="{{ url_for('ar_for', discipline=d.slug) }}">{{ d.name }}</a>{% endfor %}
+    </p>
   </div>
 </section>
 
@@ -267,11 +280,11 @@
     <div class="a-reel-layout">
       <div class="a-reel-copy">
         <h2 class="a-h2 a-h2-left">Every viewer tool in one minute</h2>
-        <p class="a-sub a-sub-left">Every tool, as your readers see it.</p>
+        <p class="a-sub a-sub-left">With sound. Loads when you press play.</p>
       </div>
       <div class="a-reel-frame" data-a-reel>
-        <img class="a-reel-poster" src="{{ url_for('static', filename='images/showreel-poster.webp') }}"
-             alt="AcademicAR showreel: a 3D model orbiting in the viewer" loading="lazy" decoding="async" width="1600" height="900">
+        <img class="a-reel-poster" src="{{ url_for('static', filename='images/home/reel/poster-scan.webp') }}"
+             alt="AcademicAR showreel: no app, just scan the QR code" loading="lazy" decoding="async" width="1600" height="900">
         <video class="a-reel-video" preload="none" playsinline width="1920" height="1080" hidden>
           <source src="{{ url_for('static', filename='videos/academicar-showreel.mp4') }}" type="video/mp4">
         </video>
@@ -292,7 +305,6 @@
       <p class="a-sub a-sub-left">One contract funds your members' models from a shared quota.</p>
       <div class="a-actions">
         <a href="{{ url_for('institutional_inquiry') }}" class="a-btn a-btn-dark">Talk to us about a contract</a>
-        <a href="{{ url_for('demo_institution', source='home_a') }}" class="a-btn a-btn-line">See the institution dashboard</a>
       </div>
     </div>
     <ul class="a-inst-list">

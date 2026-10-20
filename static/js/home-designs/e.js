@@ -13,8 +13,6 @@
     const figure = stage.querySelector('[data-e-figure]');
     const print = stage.querySelector('[data-e-print]');
     const rise = stage.querySelector('[data-e-rise]');
-    const steps = [...hero.querySelectorAll('[data-e-step]')];
-    const pinQuery = window.matchMedia('(min-width: 1024px)');
     let geo = null;
     let progress = reduce ? 1 : 0;
     let mx = 0, my = 0;
@@ -65,49 +63,36 @@
       rise.style.setProperty('--e-rise', r.toFixed(3));
       print.style.opacity = (1 - r * 0.88).toFixed(3);
       rise.classList.toggle('is-live', r > 0.9);
-      const active = p < 0.2 ? 1 : (sc < 1 ? 2 : 3);
-      steps.forEach((li, i) => li.classList.toggle('is-on', i < active));
     };
 
-    let pinned = false;
-    const setMode = () => {
-      pinned = !reduce && pinQuery.matches;
-      hero.classList.toggle('is-pinned', pinned);
-      geo = null;
-      requestAnimationFrame(() => { measure(); onScroll(); });
+    // The sequence plays once by itself when the desk comes into view (no
+    // scroll pinning), and can be replayed from a button on the desk.
+    const replay = hero.querySelector('[data-e-replay]');
+    let running = false;
+    const play = () => {
+      if (running) return;
+      running = true;
+      if (replay) replay.hidden = true;
+      const t0 = performance.now();
+      const dur = 3800;
+      const step = (now) => {
+        progress = clamp((now - t0) / dur);
+        render();
+        if (progress < 1) { requestAnimationFrame(step); return; }
+        running = false;
+        if (replay) replay.hidden = false;
+      };
+      requestAnimationFrame(step);
     };
+    if (replay) replay.addEventListener('click', () => { progress = 0; render(); setTimeout(play, 250); });
 
-    let ticking = false;
-    const onScroll = () => {
-      if (pinned) {
-        const rect = hero.getBoundingClientRect();
-        const travel = hero.offsetHeight - (window.innerHeight - 64);
-        progress = clamp((64 - rect.top) / (travel * 0.92));
-      }
-      render();
-      ticking = false;
-    };
-    window.addEventListener('scroll', () => {
-      if (!ticking) { ticking = true; requestAnimationFrame(onScroll); }
-    }, { passive: true });
-    window.addEventListener('resize', () => { geo = null; requestAnimationFrame(onScroll); });
-    pinQuery.addEventListener('change', setMode);
-
-    // Smaller screens: play the sequence once when the desk comes into view.
+    window.addEventListener('resize', () => { geo = null; requestAnimationFrame(render); });
     if (!reduce && 'IntersectionObserver' in window) {
       const io = new IntersectionObserver((entries) => {
-        if (pinned || !entries[0].isIntersecting) return;
+        if (!entries[0].isIntersecting) return;
         io.disconnect();
-        const t0 = performance.now();
-        const dur = 3600;
-        const step = (now) => {
-          if (pinned) return;
-          progress = clamp((now - t0) / dur);
-          render();
-          if (progress < 1) requestAnimationFrame(step);
-        };
-        setTimeout(() => requestAnimationFrame(step), 400);
-      }, { threshold: 0.6 });
+        setTimeout(play, 700);
+      }, { threshold: 0.5 });
       io.observe(stage);
     }
 
@@ -124,7 +109,7 @@
     }
 
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { geo = null; render(); });
-    setMode();
+    requestAnimationFrame(() => { measure(); render(); });
   }
 
   // Flow: the upload step plays once when the four steps come into view.

@@ -310,12 +310,12 @@
         pending = false;
         const orbit = mv.getCameraOrbit && mv.getCameraOrbit();
         if (!orbit) return;
-        theta.textContent = deg(orbit.theta);
-        phi.textContent = deg(orbit.phi);
+        if (theta) theta.textContent = deg(orbit.theta);
+        if (phi) phi.textContent = deg(orbit.phi);
       });
     });
-    mv.addEventListener('load', () => { stat.textContent = 'Live'; });
-    mv.addEventListener('error', () => { stat.textContent = 'Could not load'; });
+    mv.addEventListener('load', () => { if (stat) stat.textContent = 'Live'; });
+    mv.addEventListener('error', () => { if (stat) stat.textContent = 'Could not load'; });
     if (reduceMotion) mv.removeAttribute('auto-rotate');
   }
 

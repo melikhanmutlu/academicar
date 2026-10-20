@@ -1,4 +1,4 @@
-// Design C · Sahne: stage word + rail, stage parallax, four-step flow, pinned feature reel,
+// Design C · Sahne: stage word + rail, stage parallax, four-step flow, swipeable feature reel,
 // in-view clip playback, monitor tilt, click-to-play showreel.
 (() => {
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -73,55 +73,23 @@
     }
   }
 
-  /* ---------- Feature reel: vertical scroll drives the track ---------- */
+  /* ---------- Feature reel: arrow buttons page the swipe row ---------- */
   const reel = document.querySelector('[data-reel]');
   if (reel) {
-    const track = reel.querySelector('[data-reel-track]');
-    const panels = [...track.children];
-    const dots = [...reel.querySelectorAll('[data-reel-dot]')];
-    const wide = window.matchMedia('(min-width: 861px) and (min-height: 560px)');
-    let ticking = false;
-
-    const setCurrent = (i) => {
-      panels.forEach((p, n) => p.classList.toggle('is-current', n === i));
-      dots.forEach((d, n) => {
-        d.classList.toggle('is-current', n === i);
-        d.classList.toggle('is-done', n < i);
-      });
+    const win = reel.querySelector('[data-reel-window]');
+    const prev = reel.querySelector('[data-reel-prev]');
+    const next = reel.querySelector('[data-reel-next]');
+    const panel = win.querySelector('.c-reel-panel');
+    const step = () => (panel ? panel.getBoundingClientRect().width + 24 : win.clientWidth * 0.8);
+    const sync = () => {
+      prev.disabled = win.scrollLeft < 4;
+      next.disabled = win.scrollLeft > win.scrollWidth - win.clientWidth - 4;
     };
-
-    const update = () => {
-      ticking = false;
-      if (reel.classList.contains('is-swipe')) return;
-      const rect = reel.getBoundingClientRect();
-      const travel = reel.offsetHeight - (window.innerHeight - 64);
-      const progress = Math.min(1, Math.max(0, (64 - rect.top) / travel));
-      const max = track.scrollWidth - window.innerWidth;
-      track.style.transform = `translate3d(${(-progress * Math.max(0, max)).toFixed(1)}px, 0, 0)`;
-      setCurrent(Math.min(panels.length - 1, Math.round(progress * (panels.length - 1))));
-    };
-    const request = () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } };
-
-    const mode = () => {
-      const swipe = reduceMotion || !wide.matches;
-      reel.classList.toggle('is-swipe', swipe);
-      if (swipe) { track.style.transform = ''; panels.forEach((p) => p.classList.add('is-current')); }
-      else update();
-    };
-    mode();
-    wide.addEventListener('change', mode);
-    window.addEventListener('scroll', request, { passive: true });
-    window.addEventListener('resize', request);
-
-    // Clicking a chapter name jumps to that panel.
-    dots.forEach((dot, i) => {
-      dot.style.cursor = 'pointer';
-      dot.addEventListener('click', () => {
-        const travel = reel.offsetHeight - (window.innerHeight - 64);
-        const top = reel.getBoundingClientRect().top + window.scrollY - 64;
-        window.scrollTo({ top: top + travel * (i / (panels.length - 1)), behavior: reduceMotion ? 'auto' : 'smooth' });
-      });
-    });
+    prev.addEventListener('click', () => win.scrollBy({ left: -step(), behavior: reduceMotion ? 'auto' : 'smooth' }));
+    next.addEventListener('click', () => win.scrollBy({ left: step(), behavior: reduceMotion ? 'auto' : 'smooth' }));
+    win.addEventListener('scroll', sync, { passive: true });
+    window.addEventListener('resize', sync);
+    sync();
   }
 
   /* ---------- Clips play only while visible ---------- */

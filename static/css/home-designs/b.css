@@ -370,7 +370,7 @@
   object-fit: cover;
   display: block;
 }
-.b-video-poster { filter: brightness(.82); }
+.b-video-poster { filter: none; }
 .b-video.is-playing .b-video-poster { display: none; }
 .b-video-play {
   position: absolute;
@@ -447,7 +447,7 @@
   color: var(--b-ink);
 }
 .b-cite::before {
-  content: "[" counter(ref) "]";
+  content: counter(ref);
   font: 500 13px/1 var(--b-sans);
   color: var(--b-gold);
 }
@@ -586,13 +586,8 @@
 .b-strip:focus-visible { outline: 2px solid var(--b-orange); outline-offset: 2px; }
 .b-strip .b-shot { border-radius: 0; }
 
-/* Supplementary video sits in the main column, caption in the margin */
-.b-supp { margin: 8px 0 24px; }
-.b-supp .b-main { max-width: none; }
-.b-supp .b-side.b-caption { margin-top: 0; padding-top: 2px; }
 
 @media (max-width: 860px) {
-  .b-supp .b-side.b-caption { margin-top: 14px; }
   /* Fig. 1 comes straight after the title; the abstract follows it. */
   .b-paper { display: flex; flex-direction: column; }
   .b-paper > * { order: 5; }
@@ -809,4 +804,57 @@
   .b-poster-title { height: 5px; }
   .b-poster-cols span { height: 18px; }
   .b-poster-qr { width: 50%; right: 6%; bottom: 8%; padding: 3px; }
+}
+
+/* ---------- v3 refinements ---------- */
+/* A little more room on wide screens. */
+.b-paper { max-width: 1240px; padding-left: 72px; padding-right: 72px; }
+@media (max-width: 1080px) { .b-paper { padding-left: 48px; padding-right: 48px; } }
+@media (max-width: 860px) { .b-paper { padding-left: 24px; padding-right: 24px; } }
+
+.b-price { margin: 14px 0 0; font: 400 14px/1.5 var(--b-sans); color: var(--b-shale); }
+
+/* Fig. 2: four larger panels so the viewer UI is readable. */
+.b-panels { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.b-panel, .b-panel:first-child, .b-panel:nth-child(2), .b-panel:nth-child(3),
+.b-panel:nth-child(4), .b-panel:nth-child(5), .b-panel:last-child { border-radius: 8px !important; }
+
+/* Further reading: guide titles, not citations. */
+.b-cite-text em { font: 500 12px/1 var(--b-sans); font-style: normal; color: var(--b-ash); margin-left: 8px; }
+
+/* Supplementary material: video full width, then the live demos. */
+.b-supp-video { margin: 8px 0 0; }
+.b-supp-video .b-video { background: #fff; }
+.b-supp-video .b-video::after {
+  content: ""; position: absolute; inset: 0; border: 1px solid var(--b-rule);
+  border-radius: 8px; pointer-events: none;
+}
+.b-supp-video .b-video.is-playing::after { display: none; }
+.b-supp-video .b-video-play {
+  left: 24px; top: auto; bottom: 24px; transform: none;
+  box-shadow: 0 6px 24px rgba(0,0,0,.14), 0 0 0 1px var(--b-rule);
+}
+@media (max-width: 560px) {
+  .b-supp-video .b-video-play { left: auto; right: 10px; top: 10px; bottom: auto; padding: 6px; }
+  .b-supp-video .b-video-play > span:last-child { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+}
+.b-supp-list {
+  list-style: none; margin: 28px 0 0; padding: 0;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;
+}
+.b-supp-list a {
+  display: grid; gap: 6px; height: 100%;
+  padding: 18px 20px; border: 1px solid var(--b-rule); border-radius: 8px;
+  color: var(--b-ink); text-decoration: none;
+}
+.b-supp-list a:hover { border-color: var(--b-ink); }
+.b-supp-list a:focus-visible { outline: 2px solid var(--b-orange); outline-offset: 2px; }
+.b-supp-id { font: 600 12px/1.2 var(--b-sans); color: var(--b-gold); }
+.b-supp-title { font: 500 19px/1.3 var(--b-serif); }
+.b-supp-note { font: 400 14px/1.45 var(--b-sans); color: var(--b-shale); }
+@media (max-width: 860px) {
+  .b-supp-list { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+}
+@media (max-width: 560px) {
+  .b-panel { flex-basis: 92%; }
 }

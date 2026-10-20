@@ -26,6 +26,7 @@
           <a href="{{ url_for('auth.register') }}" class="b-btn b-btn-dark">Start publishing</a>
           <a href="{{ url_for('demo_mitochondria_ar', source='home_b') }}" class="b-btn b-btn-ghost">Open the AR example</a>
         </div>
+        <p class="b-price">Free to start. Pay per model only when it needs to stay online.</p>
       </div>
       <aside class="b-side b-abstract" aria-label="Abstract">
         <h2 class="b-abstract-label">Abstract</h2>
@@ -112,7 +113,7 @@
           shadow-intensity="0"
           tone-mapping="neutral"
           environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
-          loading="eager">
+          loading="lazy">
         </model-viewer>
         <div class="b-compare-static" aria-hidden="true">
           <picture>
@@ -206,10 +207,8 @@
           {% for key, letter, alt in [
             ('layers', 'a', 'Layers panel hiding and recolouring the parts of a calcaneus model'),
             ('section', 'b', 'A section plane cutting through a bone model'),
-            ('slice', 'c', 'Slice view showing a 2D cross-section with a measurement'),
-            ('measure', 'd', 'Distance measurements and labels placed on a model'),
-            ('scenes', 'e', 'Stepping through saved scenes of a model'),
-            ('figure', 'f', 'Exported publication figures with a caption')
+            ('measure', 'c', 'Distance measurements and labels placed on a model'),
+            ('figure', 'd', 'Exported publication figures with a caption')
           ] %}
           <div class="b-panel">
             <video class="b-clip" muted playsinline loop preload="none"
@@ -222,8 +221,8 @@
           {% endfor %}
         </div>
         <figcaption id="b-fig2-cap" class="b-caption">
-          <strong>Fig. 2.</strong> Viewer tools, recorded in the product.<span class="b-swipe-hint"> Swipe for all six.</span>
-          <b>(a)</b> Layers. <b>(b)</b> Section plane. <b>(c)</b> Slice view. <b>(d)</b> Measure and label. <b>(e)</b> Saved scenes and tours. <b>(f)</b> Figure export.
+          <strong>Fig. 2.</strong> Viewer tools, recorded in the product.<span class="b-swipe-hint"> Swipe for all four.</span>
+          <b>(a)</b> Layers. <b>(b)</b> Section plane. <b>(c)</b> Measure and label. <b>(d)</b> Figure export. Saved scenes and the slice view are in Video S1.
         </figcaption>
       </figure>
 
@@ -233,24 +232,6 @@
         </div>
         <figcaption id="b-fig3-cap" class="b-caption">
           <strong>Fig. 3.</strong> Axial, coronal and sagittal cross-sections with scale bars, under the 3D model.<span class="b-swipe-hint"> Scroll sideways for all three.</span>
-        </figcaption>
-      </figure>
-
-      <figure class="b-fig b-row b-supp" aria-labelledby="b-s1-cap">
-        <div class="b-main">
-        <div class="b-video" data-showreel>
-          <img class="b-video-poster" src="{{ url_for('static', filename='images/showreel-poster.webp') }}" alt="AcademicAR showreel: a 3D model orbiting in the viewer" loading="lazy" decoding="async" width="1600" height="900">
-          <video preload="none" playsinline width="1920" height="1080" hidden>
-            <source src="{{ url_for('static', filename='videos/academicar-showreel.mp4') }}" type="video/mp4">
-          </video>
-          <button type="button" class="b-video-play" aria-label="Play the AcademicAR showreel (1:00)">
-            <span class="b-video-play-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></span>
-            <span>Play video S1, 1:00</span>
-          </button>
-        </div>
-        </div>
-        <figcaption id="b-s1-cap" class="b-caption b-side">
-          <strong>Video S1.</strong> Every viewer tool in one minute.
         </figcaption>
       </figure>
     </section>
@@ -289,15 +270,58 @@
       </div>
     </section>
 
-    <!-- References -->
+    <!-- Supplementary material: real, explorable demos -->
+    <section class="b-section b-supp" aria-labelledby="b-supp">
+      <h2 id="b-supp" class="b-h2">Supplementary material</h2>
+      <figure class="b-fig b-supp-video" aria-labelledby="b-s1-cap">
+        <div class="b-video" data-showreel>
+          <img class="b-video-poster" src="{{ url_for('static', filename='images/home/reel/poster-scan.webp') }}" alt="AcademicAR showreel: a phone scanning a printed QR code" loading="lazy" decoding="async" width="1600" height="900">
+          <video preload="none" playsinline width="1920" height="1080" hidden>
+            <source src="{{ url_for('static', filename='videos/academicar-showreel.mp4') }}" type="video/mp4">
+          </video>
+          <button type="button" class="b-video-play" aria-label="Play the AcademicAR showreel (1:00)">
+            <span class="b-video-play-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></span>
+            <span>Play video S1, 1:00</span>
+          </button>
+        </div>
+        <figcaption id="b-s1-cap" class="b-caption">
+          <strong>Video S1.</strong> Every viewer tool in one minute, with sound.
+        </figcaption>
+      </figure>
+      <ul class="b-supp-list">
+        <li>
+          <a href="{{ url_for('demo_mitochondria_ar', source='home_b_supp') }}">
+            <span class="b-supp-id">Model S2</span>
+            <span class="b-supp-title">The Fig. 1 mitochondrion, live</span>
+            <span class="b-supp-note">Opens in the viewer, or in AR on a phone</span>
+          </a>
+        </li>
+        <li>
+          <a href="{{ url_for('demo_dashboard', source='home_b') }}">
+            <span class="b-supp-id">Demo S3</span>
+            <span class="b-supp-title">A researcher's dashboard</span>
+            <span class="b-supp-note">Projects, models and QR codes, with sample data</span>
+          </a>
+        </li>
+        <li>
+          <a href="{{ url_for('demo_institution', source='home_b_supp') }}">
+            <span class="b-supp-id">Demo S4</span>
+            <span class="b-supp-title">An institution's dashboard</span>
+            <span class="b-supp-note">Quota, members and funded models, with sample data</span>
+          </a>
+        </li>
+      </ul>
+    </section>
+
+    <!-- Further reading -->
     {% if posts %}
     <section class="b-section b-refs" aria-labelledby="b-refs">
-      <h2 id="b-refs" class="b-h2">References</h2>
+      <h2 id="b-refs" class="b-h2">Further reading</h2>
       <ol class="b-reflist">
-        {% for post in posts %}
+        {% for post in posts[:4] %}
         <li>
           <a href="{{ url_for('blog_post', slug=post.slug) }}" class="b-cite">
-            <span class="b-cite-text">{{ post.author or 'AcademicAR' }} ({{ (post.date|string)[:4] }}). <span class="b-cite-title">{{ post.title }}</span>. <em>AcademicAR Guides</em>.</span>
+            <span class="b-cite-text"><span class="b-cite-title">{{ post.title }}</span> <em>Guide</em></span>
             {% if post.cover %}<img src="{{ post.cover }}" alt="" width="120" height="68" loading="lazy" decoding="async">{% endif %}
           </a>
         </li>

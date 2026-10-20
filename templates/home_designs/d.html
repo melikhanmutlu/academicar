@@ -6,53 +6,53 @@
 
 {#- Pipeline data: only steps the real converters perform (see CLAUDE.md). -#}
 {% set d_inputs = [
-  {'key': 'glb', 'label': 'GLB', 'kind': '3D', 'note': 'glTF binary',
+  {'key': 'glb', 'label': 'GLB', 'kind': '3D', 'note': 'A ready-made web 3D file',
    'layers': 'As exported', 'medical': 'No', 'steps': [
-     ['Validate', 'Checked as a glTF binary'],
-     ['Optimise', 'Draco geometry, webp textures'],
-     ['AR files', 'USDZ companion for iPhone and iPad'],
+     ['Check', 'Opened and checked as a valid 3D file'],
+     ['Lighten', 'Compressed so it loads fast on phones'],
+     ['AR files', 'An extra copy for iPhone and iPad AR'],
      ['Publish', 'Viewer link and stable QR']]},
-  {'key': 'stl', 'label': 'STL', 'kind': '3D', 'note': 'Mesh from CAD or a slicer',
+  {'key': 'stl', 'label': 'STL', 'kind': '3D', 'note': 'A mesh from CAD or a slicer',
    'layers': 'Single part', 'medical': 'No', 'steps': [
-     ['Validate', 'Mesh checked with trimesh'],
-     ['Convert', 'STL to GLB'],
-     ['Optimise', 'Draco geometry compression'],
-     ['AR files', 'USDZ companion for iPhone and iPad'],
+     ['Check', 'The mesh is checked for errors'],
+     ['Convert', 'Turned into GLB, the web 3D format'],
+     ['Lighten', 'Compressed so it loads fast on phones'],
+     ['AR files', 'An extra copy for iPhone and iPad AR'],
      ['Publish', 'Viewer link and stable QR']]},
   {'key': 'obj', 'label': 'OBJ', 'kind': '3D', 'note': 'With materials and textures',
    'layers': 'As exported', 'medical': 'No', 'steps': [
-     ['Convert', 'obj2gltf wrapper'],
-     ['Textures', 'Re-encoded as webp'],
-     ['Optimise', 'Draco geometry compression'],
-     ['AR files', 'USDZ companion for iPhone and iPad'],
+     ['Convert', 'Turned into GLB with its materials'],
+     ['Textures', 'Images saved in a lighter web format'],
+     ['Lighten', 'Compressed so it loads fast on phones'],
+     ['AR files', 'An extra copy for iPhone and iPad AR'],
      ['Publish', 'Viewer link and stable QR']]},
-  {'key': 'fbx', 'label': 'FBX', 'kind': '3D', 'note': 'From Blender, Maya, 3ds Max',
+  {'key': 'fbx', 'label': 'FBX', 'kind': '3D', 'note': 'From Blender, Maya or 3ds Max',
    'layers': 'As exported', 'medical': 'No', 'steps': [
-     ['Convert', 'FBX2glTF wrapper'],
-     ['Textures', 'Re-encoded as webp'],
-     ['Optimise', 'Draco geometry compression'],
-     ['AR files', 'USDZ companion for iPhone and iPad'],
+     ['Convert', 'Turned into GLB with its materials'],
+     ['Textures', 'Images saved in a lighter web format'],
+     ['Lighten', 'Compressed so it loads fast on phones'],
+     ['AR files', 'An extra copy for iPhone and iPad AR'],
      ['Publish', 'Viewer link and stable QR']]},
   {'key': 'step', 'label': 'STEP / STP', 'kind': 'CAD', 'note': 'Exact CAD assemblies',
    'layers': 'One per part', 'medical': 'No', 'steps': [
-     ['Tessellate', 'OpenCascade turns exact CAD into a mesh'],
+     ['Mesh', 'Exact CAD surfaces turned into a 3D mesh'],
      ['Layers', 'One named layer per part'],
-     ['Optimise', 'Draco only, so parts stay separate'],
-     ['AR files', 'USDZ companion for iPhone and iPad'],
+     ['Lighten', 'Compressed, with parts kept separate'],
+     ['AR files', 'An extra copy for iPhone and iPad AR'],
      ['Publish', 'Viewer link and stable QR']]},
-  {'key': 'dicom', 'label': 'DICOM series', 'kind': 'CT / MR', 'note': 'Uploaded as a ZIP',
+  {'key': 'dicom', 'label': 'DICOM series', 'kind': 'CT / MR', 'note': 'A CT or MR series in a ZIP',
    'layers': 'One per structure', 'medical': 'Required', 'steps': [
-     ['Decode', 'Uncompressed, JPEG Lossless, JPEG-LS, JPEG 2000, RLE'],
-     ['Threshold', 'Bone, skin, contrast vessels, auto, or your own HU range'],
+     ['Read', 'Uncompressed and common compressed DICOM'],
+     ['Threshold', 'Bone, skin, vessels, automatic, or your own HU range'],
      ['Mesh', 'One layer per structure, up to 64'],
-     ['Optimise', 'Draco only, so layers stay separate'],
+     ['Lighten', 'Compressed, with layers kept separate'],
      ['Clean up', 'Raw scan deleted after conversion']]},
-  {'key': 'seg', 'label': 'Segmentation', 'kind': 'Labels', 'note': 'NIfTI, NRRD, DICOM-SEG, mask ZIP',
+  {'key': 'seg', 'label': 'Segmentation', 'kind': 'Labels', 'note': 'Labels from 3D Slicer and similar tools',
    'layers': 'One per structure', 'medical': 'Required', 'steps': [
-     ['Read labels', 'NIfTI, NRRD or .seg.nrrd, DICOM-SEG, ZIP of masks'],
+     ['Read labels', 'NIfTI, NRRD, DICOM-SEG or a ZIP of masks'],
      ['Mesh', 'One named layer per structure'],
-     ['Optimise', 'Draco only, so layers stay separate'],
-     ['AR files', 'USDZ companion for iPhone and iPad'],
+     ['Lighten', 'Compressed, with layers kept separate'],
+     ['AR files', 'An extra copy for iPhone and iPad AR'],
      ['Clean up', 'Raw scan deleted after conversion']]},
 ] %}
 
@@ -71,6 +71,7 @@
             <a class="d-btn d-btn-dark" href="{{ url_for('auth.register') }}">Start publishing</a>
             <a class="d-btn d-btn-line" href="{{ url_for('demo_mitochondria_ar', source='home_d') }}">Open the demo model</a>
           </div>
+          <p class="d-price-note">Free to start. Pay per model only when it needs to stay online.</p>
         </div>
       </div>
 
@@ -90,13 +91,13 @@
               <span class="d-drop-bar"><span></span></span>
               <span class="d-drop-done">Converted to GLB + USDZ</span>
             </div>
-            <span class="d-drop-formats">GLB · STL · OBJ · FBX · STEP · DICOM · NIfTI</span>
+            <span class="d-drop-formats">GLB, STL, OBJ, FBX, STEP, DICOM, NIfTI</span>
           </div>
-          <p>Conversion and compression run in the background.</p>
+          <p>We convert it for the web and for AR. You keep working.</p>
         </li>
         <li class="d-flow-stage">
           <div class="d-flow-head"><span class="d-flow-num">3</span><strong>Explore in the viewer</strong><span class="d-led" aria-hidden="true"></span></div>
-          <div class="d-flow-view d-flow-view-dark">
+          <div class="d-flow-view d-flow-view-dark d-flow-view-zoom">
             <img src="{{ url_for('static', filename='images/home/layers.webp') }}" alt="The AcademicAR viewer with the Layers panel open" width="960" height="540" loading="lazy" decoding="async">
           </div>
           <p>Layers, sections, measurements and saved scenes.</p>
@@ -137,7 +138,7 @@
           </fieldset>
 
           <div class="d-stage">
-            <p class="d-col-label">Processing <span class="d-col-note">in the background worker</span></p>
+            <p class="d-col-label">Processing <span class="d-col-note">on our servers, while you keep working</span></p>
             <ol class="d-steps" data-steps aria-live="polite">
               {% for step in d_inputs[0].steps %}
               <li class="d-step"><span class="d-node" aria-hidden="true"></span><strong>{{ step[0] }}</strong><span>{{ step[1] }}</span></li>
@@ -149,9 +150,9 @@
             <p class="d-col-label">Output</p>
             <ul class="d-outputs-list">
               <li class="d-output" data-output><span class="d-port d-port-in" aria-hidden="true"></span><strong>Viewer link</strong><span>Any modern browser, no login</span></li>
-              <li class="d-output" data-output><span class="d-port d-port-in" aria-hidden="true"></span><strong>Mobile AR</strong><span>Android WebXR, iOS Quick Look</span></li>
+              <li class="d-output" data-output><span class="d-port d-port-in" aria-hidden="true"></span><strong>Mobile AR</strong><span>iPhone, iPad and Android, from the browser</span></li>
               <li class="d-output" data-output><span class="d-port d-port-in" aria-hidden="true"></span><strong>Stable QR</strong><span>Survives replacements and recolours</span></li>
-              <li class="d-output" data-output><span class="d-port d-port-in" aria-hidden="true"></span><strong>Embed</strong><span>One iframe, settings update everywhere</span></li>
+              <li class="d-output" data-output><span class="d-port d-port-in" aria-hidden="true"></span><strong>Embed</strong><span>The viewer on your lab or course site</span></li>
             </ul>
           </div>
 
@@ -161,7 +162,7 @@
         <dl class="d-readout" data-readout>
           <div><dt>Source</dt><dd data-r="note">{{ d_inputs[0].note }}</dd></div>
           <div><dt>Layers</dt><dd data-r="layers">{{ d_inputs[0].layers }}</dd></div>
-          <div><dt>Medical confirmation</dt><dd data-r="medical">{{ d_inputs[0].medical }}</dd></div>
+          <div><dt>Patient-data check</dt><dd data-r="medical">{{ d_inputs[0].medical }}</dd></div>
           <div><dt>Steps</dt><dd data-r="count">{{ d_inputs[0].steps|length }}</dd></div>
         </dl>
       </div>
@@ -173,7 +174,7 @@
     <div class="d-wrap d-live">
       <div class="d-live-copy">
         <h2 id="d-live-title" class="d-h2">Step 3, live. Turn it.</h2>
-        <p class="d-p">A published AcademicAR model. Drag to orbit; scan the code to place it on your desk.</p>
+        <p class="d-p">A published AcademicAR model. Drag to turn it, or scan the code to place it on your desk.</p>
         <div class="d-live-qr">
           <img src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code that opens the mitochondria model in AR" width="112" height="112" loading="lazy">
           <p>No app needed.<br><a href="{{ url_for('demo_mitochondria_ar', source='home_d_qr') }}">Open the AR page</a></p>
@@ -202,11 +203,11 @@
           <span class="d-scope-cross" aria-hidden="true"></span>
         </div>
         <dl class="d-scope-data">
-          <div><dt>File</dt><dd>GLB, 1.5 MB</dd></div>
-          <div><dt>Compression</dt><dd>Draco + webp</dd></div>
-          <div><dt>Azimuth</dt><dd data-cam="theta">35.0°</dd></div>
-          <div><dt>Elevation</dt><dd data-cam="phi">65.0°</dd></div>
-          <div><dt>AR</dt><dd>iOS and Android</dd></div>
+          <div><dt>Download</dt><dd>1.5 MB</dd></div>
+          <div><dt>Opens in</dt><dd>Any browser</dd></div>
+          <div><dt>App needed</dt><dd>None</dd></div>
+          <div><dt>Account needed</dt><dd>None</dd></div>
+          <div><dt>AR</dt><dd>iPhone, iPad, Android</dd></div>
           <div><dt>Status</dt><dd data-cam="status">Loading</dd></div>
         </dl>
         <figcaption class="d-cap">The same viewer your readers get.</figcaption>
@@ -221,15 +222,15 @@
     ['finishes', 'Finishes and lighting', 'Matte to chrome, saved per model.', 'Free'],
     ['section', 'Section plane', 'Cut through any axis.', 'Free'],
     ['slice', 'Slice view', '2D cross-sections with a measure.', 'Free'],
-    ['measure', 'Measure and label', 'Labels, sizes and distances.', 'Labels free · measurements on paid plans'],
+    ['measure', 'Measure and label', 'Labels, sizes and distances.', 'Labels free, measurements paid'],
     ['scenes', 'Scenes and tours', 'Up to 12 views, each with its own QR.', 'Free'],
     ['figure', 'Figure export', 'PNG with legend, scale bar and QR.', 'Paid plans'],
   ] %}
   <section class="d-sec d-sec-tools" aria-labelledby="d-tools-title">
     <div class="d-wrap">
       <div class="d-sec-head">
-        <h2 id="d-tools-title" class="d-h2">Viewer tools, as specified</h2>
-        <p class="d-p">Pick a row to see it on the monitor. Plans: see <a href="{{ url_for('pricing') }}">pricing</a>.</p>
+        <h2 id="d-tools-title" class="d-h2">What readers can do in the viewer</h2>
+        <p class="d-p">Pick a row to see it on the screen. Plans are on the <a href="{{ url_for('pricing') }}">pricing</a> page.</p>
       </div>
 
       <div class="d-tools" data-tools>
@@ -285,15 +286,15 @@
   <section class="d-sec d-sec-safety" aria-labelledby="d-safety-title">
     <div class="d-wrap d-safety">
       <div>
-        <h2 id="d-safety-title" class="d-h2">Interlocks for patient-derived data</h2>
-        <p class="d-p">Built into the upload flow, not left to a setting.</p>
+        <h2 id="d-safety-title" class="d-h2">Safeguards for patient scans</h2>
+        <p class="d-p">Part of every upload. You can't switch them off.</p>
         <a class="d-text-link" href="{{ url_for('blog_post', slug='dicom-to-3d-model-guide') }}">Read the DICOM to 3D guide</a>
       </div>
       <ul class="d-locks">
         <li><span class="d-lock" aria-hidden="true"></span><div><strong>Confirmation on every upload</strong><span>Anonymisation, rights and ethics, with an audit record.</span></div></li>
         <li><span class="d-lock" aria-hidden="true"></span><div><strong>An extra check for scans</strong><span>A second confirmation for DICOM and segmentations.</span></div></li>
         <li><span class="d-lock" aria-hidden="true"></span><div><strong>Raw scan deleted</strong><span>Removed after conversion; never archived or mirrored.</span></div></li>
-        <li><span class="d-lock" aria-hidden="true"></span><div><strong>No identifiers in logs</strong><span>For education and presentation, not diagnosis.</span></div></li>
+        <li><span class="d-lock" aria-hidden="true"></span><div><strong>No patient details in logs</strong><span>For teaching and presentation, not diagnosis.</span></div></li>
       </ul>
     </div>
   </section>
@@ -332,16 +333,35 @@
     </div>
   </section>
 
-  <!-- ============================ FIELDS + GUIDES ============================ -->
-  <section class="d-sec" aria-labelledby="d-fields-title">
+  <!-- ============================ REAL DEMOS ============================ -->
+  <section class="d-sec" aria-labelledby="d-demos-title">
     <div class="d-wrap">
       <div class="d-sec-head">
-        <h2 id="d-fields-title" class="d-h2">Calibrated for your field</h2>
+        <h2 id="d-demos-title" class="d-h2">Try it before you sign up</h2>
+        <p class="d-p">Real pages from the product, open to everyone.</p>
       </div>
-      <ul class="d-fields">
-        {% for d in disciplines %}
-        <li><a href="{{ url_for('ar_for', discipline=d.slug) }}"><strong>{{ d.name }}</strong></a></li>
-        {% endfor %}
+      <ul class="d-demos">
+        <li>
+          <a href="{{ url_for('demo_mitochondria_ar', source='home_d_demos') }}">
+            <strong>A published model</strong>
+            <span>The mitochondrion from this page, with its AR view and QR code.</span>
+            <em>Open the model</em>
+          </a>
+        </li>
+        <li>
+          <a href="{{ url_for('demo_dashboard', source='home_d_demos') }}">
+            <strong>The researcher dashboard</strong>
+            <span>Projects, uploads, QR codes and access dates, with sample data.</span>
+            <em>Open the dashboard</em>
+          </a>
+        </li>
+        <li>
+          <a href="{{ url_for('demo_institution', source='home_d_demos') }}">
+            <strong>The institution panel</strong>
+            <span>Members, quota and funded models, with sample data.</span>
+            <em>Open the panel</em>
+          </a>
+        </li>
       </ul>
 
       {% if posts %}
@@ -360,6 +380,11 @@
         {% endfor %}
       </ul>
       {% endif %}
+
+      <p class="d-fields-line">
+        <span>Guides by field:</span>
+        {% for d in disciplines %}<a href="{{ url_for('ar_for', discipline=d.slug) }}">{{ d.name }}</a>{% endfor %}
+      </p>
     </div>
   </section>
 

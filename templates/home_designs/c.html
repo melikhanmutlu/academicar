@@ -53,12 +53,13 @@
   </div>
 
   <div class="c-stage-copy">
-    <h1 id="c-hero-title" class="c-hero-title">Put your 3D research on a live stage</h1>
-    <p class="c-hero-lead">Readers rotate, cut, measure and place your model in AR from a link or a QR code.</p>
+    <h1 id="c-hero-title" class="c-hero-title">A live 3D figure for every paper, poster and slide</h1>
+    <p class="c-hero-lead">Upload a 3D model or a CT/MR scan. Readers rotate, cut and measure it in the browser, or scan its QR code to place it in AR.</p>
     <div class="c-hero-actions">
       <a href="{{ url_for('auth.register') }}" class="c-btn c-btn-light">Start publishing</a>
       <a href="{{ url_for('demo_mitochondria_ar', source='home_c_hero') }}" class="c-btn c-btn-ghost">Open the example</a>
     </div>
+    <p class="c-hero-price">Free to start. Pay per model only when it needs to stay online.</p>
   </div>
 
   <nav class="c-rail" aria-label="What the viewer does">
@@ -74,14 +75,26 @@
 
   <div class="c-stage-meta">
     <p class="c-stage-note" aria-live="polite"><span data-stage-label>Orbit</span><span data-stage-note>Rotate, zoom and pan in any browser</span></p>
-    <p class="c-stage-hint">Live model: drag to rotate</p>
   </div>
 
   <a href="{{ url_for('demo_mitochondria_ar', source='home_c_qr') }}" class="c-stage-qr" title="Scan to view in AR">
     <img src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code that opens this model in AR" width="64" height="64">
     <span>Scan for AR</span>
   </a>
+
+  <ol class="c-hero-steps" aria-label="How it works">
+    {% for title, text in [
+      ('Make the model', 'From a CT/MR scan, CAD or a scanner'),
+      ('Upload it', 'Converted for the web and AR'),
+      ('Explore it', 'Layers, sections and measurements'),
+      ('Add the QR', 'On the paper, poster or slide')
+    ] %}
+    <li><a href="#c-flow-title"><span class="c-hero-step-num">{{ loop.index }}</span><span class="c-hero-step-title">{{ title }}</span><span class="c-hero-step-text">{{ text }}</span></a></li>
+    {% endfor %}
+  </ol>
 </section>
+
+<div class="c-light">
 
 <!-- ============================= FLOW: FOUR STEPS ============================= -->
 <section class="c-flow" data-flow aria-labelledby="c-flow-title">
@@ -119,7 +132,7 @@
         <p>Any common 3D format or a CT/MR series. Converted for web and AR.</p>
       </li>
       <li class="c-flow-step" style="--i: 2;">
-        <figure class="c-flow-frame">
+        <figure class="c-flow-frame c-flow-zoom">
           <video class="c-clip-video" muted playsinline loop preload="none" data-autoplay
                  poster="{{ url_for('static', filename='images/home/layers.webp') }}"
                  width="960" height="540" aria-label="Layers in the AcademicAR viewer">
@@ -152,11 +165,17 @@
 </section>
 
 <!-- ============================= FEATURE REEL (signature) ============================= -->
-<section class="c-reel" data-reel style="--c-panels: {{ reel|length }};" aria-labelledby="c-reel-title">
-  <div class="c-reel-sticky">
+<section class="c-reel" data-reel aria-labelledby="c-reel-title">
+  <div class="c-reel-inner">
     <div class="c-reel-head">
-      <h2 id="c-reel-title" class="c-h2">Every tool of the viewer, in motion</h2>
-      <p class="c-sub">Recorded in the AcademicAR viewer.</p>
+      <div>
+        <h2 id="c-reel-title" class="c-h2">What readers can do with it</h2>
+        <p class="c-sub">Clips recorded in the AcademicAR viewer.</p>
+      </div>
+      <div class="c-reel-nav">
+        <button type="button" class="c-reel-arrow" data-reel-prev aria-label="Previous clips"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <button type="button" class="c-reel-arrow" data-reel-next aria-label="Next clips"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      </div>
     </div>
     <div class="c-reel-window" data-reel-window tabindex="0" role="region" aria-label="Viewer tool clips">
       <ol class="c-reel-track" data-reel-track>
@@ -176,9 +195,6 @@
         </li>
         {% endfor %}
       </ol>
-    </div>
-    <div class="c-reel-progress" aria-hidden="true">
-      {% for key, title, text, tag in reel %}<span data-reel-dot>{{ title }}</span>{% endfor %}
     </div>
   </div>
 </section>
@@ -205,10 +221,10 @@
   <div class="c-wrap">
     <div class="c-showreel-head">
       <h2 id="c-showreel-title" class="c-h2">The whole viewer in one minute</h2>
-      <p class="c-sub">With sound. Loads when you press play.</p>
+      <p class="c-sub">With sound. It loads when you press play.</p>
     </div>
     <div class="c-showreel-frame" data-launch-video>
-      <img class="c-showreel-poster" src="{{ url_for('static', filename='images/showreel-poster.webp') }}" alt="AcademicAR showreel: a 3D model orbiting in the viewer" loading="lazy" decoding="async" width="1600" height="900">
+      <img class="c-showreel-poster" src="{{ url_for('static', filename='images/home/reel/poster-scan.webp') }}" alt="A frame from the AcademicAR showreel: a phone scanning a QR code, with the words No app. Just scan." loading="lazy" decoding="async" width="1600" height="900">
       <video class="c-showreel-video" preload="none" playsinline width="1920" height="1080" hidden>
         <source src="{{ url_for('static', filename='videos/academicar-showreel.mp4') }}" type="video/mp4">
       </video>
@@ -220,15 +236,42 @@
   </div>
 </section>
 
-<!-- ============================= INSTITUTIONS (light band) ============================= -->
+<!-- ============================= TRY IT: real demos ============================= -->
+<section class="c-try" aria-labelledby="c-try-title">
+  <div class="c-wrap">
+    <h2 id="c-try-title" class="c-h2">Try it before you upload</h2>
+    <ul class="c-try-list">
+      <li>
+        <a class="c-try-item" href="{{ url_for('demo_mitochondria_ar', source='home_c') }}">
+          <img class="c-try-qr" src="{{ url_for('demo_mitochondria_qr') }}" alt="" width="88" height="88" loading="lazy">
+          <span class="c-try-body"><strong>Open a published model</strong><span>A mitochondrion in the viewer and in AR. Scan the code with your phone.</span></span>
+        </a>
+      </li>
+      <li>
+        <a class="c-try-item" href="{{ url_for('demo_dashboard', source='home_c') }}">
+          <span class="c-try-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18v16H3z"/><path d="M3 9h18"/><path d="M8 9v11"/></svg></span>
+          <span class="c-try-body"><strong>Look around a researcher dashboard</strong><span>Projects, models, QR codes and plans, with sample data. No account needed.</span></span>
+        </a>
+      </li>
+      <li>
+        <a class="c-try-item" href="{{ url_for('demo_institution', source='home_c') }}">
+          <span class="c-try-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l9-6 9 6"/><path d="M5 10v9M19 10v9M9 10v9M15 10v9"/><path d="M3 20h18"/></svg></span>
+          <span class="c-try-body"><strong>See the institution panel</strong><span>Quota, members and funded models, as a department admin sees them.</span></span>
+        </a>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================= INSTITUTIONS ============================= -->
 <section class="c-inst" aria-labelledby="c-inst-title">
   <div class="c-wrap c-inst-grid">
     <div>
       <h2 id="c-inst-title" class="c-h2">For departments, labs and libraries</h2>
       <p class="c-inst-lead">One contract covers your members' models for as long as it runs.</p>
       <div class="c-hero-actions">
-        <a href="{{ url_for('institutional_inquiry') }}" class="c-btn c-btn-dark">Talk to us</a>
-        <a href="{{ url_for('demo_institution', source='home_c') }}" class="c-btn c-btn-ghost-dark">See the institution dashboard</a>
+        <a href="{{ url_for('institutional_inquiry') }}#inquiry" class="c-btn c-btn-dark">Talk to us</a>
+        <a href="{{ url_for('institutional_inquiry') }}#how-it-works" class="c-btn c-btn-ghost-dark">How contracts work</a>
       </div>
     </div>
     <ul class="c-inst-list">
@@ -236,25 +279,6 @@
       <li><strong>Invite links</strong><span>Optionally limited to your email domain.</span></li>
       <li><strong>Public showcase</strong><span>Your models on one page, with credit in every viewer.</span></li>
       <li><strong>Monthly reports</strong><span>Usage for admins, and a renewal reminder.</span></li>
-    </ul>
-  </div>
-</section>
-
-<!-- ============================= DISCIPLINES ============================= -->
-<section class="c-fields" aria-labelledby="c-fields-title">
-  <div class="c-wrap">
-    <div class="c-fields-head">
-      <h2 id="c-fields-title" class="c-h2">Made for fields that think in three dimensions</h2>
-      <a href="{{ url_for('ar_for_index') }}" class="c-link">All use cases</a>
-    </div>
-    <ul class="c-fields-list">
-      {% for d in disciplines %}
-      <li>
-        <a href="{{ url_for('ar_for', discipline=d.slug) }}">
-          <span class="c-field-name">{{ d.name }}</span>
-        </a>
-      </li>
-      {% endfor %}
     </ul>
   </div>
 </section>
@@ -289,16 +313,25 @@
 </section>
 {% endif %}
 
+<section class="c-fields" aria-label="Use cases by field">
+  <div class="c-wrap">
+    <p class="c-fields-line">
+      <span>By field:</span>
+      {% for d in disciplines %}<a href="{{ url_for('ar_for', discipline=d.slug) }}">{{ d.name }}</a>{% endfor %}
+    </p>
+  </div>
+</section>
+</div>
+
 <!-- ============================= CLOSING CTA ============================= -->
 <section class="c-end" aria-labelledby="c-end-title">
   <div class="c-end-word" aria-hidden="true">Explore</div>
   <div class="c-wrap c-end-inner">
     <h2 id="c-end-title" class="c-display c-end-title">Make every 3D project explorable</h2>
-    <p class="c-lead">Free for three days. An Academic licence keeps a model online for three years.</p>
+    <p class="c-lead">Start free. An Academic licence keeps a model online for {{ access_window_label(license_plans['academic'].duration_days) if license_plans.get('academic') else '3 years' }}.</p>
     <div class="c-hero-actions c-end-actions">
       <a href="{{ url_for('auth.register') }}" class="c-btn c-btn-light">Start publishing</a>
       <a href="{{ url_for('pricing') }}" class="c-btn c-btn-ghost">See pricing</a>
-      <a href="{{ url_for('demo_dashboard', source='home_c') }}" class="c-btn c-btn-ghost">Try the researcher dashboard</a>
     </div>
   </div>
 </section>
