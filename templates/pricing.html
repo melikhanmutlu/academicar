@@ -165,7 +165,7 @@
     <a href="{{ url_for('institutional_inquiry') }}" class="pr-btn is-solid">See institutional plans</a>
   </section>
 
-  <section class="pr-faq" aria-labelledby="pr-faq-title">
+  <section class="pr-faq" aria-labelledby="pr-faq-title" data-smooth-details>
     <h2 id="pr-faq-title">Common questions</h2>
     <details>
       <summary>Is this a subscription?</summary>
@@ -185,4 +185,8 @@
     </details>
   </section>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/smooth-details.js', v=asset_version) }}" defer></script>
 {% endblock %}
