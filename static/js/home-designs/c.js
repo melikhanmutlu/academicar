@@ -1,4 +1,4 @@
-// Design C · Sahne: stage word + rail, stage parallax, pinned feature reel,
+// Design C · Sahne: stage word + rail, stage parallax, four-step flow, pinned feature reel,
 // in-view clip playback, monitor tilt, click-to-play showreel.
 (() => {
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -138,6 +138,16 @@
       });
     }, { threshold: 0.55 });
     clips.forEach((v) => io.observe(v));
+  }
+
+  /* ---------- Flow: the four steps light up in order once ---------- */
+  const flow = document.querySelector('[data-flow]');
+  if (flow && !reduceMotion && 'IntersectionObserver' in window) {
+    flow.classList.add('is-armed');
+    const fio = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) { flow.classList.add('is-in'); fio.disconnect(); }
+    }, { threshold: 0.3 });
+    fio.observe(flow);
   }
 
   /* ---------- Monitor flattens as it scrolls into view ---------- */

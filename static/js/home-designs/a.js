@@ -113,6 +113,23 @@
     setTimeout(layoutLeaders, 600);
   }
 
+  /* ---------------- Route: draw the four-step line once it is in view ---------------- */
+  const route = document.querySelector('[data-a-route]');
+  if (route) {
+    const list = route.querySelector('.a-route-list');
+    const visual = route.querySelector('.a-route-visual');
+    const placeLine = () => { if (visual) list.style.setProperty('--a-route-vis', visual.offsetHeight + 'px'); };
+    placeLine();
+    window.addEventListener('resize', placeLine);
+    if (!reduceMotion && 'IntersectionObserver' in window) {
+      route.classList.add('is-armed');
+      const ro = new IntersectionObserver((entries) => {
+        if (entries.some((e) => e.isIntersecting)) { route.classList.add('is-in'); ro.disconnect(); }
+      }, { threshold: 0.3 });
+      ro.observe(list);
+    }
+  }
+
   /* ---------------- Clips: play only while visible ---------------- */
   const clipObserver = 'IntersectionObserver' in window ? new IntersectionObserver((entries) => {
     entries.forEach((entry) => {

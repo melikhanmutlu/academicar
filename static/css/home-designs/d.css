@@ -479,3 +479,143 @@
   .d-field-uses { display: none; }
 }
 .d-step.is-lit .d-node, .d-step.is-done.is-lit .d-node { background: var(--d-orange); border-color: var(--d-orange); }
+
+/* ---------- Round 3: the four-step flow ---------- */
+.d-flow {
+  list-style: none; margin: 0 0 28px; padding: 0;
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px;
+  counter-reset: none;
+}
+.d-flow-stage {
+  position: relative;
+  background: var(--d-white);
+  border: 1px solid var(--d-line);
+  border-radius: 8px;
+  padding: 14px 14px 16px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+/* wire between stages, with a packet running along it */
+.d-flow-stage:not(:last-child)::after {
+  content: "";
+  position: absolute; top: 25px; left: 100%;
+  width: 28px; height: 1.5px;
+  background: var(--d-ink);
+}
+.d-flow-stage:not(:last-child)::before {
+  content: "";
+  position: absolute; top: 22px; left: calc(100% + 2px);
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--d-orange);
+  z-index: 1;
+  animation: d-flow-packet 6s linear infinite;
+  animation-delay: calc(var(--i, 0) * 1.5s + 1.1s);
+  opacity: 0;
+}
+@keyframes d-flow-packet {
+  0% { opacity: 1; transform: translateX(0); }
+  6% { opacity: 1; transform: translateX(16px); }
+  7%, 100% { opacity: 0; transform: translateX(16px); }
+}
+.d-flow-stage:nth-child(1) { --i: 0; }
+.d-flow-stage:nth-child(2) { --i: 1; }
+.d-flow-stage:nth-child(3) { --i: 2; }
+.d-flow-stage:nth-child(4) { --i: 3; }
+.d-flow-head { display: flex; align-items: center; gap: 10px; font-size: 15px; line-height: 1.2; }
+.d-flow-head strong { font-weight: 600; flex: 1; }
+.d-flow-num {
+  width: 24px; height: 24px; flex: none;
+  display: inline-grid; place-items: center;
+  border-radius: 50%; border: 1.5px solid var(--d-ink);
+  font: 600 12px/1 var(--d-body);
+}
+.d-flow-head .d-led { background: #cfcfcf; box-shadow: none; animation: d-flow-led 6s linear infinite; animation-delay: calc(var(--i, 0) * 1.5s); }
+@keyframes d-flow-led {
+  0%, 22% { background: var(--d-orange); box-shadow: 0 0 0 3px rgba(255, 104, 44, 0.18); }
+  26%, 100% { background: #cfcfcf; box-shadow: none; }
+}
+.d-flow-stage p { margin: 0; font-size: 14px; line-height: 1.45; color: var(--d-shale); }
+.d-flow-view {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--d-cloud);
+  border: 1px solid var(--d-pearl);
+}
+.d-flow-view img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.d-flow-view-make { background: #fff; }
+.d-flow-view-make img { object-fit: contain; }
+.d-flow-view-dark { background: #1b1b1b; border-color: #1b1b1b; }
+
+/* stage 2: upload drop zone */
+.d-flow-view-upload { display: flex; flex-direction: column; justify-content: center; gap: 10px; padding: 12px; background: var(--d-white); }
+.d-drop {
+  border: 1.5px dashed #c8c8c8; border-radius: 6px;
+  padding: 12px; display: grid; gap: 8px; background: var(--d-cloud);
+}
+.d-drop-file { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 500; min-width: 0; white-space: nowrap; }
+.d-drop-file em { font-style: normal; color: var(--d-ash); margin-left: auto; font-weight: 400; }
+.d-drop-ext { font-size: 10px; font-weight: 700; color: #fff; background: var(--d-ink); border-radius: 4px; padding: 3px 5px; }
+.d-drop-bar { height: 4px; border-radius: 4px; background: var(--d-pearl); overflow: hidden; }
+.d-drop-bar span { display: block; height: 100%; width: 100%; background: var(--d-gold); transform-origin: left; animation: d-drop-fill 6s ease-out infinite; animation-delay: 1.5s; }
+@keyframes d-drop-fill { 0% { transform: scaleX(0.05); } 18%, 100% { transform: scaleX(1); } }
+.d-drop-done { font-size: 12px; font-weight: 600; color: var(--d-gold); }
+.d-drop-formats { font-size: 11px; color: var(--d-ash); text-align: center; letter-spacing: 0.01em; }
+
+/* stage 4: a printed sheet with the real QR */
+.d-flow-view-qr { background: #e9e9e9; display: grid; place-items: center; }
+.d-sheet {
+  position: absolute; left: 14%; top: 10%; width: 72%; height: 100%;
+  background: #fff; border-radius: 2px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 6px 18px rgba(0,0,0,.08);
+  padding: 9% 9%; display: flex; flex-direction: column; gap: 6px;
+  transform: rotate(-2deg);
+}
+.d-sheet span { display: block; background: #dcdcdc; border-radius: 2px; height: 5px; }
+.d-sheet .d-sheet-title { background: var(--d-ink); height: 7px; width: 70%; }
+.d-sheet .d-sheet-short { width: 55%; }
+.d-sheet .d-sheet-fig { height: 38%; width: 58%; background: #f0e3d9; margin-top: 4px; }
+.d-sheet-qr {
+  position: absolute; right: 18%; bottom: 10%;
+  width: 30% !important; height: auto !important; aspect-ratio: 1;
+  background: #fff; padding: 3px; border-radius: 3px;
+  transform: rotate(-2deg);
+  object-fit: contain !important;
+  box-shadow: 0 0 0 2px var(--d-orange);
+}
+
+@media (max-width: 1100px) {
+  .d-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .d-flow-stage:nth-child(2)::after, .d-flow-stage:nth-child(2)::before { display: none; }
+}
+@media (max-width: 900px) {
+  .d-flow { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .d-flow-stage {
+    display: grid;
+    grid-template-columns: 128px minmax(0, 1fr);
+    grid-template-areas: "view head" "view text";
+    column-gap: 14px; row-gap: 6px; align-items: start;
+    padding: 12px;
+  }
+  .d-flow-head { grid-area: head; font-size: 15px; }
+  .d-flow-view { grid-area: view; }
+  .d-flow-stage p { grid-area: text; font-size: 13.5px; }
+  .d-flow-stage:not(:last-child)::after { top: 100%; left: 76px; width: 1.5px; height: 12px; display: block !important; }
+  .d-flow-stage:not(:last-child)::before { display: none !important; }
+  .d-flow-view-upload { padding: 6px; gap: 4px; }
+  .d-drop { padding: 6px; gap: 5px; }
+  .d-drop-file { font-size: 10px; gap: 5px; }
+  .d-drop-file em, .d-drop-formats { display: none; }
+  .d-drop-ext { font-size: 8px; padding: 2px 3px; }
+  .d-drop-done { font-size: 9.5px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .d-flow-stage::before { display: none !important; }
+  .d-flow-head .d-led, .d-drop-bar span { animation: none !important; }
+  .d-flow-head .d-led { background: var(--d-orange); }
+}
+.d-h1 { max-width: none; font-size: clamp(36px, 4.2vw, 58px); }
+@media (min-width: 901px) { .d-hero-head { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); } }
+.d-drop-file { overflow: hidden; }
+.d-drop-name { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.d-cta { grid-template-columns: minmax(0, 1fr); }

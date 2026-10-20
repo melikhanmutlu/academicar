@@ -21,7 +21,7 @@
     <div class="b-row b-titleblock">
       <div class="b-main">
         <h1 id="b-title" class="b-title">Interactive 3D figures for every paper, poster and thesis</h1>
-        <p class="b-byline">For researchers, educators and institutions who publish work in three dimensions.</p>
+        <p class="b-byline">Make a model, upload it, let readers explore it, print the QR code.</p>
         <div class="b-actions">
           <a href="{{ url_for('auth.register') }}" class="b-btn b-btn-dark">Start publishing</a>
           <a href="{{ url_for('demo_mitochondria_ar', source='home_b') }}" class="b-btn b-btn-ghost">Open the AR example</a>
@@ -29,9 +29,70 @@
       </div>
       <aside class="b-side b-abstract" aria-label="Abstract">
         <h2 class="b-abstract-label">Abstract</h2>
-        <p>Upload a GLB, STL, OBJ, FBX or STEP file, or a CT/MR scan, and AcademicAR returns a browser-based 3D viewer, a mobile AR view and a stable QR code. Readers need no app and no account.</p>
+        <p>Upload a 3D file or a CT/MR scan. You get a browser viewer, mobile AR and a stable QR code. Readers need no app and no account.</p>
       </aside>
     </div>
+
+
+    <!-- Graphical abstract: the four-step flow -->
+    <figure class="b-fig b-flow" aria-labelledby="b-flow-cap">
+      <ol class="b-flow-steps">
+        <li class="b-flow-step">
+          <div class="b-flow-vis b-flow-vis-make">
+            <img src="{{ url_for('static', filename='images/blog/covers/3d-slicer-export-share.webp') }}" alt="A stack of CT slices turned into a 3D kidney model" width="1600" height="800" loading="lazy" decoding="async">
+            <ul class="b-flow-sources" aria-label="Typical sources">
+              <li>3D Slicer</li><li>CAD</li><li>Scanner</li><li>Blender</li>
+            </ul>
+          </div>
+          <h3><span class="b-flow-num">1</span>Make the model</h3>
+          <p>Segment a scan, export a CAD part or scan an object.</p>
+        </li>
+        <li class="b-flow-step">
+          <div class="b-flow-vis b-flow-vis-upload" aria-hidden="true">
+            <div class="b-drop">
+              <div class="b-drop-file">
+                <span class="b-drop-icon">GLB</span>
+                <span class="b-drop-name">mitochondria.glb<small>1.5 MB</small></span>
+              </div>
+              <span class="b-drop-bar"><span></span></span>
+              <span class="b-drop-done"><svg viewBox="0 0 16 16" width="14" height="14"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Converted to GLB + USDZ</span>
+              <span class="b-drop-formats">GLB · STL · OBJ · FBX · STEP · DICOM ZIP · NIfTI</span>
+            </div>
+          </div>
+          <h3><span class="b-flow-num">2</span>Upload it</h3>
+          <p>Drop the file in. Conversion runs on its own.</p>
+        </li>
+        <li class="b-flow-step">
+          <div class="b-flow-vis b-flow-vis-view">
+            <video class="b-clip" muted playsinline loop preload="none"
+                   poster="{{ url_for('static', filename='images/home/layers.webp') }}"
+                   aria-label="The viewer's Layers panel recolouring parts of a bone model" width="960" height="540">
+              <source src="{{ url_for('static', filename='videos/home/layers.mp4') }}" type="video/mp4">
+            </video>
+          </div>
+          <h3><span class="b-flow-num">3</span>Explore it in the viewer</h3>
+          <p>Rotate, cut, measure and label in any browser.</p>
+        </li>
+        <li class="b-flow-step">
+          <div class="b-flow-vis b-flow-vis-qr">
+            <div class="b-poster" aria-hidden="true">
+              <span class="b-poster-title"></span>
+              <span class="b-poster-title b-poster-title-short"></span>
+              <span class="b-poster-cols"><span></span><span></span></span>
+              <span class="b-poster-fig"></span>
+            </div>
+            <a class="b-poster-qr" href="{{ url_for('demo_mitochondria_ar', source='home_b_flow') }}">
+              <img src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code that opens the demo model in AR" width="96" height="96" loading="lazy">
+            </a>
+          </div>
+          <h3><span class="b-flow-num">4</span>Add the QR code</h3>
+          <p>Print it on the poster, slide or paper. The link stays stable.</p>
+        </li>
+      </ol>
+      <figcaption id="b-flow-cap" class="b-caption">
+        <strong>Graphical abstract.</strong> From a model on your computer to a QR code your readers scan.
+      </figcaption>
+    </figure>
 
     <!-- Fig. 1: printed vs live (signature moment) -->
     <figure class="b-fig b-fig-wide b-fig1" aria-labelledby="b-fig1-cap">
@@ -73,13 +134,13 @@
         </div>
       </div>
       <figcaption id="b-fig1-cap" class="b-caption">
-        <strong>Fig. 1.</strong> The same mitochondrion as a printed figure (left) and as a live model (right). Drag the divider, then rotate the model. On a phone, the QR code opens it in augmented reality on your desk.
+        <strong>Fig. 1.</strong> The same mitochondrion, printed (left) and live (right). Drag the divider, then rotate the model.
       </figcaption>
       <aside class="b-fig1-qr">
         <a href="{{ url_for('demo_mitochondria_ar', source='home_b_qr') }}">
           <img src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code that opens the mitochondrion in AR" width="112" height="112" loading="lazy">
         </a>
-        <p>Scan to place this model in AR. Works in the phone's browser.</p>
+        <p>Scan to place it on your desk in AR.</p>
       </aside>
     </figure>
 
@@ -94,11 +155,10 @@
       <h2 id="b-s1" class="b-h2"><span class="b-num">1</span>Introduction</h2>
       <div class="b-row">
         <div class="b-main b-prose">
-          <p>Most three-dimensional research still reaches its readers as a flat screenshot. A segmented heart, a fossil scan or a gearbox assembly is rotated once in specialist software, captured at a single angle and pasted into a PDF. Depth, scale and the relationship between parts are left for the reader to imagine.<sup class="b-ref">1</sup></p>
-          <p>When the original files are shared at all, they sit in a supplementary archive that needs the right application to open, and the link tends to break when a repository moves. We built AcademicAR so the model itself can travel with the work: one link, one QR code, opened in any modern browser.</p>
+          <p>Most 3D research still reaches readers as a flat screenshot, captured at one angle and pasted into a PDF. Depth, scale and the relation between parts are left to the imagination.<sup class="b-ref">1</sup> AcademicAR lets the model itself travel with the work.</p>
         </div>
         <aside class="b-side b-note" data-parallax="0.35">
-          <p><span class="b-note-num">1</span>Static figures show one angle. Readers cannot check a structure from behind, cut through it or measure it.</p>
+          <p><span class="b-note-num">1</span>A static figure cannot be turned, cut or measured.</p>
         </aside>
       </div>
     </section>
@@ -108,26 +168,16 @@
       <h2 id="b-s2" class="b-h2"><span class="b-num">2</span>Methods</h2>
       <div class="b-row">
         <div class="b-main b-prose">
-          <h3 class="b-h3"><span class="b-num-sm">2.1</span>Upload</h3>
-          <p>Add a model to a project and confirm that it is anonymised, that you hold the rights and that ethics responsibilities are met. Medical scans ask for one more confirmation, and the raw scan is deleted once conversion finishes.<sup class="b-ref">2</sup></p>
-
-          <h3 class="b-h3"><span class="b-num-sm">2.2</span>Conversion</h3>
-          <p>A background worker converts every input to an optimised GLB with compressed geometry, builds a USDZ companion for iPhone AR, and keeps multi-part models as named layers. CT and MR series are thresholded with presets or your own Hounsfield range.</p>
-
-          <h3 class="b-h3"><span class="b-num-sm">2.3</span>Stable link and QR code</h3>
-          <p>Each model gets a short resolver link and a QR code. Replace the file, rescale it or change its colours and the printed code keeps pointing at the current version.</p>
-
-          <h3 class="b-h3"><span class="b-num-sm">2.4</span>Sharing</h3>
-          <p>Keep a model private while you work, send a review link to co-authors or examiners, or make it public when the paper is out.</p>
+          <p>A background worker turns every input into a compressed GLB with a USDZ companion for iPhone AR. Multi-part models keep one named layer per part or structure.<sup class="b-ref">2</sup></p>
         </div>
         <aside class="b-side b-note" data-parallax="0.35">
-          <p><span class="b-note-num">2</span>Compliance confirmation is mandatory for every upload and replacement. Patient identifiers are never logged.</p>
+          <p><span class="b-note-num">2</span>Medical scans need an extra confirmation, and the raw scan is deleted after conversion.</p>
         </aside>
       </div>
 
       <div class="b-tablewrap">
         <table class="b-table">
-          <caption><strong>Table 1.</strong> Inputs AcademicAR converts to a web and AR model.</caption>
+          <caption><strong>Table 1.</strong> Supported inputs.</caption>
           <thead>
             <tr><th scope="col">Input</th><th scope="col">Typical source</th><th scope="col">What you get</th></tr>
           </thead>
@@ -147,7 +197,7 @@
       <h2 id="b-s3" class="b-h2"><span class="b-num">3</span>Results</h2>
       <div class="b-row">
         <div class="b-main b-prose">
-          <p>The viewer gives readers the tools they would otherwise need desktop software for. Every tool runs in the browser, and owners can save what a reader should see first as a named scene.</p>
+          <p>Readers get tools that used to need desktop software, in the browser.</p>
         </div>
       </div>
 
@@ -172,13 +222,8 @@
           {% endfor %}
         </div>
         <figcaption id="b-fig2-cap" class="b-caption">
-          <strong>Fig. 2.</strong> Viewer tools, recorded in the product.<span class="b-swipe-hint"> Swipe for all six panels.</span>
-          <b>(a)</b> Layers: show, hide, recolour or X-ray each part.
-          <b>(b)</b> Section plane through any axis.
-          <b>(c)</b> Slice view with 2D cross-sections and a snapping measure.
-          <b>(d)</b> Measurements and labels on the surface.
-          <b>(e)</b> Saved scenes and guided tours, each with its own link and QR code.
-          <b>(f)</b> Figure export with a legend, scale bar and QR card.
+          <strong>Fig. 2.</strong> Viewer tools, recorded in the product.<span class="b-swipe-hint"> Swipe for all six.</span>
+          <b>(a)</b> Layers. <b>(b)</b> Section plane. <b>(c)</b> Slice view. <b>(d)</b> Measure and label. <b>(e)</b> Saved scenes and tours. <b>(f)</b> Figure export.
         </figcaption>
       </figure>
 
@@ -187,7 +232,7 @@
           <img class="b-shot" src="{{ url_for('static', filename='images/home/b/slice-panels.webp') }}" alt="Three cross-section panels from the viewer's slice view: axial, coronal and sagittal outlines of a bone, each with a scale bar" width="1440" height="338" loading="lazy" decoding="async">
         </div>
         <figcaption id="b-fig3-cap" class="b-caption">
-          <strong>Fig. 3.</strong> Slice view, as it appears under the 3D model in the viewer.<span class="b-swipe-hint"> Scroll sideways for all three planes.</span> Axial, coronal and sagittal cross-sections follow the scan's patient orientation, carry their own scale bars and take a snapping two-point measure.
+          <strong>Fig. 3.</strong> Axial, coronal and sagittal cross-sections with scale bars, under the 3D model.<span class="b-swipe-hint"> Scroll sideways for all three.</span>
         </figcaption>
       </figure>
 
@@ -205,7 +250,7 @@
         </div>
         </div>
         <figcaption id="b-s1-cap" class="b-caption b-side">
-          <strong>Supplementary video S1.</strong> Every viewer tool in sixty seconds, with sound.
+          <strong>Video S1.</strong> Every viewer tool in one minute.
         </figcaption>
       </figure>
     </section>
@@ -218,19 +263,19 @@
           <dl class="b-avail">
             <div>
               <dt>Readers</dt>
-              <dd>Open the viewer from a link or a QR code on a poster, slide or thesis page. Augmented reality works on recent iPhones, iPads and Android phones without an app, through iOS Quick Look and WebXR.</dd>
+              <dd>A link or QR code opens the viewer. AR works on recent iPhones, iPads and Android phones, no app needed.</dd>
             </div>
             <div>
               <dt>Websites</dt>
-              <dd>Embed the viewer on a lab page, course site or online article. <a href="{{ url_for('blog_post', slug='embed-3d-model-website') }}">How embedding works</a></dd>
+              <dd>Embed the viewer on a lab page or course site. <a href="{{ url_for('blog_post', slug='embed-3d-model-website') }}">How embedding works</a></dd>
             </div>
             <div>
               <dt>Institutions</dt>
-              <dd>Universities and departments fund their members' models from a shared quota, invite people by link, manage them from an institution panel and get a public showcase page. <a href="{{ url_for('demo_institution', source='home_b') }}">See the institution dashboard</a></dd>
+              <dd>A shared quota for members, invite links and a public showcase page. <a href="{{ url_for('demo_institution', source='home_b') }}">See the institution dashboard</a></dd>
             </div>
             <div>
               <dt>Licensing</dt>
-              <dd>Plans are per model, so each model carries its own access period and storage. Start on the free plan and upgrade only the models that need it. <a href="{{ url_for('pricing') }}">Compare plans</a></dd>
+              <dd>Plans are per model. Start free and upgrade only the models that need it. <a href="{{ url_for('pricing') }}">Compare plans</a></dd>
             </div>
           </dl>
         </div>
@@ -239,7 +284,7 @@
             <source srcset="{{ url_for('static', filename='images/ar-phone-mockup.webp') }}" type="image/webp">
             <img src="{{ url_for('static', filename='images/ar-phone-mockup.png') }}" alt="A mitochondrion model placed in augmented reality on a desk, seen through a phone" width="941" height="1672" loading="lazy" decoding="async">
           </picture>
-          <p class="b-caption"><strong>Fig. 4.</strong> The model from Fig. 1, placed on a desk with a phone's camera.</p>
+          <p class="b-caption"><strong>Fig. 4.</strong> Fig. 1's model in AR on a desk.</p>
         </aside>
       </div>
     </section>
@@ -267,7 +312,7 @@
       <h2 id="b-ack" class="b-h2">Acknowledgements</h2>
       <div class="b-row">
         <div class="b-main b-prose">
-          <p>This page was set in a browser, with a live figure. Your next paper can be too. Create an account, upload a model and print the QR code on your poster before the conference.</p>
+          <p>Your next paper can carry a live figure too. Upload a model and print its QR code before the conference.</p>
           <div class="b-actions">
             <a href="{{ url_for('auth.register') }}" class="b-btn b-btn-dark">Start publishing</a>
             <a href="{{ url_for('pricing') }}" class="b-btn b-btn-ghost">View pricing</a>

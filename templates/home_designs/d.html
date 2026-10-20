@@ -64,9 +64,9 @@
   <section class="d-hero" aria-labelledby="d-hero-title">
     <div class="d-wrap">
       <div class="d-hero-head">
-        <h1 id="d-hero-title" class="d-h1"><span>Any 3D file in.</span> <span>A live viewer, AR and a QR code out.</span></h1>
+        <h1 id="d-hero-title" class="d-h1"><span>From your 3D model</span> <span>to a QR code in your paper.</span></h1>
         <div class="d-hero-side">
-          <p class="d-lead">Upload a mesh, a CAD assembly or a CT scan. AcademicAR converts and compresses it in the background, then gives you a viewer link and a QR code that keep working when you replace the model.</p>
+          <p class="d-lead">Upload the model, check it in the viewer, print the QR. Readers open it in 3D or AR, with no app.</p>
           <div class="d-actions">
             <a class="d-btn d-btn-dark" href="{{ url_for('auth.register') }}">Start publishing</a>
             <a class="d-btn d-btn-line" href="{{ url_for('demo_mitochondria_ar', source='home_d') }}">Open the demo model</a>
@@ -74,9 +74,49 @@
         </div>
       </div>
 
+      <ol class="d-flow" aria-label="How it works">
+        <li class="d-flow-stage">
+          <div class="d-flow-head"><span class="d-flow-num">1</span><strong>Make the model</strong><span class="d-led" aria-hidden="true"></span></div>
+          <div class="d-flow-view d-flow-view-make">
+            <img src="{{ url_for('static', filename='images/home/d/flow-make.webp') }}" alt="CT slices turned into a 3D kidney model" width="800" height="400" loading="lazy" decoding="async">
+          </div>
+          <p>A CT or MR segmentation, CAD, a 3D scan or a Blender mesh.</p>
+        </li>
+        <li class="d-flow-stage">
+          <div class="d-flow-head"><span class="d-flow-num">2</span><strong>Upload it</strong><span class="d-led" aria-hidden="true"></span></div>
+          <div class="d-flow-view d-flow-view-upload" aria-hidden="true">
+            <div class="d-drop">
+              <span class="d-drop-file"><span class="d-drop-ext">GLB</span><span class="d-drop-name">mitochondria.glb</span><em>1.5 MB</em></span>
+              <span class="d-drop-bar"><span></span></span>
+              <span class="d-drop-done">Converted to GLB + USDZ</span>
+            </div>
+            <span class="d-drop-formats">GLB · STL · OBJ · FBX · STEP · DICOM · NIfTI</span>
+          </div>
+          <p>Conversion and compression run in the background.</p>
+        </li>
+        <li class="d-flow-stage">
+          <div class="d-flow-head"><span class="d-flow-num">3</span><strong>Explore in the viewer</strong><span class="d-led" aria-hidden="true"></span></div>
+          <div class="d-flow-view d-flow-view-dark">
+            <img src="{{ url_for('static', filename='images/home/layers.webp') }}" alt="The AcademicAR viewer with the Layers panel open" width="960" height="540" loading="lazy" decoding="async">
+          </div>
+          <p>Layers, sections, measurements and saved scenes.</p>
+        </li>
+        <li class="d-flow-stage">
+          <div class="d-flow-head"><span class="d-flow-num">4</span><strong>Add the QR</strong><span class="d-led" aria-hidden="true"></span></div>
+          <div class="d-flow-view d-flow-view-qr">
+            <div class="d-sheet" aria-hidden="true">
+              <span class="d-sheet-title"></span><span class="d-sheet-line"></span><span class="d-sheet-line d-sheet-short"></span>
+              <span class="d-sheet-fig"></span>
+            </div>
+            <img class="d-sheet-qr" src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code that opens the demo model in AR" width="96" height="96" loading="lazy">
+          </div>
+          <p>On a paper, poster or slide. The link survives model updates.</p>
+        </li>
+      </ol>
+
       <div class="d-panel" data-pipeline>
         <div class="d-panel-bar">
-          <span class="d-panel-title">Conversion pipeline</span>
+          <span class="d-panel-title">Step 2 in detail: what happens to your file</span>
           <span class="d-panel-status"><span class="d-led" aria-hidden="true"></span><span data-status>Showing each input in turn</span></span>
           <button type="button" class="d-panel-toggle" data-cycle-toggle aria-pressed="true">Pause</button>
         </div>
@@ -132,11 +172,11 @@
   <section class="d-sec" aria-labelledby="d-live-title">
     <div class="d-wrap d-live">
       <div class="d-live-copy">
-        <h2 id="d-live-title" class="d-h2">This is the output. Turn it.</h2>
-        <p class="d-p">The model on the right is a published AcademicAR file: a mitochondrion, Draco-compressed with webp textures. Drag to orbit it; the readout follows your camera. On a phone, scan the code to place it on your desk.</p>
+        <h2 id="d-live-title" class="d-h2">Step 3, live. Turn it.</h2>
+        <p class="d-p">A published AcademicAR model. Drag to orbit; scan the code to place it on your desk.</p>
         <div class="d-live-qr">
           <img src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code that opens the mitochondria model in AR" width="112" height="112" loading="lazy">
-          <p>Scan with a phone camera. No app needed.<br><a href="{{ url_for('demo_mitochondria_ar', source='home_d_qr') }}">Open the AR page</a></p>
+          <p>No app needed.<br><a href="{{ url_for('demo_mitochondria_ar', source='home_d_qr') }}">Open the AR page</a></p>
         </div>
       </div>
 
@@ -169,27 +209,27 @@
           <div><dt>AR</dt><dd>iOS and Android</dd></div>
           <div><dt>Status</dt><dd data-cam="status">Loading</dd></div>
         </dl>
-        <figcaption class="d-cap">Live <code>&lt;model-viewer&gt;</code> render of the demo model, the same viewer your readers get.</figcaption>
+        <figcaption class="d-cap">The same viewer your readers get.</figcaption>
       </figure>
     </div>
   </section>
 
   <!-- ============================ TOOLS SPEC SHEET ============================ -->
   {% set d_tools = [
-    ['orbit', 'Orbit and zoom', 'Turn the model in 3D, in any browser, with no login.', 'Free'],
-    ['layers', 'Layers', 'Show, hide, recolour, rename and fade each part or structure.', 'Free'],
-    ['finishes', 'Finishes and lighting', 'Matte to chrome finishes, lighting presets saved per model.', 'Free'],
-    ['section', 'Section plane', 'Cut through any axis and look inside.', 'Free'],
-    ['slice', 'Slice view', '2D cross-sections of every layer, with a snapping two-point measure.', 'Free'],
-    ['measure', 'Measure and label', 'Annotations on the model; structure sizes and distances between layers.', 'Labels free · measurements on paid plans'],
-    ['scenes', 'Scenes and tours', 'Up to 12 saved views, each with its own link, QR and AR file.', 'Free'],
-    ['figure', 'Figure export', 'PNG with title, layer legend, scale bar and QR card.', 'Paid plans'],
+    ['orbit', 'Orbit and zoom', 'In any browser, no login.', 'Free'],
+    ['layers', 'Layers', 'Show, hide or recolour each part.', 'Free'],
+    ['finishes', 'Finishes and lighting', 'Matte to chrome, saved per model.', 'Free'],
+    ['section', 'Section plane', 'Cut through any axis.', 'Free'],
+    ['slice', 'Slice view', '2D cross-sections with a measure.', 'Free'],
+    ['measure', 'Measure and label', 'Labels, sizes and distances.', 'Labels free · measurements on paid plans'],
+    ['scenes', 'Scenes and tours', 'Up to 12 views, each with its own QR.', 'Free'],
+    ['figure', 'Figure export', 'PNG with legend, scale bar and QR.', 'Paid plans'],
   ] %}
   <section class="d-sec d-sec-tools" aria-labelledby="d-tools-title">
     <div class="d-wrap">
       <div class="d-sec-head">
         <h2 id="d-tools-title" class="d-h2">Viewer tools, as specified</h2>
-        <p class="d-p">Pick a row to see the tool on the monitor. Plan column shows the default; admins can change it, and <a href="{{ url_for('pricing') }}">pricing</a> lists the current plans.</p>
+        <p class="d-p">Pick a row to see it on the monitor. Plans: see <a href="{{ url_for('pricing') }}">pricing</a>.</p>
       </div>
 
       <div class="d-tools" data-tools>
@@ -215,7 +255,7 @@
         </div>
           <figure class="d-shot">
             <img src="{{ url_for('static', filename='images/home/slicer-ui.webp') }}" alt="The AcademicAR viewer with the slice view open: axial, coronal and sagittal cross-sections of a calcaneus" width="1440" height="900" loading="lazy" decoding="async">
-            <figcaption>Screenshot of the slice view: three cross-sections with scale bars, next to the 3D section plane.</figcaption>
+            <figcaption>Slice view: three cross-sections with scale bars.</figcaption>
           </figure>
         </div>
 
@@ -231,8 +271,8 @@
             </tr>
             {% endfor %}
             <tr class="d-spec-row is-static">
-              <th scope="row"><span class="d-spec-static">Comparison<span class="d-spec-desc">Two models side by side, synced, on one shareable link.</span></span></th>
-              <td>Two models side by side, synced, on one shareable link.</td>
+              <th scope="row"><span class="d-spec-static">Comparison<span class="d-spec-desc">Two models side by side, synced.</span></span></th>
+              <td>Two models side by side, synced.</td>
               <td class="d-plan">Paid plans</td>
             </tr>
           </tbody>
@@ -246,14 +286,14 @@
     <div class="d-wrap d-safety">
       <div>
         <h2 id="d-safety-title" class="d-h2">Interlocks for patient-derived data</h2>
-        <p class="d-p">Scans are handled differently from other uploads. These rules are built into the upload and conversion flow, not left to a setting.</p>
+        <p class="d-p">Built into the upload flow, not left to a setting.</p>
         <a class="d-text-link" href="{{ url_for('blog_post', slug='dicom-to-3d-model-guide') }}">Read the DICOM to 3D guide</a>
       </div>
       <ul class="d-locks">
-        <li><span class="d-lock" aria-hidden="true"></span><div><strong>Confirmation on every upload</strong><span>Anonymisation, rights and ethics are confirmed for every model and every replacement, with an audit record.</span></div></li>
-        <li><span class="d-lock" aria-hidden="true"></span><div><strong>An extra check for scans</strong><span>DICOM and segmentation uploads need a second, medical-specific confirmation.</span></div></li>
-        <li><span class="d-lock" aria-hidden="true"></span><div><strong>Raw scan deleted</strong><span>The uploaded scan is removed after conversion, whether it succeeds or fails. Medical uploads are never archived or mirrored.</span></div></li>
-        <li><span class="d-lock" aria-hidden="true"></span><div><strong>No identifiers in logs</strong><span>Patient identifiers are never written to logs. Models are for education and presentation, not diagnosis.</span></div></li>
+        <li><span class="d-lock" aria-hidden="true"></span><div><strong>Confirmation on every upload</strong><span>Anonymisation, rights and ethics, with an audit record.</span></div></li>
+        <li><span class="d-lock" aria-hidden="true"></span><div><strong>An extra check for scans</strong><span>A second confirmation for DICOM and segmentations.</span></div></li>
+        <li><span class="d-lock" aria-hidden="true"></span><div><strong>Raw scan deleted</strong><span>Removed after conversion; never archived or mirrored.</span></div></li>
+        <li><span class="d-lock" aria-hidden="true"></span><div><strong>No identifiers in logs</strong><span>For education and presentation, not diagnosis.</span></div></li>
       </ul>
     </div>
   </section>
@@ -279,10 +319,10 @@
       <div class="d-inst-copy">
         <h2 id="d-inst-title" class="d-h2">One contract for a department or a whole university</h2>
         <ul class="d-ticks">
-          <li>Model and storage quotas funded by the contract</li>
-          <li>Invite links, optionally limited to your email domain</li>
-          <li>A public showcase page and “Supported by” credit in the viewer</li>
-          <li>Monthly usage reports and a reminder 30 days before renewal</li>
+          <li>Shared model and storage quota</li>
+          <li>Invite links, limited to your domain if you like</li>
+          <li>A showcase page and “Supported by” credit</li>
+          <li>Monthly usage reports</li>
         </ul>
         <div class="d-actions">
           <a class="d-btn d-btn-dark" href="{{ url_for('institutional_inquiry') }}">Talk to us about a contract</a>
@@ -297,12 +337,10 @@
     <div class="d-wrap">
       <div class="d-sec-head">
         <h2 id="d-fields-title" class="d-h2">Calibrated for your field</h2>
-        <p class="d-p">Each field has its own page with typical inputs, uses and answers to common questions.</p>
       </div>
       <ul class="d-fields">
         {% for d in disciplines %}
-        <li><a href="{{ url_for('ar_for', discipline=d.slug) }}"><strong>{{ d.name }}</strong>
-          <ul class="d-field-uses">{% for u in d.use_cases[:3] %}<li>{{ u.title }}</li>{% endfor %}</ul></a></li>
+        <li><a href="{{ url_for('ar_for', discipline=d.slug) }}"><strong>{{ d.name }}</strong></a></li>
         {% endfor %}
       </ul>
 
@@ -331,15 +369,11 @@
       <div class="d-cta">
         <div>
           <h2 class="d-h2">Run your first file through it</h2>
-          <p class="d-p">Free to start. Your model gets a viewer link and a QR code as soon as conversion finishes.</p>
+          <p class="d-p">Free to start. Your QR code is ready when conversion finishes.</p>
           <div class="d-actions">
             <a class="d-btn d-btn-light" href="{{ url_for('auth.register') }}">Create a free account</a>
             <a class="d-btn d-btn-ghost-light" href="{{ url_for('demo_dashboard', source='home_d') }}">Explore the researcher dashboard</a>
           </div>
-        </div>
-        <div class="d-cta-formats">
-          <p>Accepted inputs</p>
-          <ul>{% for item in d_inputs %}<li>{{ item.label }}</li>{% endfor %}</ul>
         </div>
       </div>
     </div>

@@ -506,6 +506,117 @@ body.hd-e { overflow-x: clip; }
 .e-fields a { color: var(--e-shale); text-decoration: none; border-bottom: 1px solid #cfcfcf; }
 .e-fields a:hover { color: var(--e-ink); border-color: var(--e-ink); }
 
+/* ============================= FLOW: make → upload → explore → print ============================= */
+.e-flow { background: var(--e-slate); position: relative; }
+.e-flow::before { /* same cutting-mat grid as the hero desk */
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(32,32,32,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(32,32,32,.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+.e-flow .e-wrap { position: relative; }
+.e-flow-list {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px;
+  position: relative;
+}
+.e-flow-list::before { /* the thread that ties the four sheets together */
+  content: ""; position: absolute; left: 6%; right: 6%; top: 92px;
+  border-top: 2px dashed #c4c4c4; z-index: 0;
+}
+.e-flow-step {
+  position: relative; z-index: 1;
+  background: #fff;
+  border-radius: 4px;
+  padding: 14px 14px 22px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 10px 24px -14px rgba(0,0,0,.22);
+}
+.e-flow-step:nth-child(1) { transform: rotate(-1.2deg); }
+.e-flow-step:nth-child(2) { transform: rotate(0.8deg) translateY(8px); }
+.e-flow-step:nth-child(3) { transform: rotate(-0.6deg); }
+.e-flow-step:nth-child(4) { transform: rotate(1.1deg) translateY(6px); }
+.e-flow-visual {
+  position: relative; aspect-ratio: 4 / 3; border-radius: 3px; overflow: hidden;
+  background: var(--e-cloud); margin-bottom: 18px;
+}
+.e-flow-num {
+  display: inline-grid; place-items: center;
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 1.5px solid var(--e-ink);
+  font: 600 14px/1 var(--e-body); color: var(--e-ink);
+  margin: 0 0 12px 4px;
+}
+.e-flow-step:last-child .e-flow-num { background: var(--e-orange); border-color: var(--e-orange); color: #fff; }
+.e-flow-step h3 { font: 600 18px/1.25 var(--e-display); letter-spacing: -0.01em; color: var(--e-ink); margin: 0 4px 6px; }
+.e-flow-step p { font: 400 15px/1.45 var(--e-body); color: var(--e-shale); margin: 0 4px; }
+
+/* 1 · make: three prints fanned on the sheet */
+.e-flow-make { background: var(--e-cloud); }
+.e-photo {
+  position: absolute; margin: 0; width: 56%;
+  background: #fff; padding: 4px; border-radius: 2px;
+  box-shadow: 0 4px 12px -4px rgba(0,0,0,.25);
+}
+.e-photo img { display: block; width: 100%; aspect-ratio: 16 / 11; object-fit: cover; }
+.e-photo figcaption {
+  position: absolute; top: 8px; left: 8px;
+  font: 600 10px/1 var(--e-body); color: var(--e-ink);
+  background: #fff; border-radius: 200px; padding: 4px 7px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.15);
+}
+.e-photo-1 { left: 4%; top: 6%; transform: rotate(-6deg); }
+.e-photo-2 { right: 4%; top: 10%; transform: rotate(5deg); }
+.e-photo-3 { left: 22%; bottom: 5%; transform: rotate(-1deg); z-index: 2; }
+
+/* 2 · upload: a drop zone styled after the product */
+.e-flow-upload { display: flex; flex-direction: column; justify-content: center; gap: 10px; padding: 14px; background: #fff; }
+.e-drop {
+  border: 1.5px dashed #c4c4c4; border-radius: 8px; padding: 14px 12px;
+  display: grid; gap: 10px; background: var(--e-cloud);
+}
+.e-drop-file {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  background: #fff; border: 1px solid var(--e-pearl); border-radius: 6px; padding: 8px 10px;
+  font: 400 12px/1.2 var(--e-body); color: var(--e-ash);
+}
+.e-drop-file b { font-weight: 600; color: var(--e-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.e-drop-file i { font-style: normal; flex: none; }
+.e-drop-bar { display: block; height: 4px; border-radius: 4px; background: var(--e-pearl); overflow: hidden; }
+.e-drop-bar i { display: block; height: 100%; width: 100%; background: var(--e-ink); transform-origin: left; }
+.e-drop-done { display: flex; align-items: center; gap: 6px; font: 600 12px/1.2 var(--e-body); color: var(--e-ink); }
+.e-drop-done svg { width: 14px; height: 14px; color: var(--e-orange); flex: none; }
+.e-drop-formats { margin: 0; font: 500 11px/1.4 var(--e-body); color: var(--e-ash); text-align: center; }
+/* the upload plays once when the steps come into view (JS adds the classes) */
+.e-flow-list.is-armed .e-drop-bar i { transform: scaleX(0); }
+.e-flow-list.is-armed .e-drop-done { opacity: 0; }
+.e-flow-list.is-in .e-drop-bar i { transform: scaleX(1); transition: transform 1.6s cubic-bezier(.4,0,.2,1) .4s; }
+.e-flow-list.is-in .e-drop-done { opacity: 1; transition: opacity .4s ease 2.1s; }
+
+/* 3 · viewer clip */
+.e-flow-view { background: #1c1c1c; }
+.e-flow-view video { width: 100%; height: 100%; object-fit: cover; object-position: 100% 50%; display: block; }
+
+/* 4 · the QR on a printed page */
+.e-flow-print { display: grid; place-items: center; background: var(--e-cloud); }
+.e-mini-poster {
+  width: 62%; aspect-ratio: 210 / 297; background: #fff; border-radius: 2px;
+  box-shadow: 0 4px 14px -4px rgba(0,0,0,.25);
+  padding: 9% 8%; display: flex; flex-direction: column; gap: 5%;
+  transform: rotate(-2deg) translateY(-6%);
+}
+.e-mini-poster > i { display: block; height: 4px; border-radius: 2px; background: #dcdcdc; }
+.e-mini-poster > i.e-mp-title { height: 7px; width: 80%; background: var(--e-ink); }
+.e-mini-poster > i.e-mp-s { width: 60%; }
+.e-mp-row { display: grid; grid-template-columns: 1fr 38%; gap: 6%; align-items: end; }
+.e-mp-fig { display: block; aspect-ratio: 4 / 3; background: #f2d4c4; border-radius: 2px; }
+.e-mp-row img { width: 100%; height: auto; display: block; image-rendering: pixelated; outline: 2px solid var(--e-orange); outline-offset: 2px; }
+.e-mp-url {
+  position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+  font: 600 11px/1 var(--e-body); color: var(--e-ink);
+  background: #fff; border: 1px solid var(--e-pearl); border-radius: 200px; padding: 6px 10px; white-space: nowrap;
+}
+
 /* ============================= PINNED HERO (desktop + motion) ============================= */
 @media (min-width: 1024px) and (prefers-reduced-motion: no-preference) {
   .e-hero.is-pinned { height: 230vh; }
@@ -515,6 +626,8 @@ body.hd-e { overflow-x: clip; }
 
 /* ============================= RESPONSIVE ============================= */
 @media (max-width: 1023px) {
+  .e-flow-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 20px; }
+  .e-flow-list::before { display: none; }
   .e-hero-inner { grid-template-columns: 1fr; min-height: 0; }
   .e-hero-copy { justify-self: start; max-width: 680px; padding: 48px 40px 32px; }
   .e-desk { margin: 0 24px 24px; border-radius: 8px; }
@@ -523,6 +636,24 @@ body.hd-e { overflow-x: clip; }
   .e-aud-panel { grid-template-columns: 1fr; gap: 28px; }
 }
 @media (max-width: 720px) {
+  .e-flow-list { grid-template-columns: 1fr; gap: 20px; }
+  .e-flow-list::before { display: block; left: 34px; right: auto; top: 0; bottom: 0; border-top: 0; border-left: 2px dashed #c4c4c4; }
+  .e-flow-step { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 0 14px; align-items: start; padding: 12px; }
+  .e-flow-step:nth-child(n) { transform: none; }
+  .e-flow-visual { grid-row: 1 / span 3; margin: 0; aspect-ratio: 1; }
+  .e-flow-num { margin: 2px 0 8px; width: 26px; height: 26px; font-size: 13px; }
+  .e-flow-step h3 { margin: 0 0 4px; font-size: 17px; }
+  .e-flow-step p { margin: 0; font-size: 14px; }
+  .e-photo { width: 66%; padding: 3px; }
+  .e-photo figcaption { display: none; }
+  .e-flow-upload { padding: 8px; gap: 6px; }
+  .e-drop { padding: 8px 6px; gap: 6px; }
+  .e-drop-file { padding: 5px 6px; font-size: 10px; }
+  .e-drop-file i { display: none; }
+  .e-drop-done { font-size: 10px; }
+  .e-drop-formats { display: none; }
+  .e-mini-poster { width: 58%; transform: rotate(-2deg) translateY(-8%); }
+  .e-mp-url { font-size: 9px; padding: 4px 6px; bottom: 5px; }
   .e-wrap { padding: 0 20px; }
   .e-section { padding: 64px 0; }
   .e-head { margin-bottom: 28px; }
@@ -562,5 +693,6 @@ body.hd-e { overflow-x: clip; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .e-flow-list .e-drop-bar i, .e-flow-list .e-drop-done { transform: none !important; opacity: 1 !important; transition: none !important; }
   .e-phone-ar, .e-fig-print, .e-hero-steps li, .e-step-dot { transition: none; }
 }

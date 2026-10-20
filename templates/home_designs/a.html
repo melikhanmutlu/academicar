@@ -17,7 +17,7 @@
       <p class="a-kicker">3D and AR for research, teaching and publishing</p>
       <h1 class="a-title">Publish the model, not a screenshot of it.</h1>
       <p class="a-lead">
-        Upload GLB, STL, OBJ, FBX, STEP or a CT/MR scan. AcademicAR turns it into a browser viewer, an AR view and a stable QR code for your paper, poster or thesis.
+        Upload a 3D file or a CT/MR scan. Get a browser viewer, AR and a stable QR code for your paper, poster or thesis.
       </p>
       <div class="a-actions">
         <a href="{{ url_for('auth.register') }}" class="a-btn a-btn-dark">Start publishing</a>
@@ -56,23 +56,23 @@
       <li class="a-callout" data-callout="0">
         <span class="a-callout-step">Orbit</span>
         <h2>Rotate it in any browser</h2>
-        <p>Orbit, zoom and inspect from every side. No login, no app, no plug-in for your readers.</p>
+        <p>No login, no app, no plug-in.</p>
       </li>
       <li class="a-callout" data-callout="1">
         <span class="a-callout-step">AR</span>
         <h2>Scan the QR, place it on the desk</h2>
-        <p>Every model gets a stable QR code. Phones open it in AR straight from the browser.</p>
+        <p>Phones open it in AR from the browser.</p>
         <img class="a-callout-qr" src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code that opens this model in AR" width="72" height="72" loading="lazy">
       </li>
       <li class="a-callout" data-callout="2">
         <span class="a-callout-step">Section</span>
         <h2>Cut a section, read the slice</h2>
-        <p>Move a section plane along any axis and read the 2D cross-section with a snapping measure.</p>
+        <p>Slice along any axis and measure the cut.</p>
       </li>
       <li class="a-callout" data-callout="3">
         <span class="a-callout-step">Figure</span>
         <h2>Measure, label, export the figure</h2>
-        <p>Add distances and labels, then export a PNG figure with a layer legend, scale bar and QR.</p>
+        <p>PNG with legend, scale bar and QR.</p>
       </li>
     </ol>
 
@@ -83,22 +83,92 @@
   </div>
 </section>
 
+
+<!-- ===================== ROUTE: make → upload → explore → print ===================== -->
+<section class="a-route" data-a-route aria-labelledby="a-route-title">
+  <div class="a-wrap">
+    <header class="a-head">
+      <h2 class="a-h2" id="a-route-title">From your model to a QR on the page</h2>
+      <p class="a-sub">Four steps. The middle two take minutes.</p>
+    </header>
+
+    <ol class="a-route-list">
+      <li class="a-route-step">
+        <div class="a-route-visual a-route-make">
+          <img src="{{ url_for('static', filename='images/blog/covers/3d-slicer-export-share.webp') }}" alt="A CT segmentation exported from 3D Slicer as a 3D mesh" loading="lazy" decoding="async" width="640" height="360">
+          <ul class="a-route-tags" aria-label="Typical sources">
+            <li>3D Slicer</li><li>CAD</li><li>Scanner</li>
+          </ul>
+        </div>
+        <span class="a-route-num" aria-hidden="true">1</span>
+        <h3>Make the model</h3>
+        <p>Segment a CT/MR scan, export from CAD or scan an object. <a href="{{ url_for('blog_post', slug='dicom-to-3d-model-guide') }}">DICOM to 3D guide</a></p>
+      </li>
+
+      <li class="a-route-step">
+        <div class="a-route-visual a-route-upload" aria-hidden="true">
+          <div class="a-drop">
+            <span class="a-drop-file"><b>calcaneus.stl</b><i>STL</i></span>
+            <span class="a-drop-bar"><span></span></span>
+            <span class="a-drop-done">
+              <svg viewBox="0 0 16 16"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Converted to GLB + USDZ
+            </span>
+          </div>
+          <span class="a-drop-formats">GLB STL OBJ FBX STEP DICOM NIfTI</span>
+        </div>
+        <span class="a-route-num" aria-hidden="true">2</span>
+        <h3>Upload to AcademicAR</h3>
+        <p>Converted and compressed for you.</p>
+      </li>
+
+      <li class="a-route-step">
+        <div class="a-route-visual a-route-view">
+          <video muted playsinline loop preload="none" poster="{{ still_base }}layers.webp" width="960" height="540" data-inline-clip aria-label="The Layers panel in the AcademicAR viewer">
+            <source src="{{ clip_base }}layers.mp4" type="video/mp4">
+          </video>
+        </div>
+        <span class="a-route-num" aria-hidden="true">3</span>
+        <h3>Explore it in the viewer</h3>
+        <p>Rotate, cut, measure and save views.</p>
+      </li>
+
+      <li class="a-route-step">
+        <div class="a-route-visual a-route-print">
+          <div class="a-sheet" aria-hidden="true">
+            <span class="a-sheet-title"></span>
+            <span class="a-sheet-line"></span>
+            <span class="a-sheet-line a-sheet-short"></span>
+            <span class="a-sheet-fig"></span>
+            <span class="a-sheet-line"></span>
+          </div>
+          <img class="a-sheet-qr" src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code printed on a poster, opening the model in AR" width="96" height="96" loading="lazy">
+          <span class="a-sheet-link">/m/… stays the same</span>
+        </div>
+        <span class="a-route-num" aria-hidden="true">4</span>
+        <h3>Add the QR to your work</h3>
+        <p>Paper, poster or slide. <a href="{{ url_for('demo_mitochondria_ar', source='home_a_route') }}">Try the scan</a></p>
+      </li>
+    </ol>
+  </div>
+</section>
+
 <!-- ===================== TOOLS: scrollytelling with real clips ===================== -->
 <section class="a-tools" id="tools">
   <div class="a-wrap">
     <header class="a-head">
       <h2 class="a-h2">The viewer your readers get</h2>
-      <p class="a-sub">Recorded in the AcademicAR viewer. Every tool works in a phone or desktop browser.</p>
+      <p class="a-sub">Recorded in the viewer. Works on phones and desktops.</p>
     </header>
 
     {% set tools = [
-      ('orbit',   'Orbit and zoom',            'Open the link and the model is already turning. Drag to rotate, pinch to zoom, double-tap to frame a detail.'),
-      ('layers',  'Layers for every part',     'Multi-part models get a Layers panel: hide, isolate, recolour or X-ray each structure, then save the view as the default.'),
-      ('section', 'Section planes',            "Cut through X, Y or Z with guides that show where the plane sits. The cut follows the scan's patient orientation for medical data."),
-      ('slice',   'Slice view',                'Read axial, coronal and sagittal cross-sections in 2D, side by side with the 3D model, and measure across them.'),
-      ('measure', 'Measure and label',         "Pin labels to structures and measure point to point in real units. Layer metrics list each structure's dimensions."),
-      ('scenes',  'Scenes and guided tours',   'Save up to 12 views per model. Each scene gets its own link, QR and AR file, and a tour plays them in order.'),
-      ('figure',  'Figure export',             'Export a publication-ready PNG from any angle with a title, layer legend, scale bar and QR code.')
+      ('orbit',   'Orbit and zoom',            'Drag to rotate, pinch to zoom.'),
+      ('layers',  'Layers for every part',     'Hide, recolour or X-ray each structure.'),
+      ('section', 'Section planes',            'Cut through X, Y or Z, with guides.'),
+      ('slice',   'Slice view',                'Axial, coronal and sagittal slices in 2D, with a measure.'),
+      ('measure', 'Measure and label',         'Labels and point-to-point distances in real units.'),
+      ('scenes',  'Scenes and guided tours',   'Up to 12 saved views, each with its own link and QR.'),
+      ('figure',  'Figure export',             'A PNG with legend, scale bar and QR code.')
     ] %}
 
     <div class="a-tools-grid">
@@ -147,8 +217,8 @@
       <dl class="a-spec">
         <div><dt>Meshes</dt><dd>GLB, STL, OBJ, FBX</dd></div>
         <div><dt>CAD</dt><dd>STEP / STP assemblies, one layer per part</dd></div>
-        <div><dt>CT and MR</dt><dd>DICOM series as ZIP, thresholded with bone and tissue presets or your own HU range</dd></div>
-        <div><dt>Segmentations</dt><dd>NIfTI, NRRD, DICOM-SEG or a ZIP of masks, one layer per structure</dd></div>
+        <div><dt>CT and MR</dt><dd>DICOM series as ZIP, with HU presets</dd></div>
+        <div><dt>Segmentations</dt><dd>NIfTI, NRRD, DICOM-SEG, one layer per structure</dd></div>
       </dl>
     </div>
 
@@ -163,10 +233,10 @@
     <div class="a-flow-col">
       <h2 class="a-h2 a-h2-left">Share one link that keeps working</h2>
       <dl class="a-spec">
-        <div><dt>Viewer</dt><dd>A public or private viewer page that runs in any modern browser</dd></div>
+        <div><dt>Viewer</dt><dd>Public or private, in any browser</dd></div>
         <div><dt>AR</dt><dd>WebXR on Android, Quick Look on iPhone and iPad</dd></div>
-        <div><dt>QR</dt><dd>A short /m/ link that survives replacements, recolours and upgrades</dd></div>
-        <div><dt>Embed</dt><dd>An iframe for your lab site, course page or online article</dd></div>
+        <div><dt>QR</dt><dd>A short /m/ link that survives replacements</dd></div>
+        <div><dt>Embed</dt><dd>An iframe for your lab or course site</dd></div>
       </dl>
     </div>
   </div>
@@ -184,7 +254,6 @@
       <li>
         <a href="{{ url_for('ar_for', discipline=d.slug) }}">
           <span class="a-field-name">{{ d.name }}</span>
-          <span class="a-field-sub">{{ d.subhead }}</span>
         </a>
       </li>
       {% endfor %}
@@ -198,7 +267,7 @@
     <div class="a-reel-layout">
       <div class="a-reel-copy">
         <h2 class="a-h2 a-h2-left">Every viewer tool in one minute</h2>
-        <p class="a-sub a-sub-left">Orbit, layers, finishes, sections, measurements, lighting, scenes, slice view, figure export and AR, as they appear to your readers.</p>
+        <p class="a-sub a-sub-left">Every tool, as your readers see it.</p>
       </div>
       <div class="a-reel-frame" data-a-reel>
         <img class="a-reel-poster" src="{{ url_for('static', filename='images/showreel-poster.webp') }}"
@@ -220,17 +289,17 @@
   <div class="a-wrap a-inst-grid">
     <div class="a-inst-copy">
       <h2 class="a-h2 a-h2-left">For departments, libraries and faculties</h2>
-      <p class="a-sub a-sub-left">An institutional contract funds your members' models from one shared quota, with a panel to manage who publishes.</p>
+      <p class="a-sub a-sub-left">One contract funds your members' models from a shared quota.</p>
       <div class="a-actions">
         <a href="{{ url_for('institutional_inquiry') }}" class="a-btn a-btn-dark">Talk to us about a contract</a>
         <a href="{{ url_for('demo_institution', source='home_a') }}" class="a-btn a-btn-line">See the institution dashboard</a>
       </div>
     </div>
     <ul class="a-inst-list">
-      <li><h3>Shared quota</h3><p>Model count and storage set by contract, used by every member's uploads.</p></li>
-      <li><h3>Invite links</h3><p>Members join through a link, optionally limited to your university email domain.</p></li>
-      <li><h3>Public showcase</h3><p>A page at /i/your-institution lists the models your members publish.</p></li>
-      <li><h3>"Supported by" in the viewer</h3><p>Funded models show your institution's name to every reader.</p></li>
+      <li><h3>Shared quota</h3><p>Model count and storage set by contract.</p></li>
+      <li><h3>Invite links</h3><p>Optionally limited to your email domain.</p></li>
+      <li><h3>Public showcase</h3><p>Your members' models at /i/your-institution.</p></li>
+      <li><h3>"Supported by" in the viewer</h3><p>Your name on every funded model.</p></li>
     </ul>
   </div>
 </section>
@@ -251,7 +320,6 @@
             {% if p.cover %}<img src="{{ p.cover }}" alt="" loading="lazy" decoding="async" width="640" height="360">{% endif %}
           </span>
           <span class="a-guide-title">{{ p.title }}</span>
-          {% if p.description %}<span class="a-guide-desc">{{ p.description }}</span>{% endif %}
         </a>
       </li>
       {% endfor %}
@@ -264,7 +332,7 @@
 <section class="a-cta">
   <div class="a-wrap a-cta-inner">
     <h2 class="a-cta-title">Give your next figure a third dimension.</h2>
-    <p class="a-cta-sub">Project pages are free. Give a model a 3-year Academic or 10-year Extended Archive access window when it needs one.</p>
+    <p class="a-cta-sub">Start free. Keep a model online for 3 or 10 years when it needs to stay.</p>
     <div class="a-actions a-actions-center">
       <a href="{{ url_for('auth.register') }}" class="a-btn a-btn-light">Start publishing</a>
       <a href="{{ url_for('pricing') }}" class="a-btn a-btn-ghost-light">See pricing</a>

@@ -127,6 +127,18 @@
     setMode();
   }
 
+  // Flow: the upload step plays once when the four steps come into view.
+  const flow = document.querySelector('[data-e-flow]');
+  if (flow && !reduce && 'IntersectionObserver' in window) {
+    flow.classList.add('is-armed');
+    const fio = new IntersectionObserver((entries) => {
+      if (!entries[0].isIntersecting) return;
+      fio.disconnect();
+      requestAnimationFrame(() => flow.classList.add('is-in'));
+    }, { threshold: 0.35 });
+    fio.observe(flow);
+  }
+
   // Feature clips: play only while visible.
   const clips = [...document.querySelectorAll('.e-clip')];
   if (clips.length && 'IntersectionObserver' in window && !reduce) {

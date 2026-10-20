@@ -16,15 +16,15 @@
 ] %}
 
 {% set reel = [
-  ('orbit', 'Orbit', 'Rotate, zoom and pan in any browser. No login, no app.', None),
-  ('layers', 'Layers', 'Each part or structure gets its own layer to show, hide, recolour or fade.', None),
-  ('finishes', 'Finishes', 'Matte, plastic, ceramic, glossy, metal, gold, chrome or glass, per layer.', None),
-  ('section', 'Section plane', 'Cut through the model on any axis and look inside, with plane guides.', None),
-  ('measure', 'Measure and label', 'Pin labels to the surface and measure between two points.', None),
-  ('lighting', 'Lighting', 'Studio, soft, dramatic, bright or flat, on a dark or light background. Saved per model.', None),
-  ('scenes', 'Scenes and tours', 'Save up to 12 views and play them as a guided tour. Each scene has its own link and QR.', None),
-  ('slice', 'Slice view', 'Colour-coded 2D cross-sections with a snapping two-point measure.', None),
-  ('figure', 'Figure export', 'A publication-ready PNG with title, layer legend, scale bar and QR.', 'Paid plans')
+  ('orbit', 'Orbit', 'Rotate and zoom in any browser.', None),
+  ('layers', 'Layers', 'Show, hide, recolour or fade each part.', None),
+  ('finishes', 'Finishes', 'From matte to chrome, per layer.', None),
+  ('section', 'Section plane', 'Cut on any axis and look inside.', None),
+  ('measure', 'Measure and label', 'Labels and point-to-point distances.', None),
+  ('lighting', 'Lighting', 'Five presets, saved per model.', None),
+  ('scenes', 'Scenes and tours', 'Up to 12 saved views, played as a tour.', None),
+  ('slice', 'Slice view', '2D cross-sections with a measure.', None),
+  ('figure', 'Figure export', 'A PNG with legend, scale bar and QR.', 'Paid plans')
 ] %}
 
 {% block hd_content %}
@@ -54,7 +54,7 @@
 
   <div class="c-stage-copy">
     <h1 id="c-hero-title" class="c-hero-title">Put your 3D research on a live stage</h1>
-    <p class="c-hero-lead">Upload a model or a CT scan. Readers rotate it, cut through it, measure it and place it in AR from a link or a QR code, in any browser.</p>
+    <p class="c-hero-lead">Readers rotate, cut, measure and place your model in AR from a link or a QR code.</p>
     <div class="c-hero-actions">
       <a href="{{ url_for('auth.register') }}" class="c-btn c-btn-light">Start publishing</a>
       <a href="{{ url_for('demo_mitochondria_ar', source='home_c_hero') }}" class="c-btn c-btn-ghost">Open the example</a>
@@ -83,12 +83,80 @@
   </a>
 </section>
 
+<!-- ============================= FLOW: FOUR STEPS ============================= -->
+<section class="c-flow" data-flow aria-labelledby="c-flow-title">
+  <div class="c-wrap">
+    <div class="c-flow-head">
+      <h2 id="c-flow-title" class="c-h2">From your file to a QR on the page</h2>
+      <p class="c-sub">Four steps, no plug-ins.</p>
+    </div>
+    <div class="c-flow-rail" aria-hidden="true"><span class="c-flow-rail-fill"></span>{% for i in range(4) %}<span class="c-flow-node" style="--i: {{ i }};"></span>{% endfor %}</div>
+    <ol class="c-flow-steps">
+      <li class="c-flow-step" style="--i: 0;">
+        <figure class="c-flow-frame c-flow-frame-light">
+          <img src="{{ url_for('static', filename='images/blog/covers/3d-slicer-export-share.webp') }}" alt="A stack of CT slices turned into a 3D kidney model" width="1600" height="800" loading="lazy" decoding="async">
+          <ul class="c-flow-sources" aria-label="Typical sources">
+            {% for src in ['3D Slicer', 'CAD', 'Scanner', 'Blender'] %}<li>{{ src }}</li>{% endfor %}
+          </ul>
+        </figure>
+        <h3><span class="c-flow-num">1</span>Make the model</h3>
+        <p>Segment a scan, export from CAD, or scan an object.</p>
+      </li>
+      <li class="c-flow-step" style="--i: 1;">
+        <figure class="c-flow-frame c-flow-upload" aria-label="Upload panel: a DICOM series converted to GLB and USDZ">
+          <div class="c-flow-drop">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg>
+            <span>Drop a file</span>
+          </div>
+          <div class="c-flow-file">
+            <span class="c-flow-file-name">heart_ct_series.zip</span>
+            <span class="c-flow-file-type">DICOM</span>
+            <span class="c-flow-bar"><span></span></span>
+            <span class="c-flow-done"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Converted to GLB + USDZ</span>
+          </div>
+        </figure>
+        <h3><span class="c-flow-num">2</span>Upload to AcademicAR</h3>
+        <p>Any common 3D format or a CT/MR series. Converted for web and AR.</p>
+      </li>
+      <li class="c-flow-step" style="--i: 2;">
+        <figure class="c-flow-frame">
+          <video class="c-clip-video" muted playsinline loop preload="none" data-autoplay
+                 poster="{{ url_for('static', filename='images/home/layers.webp') }}"
+                 width="960" height="540" aria-label="Layers in the AcademicAR viewer">
+            <source src="{{ url_for('static', filename='videos/home/layers.mp4') }}" type="video/mp4">
+          </video>
+        </figure>
+        <h3><span class="c-flow-num">3</span>Explore in the viewer</h3>
+        <p>Layers, sections, measurements and AR, in any browser.</p>
+      </li>
+      <li class="c-flow-step" style="--i: 3;">
+        <figure class="c-flow-frame c-flow-frame-light c-flow-poster" aria-label="A printed poster with the model's QR code">
+          <div class="c-flow-sheet">
+            <span class="c-flow-sheet-title"></span>
+            <span class="c-flow-sheet-line"></span>
+            <span class="c-flow-sheet-line is-short"></span>
+            <span class="c-flow-sheet-fig"><img src="{{ url_for('static', filename='images/home/c/mito-print.webp') }}" alt="" loading="lazy" decoding="async"></span>
+            <span class="c-flow-sheet-line"></span>
+            <span class="c-flow-sheet-line is-short"></span>
+          </div>
+          <span class="c-flow-qr">
+            <img src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code that opens the example model" width="112" height="112" loading="lazy">
+            <span>academicar.com/m/…</span>
+          </span>
+        </figure>
+        <h3><span class="c-flow-num">4</span>Add the QR to your work</h3>
+        <p>On a paper, poster or slide. The link survives every update.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
 <!-- ============================= FEATURE REEL (signature) ============================= -->
 <section class="c-reel" data-reel style="--c-panels: {{ reel|length }};" aria-labelledby="c-reel-title">
   <div class="c-reel-sticky">
     <div class="c-reel-head">
       <h2 id="c-reel-title" class="c-h2">Every tool of the viewer, in motion</h2>
-      <p class="c-sub">Nine of the tools your readers get with every model. Clips are recorded in the AcademicAR viewer.</p>
+      <p class="c-sub">Recorded in the AcademicAR viewer.</p>
     </div>
     <div class="c-reel-window" data-reel-window tabindex="0" role="region" aria-label="Viewer tool clips">
       <ol class="c-reel-track" data-reel-track>
@@ -115,39 +183,12 @@
   </div>
 </section>
 
-<!-- ============================= NO APP. JUST SCAN. ============================= -->
-<section class="c-scan" aria-labelledby="c-scan-title">
-  <div class="c-wrap c-scan-grid">
-    <div class="c-scan-copy">
-      <h2 id="c-scan-title" class="c-display">No app.<br>Just scan.</h2>
-      <p class="c-lead">Every model gets a QR code and a short link. Readers scan it from a printed paper, poster or slide and place the model on their desk at true scale, in the phone's browser.</p>
-      <div class="c-scan-card">
-        <img src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code for the mitochondria example" width="112" height="112" loading="lazy">
-        <div>
-          <p class="c-scan-card-title">Try it now</p>
-          <p class="c-scan-card-text">Scan with your phone camera to place this mitochondrion on the surface in front of you.</p>
-          <a href="{{ url_for('demo_mitochondria_ar', source='home_c_scan') }}" class="c-link">Open the AR example</a>
-        </div>
-      </div>
-      <dl class="c-facts">
-        <div><dt>Android</dt><dd>WebXR and Scene Viewer</dd></div>
-        <div><dt>iPhone and iPad</dt><dd>Quick Look with a USDZ made for you</dd></div>
-        <div><dt>Stable link</dt><dd>The QR keeps working when you replace, recolour or upgrade the model</dd></div>
-      </dl>
-    </div>
-    <div class="c-scan-visual" data-parallax="0.6">
-      <div class="c-scan-glow" aria-hidden="true"></div>
-      <img src="{{ url_for('static', filename='images/ar-phone-mockup.webp') }}" alt="A phone showing the mitochondria model placed in AR on a desk" width="941" height="1672" loading="lazy" decoding="async">
-    </div>
-  </div>
-</section>
-
 <!-- ============================= MONITOR: SLICE VIEW ============================= -->
 <section class="c-monitor" data-monitor aria-labelledby="c-monitor-title">
   <div class="c-wrap">
     <div class="c-monitor-head">
       <h2 id="c-monitor-title" class="c-h2">Read a CT model the way you read a scan</h2>
-      <p class="c-sub">Upload a DICOM series as a ZIP and choose the bone, skin or contrast-vessel preset or your own Hounsfield range, or bring a segmentation as NIfTI, NRRD, DICOM-SEG or a ZIP of masks. Axial, coronal and sagittal slices follow the scan's orientation.</p>
+      <p class="c-sub">Upload a DICOM series with a preset or your own Hounsfield range, or a segmentation. Slices follow the scan's orientation.</p>
     </div>
     <figure class="c-monitor-frame" data-monitor-frame>
       <img src="{{ url_for('static', filename='images/home/slicer-ui.webp') }}" alt="The AcademicAR viewer with the slice view open: a coronal plane through a calcaneus and three cross-section panels" width="1440" height="900" loading="lazy" decoding="async">
@@ -155,7 +196,7 @@
     <ul class="c-formats" aria-label="Files you can upload">
       {% for f in ['GLB', 'STL', 'OBJ', 'FBX', 'STEP / STP', 'DICOM', 'NIfTI', 'NRRD', 'DICOM-SEG'] %}<li>{{ f }}</li>{% endfor %}
     </ul>
-    <p class="c-fineprint">Medical uploads need an extra confirmation, are never archived or mirrored, and the raw scan is deleted after conversion. For education and presentation, not for diagnosis.</p>
+    <p class="c-fineprint">The raw scan is deleted after conversion. For education and presentation, not for diagnosis.</p>
   </div>
 </section>
 
@@ -184,17 +225,17 @@
   <div class="c-wrap c-inst-grid">
     <div>
       <h2 id="c-inst-title" class="c-h2">For departments, labs and libraries</h2>
-      <p class="c-inst-lead">One contract covers your members' models. They join with an invite link, and their uploads are licensed for as long as the contract runs.</p>
+      <p class="c-inst-lead">One contract covers your members' models for as long as it runs.</p>
       <div class="c-hero-actions">
         <a href="{{ url_for('institutional_inquiry') }}" class="c-btn c-btn-dark">Talk to us</a>
         <a href="{{ url_for('demo_institution', source='home_c') }}" class="c-btn c-btn-ghost-dark">See the institution dashboard</a>
       </div>
     </div>
     <ul class="c-inst-list">
-      <li><strong>Quota you can see</strong><span>Model count and storage for the whole contract, in one admin panel.</span></li>
-      <li><strong>Invite links</strong><span>Optionally limited to your email domain. One institution per member.</span></li>
-      <li><strong>A public showcase</strong><span>Your institution's page lists its published models, and every viewer shows who supports it.</span></li>
-      <li><strong>Monthly usage reports</strong><span>Sent to institution admins, with a reminder before the contract ends.</span></li>
+      <li><strong>Shared quota</strong><span>Models and storage, in one admin panel.</span></li>
+      <li><strong>Invite links</strong><span>Optionally limited to your email domain.</span></li>
+      <li><strong>Public showcase</strong><span>Your models on one page, with credit in every viewer.</span></li>
+      <li><strong>Monthly reports</strong><span>Usage for admins, and a renewal reminder.</span></li>
     </ul>
   </div>
 </section>
@@ -211,7 +252,6 @@
       <li>
         <a href="{{ url_for('ar_for', discipline=d.slug) }}">
           <span class="c-field-name">{{ d.name }}</span>
-          <span class="c-field-sub">{{ d.subhead }}</span>
         </a>
       </li>
       {% endfor %}
@@ -233,7 +273,6 @@
         {% if post.cover %}<span class="c-guide-media"><img src="{{ post.cover }}" alt="" loading="lazy" decoding="async"></span>{% endif %}
         <span class="c-guide-body">
           <span class="c-guide-title">{{ post.title }}</span>
-          {% if post.description %}<span class="c-guide-desc">{{ post.description }}</span>{% endif %}
         </span>
       </a>
       {% endfor %}
@@ -255,7 +294,7 @@
   <div class="c-end-word" aria-hidden="true">Explore</div>
   <div class="c-wrap c-end-inner">
     <h2 id="c-end-title" class="c-display c-end-title">Make every 3D project explorable</h2>
-    <p class="c-lead">Try a model free for three days. An Academic licence keeps it online for three years.</p>
+    <p class="c-lead">Free for three days. An Academic licence keeps a model online for three years.</p>
     <div class="c-hero-actions c-end-actions">
       <a href="{{ url_for('auth.register') }}" class="c-btn c-btn-light">Start publishing</a>
       <a href="{{ url_for('pricing') }}" class="c-btn c-btn-ghost">See pricing</a>

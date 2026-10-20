@@ -15,18 +15,12 @@
         <p class="e-kicker">QR codes and AR for printed research</p>
         <h1 class="e-hero-title">From the printed page to a model in your&nbsp;hand.</h1>
         <p class="e-hero-lead">
-          Every model you publish gets a QR code for posters, theses, slides and handouts.
-          Readers scan it with their phone camera and the figure opens in 3D or AR. No app, no login.
+          Print your model's QR code on a poster, thesis or slide. Readers scan it and the figure opens in 3D or AR. No app, no login.
         </p>
         <div class="e-hero-actions">
           <a href="{{ url_for('auth.register') }}" class="e-btn e-btn-dark">Start publishing</a>
           <a href="{{ url_for('demo_mitochondria_ar', source='home_e_hero') }}" class="e-btn e-btn-line">Open the demo model</a>
         </div>
-        <ol class="e-hero-steps" aria-label="What happens">
-          <li data-e-step="1"><span class="e-step-dot" aria-hidden="true"></span>Print the QR next to your figure</li>
-          <li data-e-step="2"><span class="e-step-dot" aria-hidden="true"></span>A reader scans it with any phone</li>
-          <li data-e-step="3"><span class="e-step-dot" aria-hidden="true"></span>The model opens in 3D, or on the desk in AR</li>
-        </ol>
       </div>
 
       <div class="e-desk" data-e-desk>
@@ -108,22 +102,79 @@
   </div>
 </section>
 
+<!-- ============================= THE FLOW: make → upload → explore → print ============================= -->
+<section class="e-section e-flow" id="how-it-works" aria-labelledby="e-flow-title">
+  <div class="e-wrap">
+    <div class="e-head">
+      <h2 class="e-h2" id="e-flow-title">From your 3D model to the printed page in four steps.</h2>
+    </div>
+    <ol class="e-flow-list" data-e-flow>
+      <li class="e-flow-step">
+        <div class="e-flow-visual e-flow-make" aria-hidden="true">
+          <figure class="e-photo e-photo-1"><img src="{{ url_for('static', filename='images/blog/covers/3d-slicer-export-share.webp') }}" alt="" loading="lazy" width="1200" height="630"><figcaption>CT / MR</figcaption></figure>
+          <figure class="e-photo e-photo-2"><img src="{{ url_for('static', filename='images/blog/covers/step-cad-assemblies-ar-engineering.webp') }}" alt="" loading="lazy" width="1200" height="630"><figcaption>CAD</figcaption></figure>
+          <figure class="e-photo e-photo-3"><img src="{{ url_for('static', filename='images/blog/covers/ar-for-archaeology-3d-artifacts.webp') }}" alt="" loading="lazy" width="1200" height="630"><figcaption>3D scan</figcaption></figure>
+        </div>
+        <span class="e-flow-num">1</span>
+        <h3>Make the model</h3>
+        <p>Segment a scan in 3D Slicer, export from CAD or Blender, or scan an object.</p>
+      </li>
+      <li class="e-flow-step">
+        <div class="e-flow-visual e-flow-upload" aria-hidden="true">
+          <div class="e-drop">
+            <span class="e-drop-file"><b>mitochondria.glb</b><i>1.5 MB</i></span>
+            <span class="e-drop-bar"><i></i></span>
+            <span class="e-drop-done"><svg viewBox="0 0 16 16"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Converted to GLB + USDZ</span>
+          </div>
+          <p class="e-drop-formats">GLB · STL · OBJ · FBX · STEP · DICOM · NIfTI</p>
+        </div>
+        <span class="e-flow-num">2</span>
+        <h3>Upload it to AcademicAR</h3>
+        <p>Drop the file. Conversion and the QR code are automatic.</p>
+      </li>
+      <li class="e-flow-step">
+        <div class="e-flow-visual e-flow-view" aria-hidden="true">
+          <video class="e-clip" muted playsinline loop preload="none" width="960" height="540"
+                 poster="{{ url_for('static', filename='images/home/layers.webp') }}">
+            <source src="{{ url_for('static', filename='videos/home/layers.mp4') }}" type="video/mp4">
+          </video>
+        </div>
+        <span class="e-flow-num">3</span>
+        <h3>Explore it in the viewer</h3>
+        <p>Rotate, cut, measure and label it in any browser.</p>
+      </li>
+      <li class="e-flow-step">
+        <div class="e-flow-visual e-flow-print" aria-hidden="true">
+          <span class="e-mini-poster">
+            <i class="e-mp-title"></i><i></i><i class="e-mp-s"></i>
+            <span class="e-mp-row"><i class="e-mp-fig"></i><img src="{{ qr_src }}" alt="" width="120" height="120" loading="lazy"></span>
+            <i></i><i class="e-mp-s"></i>
+          </span>
+          <span class="e-mp-url">academicar.com/m/&hellip;</span>
+        </div>
+        <span class="e-flow-num">4</span>
+        <h3>Add the QR to your work</h3>
+        <p>Print it on a poster, thesis or slide. Readers scan and the model opens.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
 <!-- ============================= EVERY PRINTED SURFACE ============================= -->
 <section class="e-section e-surfaces" id="surfaces">
   <div class="e-wrap">
     <div class="e-head">
-      <h2 class="e-h2">Wherever your work is printed, the model is one scan away.</h2>
-      <p class="e-sub">The same QR code and short link work on every surface. Here is how people use them.</p>
+      <h2 class="e-h2">One code for every printed surface.</h2>
     </div>
 
     <ul class="e-surface-list">
       {% set surfaces = [
-        ('poster', 'Conference poster', 'Print the code beside the figure. Visitors open the model on their phone while they stand at your board.', url_for('blog_post', slug='qr-codes-on-academic-posters-guide'), 'Poster QR guide'),
-        ('thesis', 'Thesis and dissertation', 'Add a code and short link for each model to the printed copy, so examiners can rotate the specimen instead of reading three fixed views.', url_for('blog_post', slug='how-to-add-3d-models-to-research-papers'), 'Adding models to papers'),
-        ('journal', 'Journal article', 'Put the viewer link in the figure caption or supplementary material. Reviewers inspect the geometry, not a screenshot of it.', url_for('blog_post', slug='interactive-3d-figures-scientific-publishing'), 'Interactive figures'),
-        ('slide', 'Lecture slide', 'Place the code on the slide and students open the exact structure you are describing, during class or after it.', url_for('blog_post', slug='add-3d-model-to-powerpoint'), '3D in PowerPoint'),
-        ('label', 'Lab station or museum label', 'Pair a printed label with its model. Tap-to-place AR shows the object at true scale on the bench or in the gallery.', url_for('ar_for', discipline='museums'), 'AR for museums'),
-        ('web', 'Lab or project website', 'Embed the same viewer in a web page with an iframe. Updating the model updates every place it appears.', url_for('blog_post', slug='embed-3d-model-website'), 'Embedding guide')
+        ('poster', 'Conference poster', 'Visitors open the model while they stand at your board.', url_for('blog_post', slug='qr-codes-on-academic-posters-guide'), 'Poster QR guide'),
+        ('thesis', 'Thesis and dissertation', 'Examiners rotate the specimen instead of three fixed views.', url_for('blog_post', slug='how-to-add-3d-models-to-research-papers'), 'Adding models to papers'),
+        ('journal', 'Journal article', 'Put the link in the caption so reviewers inspect the geometry.', url_for('blog_post', slug='interactive-3d-figures-scientific-publishing'), 'Interactive figures'),
+        ('slide', 'Lecture slide', 'Students open the structure you are describing, in class.', url_for('blog_post', slug='add-3d-model-to-powerpoint'), '3D in PowerPoint'),
+        ('label', 'Lab station or museum label', 'AR shows the object at true scale on the bench or in the gallery.', url_for('ar_for', discipline='museums'), 'AR for museums'),
+        ('web', 'Lab or project website', 'Embed the same viewer with an iframe; updates show everywhere.', url_for('blog_post', slug='embed-3d-model-website'), 'Embedding guide')
       ] %}
       {% for key, title, text, href, link in surfaces %}
       <li class="e-surface">
@@ -159,17 +210,13 @@
     <div class="e-stable-copy">
       <h2 class="e-h2">The printed code outlives the file behind it.</h2>
       <p>
-        Your QR code points to a stable address, not to a file. Replace the model with a new scan,
-        recolour it, rescale it or move it to another plan, and the code on every printout keeps
-        opening the current version.
-      </p>
-      <p>
-        If a model's access window ends, the same link shows a clear page that says so, never a dead link.
+        The code points to a stable address, not a file. Replace, recolour or rescale the model and every printout opens the current version.
       </p>
       <dl class="e-stable-facts">
         <div><dt>Address</dt><dd>academicar.com/m/&hellip; for each model</dd></div>
         <div><dt>History</dt><dd>Every replacement is kept as a model version</dd></div>
         <div><dt>Print</dt><dd>PNG and print-ready QR files from the dashboard</dd></div>
+        <div><dt>Expiry</dt><dd>A clear notice page, never a dead link</dd></div>
       </dl>
     </div>
 
@@ -208,8 +255,7 @@
   <div class="e-wrap">
     <div class="e-head e-head-row">
       <div>
-        <h2 class="e-h2">What your reader gets after the scan.</h2>
-        <p class="e-sub">A full 3D viewer in the browser, with the tools you chose to show.</p>
+        <h2 class="e-h2">What opens after the scan.</h2>
       </div>
       <p class="e-tools-hint" aria-hidden="true">Scroll sideways</p>
     </div>
@@ -219,11 +265,9 @@
       ('orbit', 'Rotate in any browser', 'No login and nothing to install.'),
       ('layers', 'Layers', 'Hide, x-ray and recolour each part of the model.'),
       ('section', 'Section plane', 'Cut along any axis and look inside.'),
-      ('measure', 'Measure and label', 'Distances in real units, with labelled points.'),
-      ('slice', 'Slice view', '2D cross-sections with a snapping two-point measure.'),
-      ('scenes', 'Scenes and tours', 'Saved views, each with its own link, QR code and AR file.'),
-      ('figure', 'Figure export', 'A PNG with legend, scale bar and QR code for your next paper.'),
-      ('scan', 'AR on the desk', 'WebXR on Android and Quick Look on iPhone.')
+      ('measure', 'Measure and label', 'Distances in real units.'),
+      ('scenes', 'Scenes and tours', 'Saved views, each with its own QR code.'),
+      ('figure', 'Figure export', 'A PNG with legend, scale bar and QR code.')
     ] %}
     {% for key, title, text in tools %}
     <figure class="e-tool">
@@ -256,7 +300,7 @@
       <img src="{{ url_for('static', filename='images/use-scientific-publication.png') }}" alt="A printed scientific article with an interactive 3D model beside it" loading="lazy">
       <div>
         <h3>Attach a model to the paper, poster or thesis.</h3>
-        <p>Upload GLB, STL, OBJ, FBX, STEP or a CT/MR scan. AcademicAR converts it for the web, generates the QR code and keeps it private until you share a review link or publish.</p>
+        <p>Keep it private until you share a review link or publish.</p>
         <ul class="e-aud-links">
           <li><a href="{{ url_for('auth.register') }}">Create a free account</a></li>
           <li><a href="{{ url_for('demo_dashboard', source='home_e') }}">See a researcher dashboard</a></li>
@@ -268,7 +312,7 @@
       <img src="{{ url_for('static', filename='images/use-medical-education.png') }}" alt="Students exploring an anatomy model on a phone" loading="lazy">
       <div>
         <h3>Put a structure on every handout and slide.</h3>
-        <p>Students scan the code during class and keep the model afterwards. Saved scenes walk them through it step by step, each with its own link and QR code.</p>
+        <p>Saved scenes walk students through it, each with its own QR code.</p>
         <ul class="e-aud-links">
           <li><a href="{{ url_for('ar_for', discipline='anatomy') }}">AR for anatomy</a></li>
           <li><a href="{{ url_for('ar_for', discipline='stem-education') }}">AR for STEM education</a></li>
@@ -280,7 +324,7 @@
       <img src="{{ url_for('static', filename='images/use-research-projects.png') }}" alt="A department's research projects with their 3D models" loading="lazy">
       <div>
         <h3>Fund models for a whole department.</h3>
-        <p>An institutional contract covers members' models within a model and storage quota. Invite people with a link, limit it to your email domain, and show the work on a public showcase page. Viewers see who supported it.</p>
+        <p>Members' models run on one shared quota, with invite links and a public showcase page.</p>
         <ul class="e-aud-links">
           <li><a href="{{ url_for('demo_institution', source='home_e') }}">See an institution dashboard</a></li>
           <li><a href="{{ url_for('institutional_inquiry') }}">Ask about an institutional plan</a></li>
@@ -291,7 +335,7 @@
       <img src="{{ url_for('static', filename='images/blog/covers/ar-for-archaeology-3d-artifacts.webp') }}" alt="An archaeological artefact shown as a 3D model" loading="lazy">
       <div>
         <h3>Let visitors take the object off the label.</h3>
-        <p>A QR code on the gallery label opens the scanned object in 3D. Visitors turn it over, look underneath and place it at true scale on the floor in AR.</p>
+        <p>The label's QR code opens the object in 3D and at true scale in AR.</p>
         <ul class="e-aud-links">
           <li><a href="{{ url_for('ar_for', discipline='museums') }}">AR for museums and heritage</a></li>
           <li><a href="{{ url_for('ar_for', discipline='archaeology') }}">AR for archaeology</a></li>
@@ -306,7 +350,6 @@
   <div class="e-wrap">
     <div class="e-head">
       <h2 class="e-h2">Every viewer feature in one minute.</h2>
-      <p class="e-sub">The showreel, with sound. It loads only when you press play.</p>
     </div>
     <div class="e-screen" data-e-showreel>
       <span class="e-screen-roller" aria-hidden="true"></span>
@@ -332,11 +375,10 @@
     <div class="e-inst-copy">
       <h2 class="e-h2">For departments, libraries and journals.</h2>
       <ul class="e-inst-list">
-        <li>A contract with a model and storage quota, and an end date you control</li>
-        <li>Invite links for members, optionally limited to your email domain</li>
-        <li>A public showcase page for the work your institution funded</li>
-        <li>"Supported by" attribution in every funded viewer</li>
-        <li>Monthly usage reports and a reminder before renewal</li>
+        <li>One model and storage quota for the contract</li>
+        <li>Invite links, optionally limited to your email domain</li>
+        <li>A public showcase and "Supported by" in every funded viewer</li>
+        <li>Monthly usage reports</li>
       </ul>
       <div class="e-hero-actions">
         <a href="{{ url_for('institutional_inquiry') }}" class="e-btn e-btn-dark">Talk to us about a plan</a>
@@ -365,7 +407,7 @@
     <div class="e-cta-box">
       <div>
         <h2 class="e-cta-title">Put a model on your next printout.</h2>
-        <p>Free to start. Upload a model, print the QR code, and see it open on your own phone.</p>
+        <p>Free to start. Upload a model and scan its QR code with your own phone.</p>
       </div>
       <div class="e-hero-actions">
         <a href="{{ url_for('auth.register') }}" class="e-btn e-btn-light">Start publishing</a>
