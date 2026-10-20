@@ -3,8 +3,26 @@
 {% block meta_description %}{{ discipline.meta_description }}{% endblock %}
 {% block og_title %}{{ discipline.h1 }}{% endblock %}
 {% block og_description %}{{ discipline.meta_description }}{% endblock %}
+{% block og_image %}{{ share_image }}{% endblock %}
 
 {% block head %}
+<link rel="preload" as="image" href="{{ url_for('static', filename=discipline.image) }}" fetchpriority="high">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  "name": {{ discipline.h1 | tojson }},
+  "description": {{ discipline.meta_description | tojson }},
+  "url": {{ canonical_url() | tojson }},
+  "primaryImageOfPage": {
+    "@type": "ImageObject",
+    "url": {{ share_image | tojson }},
+    "width": 1200,
+    "height": 670,
+    "caption": {{ discipline.image_alt | tojson }}
+  }
+}
+</script>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -25,8 +43,8 @@
   "@context": "https://schema.org",
   "@type": "BreadcrumbList",
   "itemListElement": [
-    { "@type": "ListItem", "position": 1, "name": "Home", "item": {{ url_for('landing', _external=True) | tojson }} },
-    { "@type": "ListItem", "position": 2, "name": "Use cases", "item": {{ url_for('ar_for_index', _external=True) | tojson }} },
+    { "@type": "ListItem", "position": 1, "name": "Home", "item": {{ public_url('landing') | tojson }} },
+    { "@type": "ListItem", "position": 2, "name": "Use cases", "item": {{ public_url('ar_for_index') | tojson }} },
     { "@type": "ListItem", "position": 3, "name": {{ discipline.name | tojson }}, "item": {{ canonical_url() | tojson }} }
   ]
 }
@@ -34,76 +52,106 @@
 {% endblock %}
 
 {% block content %}
-<div class="max-w-5xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+<div class="max-w-6xl mx-auto px-4 py-10 sm:py-12 sm:px-6 lg:px-8">
 
   <!-- Breadcrumb -->
   <nav class="text-sm text-[#6b6b6b] mb-8" aria-label="Breadcrumb">
     <a href="{{ url_for('landing') }}" class="hover:text-[#202020]">Home</a>
-    <span class="mx-2">/</span>
+    <span class="mx-2" aria-hidden="true">/</span>
     <a href="{{ url_for('ar_for_index') }}" class="hover:text-[#202020]">Use cases</a>
-    <span class="mx-2">/</span>
-    <span class="text-[#4d4d4d]">{{ discipline.name }}</span>
+    <span class="mx-2" aria-hidden="true">/</span>
+    <span class="text-[#4d4d4d]" aria-current="page">{{ discipline.name }}</span>
   </nav>
 
-  <!-- Hero -->
-  <header class="max-w-3xl">
-    <p class="text-sm font-semibold uppercase tracking-wide text-[#ff682c] mb-3">AR for {{ discipline.name }}</p>
-    <h1 class="font-serif text-4xl sm:text-5xl font-bold text-[#202020] leading-tight mb-5">{{ discipline.h1 }}</h1>
-    <p class="text-lg text-[#4d4d4d] leading-relaxed mb-8">{{ discipline.subhead }}</p>
-    <div class="flex flex-wrap gap-3">
-      <a href="{{ url_for('auth.register') }}" class="inline-flex items-center justify-center rounded-md px-5 py-3 text-sm font-semibold text-white bg-[#202020] hover:bg-black transition-colors">Create a free account</a>
-      <a href="{{ url_for('demo_mitochondria_ar') }}" class="inline-flex items-center justify-center rounded-md px-5 py-3 text-sm font-semibold text-[#202020] border border-[#202020] hover:bg-[#f5f5f5] transition-colors">See a live demo</a>
+  <!-- Hero: copy beside the field illustration -->
+  <header class="grid gap-8 lg:grid-cols-12 lg:gap-10 lg:items-center">
+    <div class="lg:col-span-5">
+      <p class="text-sm font-semibold text-[#ff682c] mb-3">AR for {{ discipline.name }}</p>
+      <h1 class="font-serif text-4xl sm:text-5xl lg:text-[2.75rem] font-bold text-[#202020] leading-tight mb-5">{{ discipline.h1 }}</h1>
+      <p class="text-lg text-[#4d4d4d] leading-relaxed mb-8">{{ discipline.subhead }}</p>
+      <div class="flex flex-wrap gap-3">
+        <a href="{{ url_for('auth.register') }}" class="inline-flex items-center justify-center rounded-md px-5 py-3 text-sm font-semibold text-white bg-[#202020] hover:bg-black transition-colors">Create a free account</a>
+        <a href="{{ url_for('demo_mitochondria_ar') }}" class="inline-flex items-center justify-center rounded-md px-5 py-3 text-sm font-semibold text-[#202020] border border-[#202020] hover:bg-[#f5f5f5] transition-colors">See a live demo</a>
+      </div>
     </div>
+    <figure class="lg:col-span-7">
+      <img src="{{ url_for('static', filename=discipline.image) }}"
+           alt="{{ discipline.image_alt }}"
+           width="1200" height="670" fetchpriority="high" decoding="async"
+           class="block w-full h-auto aspect-[1200/670] rounded-lg border border-[#e8e8e8] bg-white">
+    </figure>
   </header>
 
   <!-- Intro -->
-  <div class="prose prose-lg max-w-none mt-14 space-y-5 text-[#374151]">
+  <div class="max-w-3xl mt-14 space-y-5 text-lg leading-relaxed text-[#374151]">
     {% for para in discipline.intro %}
     <p>{{ para }}</p>
     {% endfor %}
   </div>
 
   <!-- Why -->
-  <section class="mt-16">
-    <h2 class="font-serif text-2xl font-bold text-[#202020] mb-6">Why {{ discipline.name | lower }} needs interactive 3D</h2>
-    <div class="grid gap-5 sm:grid-cols-3">
+  <section class="mt-16" aria-labelledby="why-heading">
+    <h2 id="why-heading" class="font-serif text-2xl sm:text-3xl font-bold text-[#202020] mb-6">Why {{ discipline.name | lower }} needs interactive 3D</h2>
+    <div class="grid gap-x-8 gap-y-6 sm:grid-cols-3 border-t border-[#202020] pt-6">
       {% for point in discipline.why %}
-      <div class="border border-[#e8e8e8] rounded-lg p-6">
-        <p class="text-[#202020] font-semibold mb-2">{{ point.lead }}</p>
+      <div>
+        <h3 class="text-[#202020] font-semibold mb-2">{{ point.lead }}</h3>
         <p class="text-[#4d4d4d] text-sm leading-relaxed">{{ point.text }}</p>
       </div>
       {% endfor %}
     </div>
   </section>
 
-  <!-- How it works (generic, shared workflow) -->
-  <section class="mt-16">
-    <h2 class="font-serif text-2xl font-bold text-[#202020] mb-6">How it works</h2>
+  <!-- Viewer tools that suit this field -->
+  {% if discipline.tools %}
+  <section class="mt-16" aria-labelledby="tools-heading">
+    <h2 id="tools-heading" class="font-serif text-2xl sm:text-3xl font-bold text-[#202020] mb-2">Viewer tools {{ discipline.name | lower }} teams reach for</h2>
+    <p class="text-[#4d4d4d] mb-6 max-w-2xl">Every published model opens in the same viewer. These are the tools that matter most for {{ discipline.name | lower }} work.</p>
+    <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      {% for tool in discipline.tools %}
+      <figure class="min-w-0">
+        <img src="{{ url_for('static', filename=tool.image) }}"
+             alt="The AcademicAR viewer showing the {{ tool.title | lower }} tool on a 3D model"
+             width="960" height="540" loading="lazy" decoding="async"
+             class="block w-full h-auto aspect-video rounded-lg bg-[#202020] object-cover">
+        <figcaption class="mt-3">
+          <span class="block text-[#202020] font-semibold">{{ tool.title }}</span>
+          <span class="block text-[#4d4d4d] text-sm leading-relaxed mt-1">{{ tool.body }}</span>
+        </figcaption>
+      </figure>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- How it works (shared workflow, a real sequence) -->
+  <section class="mt-16" aria-labelledby="how-heading">
+    <h2 id="how-heading" class="font-serif text-2xl sm:text-3xl font-bold text-[#202020] mb-6">How it works</h2>
     <ol class="grid gap-5 sm:grid-cols-3">
       <li class="border border-[#e8e8e8] rounded-lg p-6">
-        <span class="text-[#6b6b6b] text-sm font-semibold">01</span>
+        <span class="text-[#6b6b6b] text-sm font-semibold">Step 1</span>
         <p class="text-[#202020] font-semibold mt-1 mb-1">Upload your model</p>
         <p class="text-[#4d4d4d] text-sm leading-relaxed">Drop in a GLB, STL, OBJ, FBX or STEP file, or a CT/MR segmentation. It's converted and optimized for the web automatically.</p>
       </li>
       <li class="border border-[#e8e8e8] rounded-lg p-6">
-        <span class="text-[#6b6b6b] text-sm font-semibold">02</span>
-        <p class="text-[#202020] font-semibold mt-1 mb-1">Get a viewer & QR code</p>
+        <span class="text-[#6b6b6b] text-sm font-semibold">Step 2</span>
+        <p class="text-[#202020] font-semibold mt-1 mb-1">Get a viewer &amp; QR code</p>
         <p class="text-[#4d4d4d] text-sm leading-relaxed">You get an interactive 3D viewer with tap-to-place AR, a short link, and a stable QR code.</p>
       </li>
       <li class="border border-[#e8e8e8] rounded-lg p-6">
-        <span class="text-[#6b6b6b] text-sm font-semibold">03</span>
+        <span class="text-[#6b6b6b] text-sm font-semibold">Step 3</span>
         <p class="text-[#202020] font-semibold mt-1 mb-1">Share anywhere</p>
-        <p class="text-[#4d4d4d] text-sm leading-relaxed">Place the QR code on a slide, poster, handout, label, or paper — no app, no headset for your audience.</p>
+        <p class="text-[#4d4d4d] text-sm leading-relaxed">Place the QR code on a slide, poster, handout, label, or paper. Your audience needs no app and no headset.</p>
       </li>
     </ol>
   </section>
 
   <!-- Use cases -->
-  <section class="mt-16">
-    <h2 class="font-serif text-2xl font-bold text-[#202020] mb-6">Ways {{ discipline.name | lower }} teams use it</h2>
+  <section class="mt-16" aria-labelledby="uses-heading">
+    <h2 id="uses-heading" class="font-serif text-2xl sm:text-3xl font-bold text-[#202020] mb-6">Ways {{ discipline.name | lower }} teams use it</h2>
     <div class="grid gap-5 sm:grid-cols-3">
       {% for uc in discipline.use_cases %}
-      <div class="border border-[#e8e8e8] rounded-lg p-6 bg-[#f5f5f5]">
+      <div class="rounded-lg p-6 bg-[#f5f5f5]">
         <h3 class="text-[#202020] font-semibold mb-2">{{ uc.title }}</h3>
         <p class="text-[#4d4d4d] text-sm leading-relaxed">{{ uc.body }}</p>
       </div>
@@ -111,12 +159,31 @@
     </div>
   </section>
 
+  <!-- Related guides from the blog -->
+  {% if guides %}
+  <section class="mt-16" aria-labelledby="guides-heading">
+    <h2 id="guides-heading" class="font-serif text-2xl sm:text-3xl font-bold text-[#202020] mb-6">Guides for {{ discipline.name | lower }}</h2>
+    <div class="grid gap-6 sm:grid-cols-3">
+      {% for post in guides %}
+      <a href="{{ url_for('blog_post', slug=post.slug) }}" class="group block min-w-0">
+        {% if post.cover %}
+        <img src="{{ post.cover }}" alt="" width="1600" height="800" loading="lazy" decoding="async"
+             class="block w-full h-auto aspect-[2/1] object-cover rounded-lg border border-[#e8e8e8] bg-white">
+        {% endif %}
+        <span class="block mt-3 text-[#202020] font-semibold leading-snug group-hover:underline underline-offset-4">{{ post.title }}</span>
+        <span class="block mt-1 text-[#4d4d4d] text-sm leading-relaxed">{{ post.description }}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
   <!-- FAQ -->
-  <section class="mt-16">
-    <h2 class="font-serif text-2xl font-bold text-[#202020] mb-6">{{ discipline.name }} FAQ</h2>
-    <div class="space-y-4">
+  <section class="mt-16 max-w-3xl" aria-labelledby="faq-heading">
+    <h2 id="faq-heading" class="font-serif text-2xl sm:text-3xl font-bold text-[#202020] mb-4">{{ discipline.name }} FAQ</h2>
+    <div class="divide-y divide-[#e8e8e8] border-y border-[#e8e8e8]">
       {% for faq in discipline.faqs %}
-      <div class="border border-[#e8e8e8] rounded-lg p-6">
+      <div class="py-5">
         <h3 class="text-lg font-semibold text-[#202020] mb-2">{{ faq.q }}</h3>
         <p class="text-[#4d4d4d] leading-relaxed">{{ faq.a }}</p>
       </div>
@@ -126,20 +193,26 @@
 
   <!-- Related disciplines -->
   {% if related %}
-  <section class="mt-16">
-    <h2 class="font-serif text-2xl font-bold text-[#202020] mb-6">Explore other fields</h2>
-    <div class="flex flex-wrap gap-3">
+  <section class="mt-16" aria-labelledby="related-heading">
+    <div class="flex flex-wrap items-baseline justify-between gap-3 mb-6">
+      <h2 id="related-heading" class="font-serif text-2xl sm:text-3xl font-bold text-[#202020]">Explore other fields</h2>
+      <a href="{{ url_for('ar_for_index') }}" class="text-sm font-semibold text-[#202020] border-b-2 border-[#202020] pb-0.5 hover:border-[#ff682c]">All use cases</a>
+    </div>
+    <div class="grid gap-6 sm:grid-cols-3">
       {% for rel in related %}
-      <a href="{{ url_for('ar_for', discipline=rel.slug) }}" class="inline-flex items-center rounded-full border border-[#e8e8e8] px-4 py-2 text-sm text-[#4d4d4d] hover:border-[#202020] hover:text-[#202020] transition-colors">AR for {{ rel.name }}</a>
+      <a href="{{ url_for('ar_for', discipline=rel.slug) }}" class="group block min-w-0">
+        <img src="{{ url_for('static', filename=rel.thumb) }}" alt="" width="640" height="357" loading="lazy" decoding="async"
+             class="block w-full h-auto aspect-[640/357] object-cover rounded-lg border border-[#e8e8e8] bg-white">
+        <span class="block mt-3 text-[#202020] font-semibold group-hover:underline underline-offset-4">AR for {{ rel.name }}</span>
+      </a>
       {% endfor %}
-      <a href="{{ url_for('ar_for_index') }}" class="inline-flex items-center rounded-full border border-[#e8e8e8] px-4 py-2 text-sm text-[#4d4d4d] hover:border-[#202020] hover:text-[#202020] transition-colors">All use cases →</a>
     </div>
   </section>
   {% endif %}
 
   <!-- Final CTA -->
   <section class="mt-16 border-t border-[#e8e8e8] pt-10 text-center">
-    <h2 class="font-serif text-2xl font-bold text-[#202020] mb-3">Publish your first {{ discipline.name | lower }} model</h2>
+    <h2 class="font-serif text-2xl sm:text-3xl font-bold text-[#202020] mb-3">Publish your first {{ discipline.name | lower }} model</h2>
     <p class="text-[#4d4d4d] mb-6 max-w-2xl mx-auto">Create a free account, upload a model, and share an interactive 3D &amp; AR figure in minutes.</p>
     <div class="flex flex-wrap gap-3 justify-center">
       <a href="{{ url_for('auth.register') }}" class="inline-flex items-center justify-center rounded-md px-5 py-3 text-sm font-semibold text-white bg-[#202020] hover:bg-black transition-colors">Get started free</a>

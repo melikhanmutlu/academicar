@@ -251,6 +251,16 @@
         </div>
       </div>
     </div>
+
+    {% if disciplines %}
+    <nav class="mt-10 flex flex-wrap items-center justify-center gap-2" aria-label="Use cases by field">
+      <span class="text-sm text-[#4d4d4d] mr-1">By field:</span>
+      {% for d in disciplines %}
+      <a href="{{ url_for('ar_for', discipline=d.slug) }}" class="inline-flex items-center rounded-full border border-[#e8e8e8] bg-white px-4 py-2 text-sm text-[#4d4d4d] hover:border-[#202020] hover:text-[#202020] transition-colors">{{ d.name }}</a>
+      {% endfor %}
+      <a href="{{ url_for('ar_for_index') }}" class="inline-flex items-center px-2 py-2 text-sm font-semibold text-[#202020] underline underline-offset-4">All use cases</a>
+    </nav>
+    {% endif %}
   </div>
 </section>
 

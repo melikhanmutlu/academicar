@@ -80,3 +80,52 @@ def test_titles_and_descriptions_are_unique(client):
     descs = {d["meta_description"] for d in all_disciplines()}
     assert len(titles) == len(discipline_slugs())
     assert len(descs) == len(discipline_slugs())
+
+
+def test_every_discipline_has_its_illustration_and_tools():
+    import os
+
+    for d in all_disciplines():
+        for key in ("image", "thumb"):
+            assert os.path.isfile(os.path.join("static", d[key])), (d["slug"], key)
+        assert d["image_alt"], d["slug"]
+        assert len(d["tools"]) == 3, d["slug"]
+        for tool in d["tools"]:
+            assert os.path.isfile(os.path.join("static", tool["image"])), tool["image"]
+
+
+def test_discipline_page_shows_illustration_tools_and_guides(client):
+    body = client.get("/ar-for-anatomy").get_data(as_text=True)
+    anatomy = get_discipline("anatomy")
+    assert "images/use-cases/anatomy.webp" in body
+    assert str(escape(anatomy["image_alt"])) in body
+    # The share preview uses the field illustration, not the site default.
+    assert 'property="og:image" content="http' in body
+    assert "images/use-cases/anatomy.webp" in body.split('property="og:image"')[1].split(">")[0]
+    assert '"primaryImageOfPage"' in body
+    for tool in anatomy["tools"]:
+        assert tool["title"] in body
+    # Related blog guides are linked for internal linking.
+    for slug in anatomy["guide_slugs"]:
+        assert f"/blog/{slug}" in body
+
+
+def test_hub_cards_show_thumbnails_and_share_image(client):
+    body = client.get("/ar-for").get_data(as_text=True)
+    for d in all_disciplines():
+        assert d["thumb"] in body
+    assert "images/use-cases/" in body.split('property="og:image"')[1].split(">")[0]
+
+
+def test_related_disciplines_rotate_through_the_cluster():
+    slugs = discipline_slugs()
+    # Every field is linked from at least one other field's page.
+    linked = {rel["slug"] for s in slugs for rel in related_disciplines(s)}
+    assert linked == set(slugs)
+    assert all(s not in {r["slug"] for r in related_disciplines(s)} for s in slugs)
+
+
+def test_landing_links_each_field(client):
+    body = client.get("/").get_data(as_text=True)
+    for slug in discipline_slugs():
+        assert f"/ar-for-{slug}" in body

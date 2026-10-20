@@ -3,6 +3,7 @@
 {% block meta_description %}See how interactive 3D and AR work for anatomy, chemistry, biology, archaeology, geology, engineering, museums, and STEM teaching — with a QR code, no app.{% endblock %}
 {% block og_title %}Interactive 3D & AR for research and teaching, by field{% endblock %}
 {% block og_description %}How researchers, educators, and museums use AcademicAR to publish interactive 3D and AR models across disciplines.{% endblock %}
+{% block og_image %}{{ share_image }}{% endblock %}
 
 {% block head %}
 <script type="application/ld+json">
@@ -10,7 +11,7 @@
   "@context": "https://schema.org",
   "@type": "BreadcrumbList",
   "itemListElement": [
-    { "@type": "ListItem", "position": 1, "name": "Home", "item": {{ url_for('landing', _external=True) | tojson }} },
+    { "@type": "ListItem", "position": 1, "name": "Home", "item": {{ public_url('landing') | tojson }} },
     { "@type": "ListItem", "position": 2, "name": "Use cases", "item": {{ canonical_url() | tojson }} }
   ]
 }
@@ -21,7 +22,7 @@
   "@type": "ItemList",
   "itemListElement": [
     {% for d in disciplines %}
-    { "@type": "ListItem", "position": {{ loop.index }}, "name": {{ ("AR for " ~ d.name) | tojson }}, "url": {{ url_for('ar_for', discipline=d.slug, _external=True) | tojson }} }{{ "," if not loop.last }}
+    { "@type": "ListItem", "position": {{ loop.index }}, "name": {{ ("AR for " ~ d.name) | tojson }}, "url": {{ public_url('ar_for', discipline=d.slug) | tojson }}, "image": {{ public_url('static', filename=d.image) | tojson }} }{{ "," if not loop.last }}
     {% endfor %}
   ]
 }
@@ -29,16 +30,15 @@
 {% endblock %}
 
 {% block content %}
-<div class="max-w-5xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+<div class="max-w-6xl mx-auto px-4 py-10 sm:py-12 sm:px-6 lg:px-8">
 
   <nav class="text-sm text-[#6b6b6b] mb-8" aria-label="Breadcrumb">
     <a href="{{ url_for('landing') }}" class="hover:text-[#202020]">Home</a>
-    <span class="mx-2">/</span>
-    <span class="text-[#4d4d4d]">Use cases</span>
+    <span class="mx-2" aria-hidden="true">/</span>
+    <span class="text-[#4d4d4d]" aria-current="page">Use cases</span>
   </nav>
 
   <header class="max-w-3xl">
-    <p class="text-sm font-semibold uppercase tracking-wide text-[#ff682c] mb-3">Use cases</p>
     <h1 class="font-serif text-4xl sm:text-5xl font-bold text-[#202020] leading-tight mb-5">Interactive 3D &amp; AR for your field</h1>
     <p class="text-lg text-[#4d4d4d] leading-relaxed">
       The same workflow — upload a model, get a viewer with augmented reality and a stable QR code —
@@ -46,21 +46,25 @@
     </p>
   </header>
 
-  <div class="grid gap-5 sm:grid-cols-2 mt-12">
+  <ul class="grid gap-x-8 gap-y-12 sm:grid-cols-2 mt-12">
     {% for d in disciplines %}
-    <a href="{{ url_for('ar_for', discipline=d.slug) }}"
-       class="group block border border-[#e8e8e8] rounded-lg p-6 hover:border-[#202020] transition-colors">
-      <div class="flex items-baseline justify-between gap-3">
-        <h2 class="font-serif text-xl font-bold text-[#202020]">AR for {{ d.name }}</h2>
-        <span class="text-[#6b6b6b] group-hover:text-[#202020] transition-colors" aria-hidden="true">→</span>
-      </div>
-      <p class="text-[#4d4d4d] text-sm leading-relaxed mt-2">{{ d.subhead }}</p>
-    </a>
+    <li class="min-w-0">
+      <a href="{{ url_for('ar_for', discipline=d.slug) }}" class="group block">
+        <img src="{{ url_for('static', filename=d.thumb) }}"
+             srcset="{{ url_for('static', filename=d.thumb) }} 640w, {{ url_for('static', filename=d.image) }} 1200w"
+             sizes="(min-width: 1152px) 540px, (min-width: 640px) 46vw, 92vw"
+             alt="{{ d.image_alt }}" width="640" height="357"
+             {% if loop.index > 2 %}loading="lazy"{% else %}fetchpriority="high"{% endif %} decoding="async"
+             class="block w-full h-auto aspect-[640/357] object-cover rounded-lg border border-[#e8e8e8] bg-white transition-colors group-hover:border-[#202020]">
+        <h2 class="font-serif text-2xl font-bold text-[#202020] mt-5 group-hover:underline underline-offset-4 decoration-2">AR for {{ d.name }}</h2>
+        <p class="text-[#4d4d4d] leading-relaxed mt-2">{{ d.subhead }}</p>
+      </a>
+    </li>
     {% endfor %}
-  </div>
+  </ul>
 
-  <section class="mt-16 border-t border-[#e8e8e8] pt-10 text-center">
-    <h2 class="font-serif text-2xl font-bold text-[#202020] mb-3">Don't see your field?</h2>
+  <section class="mt-20 border-t border-[#e8e8e8] pt-10 text-center">
+    <h2 class="font-serif text-2xl sm:text-3xl font-bold text-[#202020] mb-3">Don't see your field?</h2>
     <p class="text-[#4d4d4d] mb-6 max-w-2xl mx-auto">
       If your work produces 3D data, AcademicAR can publish it. Create a free account and try it with your own model.
     </p>

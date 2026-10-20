@@ -5483,7 +5483,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/")
     def landing():
-        return render_template("landing.html")
+        return render_template("landing.html", disciplines=all_disciplines())
 
     # Alternative homepage designs for review (preview only, noindex, not linked
     # from the site). The live homepage stays templates/landing.html.
@@ -5824,7 +5824,12 @@ def register_routes(app: Flask) -> None:
     @app.route("/ar-for")
     def ar_for_index():
         """Hub page linking every discipline landing page (topic-cluster center)."""
-        return render_template("disciplines_index.html", disciplines=all_disciplines())
+        disciplines = all_disciplines()
+        return render_template(
+            "disciplines_index.html",
+            disciplines=disciplines,
+            share_image=public_url("static", filename=disciplines[0]["image"]),
+        )
 
     @app.route("/ar-for-<discipline>")
     def ar_for(discipline):
@@ -5832,10 +5837,20 @@ def register_routes(app: Flask) -> None:
         data = get_discipline(discipline)
         if not data:
             abort(404)
+        # Related blog guides for internal links; unpublished or removed
+        # posts simply drop out.
+        posts_by_slug = {post["slug"]: post for post in merged_blog_posts()}
+        guides = [
+            {**posts_by_slug[slug], "cover": cover_image_path(posts_by_slug[slug].get("body") or "")}
+            for slug in data["guide_slugs"]
+            if slug in posts_by_slug
+        ]
         return render_template(
             "discipline.html",
             discipline=data,
             related=related_disciplines(data["slug"]),
+            guides=guides,
+            share_image=public_url("static", filename=data["image"]),
         )
 
     @app.route("/contact", methods=["GET", "POST"])

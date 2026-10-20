@@ -429,23 +429,127 @@ DISCIPLINES: dict[str, dict] = {
 }
 
 
+# Viewer tools shown on discipline pages. Images are frames from the product
+# showreel (static/images/home/); each card names what the tool does.
+VIEWER_TOOLS: dict[str, dict] = {
+    "layers": {"title": "Layers", "image": "images/home/layers.webp",
+               "body": "Show, hide, recolour or fade each part of a multi-part model, one layer at a time."},
+    "section": {"title": "Section plane", "image": "images/home/section.webp",
+                "body": "Cut through the model on the X, Y or Z axis to see what is inside."},
+    "slice": {"title": "Slice view", "image": "images/home/slice.webp",
+              "body": "Read 2D cross-sections of the mesh and measure across them with two snapping points."},
+    "measure": {"title": "Measure and label", "image": "images/home/measure.webp",
+                "body": "Pin labelled hotspots on named features and take distances at real scale."},
+    "scenes": {"title": "Scenes and tours", "image": "images/home/scenes.webp",
+               "body": "Save up to 12 views, each with its own link and QR code, and play them as a guided tour."},
+    "figure": {"title": "Figure export", "image": "images/home/figure.webp",
+               "body": "Export a clean PNG from any angle for a paper, slide or poster (paid plans)."},
+    "lighting": {"title": "Lighting and finishes", "image": "images/home/lighting.webp",
+                 "body": "Pick a lighting preset and a material finish so surface detail reads clearly."},
+    "orbit": {"title": "Orbit in any browser", "image": "images/home/orbit.webp",
+              "body": "Rotate and zoom in 360 degrees on any phone or laptop, with no login and no app."},
+    "scan": {"title": "Scan to open", "image": "images/home/scan.webp",
+             "body": "A stable QR code opens the model on a phone and places it in AR, with nothing to install."},
+}
+
+# Per-discipline media and internal links, kept apart from the copy above:
+# the hero illustration (static/images/use-cases/<slug>.webp plus a 640px
+# thumbnail), its alt text, three viewer tools and three related blog guides.
+DISCIPLINE_MEDIA: dict[str, dict] = {
+    "anatomy": {
+        "image_alt": "Pencil illustration of a student holding a phone over a lecture desk while a 3D heart "
+                     "with highlighted coronary arteries appears in AR above a handout with a QR code.",
+        "tools": ["layers", "section", "measure"],
+        "guides": ["augmented-reality-anatomy-education", "measuring-anatomy-3d-layer-metrics",
+                   "3d-models-surgical-education-case-reports"],
+    },
+    "chemistry": {
+        "image_alt": "Pencil illustration of a chemist at a lab bench holding a tablet while a protein "
+                     "structure with a highlighted bound ligand floats above the bench in AR.",
+        "tools": ["orbit", "scenes", "figure"],
+        "guides": ["interactive-3d-figures-scientific-publishing", "glb-stl-gltf-obj-3d-format-guide",
+                   "qr-codes-on-academic-posters-guide"],
+    },
+    "biology": {
+        "image_alt": "Pencil illustration of a biologist at a microscope checking a phone while an "
+                     "enlarged 3D cell with a highlighted mitochondrion appears on the lab table.",
+        "tools": ["section", "slice", "layers"],
+        "guides": ["section-plane-slice-view-cross-sections", "interactive-3d-figures-scientific-publishing",
+                   "publication-ready-3d-figures-comparisons"],
+    },
+    "archaeology": {
+        "image_alt": "Pencil illustration of an archaeologist photographing a broken vessel in an excavation "
+                     "trench while the complete vessel stands as a 3D model on the field table.",
+        "tools": ["measure", "lighting", "figure"],
+        "guides": ["ar-for-archaeology-3d-artifacts", "convert-obj-fbx-to-glb",
+                   "sketchfab-alternative-researchers"],
+    },
+    "geology": {
+        "image_alt": "Pencil illustration of a geologist at a layered sea cliff holding a tablet while a 3D "
+                     "block model of faulted rock strata sits on a boulder beside a compass.",
+        "tools": ["section", "slice", "measure"],
+        "guides": ["section-plane-slice-view-cross-sections", "view-stl-online-share-link",
+                   "qr-codes-on-academic-posters-guide"],
+    },
+    "engineering": {
+        "image_alt": "Pencil illustration of an engineering student at a workbench with a tablet while an "
+                     "exploded 3D gearbox assembly with dimension lines floats above the bench.",
+        "tools": ["layers", "section", "measure"],
+        "guides": ["step-cad-assemblies-ar-engineering", "open-step-stp-file-online", "convert-stl-to-glb"],
+    },
+    "museums": {
+        "image_alt": "Pencil illustration of a museum visitor pointing a phone at a fossil skull in a glass "
+                     "case while a larger 3D copy of the skull appears in AR beside it.",
+        "tools": ["scan", "scenes", "lighting"],
+        "guides": ["embed-3d-model-website", "saved-scenes-guided-tours-3d-teaching", "glb-to-usdz-iphone-ar"],
+    },
+    "stem-education": {
+        "image_alt": "Pencil illustration of three students with tablets around a 3D solar system model "
+                     "while their teacher points to a slide with a QR code.",
+        "tools": ["scan", "orbit", "scenes"],
+        "guides": ["saved-scenes-guided-tours-3d-teaching", "add-3d-model-to-powerpoint",
+                   "qr-codes-on-academic-posters-guide"],
+    },
+}
+
+
+def _with_media(slug: str, data: dict) -> dict:
+    media = DISCIPLINE_MEDIA.get(slug, {})
+    return {
+        "slug": slug,
+        **data,
+        "image": f"images/use-cases/{slug}.webp",
+        "thumb": f"images/use-cases/{slug}-640.webp",
+        "image_alt": media.get("image_alt", ""),
+        "tools": [VIEWER_TOOLS[key] for key in media.get("tools", []) if key in VIEWER_TOOLS],
+        "guide_slugs": list(media.get("guides", [])),
+    }
+
+
 def all_disciplines() -> list[dict]:
     """Disciplines in hub display order, each augmented with its ``slug``."""
-    return [{"slug": slug, **data} for slug, data in DISCIPLINES.items()]
+    return [_with_media(slug, data) for slug, data in DISCIPLINES.items()]
 
 
 def get_discipline(slug: str) -> dict | None:
     """Return one discipline (with ``slug``) or ``None`` if the slug is unknown."""
-    data = DISCIPLINES.get((slug or "").strip().lower())
+    key = (slug or "").strip().lower()
+    data = DISCIPLINES.get(key)
     if not data:
         return None
-    return {"slug": slug, **data}
+    return _with_media(key, data)
 
 
 def related_disciplines(slug: str, limit: int = 3) -> list[dict]:
-    """Sibling disciplines for internal linking, excluding ``slug``."""
-    siblings = [d for d in all_disciplines() if d["slug"] != slug]
-    return siblings[:limit]
+    """The next ``limit`` disciplines after ``slug`` in hub order (wrapping),
+    so every page is linked from several others instead of all pages pointing
+    at the first three."""
+    items = all_disciplines()
+    slugs = [d["slug"] for d in items]
+    if slug not in slugs:
+        return items[:limit]
+    start = slugs.index(slug)
+    return [items[(start + offset) % len(items)] for offset in range(1, min(limit, len(items) - 1) + 1)]
 
 
 def discipline_slugs() -> list[str]:
