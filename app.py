@@ -5507,7 +5507,7 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/pricing")
     def pricing():
-        return render_template("pricing.html")
+        return render_template("pricing.html", plan_features=PLAN_FEATURES)
 
     @app.route("/demo/mitochondria/ar")
     def demo_mitochondria_ar():

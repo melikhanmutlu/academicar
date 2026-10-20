@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Pricing & Plans - AcademicAR{% endblock %}
-{% block meta_description %}AcademicAR pricing: create projects for free, then choose a 3-year Academic or 10-year Extended Archive access window per 3D/AR model. Institutional licensing available.{% endblock %}
+{% block meta_description %}AcademicAR pricing: projects are free; each shared 3D / AR model gets its own plan. Free for 3 days, Academic for 3 years, Extended Archive for 10 years. Institutional licensing available.{% endblock %}
 
 {% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pricing.css', v=asset_version) }}">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -27,204 +28,161 @@
 {% endblock %}
 
 {% block content %}
-<section class="plans-hero">
-  <div class="plans-hero-inner reveal-up">
-    <div class="plans-hero-copy">
-      <span class="landing-eyebrow">Pricing &amp; plans</span>
-      <h1 class="landing-h1">Model-based access for academic publishing.</h1>
-      <p class="landing-lead">
-        Keep the project workspace free, then choose an access window for each shared 3D / AR model.
-        The viewer URL and QR resolver stay stable when a model is upgraded, renewed, or replaced.
+{% set plan_keys = ['free', 'academic', 'extended_archive'] %}
+{% set plans = [] %}
+{% for key in plan_keys if key in license_plans %}{% set _ = plans.append(license_plans[key]) %}{% endfor %}
+{% set finite_days = plans | rejectattr('duration_days', 'none') | map(attribute='duration_days') | list %}
+{% set scale_days = (finite_days | max) if finite_days else 1 %}
+{% set plan_copy = {
+  'free': {'for': 'Try an upload or show a model to a reviewer.', 'cta': 'Start free', 'href': url_for('auth.register')},
+  'academic': {'for': 'Share a model in a paper, thesis or poster.', 'cta': 'Choose Academic', 'href': url_for('auth.register', plan='academic')},
+  'extended_archive': {'for': 'Keep reference and teaching models online for the long run.', 'cta': 'Choose Extended Archive', 'href': url_for('auth.register', plan='extended_archive')},
+} %}
+{# Shorter public names for the admin feature labels; unknown keys fall back to the label. #}
+{% set feature_names = {
+  'ar': 'Mobile AR on iOS and Android',
+  'annotations': 'Labels and notes on the model',
+  'screenshots': 'Screenshots',
+  'combined_view': 'Combined-view figures',
+  'video_recording': 'Video recording',
+  'medical_colors': 'Medical colour presets',
+  'presentation_library': 'PDF and PowerPoint library',
+  'detailed_insights': 'Model details and statistics',
+  'scenes': 'Saved scenes and presentation mode',
+  'scene_ar': 'AR for saved scenes',
+  'section_plane': 'Section plane',
+  'slice_view': '2D slice view with measuring',
+  'custom_threshold': 'Custom CT threshold for scans',
+  'embed': 'Embed code with your own settings',
+  'layer_metrics': 'Structure volumes, areas and distances',
+  'figure_export': 'Publication-ready figure export',
+  'comparison': 'Before / after comparison links',
+  'embed_full_layout': 'Embed the full viewer layout',
+  'embed_white_label': 'Embed without AcademicAR branding',
+} %}
+{% set feature_groups = {
+  'ar': 'share', 'scene_ar': 'share', 'embed': 'share', 'presentation_library': 'share',
+  'embed_full_layout': 'share', 'embed_white_label': 'share',
+  'annotations': 'explore', 'scenes': 'explore', 'section_plane': 'explore', 'slice_view': 'explore',
+  'detailed_insights': 'explore', 'medical_colors': 'explore', 'custom_threshold': 'explore',
+  'layer_metrics': 'explore', 'comparison': 'explore',
+} %}
+{% set free_features = license_plans['free'].features if 'free' in license_plans else [] %}
+{% set every_plan = {'share': [], 'explore': [], 'capture': []} %}
+{% set paid_only = [] %}
+{% for key, label in plan_features %}
+  {% set ns = namespace(count=0) %}
+  {% for plan in plans if key in plan.features %}{% set ns.count = ns.count + 1 %}{% endfor %}
+  {% if ns.count == plans | length %}{% set _ = every_plan[feature_groups.get(key, 'capture')].append(feature_names.get(key, label)) %}
+  {% elif ns.count and key not in free_features %}{% set _ = paid_only.append(feature_names.get(key, label)) %}{% endif %}
+{% endfor %}
+
+<div class="pr-page">
+  <section class="pr-hero">
+    <p class="pr-kicker">Pricing &amp; plans</p>
+    <h1>Projects are free. You pay per model, for as long as it stays online.</h1>
+    <p class="pr-lead">Each 3D model you share has its own plan. Its viewer link and QR code stay the same when you upgrade, renew or replace the file.</p>
+  </section>
+
+  <section class="pr-plans" id="plans" aria-label="Plans">
+    {% for plan in plans %}
+    {% set copy = plan_copy[plan.key] %}
+    {% set days = plan.duration_days %}
+    {% set span = 100 if days is none else [days / scale_days * 100, 1.5] | max %}
+    <article class="pr-plan{% if plan.key == 'academic' %} is-primary{% endif %}">
+      <header class="pr-plan-head">
+        <h2>{{ plan.label }}</h2>
+        <p>{{ copy['for'] }}</p>
+      </header>
+
+      <p class="pr-price">
+        <span class="pr-price-num">${{ "%.2f"|format(plan.price_usd) }}</span>
+        <span class="pr-price-note">{{ "one-time, per model" if plan.price_usd > 0 else "no card needed" }}</span>
       </p>
-      <div class="plans-hero-actions">
-        <a href="#plans" class="pricing-cta">Compare plans</a>
-        <a href="#institutional" class="pricing-cta muted">Institutional licensing</a>
-      </div>
-    </div>
-    <div class="plans-principles" aria-label="Pricing principles">
-      <div>
-        <span>01</span>
-        <strong>Project pages are free</strong>
-        <p>Project context, optional references, documents, and models stay grouped in one workspace.</p>
-      </div>
-      <div>
-        <span>02</span>
-        <strong>Access is per model</strong>
-        <p>Each model keeps its own license window, QR code, viewer link, and AR-ready GLB.</p>
-      </div>
-      <div>
-        <span>03</span>
-        <strong>Links stay durable</strong>
-        <p>Printed QR codes and shared viewer URLs can survive upgrades and replacement uploads.</p>
-      </div>
-    </div>
-  </div>
-</section>
 
-<section class="plans-section" id="plans">
-  <div class="plans-section-header reveal-up">
-    <span class="landing-eyebrow">Access windows</span>
-    <h2 class="landing-h2">Choose by project lifetime.</h2>
-    <p class="landing-body">
-      Plans are designed around how long readers, reviewers, students, or lab teams need the model to remain available.
-    </p>
-  </div>
-
-  <div class="plans-grid">
-    <article class="plan-detail-card reveal-up">
-      <div class="plan-detail-top">
-        <span class="pricing-eyebrow">Free Access</span>
-        <span class="pricing-meta">Preview</span>
+      <div class="pr-span" role="img" aria-label="Online for {{ access_window_label(days) }}">
+        <div class="pr-span-track"><span class="pr-span-fill{% if days is none %} is-open{% endif %}" style="width: {{ '%.1f'|format(span) }}%"></span></div>
+        <p class="pr-span-label">Online for <strong>{{ access_window_label(days) }}</strong></p>
       </div>
-      <h2>${{ "%.2f"|format(license_plans['free'].price_usd) }}</h2>
-      <p>For internal validation, reviewer demos, and quick model checks before a public publication is finalized.</p>
-      <dl>
-        <div><dt>Access window</dt><dd>{{ access_window_label(license_plans['free'].duration_days) }}</dd></div>
-        <div><dt>Storage limit</dt><dd>Up to {{ (license_plans['free'].storage_limit_bytes / 1024 / 1024) | round(0, 'floor') | int }} MB / model</dd></div>
-        <div><dt>Viewer</dt><dd>Watermarked public viewer</dd></div>
-        <div><dt>Best for</dt><dd>Short-lived previews and upload tests</dd></div>
+
+      <dl class="pr-facts">
+        <div><dt>File size</dt><dd>Up to {{ (plan.storage_limit_bytes / 1024 / 1024) | round(0, 'floor') | int }} MB</dd></div>
+        <div><dt>Models per project</dt><dd>{% if plan.max_models_per_project is none %}No limit{% else %}{{ plan.max_models_per_project }}{% endif %}</dd></div>
+        <div><dt>Viewer</dt><dd>{{ "No watermark" if plan.is_paid else "AcademicAR watermark" }}</dd></div>
+        <div><dt>Viewer tools</dt><dd>{% set n = plan.features | length %}{% if n >= plan_features | length %}All tools{% else %}All but {{ plan_features | length - n }}{% endif %}</dd></div>
       </dl>
-      <ul>
-        <li>Viewer, QR resolver, screenshots, and mobile AR access</li>
-        <li>Stable model URL during the preview window</li>
-        <li>Upgrade path without changing the model registry item</li>
-      </ul>
-      <a href="{{ url_for('auth.register') }}" class="pricing-cta">Start free</a>
-    </article>
 
-    <article class="plan-detail-card reveal-up delay-1">
-      <div class="plan-detail-top">
-        <span class="pricing-eyebrow">Academic</span>
-        <span class="pricing-meta">Publication</span>
+      <a href="{{ copy['href'] }}" class="pr-btn{% if plan.key == 'academic' %} is-solid{% endif %}">{{ copy['cta'] }}</a>
+    </article>
+    {% endfor %}
+  </section>
+  <p class="pr-scale-note">Bars are drawn to the same scale. When a plan ends, the link shows a renewal notice instead of a dead page.</p>
+
+  <section class="pr-scope" aria-labelledby="pr-scope-title">
+    <h2 id="pr-scope-title">What every plan includes</h2>
+    <div class="pr-scope-cols">
+      <div class="pr-list">
+        <h3>Share</h3>
+        <ul>
+          <li>A web viewer that opens on any phone or laptop</li>
+          <li>A QR code and short link for print and slides</li>
+          <li>A project page with optional DOI, PDF and references</li>
+          {% for name in every_plan['share'] %}<li>{{ name }}</li>{% endfor %}
+        </ul>
       </div>
-      <h2>${{ "%.2f"|format(license_plans['academic'].price_usd) }}</h2>
-      <p>One-time, per model access for papers, theses, conference posters, and academic supplementary material.</p>
-      <dl>
-        <div><dt>Access window</dt><dd>{{ access_window_label(license_plans['academic'].duration_days) }}</dd></div>
-        <div><dt>Storage limit</dt><dd>Up to {{ (license_plans['academic'].storage_limit_bytes / 1024 / 1024) | round(0, 'floor') | int }} MB / model</dd></div>
-        <div><dt>Viewer</dt><dd>No public watermark</dd></div>
-        <div><dt>Best for</dt><dd>Citation-ready research assets</dd></div>
-      </dl>
-      <ul>
-        <li>Persistent QR and viewer URL</li>
-        <li>AR-ready GLB, screenshot tools, and metadata page</li>
-        <li>Model replacement while retaining the same resolver</li>
-        <li>Saved scenes with their own QR, presentation mode and scene AR</li>
-        <li>Section plane, structure measurements and publication figures</li>
-        <li>Before / after comparison links</li>
-      </ul>
-      <a href="{{ url_for('auth.register', plan='academic') }}" class="pricing-cta">Get started</a>
-    </article>
-
-    <article class="plan-detail-card featured reveal-up delay-2">
-      <div class="plan-detail-top">
-        <span class="pricing-eyebrow">Extended Archive</span>
-        <span class="pricing-meta">Long term</span>
+      <div class="pr-list">
+        <h3>Explore</h3>
+        <ul>
+          {% for name in every_plan['explore'] %}<li>{{ name }}</li>{% endfor %}
+        </ul>
       </div>
-      <h2>${{ "%.2f"|format(license_plans['extended_archive'].price_usd) }}</h2>
-      <p>Long-lived model access for assets that need to remain available across thesis, archive, and teaching cycles.</p>
-      <dl>
-        <div><dt>Access window</dt><dd>{{ access_window_label(license_plans['extended_archive'].duration_days) }}</dd></div>
-        <div><dt>Storage limit</dt><dd>Up to {{ (license_plans['extended_archive'].storage_limit_bytes / 1024 / 1024) | round(0, 'floor') | int }} MB / model</dd></div>
-        <div><dt>Viewer</dt><dd>No public watermark</dd></div>
-        <div><dt>Best for</dt><dd>Reference models and durable archives</dd></div>
-      </dl>
-      <ul>
-        <li>Priority archival storage</li>
-        <li>Persistent QR and viewer URL</li>
-        <li>Viewer, AR, screenshots, and rich metadata fields</li>
-        <li>Everything in Academic: scenes, section plane, measurements, figures and comparisons</li>
-      </ul>
-      <a href="{{ url_for('auth.register', plan='extended_archive') }}" class="pricing-cta">Choose extended</a>
-    </article>
-  </div>
-</section>
-
-<section class="plans-section plans-compare">
-  <div class="plans-compare-inner reveal-up">
-    <div class="plans-compare-copy">
-      <span class="landing-eyebrow">Detailed comparison</span>
-      <h2 class="landing-h2">The difference is the access window, not the workflow.</h2>
-      <p class="landing-body">
-        Every plan keeps the same publishing flow: upload a model, generate a QR resolver, open the viewer,
-        capture screenshots, and share the model from the project page.
-      </p>
+      <div class="pr-list">
+        <h3>Upload and capture</h3>
+        <ul>
+          <li>GLB, STL, OBJ, FBX and STEP files</li>
+          <li>CT / MR scans and segmentations</li>
+          {% for name in every_plan['capture'] %}<li>{{ name }}</li>{% endfor %}
+        </ul>
+      </div>
     </div>
-    <div class="plans-table-wrap">
-      <table class="plans-table" role="table">
-        <thead role="rowgroup">
-          <tr role="row">
-            <th role="columnheader">Feature</th>
-            <th role="columnheader">Free</th>
-            <th role="columnheader">Academic</th>
-            <th role="columnheader">Extended</th>
-          </tr>
-        </thead>
-        <tbody role="rowgroup">
-          <tr role="row"><td role="rowheader">Access window</td><td role="cell">{{ access_window_label(license_plans['free'].duration_days) }}</td><td role="cell">{{ access_window_label(license_plans['academic'].duration_days) }}</td><td role="cell">{{ access_window_label(license_plans['extended_archive'].duration_days) }}</td></tr>
-          <tr role="row"><td role="rowheader">Model storage</td><td role="cell">{{ (license_plans['free'].storage_limit_bytes / 1024 / 1024) | round(0, 'floor') | int }} MB</td><td role="cell">{{ (license_plans['academic'].storage_limit_bytes / 1024 / 1024) | round(0, 'floor') | int }} MB</td><td role="cell">{{ (license_plans['extended_archive'].storage_limit_bytes / 1024 / 1024) | round(0, 'floor') | int }} MB</td></tr>
-          <tr role="row"><td role="rowheader">Supported uploads</td><td role="cell">GLB, STL, OBJ, FBX, STEP, DICOM</td><td role="cell">GLB, STL, OBJ, FBX, STEP, DICOM</td><td role="cell">GLB, STL, OBJ, FBX, STEP, DICOM</td></tr>
-          <tr role="row"><td role="rowheader">QR resolver</td><td role="cell">Included</td><td role="cell">Persistent</td><td role="cell">Persistent</td></tr>
-          <tr role="row"><td role="rowheader">Viewer screenshots</td><td role="cell">Included</td><td role="cell">Included</td><td role="cell">Included</td></tr>
-          <tr role="row"><td role="rowheader">Mobile AR</td><td role="cell">Included</td><td role="cell">Included</td><td role="cell">Included</td></tr>
-          <tr role="row"><td role="rowheader">Public watermark</td><td role="cell">Visible</td><td role="cell">Removed</td><td role="cell">Removed</td></tr>
-          <tr role="row"><td role="rowheader">Recommended use</td><td role="cell">Preview</td><td role="cell">Publication</td><td role="cell">Archive</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</section>
+  </section>
 
-<section class="plans-section">
-  <div class="plans-flow reveal-up">
-    <span class="landing-eyebrow">How billing maps to publishing</span>
-    <h2 class="landing-h2">A plan follows the model, not the whole account.</h2>
-    <div class="plans-flow-grid">
-      <div><span>01</span><strong>Create a project</strong><p>Start with context and models; DOI/PMID fields and documents remain optional.</p></div>
-      <div><span>02</span><strong>Upload models</strong><p>Each GLB, STL, OBJ, FBX, STEP or medical-scan asset becomes its own model registry item.</p></div>
-      <div><span>03</span><strong>Choose access</strong><p>Select Free, Academic, or Extended per model based on how long it should stay active.</p></div>
-      <div><span>04</span><strong>Share durable links</strong><p>Use the project page, review link, model viewer, QR resolver, screenshots, and mobile AR entry point.</p></div>
-    </div>
-  </div>
-</section>
+  <section class="pr-paid" aria-labelledby="pr-paid-title">
+    <h2 id="pr-paid-title">Academic and Extended Archive add</h2>
+    <ul>
+      <li>No watermark in the viewer</li>
+      <li>{{ access_window_label(license_plans['academic'].duration_days) }} or {{ access_window_label(license_plans['extended_archive'].duration_days) }} online instead of {{ access_window_label(license_plans['free'].duration_days) }}</li>
+      <li>More models per project and larger files</li>
+      {% for name in paid_only %}<li>{{ name }}</li>{% endfor %}
+    </ul>
+  </section>
 
-<section class="plans-section plans-compare" id="institutional">
-  <div class="plans-compare-inner reveal-up">
+  <section class="pr-inst" id="institutional" aria-labelledby="pr-inst-title">
     <div>
-      <span class="landing-eyebrow">Institutional</span>
-      <h2 class="landing-h2">For labs, departments, and universities.</h2>
-      <p class="landing-body">
-        One annual contract covers your members' uploads: invite colleagues with a link, track usage against a
-        model and storage quota, and pay by invoice.
-      </p>
+      <h2 id="pr-inst-title">For a lab, department or university</h2>
+      <p>One annual contract covers your members' uploads. You invite colleagues with a link, track usage against a model and storage quota, and pay by invoice.</p>
     </div>
-    <div class="plans-institutional-list">
-      <div><strong>Covered uploads</strong><span>Members' models get full, watermark-free access for the length of the contract.</span></div>
-      <div><strong>Admin panel</strong><span>Invite links (optionally limited to your email domain), members, funded models and usage.</span></div>
-      <div><strong>Public showcase</strong><span>An institution page listing members' public projects, plus "Supported by" on every viewer.</span></div>
-      <div><strong>Invoicing</strong><span>Annual contract with a model and storage quota, paid by invoice; monthly usage reports.</span></div>
-      <a href="{{ url_for('institutional_inquiry') }}" class="pricing-cta">Contact sales</a>
-    </div>
-  </div>
-</section>
+    <a href="{{ url_for('institutional_inquiry') }}" class="pr-btn is-solid">See institutional plans</a>
+  </section>
 
-<section class="plans-section">
-  <div class="plans-notes reveal-up">
-    <h2 class="landing-h2">What stays stable when a plan changes?</h2>
-    <div class="plans-notes-grid">
-      <div>
-        <strong>QR resolver</strong>
-        <span>The printed QR can stay the same while the model access plan changes behind it.</span>
-      </div>
-      <div>
-        <strong>Viewer URL</strong>
-        <span>The model viewer link remains stable through license upgrades and replacement uploads.</span>
-      </div>
-      <div>
-        <strong>Project page</strong>
-        <span>Project context, optional publication details, documents, and model registry stay grouped in one workspace.</span>
-      </div>
-    </div>
-  </div>
-</section>
+  <section class="pr-faq" aria-labelledby="pr-faq-title">
+    <h2 id="pr-faq-title">Common questions</h2>
+    <details>
+      <summary>Is this a subscription?</summary>
+      <p>No. You pay once per model, and the model stays online for its plan's access window. Your account and projects cost nothing.</p>
+    </details>
+    <details>
+      <summary>Can I start free and upgrade later?</summary>
+      <p>Yes. Upgrade a model from its page at any time. The viewer link and the QR code you already printed keep working.</p>
+    </details>
+    <details>
+      <summary>What happens when a plan ends?</summary>
+      <p>Visitors see a notice that the model is unavailable rather than a broken page, and you can renew it from the model's page.</p>
+    </details>
+    <details>
+      <summary>Can I replace the model file?</summary>
+      <p>Yes. Upload a new version and it takes the old one's place behind the same link and QR code.</p>
+    </details>
+  </section>
+</div>
 {% endblock %}
