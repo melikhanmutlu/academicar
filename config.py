@@ -251,6 +251,10 @@ class Config:
     # pool" etiquette) via the outbound User-Agent header. Override in prod.
     CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "info@academicar.com")
 
+    # Address shown on /institutional for visitors who prefer email (the form
+    # itself still delivers to CONTACT_EMAIL).
+    INSTITUTIONAL_EMAIL = os.environ.get("INSTITUTIONAL_EMAIL", "info.yolmed@gmail.com")
+
     # Contact page/form. Hidden for now (no inbox to receive messages). Set
     # CONTACT_ENABLED=1 to re-expose the /contact route, its links, and sitemap entry.
     CONTACT_ENABLED = os.environ.get("CONTACT_ENABLED", "0").lower() in {"1", "true", "yes", "on"}

@@ -5917,9 +5917,10 @@ def register_routes(app: Flask) -> None:
                 details={**inquiry, "delivered": bool(delivered)},
             )
             if delivered is False:
+                public_email = current_app.config.get("INSTITUTIONAL_EMAIL") or recipient
                 flash(
                     f"We saved your inquiry, but our email notification failed. "
-                    f"To be sure we see it soon, please also write to {recipient}.",
+                    f"To be sure we see it soon, please also write to {public_email}.",
                     "warning",
                 )
                 return render_template("institutional.html", inquiry=inquiry)

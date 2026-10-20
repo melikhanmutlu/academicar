@@ -61,6 +61,9 @@
   .ip-faq summary::after { content: '+'; font-weight: 400; font-size: 20px; line-height: 1; color: var(--color-silver-ash); }
   .ip-faq details[open] summary::after { content: '\2212'; }
   .ip-faq summary:focus-visible { outline: 2px solid var(--color-sunset-orange); outline-offset: 2px; }
+  .ip-faq-body { overflow: hidden; }
+  .ip-faq summary::after { transition: transform 240ms ease; }
+  .ip-faq details[open] summary::after { transform: rotate(180deg); }
   .ip-faq p { font-family: var(--font-inter); font-size: 15px; color: var(--color-dark-shale); line-height: 1.6; margin: 0 0 20px; padding-right: 32px; }
 
   .ip-inquiry { padding: 92px 0; background: var(--color-cloud-whisper); scroll-margin-top: 24px; }
@@ -398,23 +401,23 @@
     <div class="ip-faq">
       <details>
         <summary>How is the price set?</summary>
-        <p>Each contract is quoted for your institution: how many models and how much storage your members need for the year. You pay the annual contract by invoice.</p>
+        <div class="ip-faq-body"><p>Each contract is quoted for your institution: how many models and how much storage your members need for the year. You pay the annual contract by invoice.</p></div>
       </details>
       <details>
         <summary>Who can join our institution?</summary>
-        <p>Anyone your panel admins invite with a link. If you give us your email domains, only accounts with a confirmed address on those domains can accept. Each account belongs to one institution.</p>
+        <div class="ip-faq-body"><p>Anyone your panel admins invite with a link. If you give us your email domains, only accounts with a confirmed address on those domains can accept. Each account belongs to one institution.</p></div>
       </details>
       <details>
         <summary>Can members keep their models private?</summary>
-        <p>Yes. A model follows its project's visibility. Private models count toward your quota and appear in your panel, but never on the public showcase.</p>
+        <div class="ip-faq-body"><p>Yes. A model follows its project's visibility. Private models count toward your quota and appear in your panel, but never on the public showcase.</p></div>
       </details>
       <details>
         <summary>What happens when the contract ends?</summary>
-        <p>Viewers and QR codes show a clear notice instead of a broken link. When you renew, every funded model is extended at once, with the same links and QR codes.</p>
+        <div class="ip-faq-body"><p>Viewers and QR codes show a clear notice instead of a broken link. When you renew, every funded model is extended at once, with the same links and QR codes.</p></div>
       </details>
       <details>
         <summary>Can we try it before we sign?</summary>
-        <p>You can explore the <a class="ip-link" href="{{ url_for('demo_institution', source='institutional_faq') }}">demo institution panel</a> right now.</p>
+        <div class="ip-faq-body"><p>You can explore the <a class="ip-link" href="{{ url_for('demo_institution', source='institutional_faq') }}">demo institution panel</a> right now.</p></div>
       </details>
     </div>
   </div>
@@ -432,7 +435,7 @@
         <li><b>2</b><span>We agree on dates and quota, and set up your institution and first admin.</span></li>
         <li><b>3</b><span>Your admins invite members and uploads start counting toward your contract.</span></li>
       </ol>
-      {% set sales_email = config.get('CONTACT_EMAIL') or 'info@academicar.com' %}
+      {% set sales_email = config.get('INSTITUTIONAL_EMAIL') or config.get('CONTACT_EMAIL') or 'info@academicar.com' %}
       <p class="ip-mail">Prefer email? Write to <a href="mailto:{{ sales_email }}">{{ sales_email }}</a></p>
     </div>
 
@@ -473,6 +476,38 @@
 
 {% block scripts %}
 <script>
+  // FAQ: animate open/close instead of the native instant jump.
+  (() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    document.querySelectorAll('.ip-faq details').forEach((item) => {
+      const summary = item.querySelector('summary');
+      const body = item.querySelector('.ip-faq-body');
+      let anim = null;
+      summary.addEventListener('click', (event) => {
+        event.preventDefault();
+        const closing = item.open && !item.classList.contains('is-closing');
+        // A closed <details> may still report its content height, so start from 0.
+        const from = item.open ? body.offsetHeight : 0;
+        if (anim) anim.cancel();
+        if (closing) {
+          item.classList.add('is-closing');
+        } else {
+          item.classList.remove('is-closing');
+          item.open = true;
+        }
+        const to = closing ? 0 : body.scrollHeight;
+        anim = body.animate(
+          [{ height: from + 'px', opacity: closing ? 1 : 0 }, { height: to + 'px', opacity: closing ? 0 : 1 }],
+          { duration: 280, easing: 'cubic-bezier(0.2, 0, 0, 1)' }
+        );
+        anim.onfinish = () => {
+          anim = null;
+          if (closing) { item.open = false; item.classList.remove('is-closing'); }
+        };
+      });
+    });
+  })();
+
   // Show form messages (sent / validation errors) next to the form, where the
   // visitor is after submitting, instead of at the top of the long page.
   (() => {

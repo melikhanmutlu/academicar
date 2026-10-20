@@ -411,9 +411,12 @@ def test_login_page_focuses_email(client):
 
 
 def test_institutional_page_uses_configured_contact_email(client, app):
-    app.config["CONTACT_EMAIL"] = "sales@example.org"
+    assert "info.yolmed@gmail.com" in client.get("/institutional").data.decode()
+    app.config["INSTITUTIONAL_EMAIL"] = "sales@example.org"
+    app.config["CONTACT_EMAIL"] = "inbox@example.org"
     html = client.get("/institutional").data.decode()
     assert "sales@example.org" in html
+    assert "inbox@example.org" not in html
     assert "hello@academicar.com" not in html
 
 
