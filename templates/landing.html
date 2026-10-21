@@ -39,23 +39,33 @@
     <!-- Viewer-style product mockup -->
     <div class="lp-hero-visual reveal-up delay-2">
       <div class="lp-viewer-mock">
-        <model-viewer
-          src="{{ url_for('static', filename='models/model.compressed.glb') }}"
-          alt="AcademicAR demo — Mitochondria 3D model"
-          camera-controls
-          disable-zoom
-          auto-rotate
-          rotation-per-second="16deg"
-          camera-orbit="35deg 65deg 9m"
-          field-of-view="32deg"
-          exposure="1.0"
-          shadow-intensity="0"
-          tone-mapping="neutral"
-          environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
-          reveal="auto"
-          poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 180'%3E%3Crect width='240' height='180' fill='%23f5f5f5'/%3E%3Cg fill='none' stroke='%23c9ccd1' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M120 58l34 20v44l-34 20-34-20V78z'/%3E%3Cpath d='M120 58v44M120 102l34-24M120 102l-34-24'/%3E%3C/g%3E%3C/svg%3E"
-          loading="lazy">
-        </model-viewer>
+        {# Static poster first: model-viewer (~290 KB) and the GLB (~1.5 MB) load
+           only when the visitor hovers, taps or focuses the viewer. #}
+        <button type="button" class="lp-viewer-poster" data-hero-viewer-load aria-label="Load the interactive 3D model">
+          <img src="{{ url_for('static', filename='images/hero-mitochondria-poster.webp') }}"
+               srcset="{{ url_for('static', filename='images/hero-mitochondria-poster-720.webp') }} 720w, {{ url_for('static', filename='images/hero-mitochondria-poster.webp') }} 1200w"
+               sizes="(max-width: 1024px) 100vw, 50vw"
+               alt="AcademicAR demo — Mitochondria 3D model" width="1200" height="900" fetchpriority="high" decoding="async">
+          <span class="lp-viewer-poster-hint" data-hero-viewer-hint>Tap to rotate in 3D</span>
+        </button>
+        <template data-hero-viewer-template>
+          <model-viewer
+            src="{{ url_for('static', filename='models/model.compressed.glb') }}"
+            alt="AcademicAR demo — Mitochondria 3D model"
+            camera-controls
+            disable-zoom
+            auto-rotate
+            rotation-per-second="16deg"
+            camera-orbit="35deg 65deg 9m"
+            field-of-view="32deg"
+            exposure="1.0"
+            shadow-intensity="0"
+            tone-mapping="neutral"
+            environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
+            reveal="auto"
+            loading="eager">
+          </model-viewer>
+        </template>
         <a href="{{ url_for('demo_mitochondria_ar') }}" class="lp-viewer-qr-float" title="Scan to view in AR">
           <img src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code — scan to view in AR">
           <span>Scan for AR</span>
@@ -390,10 +400,42 @@
 {% endblock %}
 
 {% block scripts %}
-  <script type="module" src="https://unpkg.com/@google/model-viewer@4.3.0/dist/model-viewer.min.js" crossorigin="anonymous"></script>
   <script>
   (() => {
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // Hero 3D model: swap the poster for the live viewer on first hover/tap/focus.
+    const heroPoster = document.querySelector('[data-hero-viewer-load]');
+    const heroTemplate = document.querySelector('[data-hero-viewer-template]');
+    if (heroPoster && heroTemplate) {
+      const mock = heroPoster.parentElement;
+      const hint = heroPoster.querySelector('[data-hero-viewer-hint]');
+      let started = false;
+      const loadHeroViewer = () => {
+        if (started) return;
+        started = true;
+        mock.classList.add('is-loading');
+        if (hint) hint.textContent = 'Loading 3D…';
+        const script = document.createElement('script');
+        script.type = 'module';
+        script.crossOrigin = 'anonymous';
+        script.src = 'https://unpkg.com/@google/model-viewer@4.3.0/dist/model-viewer.min.js';
+        document.head.appendChild(script);
+        const viewer = heroTemplate.content.firstElementChild.cloneNode(true);
+        viewer.addEventListener('load', () => {
+          mock.classList.add('is-ready');
+          heroPoster.tabIndex = -1;
+          heroPoster.setAttribute('aria-hidden', 'true');
+        }, { once: true });
+        heroPoster.before(viewer);
+      };
+      heroPoster.addEventListener('click', loadHeroViewer);
+      heroPoster.addEventListener('focus', loadHeroViewer);
+      mock.addEventListener('pointerenter', (event) => {
+        if (event.pointerType === 'mouse') loadHeroViewer();
+      });
+      if (window.matchMedia('(hover: hover)').matches && hint) hint.textContent = 'Hover to rotate in 3D';
+    }
 
     // Hero parallax
     if (!reduceMotion) {
