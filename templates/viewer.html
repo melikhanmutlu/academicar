@@ -28,6 +28,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  {% include "_google_analytics.html" %}
   <title>{{ model.display_name or model.original_filename }} — AcademicAR</title>
   {% set viewer_display_name = model.display_name or model.original_filename or 'Model' %}
   {% set viewer_description = (viewer_display_name ~ ' — interactive 3D model from "' ~ paper.title ~ '" on AcademicAR.')|striptags|truncate(160) %}

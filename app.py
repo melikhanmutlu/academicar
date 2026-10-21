@@ -169,11 +169,13 @@ CONTENT_SECURITY_POLICY = "; ".join(
     [
         "default-src 'self'",
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' "
-        "https://unpkg.com https://ajax.googleapis.com https://www.gstatic.com https://cdnjs.cloudflare.com",
+        "https://unpkg.com https://ajax.googleapis.com https://www.gstatic.com https://cdnjs.cloudflare.com "
+        "https://www.googletagmanager.com",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' data: https://fonts.gstatic.com",
         "img-src 'self' data: blob: https:",
-        "connect-src 'self' blob: https://unpkg.com https://ajax.googleapis.com https://www.gstatic.com",
+        "connect-src 'self' blob: https://unpkg.com https://ajax.googleapis.com https://www.gstatic.com "
+        "https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com",
         "worker-src 'self' blob:",
         "object-src 'none'",
         "base-uri 'self'",

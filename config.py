@@ -301,6 +301,11 @@ class Config:
     # Google Search Console ownership verification (HTML tag method). Paste the
     # content value Search Console gives you for your property; empty = no-op.
     GOOGLE_SITE_VERIFICATION = os.environ.get("GOOGLE_SITE_VERIFICATION", "")
+    # Google Analytics 4 measurement id. On by default only in production so
+    # local runs and tests send nothing; set it to "" to switch the tag off.
+    GA_MEASUREMENT_ID = os.environ.get(
+        "GA_MEASUREMENT_ID", "G-B2VD1CTQ1Y" if APP_ENV in {"production", "prod"} else ""
+    )
 
     @staticmethod
     def init_app(app):

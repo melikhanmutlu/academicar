@@ -182,3 +182,25 @@ def test_demo_viewer_has_seo_tags(client):
     assert 'name="description"' in body
     assert 'rel="canonical"' in body
     assert 'property="og:type" content="website"' in body
+
+
+def test_google_analytics_absent_by_default(client):
+    assert "googletagmanager.com/gtag" not in client.get("/").get_data(as_text=True)
+
+
+def test_google_analytics_tag_on_public_pages_when_configured(client):
+    client.application.config["GA_MEASUREMENT_ID"] = "G-TEST123"
+    resp = client.get("/")
+    body = resp.get_data(as_text=True)
+    assert "https://www.googletagmanager.com/gtag/js?id=G-TEST123" in body
+    assert "gtag('config', 'G-TEST123')" in body
+    csp = resp.headers.get("Content-Security-Policy") or resp.headers.get("Content-Security-Policy-Report-Only") or ""
+    assert "https://www.googletagmanager.com" in csp
+    assert "https://*.google-analytics.com" in csp
+
+
+def test_google_analytics_skipped_on_admin_and_embeds(client):
+    client.application.config["GA_MEASUREMENT_ID"] = "G-TEST123"
+    assert "G-TEST123" not in client.get("/admin/login").get_data(as_text=True)
+    assert "G-TEST123" in client.get("/blog").get_data(as_text=True)
+    assert "G-TEST123" not in client.get("/blog?embed=1").get_data(as_text=True)
