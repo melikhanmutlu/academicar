@@ -373,16 +373,4 @@
     }
   }
 
-  /* ---------------- Grid parallax ---------------- */
-  const grid = document.querySelector('.d-grid-bg');
-  if (grid && !reduceMotion) {
-    let ticking = false;
-    const update = () => {
-      grid.style.setProperty('--d-grid-y', `${(window.scrollY * 0.25).toFixed(1)}px`);
-      ticking = false;
-    };
-    window.addEventListener('scroll', () => {
-      if (!ticking) { requestAnimationFrame(update); ticking = true; }
-    }, { passive: true });
-  }
 })();

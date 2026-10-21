@@ -53,8 +53,8 @@
   </div>
 
   <div class="c-stage-copy">
-    <h1 id="c-hero-title" class="c-hero-title">A live 3D figure for every paper, poster and slide</h1>
-    <p class="c-hero-lead">Upload a 3D model or a CT/MR scan. Readers rotate, cut and measure it in the browser, or scan its QR code to place it in AR.</p>
+    <h1 id="c-hero-title" class="c-hero-title">Your research, live in 3D.</h1>
+    <p class="c-hero-lead">Put the 3D model behind your paper, poster or slide online. Readers rotate, cut and measure it in the browser, or scan its QR code to place it in AR.</p>
     <div class="c-hero-actions">
       <a href="{{ url_for('auth.register') }}" class="c-btn c-btn-light">Start publishing</a>
       <a href="{{ url_for('demo_mitochondria_ar', source='home_c_hero') }}" class="c-btn c-btn-ghost">Open the example</a>
@@ -62,7 +62,7 @@
     <p class="c-hero-price">Free to start. Pay per model only when it needs to stay online.</p>
   </div>
 
-  <nav class="c-rail" aria-label="What the viewer does">
+  <nav class="c-rail" aria-label="What the viewer does" data-ui>
     {% for key, label, note, path in tools %}
     <button type="button" class="c-rail-btn{% if loop.first %} is-active{% endif %}" data-tool="{{ key }}" data-label="{{ label }}" data-note="{{ note }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -109,7 +109,7 @@
         <figure class="c-flow-frame c-flow-frame-light">
           <img src="{{ url_for('static', filename='images/blog/covers/3d-slicer-export-share.webp') }}" alt="A stack of CT slices turned into a 3D kidney model" width="1600" height="800" loading="lazy" decoding="async">
           <ul class="c-flow-sources" aria-label="Typical sources">
-            {% for src in ['3D Slicer', 'CAD', 'Scanner', 'Blender'] %}<li>{{ src }}</li>{% endfor %}
+            {% for src in ['3D Slicer', 'CAD', 'Scanner'] %}<li>{{ src }}</li>{% endfor %}
           </ul>
         </figure>
         <h3><span class="c-flow-num">1</span>Make the model</h3>
@@ -327,7 +327,7 @@
 <section class="c-end" aria-labelledby="c-end-title">
   <div class="c-end-word" aria-hidden="true">Explore</div>
   <div class="c-wrap c-end-inner">
-    <h2 id="c-end-title" class="c-display c-end-title">Make every 3D project explorable</h2>
+    <h2 id="c-end-title" class="c-display c-end-title">Put your model on stage.</h2>
     <p class="c-lead">Start free. An Academic licence keeps a model online for {{ access_window_label(license_plans['academic'].duration_days) if license_plans.get('academic') else '3 years' }}.</p>
     <div class="c-hero-actions c-end-actions">
       <a href="{{ url_for('auth.register') }}" class="c-btn c-btn-light">Start publishing</a>

@@ -58,15 +58,14 @@
 
 {% block hd_content %}
 <div class="d-root">
-  <div class="d-grid-bg" aria-hidden="true"></div>
 
   <!-- ============================ HERO: PIPELINE ============================ -->
   <section class="d-hero" aria-labelledby="d-hero-title">
     <div class="d-wrap">
       <div class="d-hero-head">
-        <h1 id="d-hero-title" class="d-h1"><span>From your 3D model</span> <span>to a QR code in your paper.</span></h1>
+        <h1 id="d-hero-title" class="d-h1"><span>Model in,</span> <span>QR code out.</span></h1>
         <div class="d-hero-side">
-          <p class="d-lead">Upload the model, check it in the viewer, print the QR. Readers open it in 3D or AR, with no app.</p>
+          <p class="d-lead">Upload a 3D model or a CT/MR scan. AcademicAR turns it into a viewer link and a QR code for your paper, poster or slide; readers open it in 3D or AR, with no app.</p>
           <div class="d-actions">
             <a class="d-btn d-btn-dark" href="{{ url_for('auth.register') }}">Start publishing</a>
             <a class="d-btn d-btn-line" href="{{ url_for('demo_mitochondria_ar', source='home_d') }}">Open the demo model</a>
@@ -115,7 +114,7 @@
         </li>
       </ol>
 
-      <div class="d-panel" data-pipeline>
+      <div class="d-panel" data-pipeline data-ui>
         <div class="d-panel-bar">
           <span class="d-panel-title">Step 2 in detail: what happens to your file</span>
           <span class="d-panel-status"><span class="d-led" aria-hidden="true"></span><span data-status>Showing each input in turn</span></span>
@@ -181,7 +180,7 @@
         </div>
       </div>
 
-      <figure class="d-scope">
+      <figure class="d-scope" data-ui>
         <div class="d-scope-view">
           <model-viewer
             data-live-model
@@ -315,10 +314,10 @@
           <span class="d-gauge-label">Contract window</span>
           <span class="d-gauge-track"><span class="d-gauge-fill d-gauge-fill-gold" style="--fill:.8"></span></span>
         </div>
-        <p class="d-gauge-note">Illustration of the institution panel</p>
+        <p class="d-gauge-note">How the institution panel shows your contract</p>
       </div>
       <div class="d-inst-copy">
-        <h2 id="d-inst-title" class="d-h2">One contract for a department or a whole university</h2>
+        <h2 id="d-inst-title" class="d-h2">One contract for the whole department</h2>
         <ul class="d-ticks">
           <li>Shared model and storage quota</li>
           <li>Invite links, limited to your domain if you like</li>
