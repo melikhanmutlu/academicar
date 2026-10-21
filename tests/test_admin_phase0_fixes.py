@@ -108,7 +108,7 @@ def test_pricing_rejects_non_finite_or_huge_price(client, bad):
 @pytest.mark.parametrize(
     "field,value",
     [("storage_limit_mb", "5000"), ("storage_limit_mb", "9" * 30), ("duration_days", "9" * 30),
-     ("duration_days", "40000"), ("max_models_per_project", "9" * 30)],
+     ("duration_days", "40000")],
 )
 def test_pricing_rejects_out_of_range_integers(client, field, value):
     _make_admin(client)

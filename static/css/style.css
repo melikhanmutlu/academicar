@@ -3696,14 +3696,11 @@ input[type="file"]::-webkit-file-upload-button {
 .latest-model-project:hover {
   color: var(--color-sunset-orange);
 }
-.capacity-notice { display:flex; align-items:center; justify-content:space-between; gap:18px; }
-.capacity-notice h2 { margin:3px 0; font-family:var(--font-serif); font-size:22px; }
-.capacity-notice p:last-child { color:#64748b; font-size:13px; }
 .upgrade-coupon { display:grid; grid-template-columns:minmax(0,1fr) minmax(180px,240px); gap:14px; align-items:center; padding:13px 14px; border:1px solid var(--color-light-pearl); border-radius:8px; background:var(--color-cloud-whisper); }
 .upgrade-coupon label { display:block; color:#111827; font-size:13px; font-weight:700; }
 .upgrade-coupon p { margin:3px 0 0; color:#64748b; font-size:11px; line-height:1.45; }
 .upgrade-coupon input { width:100%; border:1px solid var(--color-light-pearl); border-radius:7px; padding:9px 11px; background:#fff; color:#111827; text-transform:uppercase; }
-@media (max-width:640px) { .upgrade-coupon,.capacity-notice { grid-template-columns:1fr; flex-direction:column; align-items:stretch; } }
+@media (max-width:640px) { .upgrade-coupon { grid-template-columns:1fr; flex-direction:column; align-items:stretch; } }
 .inst-publications-section { margin:18px 0 26px; padding:18px; border-radius:8px; }
 .inst-publications-section .section-heading-row p { margin-top:4px; color:var(--color-silver-ash); font-size:12px; }
 .inst-department-list { display:grid; gap:16px; margin-top:14px; }

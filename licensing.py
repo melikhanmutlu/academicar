@@ -20,6 +20,7 @@ class LicensePlan:
     duration_days: int | None
     storage_limit_bytes: int
     feature_summary: tuple[str, ...]
+    # Legacy: projects no longer cap model count (licensing is per model).
     max_models_per_project: int | None
     features: frozenset[str]
     # Admin-editable via /admin/pricing. Additionally gates upgrade/renewal
@@ -87,7 +88,7 @@ _DEFAULT_LICENSE_PLANS: dict[str, LicensePlan] = {
             "Video recording",
             "Watermarked viewer",
         ),
-        max_models_per_project=1,
+        max_models_per_project=None,
         features=frozenset(key for key, _ in PLAN_FEATURES) - PAID_ONLY_FEATURES,
     ),
     "academic": LicensePlan(
@@ -102,7 +103,7 @@ _DEFAULT_LICENSE_PLANS: dict[str, LicensePlan] = {
             "No watermark",
             "Persistent QR and viewer URL",
         ),
-        max_models_per_project=5,
+        max_models_per_project=None,
         features=frozenset(key for key, _ in PLAN_FEATURES),
     ),
     "extended_archive": LicensePlan(
@@ -118,7 +119,7 @@ _DEFAULT_LICENSE_PLANS: dict[str, LicensePlan] = {
             "Rich metadata fields",
             "Persistent QR and viewer URL",
         ),
-        max_models_per_project=20,
+        max_models_per_project=None,
         features=frozenset(key for key, _ in PLAN_FEATURES),
     ),
     "institutional": LicensePlan(

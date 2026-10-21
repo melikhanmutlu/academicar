@@ -147,11 +147,12 @@ def test_admin_plan_capabilities_gate_viewer_and_api(client, app):
     assert client.post(f"/models/{model_id}/collage", data={}).status_code == 403
 
 
-def test_free_model_limit_blocks_second_upload(client, app):
+def test_free_project_accepts_more_than_one_model(client, app):
+    # Licensing is per model, so a Free project is not capped at one model.
     register(client)
-    client.post("/projects/new", data={"title": "Limited topic"}, follow_redirects=True)
+    client.post("/projects/new", data={"title": "Open topic"}, follow_redirects=True)
     with app.app_context():
-        slug = Paper.query.filter_by(title="Limited topic").one().slug
+        slug = Paper.query.filter_by(title="Open topic").one().slug
     for filename in ("one.stl", "two.stl"):
         response = client.post(
             f"/papers/{slug}/upload-model",
@@ -159,9 +160,9 @@ def test_free_model_limit_blocks_second_upload(client, app):
             content_type="multipart/form-data",
             follow_redirects=True,
         )
-    assert b"allows 1 model" in response.data
+    assert b"allows 1 model" not in response.data
     with app.app_context():
-        assert Model3D.query.join(Paper).filter(Paper.slug == slug).count() == 1
+        assert Model3D.query.join(Paper).filter(Paper.slug == slug).count() == 2
 
 
 def test_coupon_changes_checkout_amount_and_is_redeemed_once(client, app):
@@ -479,7 +480,7 @@ def test_invalid_presentation_rolls_back_entire_project(client, app):
         assert Paper.query.filter_by(title="Atomic project").count() == 0
 
 
-def test_failed_and_expired_models_do_not_consume_topic_capacity(client, app):
+def test_failed_and_expired_models_do_not_set_the_topic_plan(client, app):
     register(client)
     with app.app_context():
         user = User.query.one()
@@ -499,11 +500,9 @@ def test_failed_and_expired_models_do_not_consume_topic_capacity(client, app):
             ),
         ])
         db.session.commit()
-        from app import project_model_capacity
-        capacity = project_model_capacity(project)
-        assert capacity["used"] == 0
-        assert capacity["plan"].key == "free"
-        assert capacity["can_add"] is True
+        from licensing import project_capacity_models, strongest_project_plan_key
+        assert project_capacity_models(project) == []
+        assert strongest_project_plan_key(project) == "free"
 
 
 def test_missing_model_qr_is_regenerated_on_demand(client, app):

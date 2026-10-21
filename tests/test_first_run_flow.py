@@ -114,13 +114,13 @@ def test_project_without_models_offers_add_first_model(client, app):
     assert html.count('href="#add-model"') >= 2  # share panel + empty state
 
 
-def test_free_capacity_notice_does_not_send_users_to_an_administrator(client, app):
+def test_free_project_with_a_model_still_offers_another_upload(client, app):
+    # Licensing is per model, so a project never caps how many models it holds.
     register(client)
     slug, _, _ = _project(app)
     html = client.get(f"/projects/{slug}").data.decode()
-    assert "Plan capacity reached" in html
-    assert "ask an administrator" not in html
-    assert "per topic" not in html
+    assert "Plan capacity reached" not in html
+    assert "Add another model" in html
 
 
 # --- New project form ---------------------------------------------------------------
