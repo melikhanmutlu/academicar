@@ -6287,7 +6287,10 @@ def register_routes(app: Flask) -> None:
             if amount_kurus == 0:
                 apply_successful_payment(payment, model, plan_key)
                 settle_coupon_reservation(payment, redeemed=bool(coupon))
-                checkout_url = success_url
+                # Same-origin path, not the SITE_URL success_url: the form is
+                # bound by CSP form-action 'self', so a redirect to another
+                # host (custom domain vs. Railway host) is silently blocked.
+                checkout_url = url_for("paper_detail", slug=model.paper.slug, upgraded=model.id)
             else:
                 checkout_url = provider.create_checkout(
                     payment=payment,

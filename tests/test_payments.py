@@ -442,3 +442,42 @@ def test_lemonsqueezy_checkout_is_none_when_unconfigured(app):
             cancel_url="c",
         )
     assert url is None
+
+
+def test_full_discount_coupon_redirects_same_origin(client, app):
+    """A 100%-off coupon settles without a provider. The redirect must stay on
+    the request's own origin: the upgrade form is limited by CSP form-action
+    'self', so an absolute SITE_URL redirect to another host (custom domain vs.
+    the Railway host) is blocked by the browser and the page just hangs."""
+    from models import Coupon
+    from tests.conftest import login, register
+
+    register(client)
+    login(client)
+    model_id = _make_model(app)
+    app.config["SITE_URL"] = "https://other-origin.example"
+    with app.app_context():
+        db.session.add(Coupon(code="FREE100", percent_off=100, is_active=True))
+        db.session.commit()
+
+    resp = client.post(
+        f"/models/{model_id}/upgrade/academic",
+        data={"coupon_code": "FREE100"},
+        follow_redirects=False,
+    )
+    assert resp.status_code in (302, 303)
+    location = resp.headers["Location"]
+    assert "other-origin.example" not in location
+    assert location.startswith("/papers/")
+    assert f"upgraded={model_id}" in location
+
+    with app.app_context():
+        model = db.session.get(Model3D, model_id)
+        assert model.license_type == "academic"
+        payment = Payment.query.filter_by(model_id=model_id).first()
+        assert payment.status == "paid"
+        assert payment.amount_kurus == 0
+        assert db.session.query(Coupon).filter_by(code="FREE100").one().redemption_count == 1
+
+    body = client.get(location).get_data(as_text=True)
+    assert "Upgrade complete" in body or "Payment successful" in body
