@@ -1,6 +1,7 @@
 """Tests for the Cloudflare R2 durable mirror: restore-on-miss logic and the
 serve route restoring a file from R2 after the local (ephemeral) copy is gone."""
 import os
+from datetime import UTC, datetime
 import uuid
 
 from services import r2_mirror
@@ -247,3 +248,63 @@ def test_r2_mirror_failure_alert_noop_when_all_mirrored(app):
     with app.app_context():
         # No models with r2_mirror_failed_at set -> nothing to alert on.
         assert ops_alerts.send_r2_mirror_failure_alert() == 0
+
+
+def _flagged_model(app_obj, local_files: bool):
+    import uuid as _uuid
+    from models import Model3D, Paper, User, db
+
+    user = User(email=f"r2retry-{_uuid.uuid4().hex[:6]}@example.com", username="R")
+    user.set_password("password123")
+    db.session.add(user)
+    db.session.flush()
+    paper = Paper(title="T", slug=f"r2r-{_uuid.uuid4().hex[:6]}", user_id=user.id, is_public=True)
+    db.session.add(paper)
+    db.session.flush()
+    model = Model3D(
+        id=str(_uuid.uuid4()), paper_id=paper.id, user_id=user.id,
+        glb_path="x.glb", processing_status="ready",
+        r2_mirror_failed_at=datetime.now(UTC).replace(tzinfo=None),
+    )
+    db.session.add(model)
+    db.session.commit()
+    if local_files:
+        folder = os.path.join(app_obj.config["CONVERTED_FOLDER"], model.id)
+        os.makedirs(folder, exist_ok=True)
+        with open(os.path.join(folder, "model.glb"), "wb") as fh:
+            fh.write(b"glb")
+    return model
+
+
+def test_failed_mirror_is_retried_and_alert_stops_after_recovery(app, monkeypatch):
+    """A mirror that failed during a storage outage must not alert forever."""
+    import ops_alerts
+    from models import Model3D, db
+    from services import r2_mirror
+
+    uploads: list[str] = []
+    monkeypatch.setattr(r2_mirror, "_is_enabled", lambda: True)
+    monkeypatch.setattr(r2_mirror, "_upload_sync", lambda path, key: uploads.append(key) or True)
+
+    with app.app_context():
+        model = _flagged_model(app, local_files=True)
+        assert ops_alerts.retry_failed_r2_mirrors() == 1
+        assert uploads == [f"converted/{model.id}/model.glb"]
+        assert db.session.get(Model3D, model.id).r2_mirror_failed_at is None
+        assert ops_alerts.send_r2_mirror_failure_alert() == 0
+
+
+def test_failed_mirror_retry_keeps_flag_when_upload_still_fails(app, monkeypatch):
+    import ops_alerts
+    from models import Model3D, db
+    from services import r2_mirror
+
+    monkeypatch.setattr(r2_mirror, "_is_enabled", lambda: True)
+    monkeypatch.setattr(r2_mirror, "_upload_sync", lambda path, key: False)
+
+    with app.app_context():
+        model = _flagged_model(app, local_files=True)
+        missing = _flagged_model(app, local_files=False)
+        assert ops_alerts.retry_failed_r2_mirrors() == 0
+        assert db.session.get(Model3D, model.id).r2_mirror_failed_at is not None
+        assert db.session.get(Model3D, missing.id).r2_mirror_failed_at is not None

@@ -9,11 +9,13 @@ unvisited dashboard.
 from __future__ import annotations
 
 import logging
+import os
 from datetime import UTC, datetime, timedelta
 
 from flask import current_app
+from sqlalchemy import or_
 
-from models import AuditLog, Model3D, User, db
+from models import AuditLog, Model3D, Paper, User, db
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +49,44 @@ def _alerted_within(now: datetime, hours: int = 24) -> bool:
     )
 
 
+def _live_model_filter():
+    """Same scope as the admin storage page: models whose project isn't deleted."""
+    return Model3D.paper.has(or_(Paper.status.is_(None), Paper.status != "deleted"))
+
+
+def retry_failed_r2_mirrors(limit: int = 5) -> int:
+    """Re-upload flagged models whose files are still on the local volume.
+
+    A mirror can fail during a short storage-provider outage; without a retry
+    the flag (and the daily alert) stays forever even after R2 recovers.
+    Returns the number of models whose flag was cleared.
+    """
+    from services.r2_mirror import _is_enabled, mirror_directory_sync
+
+    if not _is_enabled():
+        return 0
+    converted = current_app.config["CONVERTED_FOLDER"]
+    flagged = (
+        Model3D.query.filter(Model3D.r2_mirror_failed_at.isnot(None), _live_model_filter())
+        .order_by(Model3D.r2_mirror_failed_at.asc())
+        .limit(limit)
+        .all()
+    )
+    cleared = 0
+    for model in flagged:
+        local_dir = os.path.join(converted, model.id)
+        if not os.path.isdir(local_dir):
+            continue
+        if mirror_directory_sync(local_dir, f"converted/{model.id}"):
+            model.r2_mirror_failed_at = None
+            db.session.add(AuditLog(event_type="r2_mirror_auto_retried", resource_id=model.id))
+            cleared += 1
+        else:
+            model.r2_mirror_failed_at = datetime.now(UTC)
+    db.session.commit()
+    return cleared
+
+
 def send_r2_mirror_failure_alert(now: datetime | None = None, min_failures: int = 1) -> int:
     """Email admins when models have unresolved R2 mirror failures.
 
@@ -58,7 +98,9 @@ def send_r2_mirror_failure_alert(now: datetime | None = None, min_failures: int 
     from utils.email import send_email
 
     now = now or datetime.now(UTC)
-    failed = Model3D.query.filter(Model3D.r2_mirror_failed_at.isnot(None)).count()
+    failed = Model3D.query.filter(
+        Model3D.r2_mirror_failed_at.isnot(None), _live_model_filter()
+    ).count()
     if failed < max(1, min_failures):
         return 0
     if _alerted_within(now):
