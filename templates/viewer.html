@@ -735,11 +735,17 @@
     .ar-launch-bar { position: relative; display: block; height: 3px; margin-top: 10px; border-radius: 999px; overflow: hidden; background: rgba(255, 255, 255, 0.16); }
     .ar-launch-bar::after { content: ""; position: absolute; top: 0; bottom: 0; width: 40%; border-radius: 999px; background: #ff682c; animation: ar-launch-slide 1.1s ease-in-out infinite; }
     @keyframes ar-launch-slide { 0% { left: -40%; } 100% { left: 100%; } }
-    [data-ar-btn].is-busy, [data-ios-ar-btn].is-busy { animation: ar-launch-pulse 1s ease-in-out infinite; }
+    [data-ar-btn].is-busy, [data-ios-ar-btn].is-busy, #wireframeBtn.is-busy { animation: ar-launch-pulse 1s ease-in-out infinite; }
+    #wireframeBtn.is-busy { cursor: progress; }
+    /* Sits under the header so it does not cover the title and Tools buttons. */
+    .ar-launch.wire-status { top: calc(72px + env(safe-area-inset-top, 0px)); bottom: auto; }
+    #wireframeBtn.is-busy svg { animation: wire-spin 0.9s linear infinite; }
+    @keyframes wire-spin { to { transform: rotate(360deg); } }
     @keyframes ar-launch-pulse { 50% { opacity: 0.55; } }
     @media (prefers-reduced-motion: reduce) {
       .ar-launch-bar::after { animation: none; left: 0; width: 100%; }
       [data-ar-btn].is-busy, [data-ios-ar-btn].is-busy { animation: none; }
+      #wireframeBtn.is-busy, #wireframeBtn.is-busy svg { animation: none; opacity: 0.55; }
     }
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .ar-launch { color: #202020; background: rgba(255, 255, 255, 0.96); border-color: #e8e8e8; }
     html:is([data-viewer-bg="light"], [data-viewer-bg="white"]) .ar-launch-bar { background: #e8e8e8; }
@@ -7173,13 +7179,45 @@
           m.needsUpdate = true;
         });
       });
-      if (mv.queueRender) mv.queueRender();
+      // The element has no public queueRender(); without a new frame the change
+      // only shows after the next camera move or tap.
+      if (typeof scene.queueRender === 'function') scene.queueRender();
+      else if (mv.queueRender) mv.queueRender();
     };
+    // Big meshes need a moment on the first wireframe frame (three builds the
+    // edge index), so the button pulses until that frame has been drawn.
+    // On phones the menu folds away after a tap, so a status pill (the AR
+    // launch style) also shows the work; it stays up briefly to avoid a flicker.
+    var wireBusy = false;
+    var wirePill = document.createElement('div');
+    wirePill.className = 'ar-launch wire-status'; wirePill.hidden = true;
+    wirePill.setAttribute('role', 'status'); wirePill.setAttribute('aria-live', 'polite');
+    wirePill.innerHTML = '<span class="ar-launch-text"></span><span class="ar-launch-bar" aria-hidden="true"></span>';
+    document.body.appendChild(wirePill);
     wireBtn.addEventListener('click', function () {
+      if (wireBusy) return;
       wireOn = !wireOn;
+      wireBusy = true;
       wireBtn.setAttribute('aria-pressed', String(wireOn));
       wireBtn.classList.toggle('is-active', wireOn);
-      wireApply();
+      wireBtn.classList.add('is-busy');
+      wireBtn.setAttribute('aria-busy', 'true');
+      wirePill.firstChild.textContent = wireOn ? 'Preparing wireframe…' : 'Restoring surface…';
+      wirePill.hidden = false;
+      var started = Date.now();
+      // Let the browser paint the busy state before the heavy frame starts.
+      requestAnimationFrame(function () {
+        setTimeout(function () {
+          var done = function () {
+            wireBusy = false;
+            wireBtn.classList.remove('is-busy');
+            wireBtn.removeAttribute('aria-busy');
+            setTimeout(function () { if (!wireBusy) wirePill.hidden = true; }, Math.max(0, 400 - (Date.now() - started)));
+          };
+          try { wireApply(); } catch (e) { done(); return; }
+          requestAnimationFrame(function () { requestAnimationFrame(done); });
+        }, 0);
+      });
     });
     var wireViewer = document.getElementById('viewer');
     if (wireViewer) wireViewer.addEventListener('load', function () { wireSaved.clear(); if (wireOn) wireApply(); });
