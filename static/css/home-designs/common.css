@@ -43,3 +43,19 @@ body.hd-page { overflow-x: clip; }
 
 /* model-viewer's default grey loading bar reads as a stray line in these layouts. */
 .hd-page model-viewer::part(default-progress-bar) { display: none; }
+
+/* Section entrances (static/js/home-designs/reveal.js): heading, text, picture
+   rise 24px with opacity, 70ms apart. Only armed once the script has run; the
+   script drops .hd-ri after the entrance so each element's own styles return.
+   `translate` (not transform) keeps any transform the design already sets. */
+.hd-armed .hd-ri {
+  transition: opacity 560ms cubic-bezier(.2,.7,.2,1), translate 700ms cubic-bezier(.2,.7,.2,1);
+  transition-delay: calc(var(--hd-i, 0) * 70ms);
+}
+.hd-armed:not(.hd-in) .hd-ri { opacity: 0; translate: 0 24px; }
+@media (prefers-reduced-motion: reduce) {
+  .hd-armed:not(.hd-in) .hd-ri { opacity: 1; translate: none; }
+}
+
+/* Button feedback shared by every design: a small press. */
+.hd-page main a[class*="-btn"]:active, .hd-page main button:active { translate: 0 1px; }

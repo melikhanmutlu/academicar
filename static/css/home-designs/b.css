@@ -25,7 +25,6 @@
   max-width: 1180px;
   margin: 0 auto;
   background: var(--b-paper);
-  border: 1px solid var(--b-rule);
   border-radius: 8px;
   padding: 28px 80px 88px;
   color: var(--b-ink);
@@ -114,7 +113,7 @@
 .b-fig { margin: 0; }
 .b-fig-wide { margin: 8px 0 48px; }
 .b-caption {
-  font: 400 13px/1.55 var(--b-sans);
+  font: 400 14px/1.55 var(--b-sans);
   color: var(--b-shale);
   margin: 14px 0 0;
   max-width: 760px;
@@ -140,15 +139,14 @@
 .b-fig1-qr a { flex: none; display: block; border: 1px solid var(--b-rule); border-radius: 8px; padding: 6px; background: #fff; }
 .b-fig1-qr a:focus-visible { outline: 2px solid var(--b-orange); outline-offset: 2px; }
 .b-fig1-qr img { display: block; width: 76px; height: 76px; }
-.b-fig1-qr p { font: 400 13px/1.45 var(--b-sans); color: var(--b-shale); margin: 2px 0 0; }
+.b-fig1-qr p { font: 400 14px/1.45 var(--b-sans); color: var(--b-shale); margin: 2px 0 0; }
 
 .b-compare {
   position: relative;
   aspect-ratio: 16 / 9;
   border-radius: 8px;
   overflow: hidden;
-  background: #fff;
-  border: 1px solid var(--b-rule);
+  background: #f6f6f6;
   touch-action: pan-y;
 }
 .b-compare-live {
@@ -156,7 +154,7 @@
   inset: 0;
   width: 100%;
   height: 100%;
-  background: radial-gradient(circle at 60% 45%, #fff 0%, #f6f6f6 70%, #efefef 100%);
+  background: #f6f6f6;
   --poster-color: transparent;
 }
 .b-compare-static {
@@ -177,12 +175,12 @@
 .b-compare-tag {
   position: absolute;
   top: 16px;
-  font: 500 12px/1 var(--b-sans);
-  padding: 7px 11px;
+  font: 500 13px/1 var(--b-sans);
+  padding: 8px 12px;
   border-radius: 200px;
   pointer-events: none;
 }
-.b-compare-tag-left { left: 16px; background: #fff; color: var(--b-shale); border: 1px solid var(--b-rule); }
+.b-compare-tag-left { left: 16px; background: #fff; color: var(--b-ink); }
 .b-compare-tag-right { right: 16px; background: var(--b-ink); color: #fff; }
 
 .b-compare-handle {
@@ -271,7 +269,7 @@
 .b-prose a:not(.b-btn) { color: var(--b-ink); }
 
 .b-ref {
-  font: 600 11px/1 var(--b-sans);
+  font: 600 13px/1 var(--b-sans);
   color: var(--b-gold);
   margin-left: 2px;
 }
@@ -282,8 +280,8 @@
   transition: transform .1s linear;
 }
 .b-note p {
-  font: 400 13px/1.55 var(--b-sans);
-  color: var(--b-shale);
+  font: 400 15px/1.55 var(--b-sans);
+  color: var(--b-ink);
   margin: 4px 0 0;
   padding-left: 14px;
   border-left: 2px solid var(--b-ivory);
@@ -627,7 +625,9 @@
 .b-compare-tag { z-index: 3; }
 .b-desk { padding-top: 28px; }
 .b-titleblock { padding: 44px 0 36px; }
-.b-title { font-size: clamp(40px, 4.6vw, 60px); }
+.b-title { font-size: clamp(48px, 6.4vw, 92px); line-height: .98; letter-spacing: -0.03em; }
+.b-titleblock .b-main { max-width: 760px; }
+.b-byline { font-size: 19px; color: var(--b-ink); max-width: 600px; margin-top: 28px; }
 @media (max-width: 860px) {
   .b-desk { padding-top: 0; }
   .b-paper > .b-fig1 { margin-bottom: 0; }
@@ -660,7 +660,6 @@
 .b-flow-vis {
   position: relative;
   aspect-ratio: 4 / 3;
-  border: 1px solid var(--b-rule);
   border-radius: 8px;
   background: var(--b-mist);
   overflow: hidden;
@@ -684,12 +683,13 @@
 .b-flow-step p {
   margin: 0;
   padding-left: 32px;
-  font: 400 14px/1.45 var(--b-sans);
-  color: var(--b-shale);
+  font: 400 15px/1.45 var(--b-sans);
+  color: var(--b-ink);
 }
 
 /* 1 make */
-.b-flow-vis-make { background: #fff; }
+.b-flow-vis-make { background: var(--b-mist); }
+.b-flow-vis-make img { mix-blend-mode: multiply; }
 .b-flow-vis-make img { width: 100%; height: 100%; object-fit: contain; object-position: 50% 30%; display: block; padding: 0 6px 34px; }
 .b-flow-sources {
   position: absolute; left: 8px; right: 8px; bottom: 8px;
@@ -697,10 +697,9 @@
   list-style: none; margin: 0; padding: 0;
 }
 .b-flow-sources li {
-  font: 500 11px/1 var(--b-sans);
+  font: 500 13px/1 var(--b-sans);
   color: var(--b-ink);
-  background: rgba(255,255,255,.92);
-  border: 1px solid var(--b-rule);
+  background: #fff;
   border-radius: 200px;
   padding: 5px 8px;
 }
@@ -722,15 +721,15 @@
   border-radius: 4px;
   background: var(--b-ink); color: #fff;
   display: grid; place-items: center;
-  font: 600 10px/1 var(--b-sans);
+  font: 600 12px/1 var(--b-sans);
 }
 .b-drop-name { font: 500 13px/1.2 var(--b-sans); color: var(--b-ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .b-drop-name small { display: block; font-weight: 400; font-size: 12px; color: var(--b-ash); margin-top: 3px; }
 .b-drop-bar { display: block; height: 4px; border-radius: 200px; background: var(--b-rule); overflow: hidden; }
 .b-drop-bar span { display: block; height: 100%; width: 100%; background: var(--b-orange); border-radius: inherit; }
-.b-drop-done { display: inline-flex; align-items: center; gap: 6px; font: 500 12px/1.2 var(--b-sans); color: var(--b-ink); }
+.b-drop-done { display: inline-flex; align-items: center; gap: 6px; font: 500 13px/1.2 var(--b-sans); color: var(--b-ink); }
 .b-drop-done svg { color: var(--b-gold); flex: none; }
-.b-drop-formats { font: 400 11px/1.35 var(--b-sans); color: var(--b-ash); }
+.b-drop-formats { font: 400 13px/1.35 var(--b-sans); color: var(--b-shale); }
 
 /* 3 viewer */
 .b-flow-vis-view { background: #1f1f1f; }
@@ -742,19 +741,17 @@
   position: absolute; left: 14%; top: 10%;
   width: 58%; height: 98%;
   background: #fff;
-  border: 1px solid var(--b-rule);
   border-radius: 3px;
   padding: 10% 9%;
   display: flex; flex-direction: column; gap: 6px;
   transform: rotate(-3deg);
-  box-shadow: 0 6px 18px rgba(32,32,32,.08);
 }
 .b-poster-title { display: block; height: 7px; border-radius: 2px; background: var(--b-ink); width: 92%; }
 .b-poster-title-short { width: 60%; margin-bottom: 6px; }
 .b-poster-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .b-poster-cols span {
   display: block; height: 34px;
-  background: repeating-linear-gradient(180deg, #e3e3e3 0 3px, transparent 3px 7px);
+  background: #e9e9e9;
 }
 .b-poster-fig { display: block; flex: 1; border-radius: 2px; background: #f1e3db; max-height: 40px; }
 .b-poster-qr {
@@ -762,11 +759,9 @@
   width: 34%;
   aspect-ratio: 1;
   background: #fff;
-  border: 1px solid var(--b-rule);
   border-radius: 6px;
   padding: 5px;
   transform: rotate(2deg);
-  box-shadow: 0 6px 18px rgba(32,32,32,.12);
 }
 .b-poster-qr img { display: block; width: 100%; height: 100%; }
 .b-poster-qr:focus-visible { outline: 2px solid var(--b-orange); outline-offset: 2px; }
@@ -824,15 +819,10 @@
 
 /* Supplementary material: video full width, then the live demos. */
 .b-supp-video { margin: 8px 0 0; }
-.b-supp-video .b-video { background: #fff; }
-.b-supp-video .b-video::after {
-  content: ""; position: absolute; inset: 0; border: 1px solid var(--b-rule);
-  border-radius: 8px; pointer-events: none;
-}
-.b-supp-video .b-video.is-playing::after { display: none; }
+.b-supp-video .b-video { background: var(--b-mist); }
 .b-supp-video .b-video-play {
   left: 24px; top: auto; bottom: 24px; transform: none;
-  box-shadow: 0 6px 24px rgba(0,0,0,.14), 0 0 0 1px var(--b-rule);
+  background: var(--b-ink); color: #fff;
 }
 @media (max-width: 560px) {
   .b-supp-video .b-video-play { left: auto; right: 10px; top: 10px; bottom: auto; padding: 6px; }
@@ -844,17 +834,20 @@
 }
 .b-supp-list a {
   display: grid; gap: 6px; height: 100%;
-  padding: 18px 20px; border: 1px solid var(--b-rule); border-radius: 8px;
-  color: var(--b-ink); text-decoration: none;
+  padding: 22px 24px; background: var(--b-mist); border-radius: 8px;
+  color: var(--b-ink); text-decoration: none; transition: background .15s ease;
 }
-.b-supp-list a:hover { border-color: var(--b-ink); }
+.b-supp-list a:hover { background: var(--b-desk); }
 .b-supp-list a:focus-visible { outline: 2px solid var(--b-orange); outline-offset: 2px; }
-.b-supp-id { font: 600 12px/1.2 var(--b-sans); color: var(--b-gold); }
+.b-supp-id { font: 600 13px/1.2 var(--b-sans); color: var(--b-gold); }
 .b-supp-title { font: 500 19px/1.3 var(--b-serif); }
-.b-supp-note { font: 400 14px/1.45 var(--b-sans); color: var(--b-shale); }
+.b-supp-note { font: 400 15px/1.45 var(--b-sans); color: var(--b-ink); }
 @media (max-width: 860px) {
   .b-supp-list { grid-template-columns: minmax(0, 1fr); gap: 10px; }
 }
 @media (max-width: 560px) {
   .b-panel { flex-basis: 92%; }
 }
+
+/* v4: on a phone the paper runs straight into the footer (no empty desk band). */
+@media (max-width: 860px) { .b-desk { padding-bottom: 0; } }
