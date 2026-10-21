@@ -11,6 +11,8 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 
+from utils.page_cache import drop_page_cache
+
 logger = logging.getLogger(__name__)
 
 # Bounded pool for async ("best-effort") mirrors so a many-file model can no
@@ -70,6 +72,7 @@ def _upload_sync(local_path: str, r2_key: str) -> bool:
         if client is None:
             return False
         client.upload_file(local_path, _bucket(), r2_key)
+        drop_page_cache(local_path)
         logger.info("R2 mirror: %s -> %s", r2_key, _bucket())
         return True
     except Exception:

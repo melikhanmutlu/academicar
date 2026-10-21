@@ -142,6 +142,7 @@ from analytics import (
     model_snapshot,
     track_event,
 )
+from utils.page_cache import drop_page_cache
 from utils.security import require_model_editor, require_model_ownership, require_paper_editor, require_paper_ownership
 from services.storage_service import (
     STORAGE_FULL_MESSAGE,
@@ -1430,6 +1431,7 @@ def add_folder_to_zip(zip_file: zipfile.ZipFile, folder: str, archive_prefix: st
     for file_path in iter_backup_files(folder):
         arcname = os.path.join(archive_prefix, os.path.relpath(file_path, folder))
         zip_file.write(file_path, arcname)
+        drop_page_cache(file_path)
         added += 1
     return added
 
@@ -1563,6 +1565,7 @@ def create_backup_archive(app: Flask, created_by_user_id: int | None = None, rea
             zip_file.writestr("manifest.txt", "\n".join(manifest_lines) + "\n")
             zip_file.writestr("qr_links.tsv", "public_id\tstatus\tresolver_url\tmodel_id\ttarget_type\n" + "\n".join(qr_manifest) + "\n")
         os.replace(partial_path, archive_path)
+        drop_page_cache(archive_path, flush=True)
     except Exception:
         # A half-written archive (typically ENOSPC) would only eat more disk.
         try:

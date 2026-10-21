@@ -20,9 +20,19 @@ WORKDIR /app
 # present; no display is required for `blender --background`.
 ENV BLENDER_VERSION=4.3.2 \
     BLENDER_MAJOR=4.3
+# pg_dump must be at least the server's major version (Railway Postgres is 18,
+# Debian's postgresql-client is 17 and refuses to dump it), so the client comes
+# from the PostgreSQL apt repository. Keep PG_CLIENT_MAJOR >= the server version.
+ENV PG_CLIENT_MAJOR=18
 RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && install -d /usr/share/postgresql-common/pgdg \
+    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+    && . /etc/os-release \
+    && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
     && apt-get install -y --no-install-recommends \
-        curl ca-certificates git xz-utils nodejs npm postgresql-client libreoffice-impress \
+        curl ca-certificates git xz-utils nodejs npm postgresql-client-${PG_CLIENT_MAJOR} libreoffice-impress \
         libgl1 libegl1 libxi6 libxxf86vm1 libxfixes3 libxrender1 libxkbcommon0 \
         libsm6 libx11-6 libxext6 libgomp1 \
     && ( curl -fsSL "https://download.blender.org/release/Blender${BLENDER_MAJOR}/blender-${BLENDER_VERSION}-linux-x64.tar.xz" -o /tmp/blender.tar.xz \
