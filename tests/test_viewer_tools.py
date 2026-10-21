@@ -46,3 +46,18 @@ def test_entering_annotate_mode_stops_auto_rotate():
     src = _viewer_source()
     assert "Stop auto-rotate on entering annotate mode." in src
     assert src.count("if (typeof setAutoRotateState === 'function') setAutoRotateState(false);") >= 2
+
+
+def test_wireframe_toggle_redraws_and_shows_progress():
+    """Wireframe used to change materials without asking for a new frame
+    (<model-viewer> has no public queueRender), so the model only switched
+    after the next tap or drag. It must ask the scene to redraw, and show a
+    busy state while the first, heavier wireframe frame is drawn."""
+    src = _viewer_source()
+    start = src.index("var wireApply = function ()")
+    block = src[start:src.index("// Light / dark switch", start)]
+    assert "scene.queueRender()" in block
+    assert "wireBtn.classList.add('is-busy')" in block
+    assert "wireBtn.classList.remove('is-busy')" in block
+    assert "Preparing wireframe…" in block
+    assert "#wireframeBtn.is-busy" in src
