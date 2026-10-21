@@ -379,7 +379,7 @@ body.hd-c {
 .c-stage-qr:hover { background: #333; }
 
 /* ---------- Feature reel: a swipeable row of clips ---------- */
-.c-reel { padding: 112px 0 40px; background: var(--c-bg); }
+.c-reel { padding: 80px 0 40px; background: var(--c-bg); }
 .c-reel-head {
   max-width: 1240px;
   margin: 0 auto;
@@ -442,7 +442,7 @@ body.hd-c {
 .c-reel-caption p { margin: 4px 0 0; color: var(--c-ink-2); font-size: 15px; line-height: 1.5; }
 
 /* ---------- Flow: four steps ---------- */
-.c-flow { padding: 112px 0 40px; background: var(--c-bg); }
+.c-flow { padding: 80px 0 40px; background: var(--c-bg); }
 .c-flow-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px 32px; flex-wrap: wrap; }
 .c-flow-head .c-sub { margin: 0; }
 .c-flow-rail {
@@ -569,7 +569,7 @@ body.hd-c {
 .c-flow.is-armed.is-in .c-flow-done { opacity: 1; }
 
 /* ---------- Monitor: slice view ---------- */
-.c-monitor { padding: 112px 0 96px; background: var(--c-bg-2); }
+.c-monitor { padding: 80px 0; background: var(--c-bg-2); }
 .c-monitor-head { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: end; }
 .c-monitor-head .c-sub { margin: 0; }
 .c-monitor { perspective: 1600px; }
@@ -595,7 +595,7 @@ body.hd-c {
 .c-fineprint { margin: 18px 0 0; font-size: 14px; color: var(--c-ink-2); max-width: 70ch; line-height: 1.5; }
 
 /* ---------- Showreel ---------- */
-.c-showreel { padding: 24px 0 112px; background: var(--c-bg-2); }
+.c-showreel { padding: 24px 0 80px; background: var(--c-bg-2); }
 .c-showreel-head { display: flex; justify-content: space-between; align-items: end; gap: 24px; flex-wrap: wrap; }
 .c-showreel-head .c-sub { margin: 0; }
 .c-showreel-frame {
@@ -640,7 +640,7 @@ body.hd-c {
 .c-showreel-frame.is-playing .c-showreel-poster { display: none; }
 
 /* ---------- Institutions (light band) ---------- */
-.c-inst { padding: 112px 0; background: var(--c-bg-2); color: #202020; }
+.c-inst { padding: 80px 0; background: var(--c-bg-2); color: #202020; }
 .c-inst .c-h2 { color: #202020; }
 .c-inst-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: start; }
 .c-inst-lead { margin: 18px 0 0; font-size: 17px; line-height: 1.55; color: #4d4d4d; max-width: 46ch; }
@@ -651,7 +651,7 @@ body.hd-c {
 .c-inst a:focus-visible { outline-color: #202020; }
 
 /* ---------- Try it: real demos ---------- */
-.c-try { padding: 112px 0; background: var(--c-bg); }
+.c-try { padding: 80px 0; background: var(--c-bg); }
 .c-try-list { list-style: none; margin: 40px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
 .c-try-item {
   height: 100%;
@@ -678,13 +678,13 @@ body.hd-c {
 .c-fields-head { display: flex; justify-content: space-between; align-items: end; gap: 24px; flex-wrap: wrap; }
 
 /* ---------- Fields: one line of links ---------- */
-.c-fields { padding: 0 0 96px; background: var(--c-bg); }
+.c-fields { padding: 0 0 80px; background: var(--c-bg); }
 .c-fields-line { margin: 0; padding: 20px 24px; background: var(--c-bg-2); border-radius: 8px; display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 15px; color: var(--c-ink-2); }
 .c-fields-line a { color: var(--c-ink); text-decoration: none; border-bottom: 1px solid var(--c-line-2); }
 .c-fields-line a:hover { border-bottom-color: var(--c-ink); }
 
 /* ---------- Guides ---------- */
-.c-guides { padding: 112px 0 48px; background: var(--c-bg); }
+.c-guides { padding: 80px 0 40px; background: var(--c-bg); }
 .c-guides-grid {
   margin-top: 40px;
   display: grid;
@@ -711,7 +711,7 @@ body.hd-c {
 .c-guide-lead .c-guide-title { font-family: var(--c-display); font-size: 24px; letter-spacing: -0.02em; line-height: 1.2; }
 
 /* ---------- Closing ---------- */
-.c-end { position: relative; padding: 160px 0 170px; background: var(--c-stage); overflow: hidden; text-align: center; }
+.c-end { position: relative; padding: 96px 0; background: var(--c-stage); overflow: hidden; text-align: center; }
 .c-end-word {
   position: absolute;
   left: 50%;
@@ -781,8 +781,8 @@ body.hd-c {
   .c-flow-rail { display: none; }
   .c-flow-head { margin-bottom: 32px; }
   .c-flow-steps { grid-template-columns: 1fr 1fr; gap: 36px 16px; }
-  .c-monitor, .c-inst { padding: 96px 0; }
-  .c-showreel { padding: 24px 0 96px; }
+  .c-monitor, .c-inst { padding: 64px 0; }
+  .c-showreel { padding: 24px 0 64px; }
   .c-monitor-frame { margin-top: 36px; }
   .c-inst-grid { grid-template-columns: 1fr; gap: 40px; }
   .c-fields { padding-bottom: 72px; }
@@ -790,7 +790,7 @@ body.hd-c {
   .c-guides-grid { grid-template-columns: 1fr; }
   .c-guide { grid-template-columns: 112px 1fr; }
   .c-guide-lead { grid-template-columns: 1fr; }
-  .c-end { padding: 112px 0 136px; }
+  .c-end { padding: 80px 0; }
   .c-end-word { top: 20%; }
 }
 @media (max-width: 520px) {

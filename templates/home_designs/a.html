@@ -46,7 +46,7 @@
           environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
           loading="eager"
           reveal="auto">
-          <div slot="poster" class="a-model-poster" aria-hidden="true"></div>
+          <img slot="poster" class="hd-poster" src="{{ url_for('static', filename='images/home/a/mito-live.webp') }}" alt="" aria-hidden="true">
         </model-viewer>
         <span class="a-specimen-note">A live mitochondrion. Drag to turn it.</span>
       </div>
@@ -148,7 +148,7 @@
           environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
           loading="lazy"
           reveal="auto">
-          <div slot="poster" class="a-model-poster" aria-hidden="true"></div>
+          <img slot="poster" class="hd-poster" src="{{ url_for('static', filename='images/home/a/mito-live.webp') }}" alt="" aria-hidden="true">
         </model-viewer>
         <div class="a-plane" aria-hidden="true"><span></span></div>
         <div class="a-rail" aria-hidden="true"><span class="a-rail-fill"></span></div>

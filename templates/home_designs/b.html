@@ -114,6 +114,7 @@
           tone-mapping="neutral"
           environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
           loading="lazy">
+          <img slot="poster" class="hd-poster" src="{{ url_for('static', filename='images/home/b/mito-live.webp') }}" alt="" aria-hidden="true">
         </model-viewer>
         <div class="b-compare-static" aria-hidden="true">
           <picture>
@@ -423,6 +424,7 @@
           setTimeout(() => { compare.classList.remove('is-sweeping'); startRotate(); }, 1700);
         };
         viewer.addEventListener('load', () => { loaded = true; sweep(); }, { once: true });
+        viewer.addEventListener('error', () => { loaded = true; sweep(); }, { once: true });
         new IntersectionObserver((entries, obs) => {
           if (entries.some((e) => e.isIntersecting)) { seen = true; obs.disconnect(); setTimeout(sweep, 300); }
         }, { threshold: 0.45 }).observe(compare);

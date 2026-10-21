@@ -16,7 +16,7 @@
    pinned hero; clip keeps the page from scrolling sideways without that. */
 body.hd-e { overflow-x: clip; }
 .e-wrap { max-width: 1200px; margin: 0 auto; padding: 0 40px; }
-.e-section { padding: 96px 0; }
+.e-section { padding: 80px 0; }
 .e-head { max-width: 680px; margin-bottom: 44px; }
 .e-head-row { max-width: none; display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
 .e-h2 {
@@ -516,7 +516,7 @@ body.hd-e { overflow-x: clip; }
 .e-label-row span { font: 400 14px/1.45 var(--e-body); color: var(--e-shale); }
 
 /* ============================= CTA ============================= */
-.e-cta { padding-top: 32px; padding-bottom: 120px; }
+.e-cta { padding-top: 32px; padding-bottom: 80px; }
 .e-cta-box {
   display: flex; align-items: center; justify-content: space-between; gap: 32px; flex-wrap: wrap;
   background: var(--e-ink); color: #fff; border-radius: 8px; padding: 48px;

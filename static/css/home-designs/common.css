@@ -59,3 +59,26 @@ body.hd-page { overflow-x: clip; }
 
 /* Button feedback shared by every design: a small press. */
 .hd-page main a[class*="-btn"]:active, .hd-page main button:active { translate: 0 1px; }
+
+/* Still of the model, shown while it loads, if it fails, and without JS. */
+model-viewer .hd-poster { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+
+/* Phones: every standalone control gets a 44px tap target. Text links keep
+   their look; an invisible box around them takes the tap. */
+@media (max-width: 720px) {
+  .hd-page .a-btn, .hd-page .d-btn,
+  .hd-page .d-panel-toggle, .hd-page .d-reel-btn,
+  .hd-page .e-aud-tabs button { min-height: 44px; }
+  .hd-page .c-rail-btn { width: 44px; height: 44px; }
+  .hd-page .e-aud-links a { padding: 0; min-height: 44px; display: flex; align-items: center; }
+
+  .hd-page :is(.a-fieldline, .c-fields-line, .d-fields-line, .e-fields, .b-keywords, .b-refs-more, .d-live-qr) a,
+  .hd-page :is(.c-link, .d-text-link, .e-surface-link) { position: relative; }
+  .hd-page :is(.a-fieldline, .c-fields-line, .d-fields-line, .e-fields, .b-keywords, .b-refs-more, .d-live-qr) a::after,
+  .hd-page :is(.c-link, .d-text-link, .e-surface-link)::after {
+    content: ""; position: absolute; left: -4px; right: -4px; top: 50%; height: 44px; transform: translateY(-50%);
+  }
+  /* Rows of links sit 44px apart so the tap boxes don't overlap. */
+  .hd-page :is(.a-fieldline, .c-fields-line, .d-fields-line, .e-fields) { row-gap: 22px; }
+  .hd-page .b-keywords { line-height: 44px; }
+}

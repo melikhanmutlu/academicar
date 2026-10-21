@@ -198,7 +198,9 @@
             tone-mapping="neutral"
             environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
             loading="lazy"
-            reveal="auto"></model-viewer>
+            reveal="auto">
+            <img slot="poster" class="hd-poster" src="{{ url_for('static', filename='images/home/d/mito-live.webp') }}" alt="" aria-hidden="true">
+          </model-viewer>
           <span class="d-scope-cross" aria-hidden="true"></span>
         </div>
         <dl class="d-scope-data">

@@ -49,7 +49,9 @@
       shadow-intensity="0"
       tone-mapping="neutral"
       environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
-      loading="eager"></model-viewer>
+      loading="eager">
+      <img slot="poster" class="hd-poster" src="{{ url_for('static', filename='images/home/c/mito-live.webp') }}" alt="" aria-hidden="true">
+    </model-viewer>
   </div>
 
   <div class="c-stage-copy">
