@@ -9,8 +9,6 @@
 
 {% block content %}
 {% set first_model = paper.models[0] if paper.models else none %}
-{% set model_capacity = project_model_capacity(paper) %}
-{% set can_upload_more = model_capacity.can_add %}
 {% set presentation_enabled = project_supports_feature(paper, 'presentation_library') %}
 {# Editors (collaborators) edit content; deleting, visibility, upgrades and
    collaborator management stay with the owner. #}
@@ -164,7 +162,7 @@
         {% endif %}
       </div>
 
-      {% if not paper.models and can_upload_more %}
+      {% if not paper.models %}
         <div class="share-actions mt-5"><a href="#add-model" class="detail-action detail-action-primary">Add the first model</a></div>
       {% elif paper.articles and paper.articles[0].pdf_path %}
         <div class="share-actions mt-5"><a href="{{ url_for('project_article_reader', slug=paper.slug, article_id=paper.articles[0].id) }}" target="_blank" rel="noopener noreferrer" class="detail-action detail-action-primary">Present first article</a></div>
@@ -394,18 +392,12 @@
       <div class="surface rounded-xl border border-dashed border-[#111827]/20 p-12 text-center reveal-up">
         <h3 class="font-serif text-2xl font-semibold text-[#111827]">No models yet.</h3>
         <p class="text-[#5c6473] mt-2">Upload the first anonymized GLB, STL, OBJ, FBX or STEP model (or a CT/MR scan) to generate its viewer link and QR code.</p>
-        {% if can_upload_more %}<a href="#add-model" class="detail-action detail-action-primary mt-5 inline-flex">Add the first model</a>{% endif %}
+        <a href="#add-model" class="detail-action detail-action-primary mt-5 inline-flex">Add the first model</a>
       </div>
     {% endif %}
   </section>
 
   <section id="add-model" class="mb-6 reveal-up">
-    {% if not can_upload_more %}
-      <div class="surface rounded-xl p-5 capacity-notice">
-        <div><p class="project-section-kicker">Plan capacity reached</p><h2>{{ model_capacity.used }} / {{ model_capacity.limit }} models</h2><p>{{ model_capacity.plan.label }} projects hold {{ model_capacity.limit }} model{{ '' if model_capacity.limit == 1 else 's' }}. {% if model_capacity.plan.key == 'institutional' %}Ask your institution's administrator to raise this limit, or upgrade an existing model.{% else %}Upgrade the existing model to add more, or start a new project for the next model.{% endif %}</p></div>
-        {% if paper.models and is_project_owner %}<a class="detail-action detail-action-primary" href="{{ url_for('model_upgrade_page', model_id=paper.models[0].id) }}">Review upgrade options</a>{% endif %}
-      </div>
-    {% else %}
     {% if paper.models %}
       <details class="surface rounded-xl p-0 overflow-hidden upload-panel-prominent" data-upload-panel open>
         <summary class="upload-summary upload-summary-static">
@@ -519,7 +511,6 @@
       </details>
     {% else %}
       </div>
-    {% endif %}
     {% endif %}
   </section>
 

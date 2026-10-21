@@ -13,7 +13,7 @@
     {% for plan in pricing_rows %}
       <details class="admin-plan-card" {% if loop.first %}open{% endif %}>
         <summary class="admin-plan-summary">
-          <span><strong>{{ plan.label }}</strong><small><code>{{ plan.key }}</code> · {{ '$%.2f'|format(plan.price_usd_cents / 100) }} · {{ plan.max_models_per_project or 'Unlimited' }} model{{ '' if plan.max_models_per_project == 1 else 's' }}/topic</small></span>
+          <span><strong>{{ plan.label }}</strong><small><code>{{ plan.key }}</code> · {{ '$%.2f'|format(plan.price_usd_cents / 100) }}</small></span>
           <span class="admin-plan-summary-state">Edit <b aria-hidden="true">⌄</b></span>
         </summary>
         <form method="POST" action="{{ url_for('admin_pricing_update', plan_key=plan.key) }}">
@@ -28,7 +28,6 @@
             <label class="admin-editor-field"><span>Duration (days)</span><input type="number" name="duration_days" min="1" max="36500" value="{{ plan.duration_days or '' }}" placeholder="unlimited" title="Blank = unlimited"></label>
             {% endif %}
             <label class="admin-editor-field"><span>Storage (MB)</span><input type="number" name="storage_limit_mb" min="1" max="2047" value="{{ (plan.storage_limit_bytes / 1024 / 1024) | round(0, 'floor') | int }}" required></label>
-            <label class="admin-editor-field"><span>Models per topic</span><input type="number" name="max_models_per_project" min="1" value="{{ plan.max_models_per_project or '' }}" placeholder="unlimited" title="Blank = unlimited"></label>
             {% if plan.key not in ('free', 'institutional') %}
             <label class="admin-editor-field"><span>Purchasable</span>
               <select name="is_purchasable">

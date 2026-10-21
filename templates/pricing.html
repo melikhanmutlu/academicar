@@ -107,7 +107,6 @@
 
       <dl class="pr-facts">
         <div><dt>File size</dt><dd>Up to {{ (plan.storage_limit_bytes / 1024 / 1024) | round(0, 'floor') | int }} MB</dd></div>
-        <div><dt>Models per project</dt><dd>{% if plan.max_models_per_project is none %}No limit{% else %}{{ plan.max_models_per_project }}{% endif %}</dd></div>
         <div><dt>Viewer</dt><dd>{{ "No watermark" if plan.is_paid else "AcademicAR watermark" }}</dd></div>
         <div><dt>Viewer tools</dt><dd>{% set n = plan.features | length %}{% if n >= plan_features | length %}All tools{% else %}All but {{ plan_features | length - n }}{% endif %}</dd></div>
       </dl>
@@ -152,7 +151,7 @@
     <ul>
       <li>No watermark in the viewer</li>
       <li>{{ access_window_label(license_plans['academic'].duration_days) }} or {{ access_window_label(license_plans['extended_archive'].duration_days) }} online instead of {{ access_window_label(license_plans['free'].duration_days) }}</li>
-      <li>More models per project and larger files</li>
+      <li>Larger files</li>
       {% for name in paid_only %}<li>{{ name }}</li>{% endfor %}
     </ul>
   </section>

@@ -13,6 +13,6 @@
         {%- elif funding.reason == "suspended" %}{{ funding.institution.name }}'s institutional access is paused, so
         {%- else %}{{ funding.institution.name }}'s contract is not active right now, so{% endif %} this upload is not covered by your institution. Ask your institution admin, or continue on Free.</p>
     {% endif %}
-    <p class="text-xs text-[#5c6473] mt-1">New models get a 3-day, watermarked viewer (up to 100 MB){% set free_limit = get_license_plan('free').max_models_per_project %}{% if free_limit %}; a Free project holds {{ free_limit }} model{{ '' if free_limit == 1 else 's' }}{% endif %}. {{ upgrade_hint }}</p>
+    <p class="text-xs text-[#5c6473] mt-1">New models get a 3-day, watermarked viewer (up to 100 MB). {{ upgrade_hint }}</p>
   {% endif %}
 </div>

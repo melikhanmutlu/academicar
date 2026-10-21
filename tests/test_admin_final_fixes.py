@@ -281,11 +281,12 @@ def test_desktop_sidebar_breakpoint_excludes_1024px():
     assert "@media (max-width: 1023px)" in ADMIN_CSS
 
 
-def test_pricing_summary_pluralises_models_per_topic(client):
+def test_pricing_admin_has_no_models_per_topic_limit(client):
+    # Licensing is per model; projects never cap how many models they hold.
     _make_admin(client)
     html = client.get("/admin/pricing").get_data(as_text=True)
-    assert "1 models/topic" not in html
-    assert re.search(r"\b1 model/topic", html) or "models/topic" in html
+    assert "/topic" not in html
+    assert 'name="max_models_per_project"' not in html
 
 
 def test_jobs_and_blog_counters_use_the_section_head_pattern(client):

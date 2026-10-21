@@ -242,14 +242,10 @@ def _limit_error(target: dict, owner_user_id: int, size: int, medical: bool) -> 
     membership = get_active_membership(owner_user_id)
     if membership is not None and institution_can_fund_upload(membership.institution, size)[0]:
         plan = "institutional"
-    if target["type"] == "paper":
-        paper = app_module.active_paper_query().filter_by(slug=target["key"]).first()
-        capacity = app_module.project_model_capacity(paper, intended_plan=plan)
-        if not capacity["can_add"]:
-            return (
-                f"The {capacity['plan'].label} plan allows {capacity['limit']} model(s) "
-                "per project. Upgrade the existing model to add more, or start a new project."
-            )
+    if plan == "free":
+        free_error = app_module.free_model_limit_error(owner_user_id)
+        if free_error:
+            return free_error
     return model_file_limit_error(size, plan)
 
 

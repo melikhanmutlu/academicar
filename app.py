@@ -68,7 +68,6 @@ from licensing import (
     model_upgrade_options,
     normalize_license_type,
     plan_supports_feature,
-    project_capacity_models,
     project_supports_feature,
     refresh_license_plan_cache,
     strongest_project_plan_key,
@@ -303,7 +302,6 @@ def create_app(test_config: dict | None = None) -> Flask:
             "paper_is_deleted": paper_is_deleted,
             "visibility_label": visibility_label,
             "visibility_labels": VISIBILITY_LABELS,
-            "project_model_capacity": project_model_capacity,
             "project_supports_feature": request_project_supports_feature,
             "admin_chip_class": admin_chip_class,
             "admin_nav_counts": admin_nav_counts,
@@ -501,7 +499,6 @@ HEX_COLOR_PATTERN = re.compile(r"#[0-9A-Fa-f]{6}\b")
 MAX_PLAN_PRICE_USD = 10_000
 MAX_PLAN_DURATION_DAYS = 36_500
 MAX_PLAN_STORAGE_MB = 2_047  # LicensePlanConfig.storage_limit_bytes is an Integer
-MAX_PLAN_MODELS_PER_PROJECT = 100_000
 MAX_COUPON_REDEMPTIONS = 1_000_000
 MAX_INSTITUTION_AMOUNT = 10_000_000  # major units; cents must fit an Integer
 MAX_INSTITUTION_MODEL_QUOTA = 1_000_000
@@ -2797,19 +2794,6 @@ def qr_asset_response(asset, url, title, stem):
     response.headers["Cache-Control"] = "private, no-cache"
     return response
 
-def project_model_capacity(project: Paper | None, *, intended_plan: str | None = None) -> dict:
-    """Return the strongest plan's topic-level model capacity and usage."""
-    selected_key = strongest_project_plan_key(project, intended_plan=intended_plan)
-    plan = get_license_plan(selected_key)
-    used = len(project_capacity_models(project))
-    return {
-        "plan": plan,
-        "used": used,
-        "limit": plan.max_models_per_project,
-        "can_add": plan.max_models_per_project is None or used < plan.max_models_per_project,
-    }
-
-
 def intended_project_plan_for_user(user_id: int | None) -> str:
     """Plan context for a new topic before its first model exists."""
     membership = get_active_membership(user_id)
@@ -2974,6 +2958,36 @@ def new_project_share_token() -> str:
 
 def active_paper_query():
     return Paper.query.filter(or_(Paper.status.is_(None), Paper.status != "deleted"))
+
+
+# Unadvertised fair-use cap: one account can hold this many live Free models.
+FREE_MODEL_LIMIT = 5
+
+
+def free_model_limit_error(owner_user_id: int | None) -> str | None:
+    """Error when the owner already holds FREE_MODEL_LIMIT live Free models.
+
+    Failed, expired and deleted models (and models in deleted projects) do not
+    count, so upgrading or letting a Free model lapse frees a slot. Admins are
+    exempt.
+    """
+    owner = db.session.get(User, owner_user_id) if owner_user_id else None
+    if owner is None or owner.is_admin:
+        return None
+    free_models = (
+        Model3D.query.join(Paper, Model3D.paper_id == Paper.id)
+        .filter(Model3D.user_id == owner.id)
+        .filter(or_(Model3D.license_type.is_(None), Model3D.license_type == "free"))
+        .filter(or_(Paper.status.is_(None), Paper.status != "deleted"))
+        .all()
+    )
+    live = [m for m in free_models if model_access_status(m) not in {"failed", "expired", "deleted"}]
+    if len(live) < FREE_MODEL_LIMIT:
+        return None
+    return (
+        f"Free access covers up to {FREE_MODEL_LIMIT} models at a time. "
+        "Upgrade or delete one of your Free models to add another."
+    )
 
 
 def new_public_id() -> str:
@@ -5163,14 +5177,12 @@ def _create_model_for_paper(
         else:
             institutional_fallback_reason = reason
 
-    capacity = project_model_capacity(paper, intended_plan=license_normalized)
-    if not capacity["can_add"]:
-        cleanup_dir(upload_dir)
-        cleanup_dir(converted_dir)
-        return False, (
-            f"The {capacity['plan'].label} plan allows {capacity['limit']} model(s) "
-            "per project. Upgrade the existing model to add more, or start a new project."
-        )
+    if license_normalized == "free":
+        free_error = free_model_limit_error(paper.user_id)
+        if free_error:
+            cleanup_dir(upload_dir)
+            cleanup_dir(converted_dir)
+            return False, free_error
 
     # A raw scan is not what gets stored (only the resulting GLB), so it is
     # capped by MEDICAL_UPLOAD_MAX_BYTES above instead of the plan's model limit.
@@ -7664,6 +7676,17 @@ def register_routes(app: Flask) -> None:
             if page_is("overview")
             else []
         )
+        top_uploaders = (
+            db.session.query(User, func.count(Model3D.id).label("model_count"))
+            .join(Model3D, Model3D.user_id == User.id)
+            .filter(live_model)
+            .group_by(User.id)
+            .order_by(func.count(Model3D.id).desc(), User.id.asc())
+            .limit(5)
+            .all()
+            if page_is("overview")
+            else []
+        )
         expiring_models = (
             Model3D.query.filter(
                 live_model,
@@ -8077,6 +8100,7 @@ def register_routes(app: Flask) -> None:
             payment_counts=payment_counts,
             failed_format_counts=failed_format_counts,
             largest_models=largest_models,
+            top_uploaders=top_uploaders,
             expiring_models=expiring_models,
             near_limit_models=near_limit_models,
             monthly_revenue=monthly_revenue,
@@ -9216,23 +9240,6 @@ def register_routes(app: Flask) -> None:
             flash(f"Storage limit cannot exceed {MAX_PLAN_STORAGE_MB} MB.", "danger")
             return redirect(url_for("admin_dashboard", admin_page="pricing"))
         is_purchasable = plan_row.is_purchasable if price_locked else request.form.get("is_purchasable") == "1"
-        model_limit_supplied = "max_models_per_project" in request.form
-        model_limit_raw = (request.form.get("max_models_per_project") or "").strip()
-        max_models_per_project = plan_row.max_models_per_project
-        if model_limit_supplied and not model_limit_raw:
-            max_models_per_project = None
-        elif model_limit_raw:
-            try:
-                max_models_per_project = int(model_limit_raw)
-            except ValueError:
-                flash("Model limit must be a whole number, or blank for unlimited.", "danger")
-                return redirect(url_for("admin_dashboard", admin_page="pricing"))
-            if max_models_per_project <= 0:
-                flash("Model limit must be positive, or blank for unlimited.", "danger")
-                return redirect(url_for("admin_dashboard", admin_page="pricing"))
-            if max_models_per_project > MAX_PLAN_MODELS_PER_PROJECT:
-                flash(f"Model limit cannot exceed {MAX_PLAN_MODELS_PER_PROJECT}.", "danger")
-                return redirect(url_for("admin_dashboard", admin_page="pricing"))
         enabled_features = plan_row.features or []
         if request.form.get("features_present") == "1":
             submitted_features = request.form.getlist("features")
@@ -9245,7 +9252,6 @@ def register_routes(app: Flask) -> None:
             "duration_days": plan_row.duration_days,
             "storage_limit_bytes": plan_row.storage_limit_bytes,
             "is_purchasable": plan_row.is_purchasable,
-            "max_models_per_project": plan_row.max_models_per_project,
             "features": plan_row.features or [],
         }
         plan_row.label = label
@@ -9254,7 +9260,6 @@ def register_routes(app: Flask) -> None:
         plan_row.duration_days = duration_days
         plan_row.storage_limit_bytes = storage_mb * 1024 * 1024
         plan_row.is_purchasable = is_purchasable
-        plan_row.max_models_per_project = max_models_per_project
         plan_row.features = enabled_features
         try:
             db.session.commit()
@@ -9277,7 +9282,6 @@ def register_routes(app: Flask) -> None:
                     "duration_days": plan_row.duration_days,
                     "storage_limit_bytes": plan_row.storage_limit_bytes,
                     "is_purchasable": plan_row.is_purchasable,
-                    "max_models_per_project": plan_row.max_models_per_project,
                     "features": plan_row.features or [],
                 },
             },
