@@ -173,6 +173,7 @@
             <h3>Legal</h3>
             <a href="{{ url_for('terms') }}">Terms</a>
             <a href="{{ url_for('privacy') }}">Privacy</a>
+            {% if config.GA_MEASUREMENT_ID %}<a href="#" data-cookie-settings>Cookie settings</a>{% endif %}
             <a href="{{ url_for('data_protection') }}">Data Protection</a>
             <a href="{{ url_for('content_policy') }}">Content &amp; Data Use</a>
             <a href="{{ url_for('refund_policy') }}">Refund Policy</a>

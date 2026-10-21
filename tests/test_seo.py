@@ -185,15 +185,20 @@ def test_demo_viewer_has_seo_tags(client):
 
 
 def test_google_analytics_absent_by_default(client):
-    assert "googletagmanager.com/gtag" not in client.get("/").get_data(as_text=True)
+    body = client.get("/").get_data(as_text=True)
+    assert "googletagmanager.com/gtag" not in body
+    assert "aar-consent" not in body
 
 
-def test_google_analytics_tag_on_public_pages_when_configured(client):
+def test_google_analytics_waits_for_cookie_consent(client):
     client.application.config["GA_MEASUREMENT_ID"] = "G-TEST123"
     resp = client.get("/")
     body = resp.get_data(as_text=True)
-    assert "https://www.googletagmanager.com/gtag/js?id=G-TEST123" in body
-    assert "gtag('config', 'G-TEST123')" in body
+    assert '"G-TEST123"' in body
+    # The gtag script is only injected by the consent banner's Accept path.
+    assert '<script async src="https://www.googletagmanager.com' not in body
+    assert "aar-consent" in body and "Decline" in body and "Accept" in body
+    assert "data-cookie-settings" in body
     csp = resp.headers.get("Content-Security-Policy") or resp.headers.get("Content-Security-Policy-Report-Only") or ""
     assert "https://www.googletagmanager.com" in csp
     assert "https://*.google-analytics.com" in csp
@@ -204,3 +209,8 @@ def test_google_analytics_skipped_on_admin_and_embeds(client):
     assert "G-TEST123" not in client.get("/admin/login").get_data(as_text=True)
     assert "G-TEST123" in client.get("/blog").get_data(as_text=True)
     assert "G-TEST123" not in client.get("/blog?embed=1").get_data(as_text=True)
+
+
+def test_privacy_policy_mentions_google_analytics(client):
+    body = client.get("/privacy").get_data(as_text=True)
+    assert 'id="cookies"' in body and "Google Analytics" in body

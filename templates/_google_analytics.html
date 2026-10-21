@@ -1,11 +1,91 @@
-{# Google Analytics 4 (config.GA_MEASUREMENT_ID). Left out of admin pages and
-   of embeds, which run inside other people's sites. #}
+{# Google Analytics 4 (config.GA_MEASUREMENT_ID), loaded only after the visitor
+   accepts analytics cookies in the consent banner below. Left out of admin
+   pages and of embeds, which run inside other people's sites. Any element with
+   [data-cookie-settings] reopens the banner. #}
 {% if config.GA_MEASUREMENT_ID and not request.path.startswith('/admin') and request.args.get('embed') not in ('true', '1') %}
-<script async src="https://www.googletagmanager.com/gtag/js?id={{ config.GA_MEASUREMENT_ID }}"></script>
+<style>
+  .aar-consent{position:fixed;z-index:2147483000;left:max(16px,env(safe-area-inset-left,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));width:min(400px,calc(100vw - 32px));box-sizing:border-box;padding:18px 20px 16px;background:#fff;color:#202020;border:1px solid #e8e8e8;border-radius:8px;box-shadow:0 8px 28px rgba(32,32,32,.08);font:400 14px/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;opacity:0;transform:translateY(8px);transition:opacity .2s ease,transform .2s ease}
+  .aar-consent.is-in{opacity:1;transform:none}
+  .aar-consent p{margin:0;color:#4d4d4d}
+  .aar-consent strong{display:block;margin:0 0 4px;color:#202020;font-weight:600;font-size:14px}
+  .aar-consent a{color:#202020;text-decoration:underline;text-underline-offset:2px;text-decoration-color:#c9c9c9}
+  .aar-consent a:hover{text-decoration-color:#ff682c}
+  .aar-consent-actions{display:flex;gap:8px;margin-top:14px;justify-content:flex-end}
+  .aar-consent button{appearance:none;font:500 14px/1 Inter,system-ui,sans-serif;padding:9px 16px;border-radius:20px;cursor:pointer;transition:background .16s ease,border-color .16s ease,color .16s ease}
+  .aar-consent .aar-decline{background:transparent;color:#4d4d4d;border:1px solid #e8e8e8}
+  .aar-consent .aar-decline:hover{border-color:#202020;color:#202020}
+  .aar-consent .aar-accept{background:#202020;color:#fff;border:1px solid #202020}
+  .aar-consent .aar-accept:hover{background:#000}
+  .aar-consent button:focus-visible{outline:2px solid #ff682c;outline-offset:2px}
+  @media (max-width:480px){.aar-consent{left:12px;right:12px;width:auto;bottom:calc(12px + env(safe-area-inset-bottom,0px))}.aar-consent-actions button{flex:1}}
+  @media (prefers-reduced-motion:reduce){.aar-consent{transition:none}}
+  @media print{.aar-consent{display:none}}
+</style>
 <script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', '{{ config.GA_MEASUREMENT_ID }}');
+(function () {
+  var GA_ID = {{ config.GA_MEASUREMENT_ID|tojson }};
+  var KEY = 'aar_cookie_consent';
+  var loaded = false;
+  function read() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
+  function save(v) { try { localStorage.setItem(KEY, v); } catch (e) {} }
+  function loadGA() {
+    if (loaded) return;
+    loaded = true;
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function () { dataLayer.push(arguments); };
+    gtag('js', new Date());
+    gtag('config', GA_ID);
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(GA_ID);
+    document.head.appendChild(s);
+  }
+  function clearGACookies() {
+    document.cookie.split(';').forEach(function (c) {
+      var name = c.split('=')[0].trim();
+      if (name === '_ga' || name.indexOf('_ga_') === 0) {
+        var host = location.hostname.replace(/^www\./, '');
+        ['', '; domain=' + host, '; domain=.' + host].forEach(function (d) {
+          document.cookie = name + '=; Max-Age=0; path=/' + d;
+        });
+      }
+    });
+  }
+  function hide(el) {
+    el.classList.remove('is-in');
+    setTimeout(function () { el.remove(); }, 200);
+  }
+  function show() {
+    if (document.querySelector('.aar-consent')) return;
+    var el = document.createElement('div');
+    el.className = 'aar-consent';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-live', 'polite');
+    el.setAttribute('aria-label', 'Cookie preferences');
+    el.innerHTML =
+      '<strong>Analytics cookies</strong>' +
+      '<p>We use Google Analytics to see which pages help researchers most. Nothing is shared for advertising. <a href="{{ url_for('privacy') }}#cookies">Privacy</a></p>' +
+      '<div class="aar-consent-actions">' +
+      '<button type="button" class="aar-decline">Decline</button>' +
+      '<button type="button" class="aar-accept">Accept</button>' +
+      '</div>';
+    el.querySelector('.aar-accept').addEventListener('click', function () { save('granted'); loadGA(); hide(el); });
+    el.querySelector('.aar-decline').addEventListener('click', function () {
+      var wasLoaded = loaded;
+      save('denied'); clearGACookies(); hide(el);
+      if (wasLoaded) location.reload();
+    });
+    document.body.appendChild(el);
+    requestAnimationFrame(function () { requestAnimationFrame(function () { el.classList.add('is-in'); }); });
+  }
+  if (read() === 'granted') loadGA();
+  document.addEventListener('DOMContentLoaded', function () {
+    if (!read()) show();
+    document.addEventListener('click', function (e) {
+      var t = e.target.closest && e.target.closest('[data-cookie-settings]');
+      if (t) { e.preventDefault(); show(); }
+    });
+  });
+})();
 </script>
 {% endif %}
