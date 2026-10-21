@@ -60,6 +60,14 @@
       {% endfor %}
     </div>
     <div class="admin-breakdown">
+      <h3>Top uploaders</h3>
+      {% for uploader, model_count in top_uploaders %}
+        <div><span><a href="{{ url_for('admin_user_detail', user_id=uploader.id) }}" title="{{ uploader.email }}">{{ uploader.username or uploader.email }}</a></span><strong>{{ model_count }} model{{ '' if model_count == 1 else 's' }}</strong></div>
+      {% else %}
+        <p class="admin-empty">No models yet.</p>
+      {% endfor %}
+    </div>
+    <div class="admin-breakdown">
       <h3>Expiring in 30 days</h3>
       {% for model in expiring_models %}
         <div><span>{{ model.display_name or model.original_filename or model.id }}</span><strong>{{ model.access_expires_at.strftime("%Y-%m-%d") }}</strong></div>

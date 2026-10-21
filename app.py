@@ -2960,6 +2960,36 @@ def active_paper_query():
     return Paper.query.filter(or_(Paper.status.is_(None), Paper.status != "deleted"))
 
 
+# Unadvertised fair-use cap: one account can hold this many live Free models.
+FREE_MODEL_LIMIT = 5
+
+
+def free_model_limit_error(owner_user_id: int | None) -> str | None:
+    """Error when the owner already holds FREE_MODEL_LIMIT live Free models.
+
+    Failed, expired and deleted models (and models in deleted projects) do not
+    count, so upgrading or letting a Free model lapse frees a slot. Admins are
+    exempt.
+    """
+    owner = db.session.get(User, owner_user_id) if owner_user_id else None
+    if owner is None or owner.is_admin:
+        return None
+    free_models = (
+        Model3D.query.join(Paper, Model3D.paper_id == Paper.id)
+        .filter(Model3D.user_id == owner.id)
+        .filter(or_(Model3D.license_type.is_(None), Model3D.license_type == "free"))
+        .filter(or_(Paper.status.is_(None), Paper.status != "deleted"))
+        .all()
+    )
+    live = [m for m in free_models if model_access_status(m) not in {"failed", "expired", "deleted"}]
+    if len(live) < FREE_MODEL_LIMIT:
+        return None
+    return (
+        f"Free access covers up to {FREE_MODEL_LIMIT} models at a time. "
+        "Upgrade or delete one of your Free models to add another."
+    )
+
+
 def new_public_id() -> str:
     """Cryptographically random URL-safe public id for QR resolver targets."""
     return secrets.token_urlsafe(16)[:32]
@@ -5146,6 +5176,13 @@ def _create_model_for_paper(
             funding_institution = membership.institution
         else:
             institutional_fallback_reason = reason
+
+    if license_normalized == "free":
+        free_error = free_model_limit_error(paper.user_id)
+        if free_error:
+            cleanup_dir(upload_dir)
+            cleanup_dir(converted_dir)
+            return False, free_error
 
     # A raw scan is not what gets stored (only the resulting GLB), so it is
     # capped by MEDICAL_UPLOAD_MAX_BYTES above instead of the plan's model limit.
@@ -7639,6 +7676,17 @@ def register_routes(app: Flask) -> None:
             if page_is("overview")
             else []
         )
+        top_uploaders = (
+            db.session.query(User, func.count(Model3D.id).label("model_count"))
+            .join(Model3D, Model3D.user_id == User.id)
+            .filter(live_model)
+            .group_by(User.id)
+            .order_by(func.count(Model3D.id).desc(), User.id.asc())
+            .limit(5)
+            .all()
+            if page_is("overview")
+            else []
+        )
         expiring_models = (
             Model3D.query.filter(
                 live_model,
@@ -8052,6 +8100,7 @@ def register_routes(app: Flask) -> None:
             payment_counts=payment_counts,
             failed_format_counts=failed_format_counts,
             largest_models=largest_models,
+            top_uploaders=top_uploaders,
             expiring_models=expiring_models,
             near_limit_models=near_limit_models,
             monthly_revenue=monthly_revenue,
