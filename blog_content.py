@@ -2938,6 +2938,665 @@ actually explore the model.
 own model.*
 """,
     },
+    {
+        "slug": "view-3d-model-in-ar-without-app",
+        "title": "How to View a 3D Model in AR Without an App (iPhone and Android)",
+        "description": "Open a 3D model in augmented reality from a link or QR code with nothing to install: how AR Quick Look and Scene Viewer work, which phones support them, and how to share your own model.",
+        "date": "2026-10-22",
+        "author": "AcademicAR Team",
+        "tags": ["augmented reality", "how-to", "QR codes", "3D viewer"],
+        "persona": "Educators, researchers & presenters",
+        "read_minutes": 6,
+        "body": """\
+![A phone placing a 3D heart model on a desk in AR after scanning a QR code](/static/images/blog/covers/view-3d-model-in-ar-without-app.webp)
+
+Ask a room of people to install an app before they can see your model and most
+of them won't. The good news is that they don't have to. Both iPhone and Android
+ship with an augmented reality viewer built into the operating system, and a web
+page can hand a 3D model straight to it. Your audience scans a QR code or taps a
+link, then taps **View in AR**, and the model is standing on their desk.
+
+## How web AR works without an app
+
+There are two system viewers, and each wants its own file format:
+
+- **iPhone and iPad: AR Quick Look.** Built into iOS. It opens a **USDZ** file
+  from Safari (and Chrome on iOS) and places the model at real-world scale.
+- **Android: Scene Viewer.** Part of Google Play Services for AR, which most
+  recent Android phones install and update automatically. It opens a **GLB**
+  file on any ARCore-supported phone.
+
+A web viewer such as `<model-viewer>` shows the model in 3D in any browser and
+picks the right AR route for the device. Nothing else is installed, and the
+reader never leaves the page for an app store.
+
+![From a QR code to AR without an app: scan, browser viewer, then AR Quick Look or Scene Viewer](/static/images/blog/ar-without-app-flow.svg)
+
+The catch is the files. You need a GLB **and** a USDZ of the same model, both
+light enough for a phone, at the right scale, behind one stable link. Making a
+USDZ by hand is where most people stop; our
+[GLB to USDZ guide](/blog/glb-to-usdz-iphone-ar) explains why.
+
+## Step by step with AcademicAR
+
+1. **Upload the model.** GLB, STL, OBJ (with its MTL and textures), FBX,
+   STEP/STP, a DICOM series as a ZIP, or a segmentation. It's converted in the
+   background to an optimized GLB, and a USDZ is generated for iPhone and iPad.
+2. **Check the size.** On the model's page, set the real-world longest
+   dimension if the file has no units, so a 4 cm vertebra doesn't arrive in AR
+   the size of a car.
+3. **Copy the link or download the QR code.** Every model gets a viewer link and
+   a QR code that keep working if you later replace the file or recolour it.
+4. **Scan and tap View in AR.** On a phone the model opens in the browser
+   viewer; the AR button hands it to Quick Look or Scene Viewer. On a laptop the
+   same button shows a QR code so the reader can continue on their phone.
+
+![The same skull model placed in AR on an iPhone and an Android phone](/static/images/blog/inline/view-3d-model-in-ar-without-app-a.webp)
+
+## Where no-app AR works best
+
+- **Conference posters.** A QR code next to a figure turns a static panel into a
+  model visitors can walk around. See our
+  [poster QR code guide](/blog/qr-codes-on-academic-posters-guide) for size and
+  placement.
+- **Teaching.** Students place a skull, heart, or pelvis on their own desk and
+  look at it from every side; our
+  [anatomy AR guide](/blog/augmented-reality-anatomy-education) has lesson ideas.
+- **Museums and collections.** A label with a QR code lets visitors take an
+  artefact home on their phone, which is how
+  [archaeology projects](/blog/ar-for-archaeology-3d-artifacts) use it.
+- **Papers and theses.** A QR code beside a figure lets reviewers open the
+  model on the spot. See
+  [adding 3D models to research papers](/blog/how-to-add-3d-models-to-research-papers).
+
+![Scanning a museum label QR code to place a fossil in AR](/static/images/blog/inline/view-3d-model-in-ar-without-app-b.webp)
+
+## Tips for a good AR experience
+
+- **Keep the model light.** A file of a few megabytes opens in seconds on a
+  phone; a 200 MB scan does not. AcademicAR compresses uploads automatically,
+  and our guide on [reducing GLB file size](/blog/reduce-glb-file-size) covers
+  what to do before upload.
+- **Use real size where it means something.** Anatomy and artefacts read best at
+  life size. Tiny structures (a cochlea, a protein) work better enlarged, so set
+  a longest dimension that fits on a desk.
+- **Print the QR code large enough.** About 3 cm wide is a safe minimum for a
+  poster at arm's length; larger if people scan from further away.
+- **Give people a surface.** AR needs a textured, well-lit floor or table to
+  find. A plain white tablecloth in dim light is the hardest case.
+
+## Troubleshooting
+
+**There's no View in AR button.** You're probably on a laptop, where AR isn't
+available; scan the QR code that appears instead. On Android, the phone may not
+support ARCore.
+
+**The QR code opens a page but AR won't start.** In-app browsers (inside a
+messaging or social app) often block the hand-off to the AR viewer. Open the link
+in Safari or Chrome.
+
+**The model is huge or tiny.** The source file had no units or the wrong ones.
+Set the longest dimension on the model page; the link and QR code stay the same.
+
+## Frequently asked questions
+
+### Do I need an app to view a 3D model in AR?
+
+No. iPhones and iPads use AR Quick Look and Android phones use Scene Viewer, both
+built into the system. A web viewer passes the model to them from the browser,
+so readers only scan a QR code or tap a link.
+
+### Does AR work on Android phones?
+
+Yes, on phones that support ARCore with Google Play Services for AR, which covers
+most recent mid-range and flagship devices. The browser viewer still shows the
+model in 3D on phones without AR support.
+
+### What file formats does phone AR need?
+
+iPhone and iPad need a USDZ file; Android uses a GLB. AcademicAR generates both
+from a single upload, so you only manage one model and one link.
+
+### Can I try it for free?
+
+Yes. The free plan lets you upload a model and open it in the viewer and in AR
+on your own phone before you decide on a plan.
+
+*[Create a free account](/auth/register) and open your first model in AR on your
+phone.*
+""",
+    },
+    {
+        "slug": "reduce-glb-file-size",
+        "title": "How to Reduce GLB File Size Without Losing Detail",
+        "description": "Why GLB files get heavy and how to shrink them: decimation, Draco compression, texture resizing and pruning with free tools, plus the iPhone AR catch, and what AcademicAR optimizes automatically.",
+        "date": "2026-10-22",
+        "author": "AcademicAR Team",
+        "tags": ["3D formats", "how-to", "GLB", "optimization"],
+        "persona": "Researchers, 3D artists & web developers",
+        "read_minutes": 7,
+        "body": """\
+![A heavy wireframe bone and a light optimized bone on a balance scale](/static/images/blog/covers/reduce-glb-file-size.webp)
+
+A GLB that takes a minute to load is a GLB nobody looks at. Scans, CT surfaces,
+and CAD exports routinely come out at 50 to 500 MB, while a phone on a
+conference Wi-Fi is happy with a few megabytes. The good news is that most of
+that weight is invisible: triangles you can't see, raw numbers nobody
+compressed, and textures far bigger than any screen. Here's how to find it and
+remove it.
+
+## First, find out what's heavy
+
+A GLB holds three kinds of data: **geometry** (vertices and triangles),
+**textures** (images), and a small amount of scene description. Before changing
+anything, look at the split. Drop the file into [gltf.report](https://gltf.report)
+in your browser, or run:
+
+```
+npx @gltf-transform/cli inspect model.glb
+```
+
+If geometry dominates, decimate and compress. If textures dominate, resize them.
+Most scans are both.
+
+![What makes a GLB heavy and which fix removes it: decimation, Draco, texture resizing, pruning](/static/images/blog/glb-size-fixes.svg)
+
+## 1. Decimate the mesh
+
+Decimation removes triangles while keeping the shape. It's the biggest win for
+scans and medical surfaces, which often carry millions of triangles where a few
+hundred thousand look identical on screen.
+
+- **Blender:** add a *Decimate* modifier, set *Collapse* with a ratio such as
+  0.2, watch the face count in the status bar, then apply and export glTF
+  Binary (.glb).
+- **MeshLab:** *Filters › Remeshing, Simplification and Reconstruction ›
+  Simplification: Quadric Edge Collapse Decimation*, with *Preserve Boundary*
+  and *Preserve Normal* ticked.
+
+Aim for **100,000 to 500,000 triangles** for a single object. Check thin
+features (vessels, teeth, fine edges) after each step; stop when they start to
+break up.
+
+![A vertebra model going from a dense mesh to a lighter mesh with the same shape](/static/images/blog/inline/reduce-glb-file-size-a.webp)
+
+## 2. Compress the geometry with Draco
+
+Draco stores vertex positions and normals as compact quantized numbers instead
+of raw floats. Geometry often shrinks five to ten times with no visible change.
+
+```
+npx @gltf-transform/cli draco model.glb model-draco.glb
+```
+
+In Blender, tick *Compression* in the glTF exporter. Browsers and
+`<model-viewer>` decode Draco without any setup, but some desktop importers
+don't, so keep an uncompressed copy for editing.
+
+## 3. Shrink the textures
+
+Photogrammetry exports often carry 8K PNG textures: hundreds of megabytes on
+their own. A phone screen never shows more than 2048 pixels of one texture.
+
+```
+npx @gltf-transform/cli resize in.glb out.glb --width 2048 --height 2048
+```
+
+Use **JPEG** for colour (base colour) maps and keep PNG only where you need
+transparency. One catch if your audience uses iPhones: **AR Quick Look can't
+read WebP textures**, so a GLB with WebP textures converted to USDZ shows up
+magenta or untextured in iPhone AR. WebP is fine for browsers; for AR, stay with
+JPEG or PNG.
+
+![A phone loading a brain model quickly after its textures were resized](/static/images/blog/inline/reduce-glb-file-size-b.webp)
+
+## 4. Clean up the rest
+
+Exports also carry duplicate vertices, unused materials, and empty nodes.
+
+```
+npx @gltf-transform/cli optimize model.glb model-opt.glb --compress draco
+```
+
+`optimize` welds, deduplicates, prunes, lightly simplifies, and compresses in
+one go. It also **joins meshes and merges identical materials**, which is what
+you want for a single statue but not for a multi-part model: an assembly or a
+segmentation would lose its separate, clickable parts. For those, run only
+`draco` (step 2).
+
+## What AcademicAR does for you
+
+When you upload a model, the converter runs this pipeline automatically, so you
+only need to decimate truly huge meshes first:
+
+- **Draco geometry compression** on every model.
+- For single-part models, **welding, pruning, a very light simplification, and
+  textures capped at 2048 px**.
+- For models with **layers** (assemblies, segmentations), Draco only, so every
+  part stays separate in the Layers panel.
+- Textures kept in formats that **iPhone AR** can read, and a USDZ generated
+  from the same model.
+
+The link and QR code stay the same if you later upload a lighter version with
+*Replace model*. Starting from STL or OBJ? See
+[STL to GLB](/blog/convert-stl-to-glb) and
+[OBJ and FBX to GLB](/blog/convert-obj-fbx-to-glb).
+
+## Frequently asked questions
+
+### What is a good file size for a GLB on the web?
+
+Under about 10 MB loads quickly on most phones and networks, and up to 20 to
+30 MB is usually acceptable for a detailed model. Beyond that, decimate the mesh
+or shrink the textures before sharing.
+
+### Does Draco compression reduce quality?
+
+Draco quantizes vertex positions, so in theory it is lossy, but at standard
+settings the difference is far below what you can see on screen. Keep the
+original file for editing, measurement, or 3D printing.
+
+### Why is my model magenta in iPhone AR?
+
+Most often the textures are WebP, which AR Quick Look can't read. Re-export with
+JPEG or PNG textures. AcademicAR keeps AR-compatible textures for this reason.
+
+### Can I reduce GLB size online for free?
+
+Yes. gltf.report runs glTF-Transform in your browser, and the gltf-transform
+command line tool is free and open source. Uploading to AcademicAR also
+compresses the model automatically.
+
+*Have a heavy model? [Upload it to AcademicAR](/auth/register) and let the
+converter make it phone-ready.*
+""",
+    },
+    {
+        "slug": "nifti-segmentation-to-3d-model",
+        "title": "NIfTI to 3D Model: Turn .nii.gz Segmentations into an Interactive Viewer",
+        "description": "How to turn a NIfTI (.nii or .nii.gz) segmentation into a 3D model: label maps versus intensity images, TotalSegmentator and 3D Slicer outputs, label names, and a shareable 3D and AR link.",
+        "date": "2026-10-22",
+        "author": "AcademicAR Team",
+        "tags": ["medical imaging", "segmentation", "how-to", "NIfTI"],
+        "persona": "Medical imaging researchers",
+        "read_minutes": 7,
+        "body": """\
+![CT slices with coloured segmentations rising into a 3D model of the liver, kidneys and spine](/static/images/blog/covers/nifti-segmentation-to-3d-model.webp)
+
+NIfTI (`.nii` or `.nii.gz`) is the everyday format of neuroimaging and of most
+segmentation tools, from TotalSegmentator to nnU-Net. It's also a volume: a 3D
+grid of voxels, not a surface. To show it as a 3D model that a colleague can
+rotate, or a student can place on their desk in AR, you need to turn the right
+kind of NIfTI into meshes. Here's how to tell which kind you have and how to get
+from either one to a shareable model.
+
+## Two kinds of NIfTI
+
+Every NIfTI stores numbers on a grid, but what the numbers mean differs:
+
+- **Intensity images.** A T1-weighted MRI, a CT in Hounsfield units, a PET
+  volume. Hundreds or thousands of grey values, often negative or fractional.
+- **Label maps and masks.** The output of segmentation. Each voxel holds a small
+  integer: 0 for background, 1 for liver, 2 for spleen, and so on. A binary
+  mask holds only 0 and 1.
+
+Only label maps describe surfaces you can mesh directly. An intensity image has
+to be segmented first.
+
+![Which NIfTI do you have: intensity image, label map, or a folder of masks](/static/images/blog/nifti-which-file.svg)
+
+## If you have an intensity image: segment it first
+
+**TotalSegmentator** segments more than 100 structures in CT, and has an MR
+task, from the command line:
+
+```
+TotalSegmentator -i ct.nii.gz -o segmentations
+```
+
+Add `--roi_subset liver spleen kidney_left kidney_right` to keep only what you
+need; it's faster and gives a cleaner model. Two other common tools:
+
+- **3D Slicer** (Segment Editor) for manual or semi-automatic work, with
+  thresholding, painting, and AI extensions. Our
+  [3D Slicer guide](/blog/3d-slicer-export-share) covers exporting from it.
+- **ITK-SNAP** for active-contour segmentation and fast manual correction.
+
+Working from a CT in DICOM rather than NIfTI? You can skip this step:
+AcademicAR thresholds a DICOM series directly with bone, skin, and vessel
+presets. See [DICOM to 3D model](/blog/dicom-to-3d-model-guide) and the
+[Hounsfield unit guide](/blog/hounsfield-units-ct-thresholding-3d).
+
+## If you have a label map or a mask: upload it as is
+
+Upload the `.nii` or `.nii.gz` file. Each label value becomes one **layer** with
+its own colour, so readers can hide the ribs to see the kidneys, or isolate a
+tumour. To give layers real names instead of *Label 1*, *Label 2*, put the
+NIfTI in a ZIP together with a label table: an ITK-SNAP label description file,
+a 3D Slicer colour table (`.ctbl`), or a JSON file such as
+`{"1": "liver", "2": "spleen"}`. Names stored as JSON in the NIfTI header are
+read too.
+
+## If you have a folder of masks: zip it
+
+TotalSegmentator's default output is one mask per structure: `liver.nii.gz`,
+`spleen.nii.gz`, and so on. Zip the folder and upload the ZIP. Each file name
+becomes a layer name, empty masks are skipped, and a CT that happens to sit in
+the same folder is ignored rather than meshed. The masks must share the same
+grid, which they do when they come from one segmentation run. (The single
+multilabel file from `--ml` works as well, but its layers are numbered rather
+than named.)
+
+![Segmentation label maps in three slice views, ready to zip and upload](/static/images/blog/inline/nifti-segmentation-to-3d-model-a.webp)
+
+## What you get
+
+The converter turns every structure into a smoothed surface in the scan's real
+coordinates and millimetres, and builds one GLB with a layer per structure, plus
+a USDZ for iPhone AR. Up to 64 structures are kept; with more, the largest ones
+are shown and the conversion notes say so. Then you can:
+
+- **Hide, isolate, and recolour** structures in the Layers panel, and save views
+  as [scenes for teaching](/blog/saved-scenes-guided-tours-3d-teaching).
+- **Cut through the model** with a section plane or read a
+  [2D slice view](/blog/section-plane-slice-view-cross-sections).
+- **Measure** each structure's dimensions and the distance between two of them
+  with [layer measurements](/blog/measuring-anatomy-3d-layer-metrics).
+- **Share** a stable link and QR code that opens in the browser and in AR,
+  with no app.
+
+![A 3D model of the spine, ribs and kidneys with a layer list beside it](/static/images/blog/inline/nifti-segmentation-to-3d-model-b.webp)
+
+Need a printable file too? The [DICOM to STL guide](/blog/dicom-to-stl-3d-printing)
+covers exporting meshes for 3D printing, and the
+[segmentation viewer guide](/blog/medical-image-segmentation-to-3d-viewer) goes
+deeper into NRRD and DICOM-SEG.
+
+## Privacy
+
+NIfTI headers carry far fewer identifiers than DICOM, but file names and the
+header's description field can still hold a name or an ID, so check them before
+sharing. Medical uploads on AcademicAR need an extra confirmation that the data
+is de-identified, the uploaded scan is never archived, and it is deleted after
+conversion. Only the surface model is kept.
+
+## Frequently asked questions
+
+### Can I upload a raw MRI or CT NIfTI and get a 3D model?
+
+Not directly. A raw intensity volume has no surfaces until it is segmented.
+Segment it with TotalSegmentator, 3D Slicer, or ITK-SNAP first, then upload the
+label map or masks. For CT in DICOM format, AcademicAR can threshold the series
+itself.
+
+### How do I get structure names instead of Label 1, Label 2?
+
+Upload one mask file per structure in a ZIP (file names become layer names), or
+put a label table next to a multi-label NIfTI in the ZIP: an ITK-SNAP label file,
+a 3D Slicer .ctbl colour table, or a JSON map from label value to name.
+
+### Does TotalSegmentator output work?
+
+Yes. Zip the output folder with one mask per structure and upload it; layers are
+named after the files. Use --roi_subset to limit the output to the structures you
+want to show.
+
+### Is my scan stored after conversion?
+
+No. The uploaded NIfTI is deleted after conversion, whether it succeeds or fails,
+and is never archived. Only the resulting 3D surface model is kept.
+
+*[Create a free account](/auth/register) and turn your first segmentation into an
+interactive 3D model.*
+""",
+    },
+    {
+        "slug": "protein-structure-3d-ar-chimerax-pymol",
+        "title": "Share a Protein Structure in 3D and AR: Export from ChimeraX, Mol* or PyMOL",
+        "description": "Turn a PDB, mmCIF or AlphaFold structure into an interactive 3D model readers can rotate in the browser and place in AR: export GLB from ChimeraX or Mol*, OBJ from PyMOL, and share it with a link and QR code.",
+        "date": "2026-10-22",
+        "author": "AcademicAR Team",
+        "tags": ["structural biology", "how-to", "augmented reality", "3D publishing"],
+        "persona": "Structural biologists & biochemistry educators",
+        "read_minutes": 7,
+        "body": """\
+![A protein ribbon model floating above a journal page with a QR code and a phone](/static/images/blog/covers/protein-structure-3d-ar-chimerax-pymol.webp)
+
+A protein figure is a carefully chosen view of something that only makes sense in
+three dimensions. You picked the representation, the colours, and the angle; the
+reader gets one projection of it. Exporting that exact scene as a 3D model lets
+them rotate the binding pocket themselves, and on a phone, place the complex on
+the table in augmented reality. No molecular viewer to install, no PDB ID to look
+up.
+
+## Why export a model instead of linking a PDB ID?
+
+Online structure viewers are excellent, but a PDB ID link shows the default
+representation, not yours. An exported model keeps **your** cartoon, surfaces,
+colours by chain or by domain, highlighted ligand, and hidden solvent. It also
+opens on any phone, works in AR, and stays exactly as you published it.
+
+![Three routes from a structure to a shareable 3D model: ChimeraX, Mol* and PyMOL](/static/images/blog/molecule-export-routes.svg)
+
+## Route 1: ChimeraX (recommended)
+
+ChimeraX saves the scene as a **GLB** with its colours:
+
+```
+open 6vxx
+delete solvent
+cartoon
+color bychain
+surface #1/A
+transparency #1/A 50 target s
+save spike.glb
+```
+
+For an AlphaFold prediction, `alphafold fetch P69905` and
+`color bfactor palette alphafold` colour the model by confidence. Large
+assemblies with full surfaces can reach millions of triangles; a lower-detail
+surface such as `surface #1 resolution 5` or a simpler representation keeps the
+file light.
+
+## Route 2: Mol\\* Viewer
+
+The Mol\\* Viewer (the viewer behind RCSB PDB and PDBe) runs in the browser. Load a
+structure, set up the representation and colours, then use **Export Geometry**
+and choose glTF. Mol\\* can export the scene as STL or OBJ too, but GLB keeps the
+colours.
+
+## Route 3: PyMOL
+
+PyMOL saves geometry with:
+
+```
+save model.obj
+```
+
+which writes an OBJ and an MTL material file next to it. Upload both together.
+PyMOL's OBJ export is good for shape, but colours don't always survive; if your
+model comes through grey, rebuild the scene in ChimeraX or Mol\\* and export GLB.
+
+![A coloured protein surface exported from a laptop to a file and opened on a phone](/static/images/blog/inline/protein-structure-3d-ar-chimerax-pymol-a.webp)
+
+## Upload, size, and share
+
+1. **Upload the GLB** (or OBJ + MTL) to a project on AcademicAR. It's compressed
+   for the web and a USDZ is generated for iPhone AR.
+2. **Set a sensible size.** Molecular programs write ångströms as plain units,
+   so a protein arrives at an arbitrary scale. Use *Resize model* and set the
+   longest dimension, say 30 cm, so it sits nicely on a desk in AR.
+3. **Use the layers.** If the file keeps chains, ligands, or surfaces as separate
+   parts, each becomes a layer that readers can hide, isolate, or recolour.
+4. **Share the link and QR code.** Put the QR code next to the figure in the
+   paper, on the poster, or on a lecture slide. Readers scan it and tap *View in
+   AR*; see [how AR works without an app](/blog/view-3d-model-in-ar-without-app).
+
+## Ideas for teaching and papers
+
+- **Lectures:** students hold a ribosome, an antibody, or a membrane channel on
+  their own desk and walk around it.
+- **Papers and preprints:** a QR code beside a structure figure, as described in
+  [adding 3D models to research papers](/blog/how-to-add-3d-models-to-research-papers).
+- **Posters:** the binding site, in 3D, next to the panel that discusses it; see
+  the [poster QR code guide](/blog/qr-codes-on-academic-posters-guide).
+- **Guided views:** save scenes such as *overview*, *active site*, and *ligand
+  close-up* and play them as a [tour](/blog/saved-scenes-guided-tours-3d-teaching).
+
+![Two students discussing a protein model shown in AR above a table](/static/images/blog/inline/protein-structure-3d-ar-chimerax-pymol-b.webp)
+
+## Frequently asked questions
+
+### Can I share an AlphaFold model in AR?
+
+Yes. Fetch the prediction in ChimeraX, colour it by confidence with the AlphaFold
+palette if you like, save it as GLB, and upload it. Readers see it in 3D in the
+browser and in AR on their phone.
+
+### Do readers need ChimeraX or PyMOL to view the model?
+
+No. The model opens in any modern browser on a phone, tablet, or computer, and in
+AR on iPhone and Android without an app.
+
+### Is the atomic structure uploaded?
+
+No. Only the exported surface geometry is uploaded: the shapes and colours you
+see on screen, not the coordinates file. Deposit the structure itself in the PDB
+or a data repository as usual.
+
+### Can I export a cryo-EM map surface?
+
+Yes. Show the map as a surface at the threshold you want in ChimeraX, colour it,
+and save it as GLB like any other scene. Keep the surface step size reasonable so
+the file stays light.
+
+*[Create a free account](/auth/register) and put your next structure figure into
+your readers' hands.*
+""",
+    },
+    {
+        "slug": "share-photogrammetry-3d-scan",
+        "title": "How to Share a Photogrammetry or LiDAR Scan as a 3D Link and AR Model",
+        "description": "Export your Polycam, RealityScan, Metashape or Meshroom scan the right way (GLB, or OBJ with its textures), keep it light, set the real size, and share it with a viewer link and QR code that opens in AR.",
+        "date": "2026-10-22",
+        "author": "AcademicAR Team",
+        "tags": ["photogrammetry", "how-to", "sharing", "augmented reality"],
+        "persona": "Archaeologists, museums & field researchers",
+        "read_minutes": 7,
+        "body": """\
+![A phone capturing a clay pot on a turntable and the finished textured 3D model](/static/images/blog/covers/share-photogrammetry-3d-scan.webp)
+
+Photogrammetry and phone LiDAR have made 3D capture almost free. A few hundred
+photos of a pot, a fossil, or a sculpture become a textured model in an
+afternoon. Sharing it is where things get stuck: the scanning app wants your
+viewers to use its own platform, the export comes as a folder of files, and the
+model is too heavy for a phone. Here's a clean path from scan to a link and QR
+code that anyone can open, in 3D and in AR.
+
+![From photos to a shared scan: capture, reconstruct, export, upload, share](/static/images/blog/photogrammetry-share-steps.svg)
+
+## 1. Capture and reconstruct
+
+Any reconstruction tool works: **Polycam** or **Scaniverse** on a phone,
+**RealityScan**, **Agisoft Metashape**, **RealityCapture**, or the open-source
+**Meshroom** on a desktop. Before exporting:
+
+- **Crop** the turntable, the floor, and floating fragments.
+- **Fill holes** if the tool offers it, especially under the object.
+- **Include a scale bar** in the photos when you need true measurements;
+  photogrammetry has no inherent scale.
+
+## 2. Export the right format
+
+Choose **GLB** when your tool offers it: one file with geometry and textures
+together. Otherwise choose **OBJ**, which comes as three parts:
+
+- `model.obj`, the geometry;
+- `model.mtl`, the material file that names the textures;
+- one or more texture images (`.jpg` or `.png`).
+
+Upload all of them together. When an OBJ scan shows up grey, the cause is almost
+always a missing texture or an MTL that points to a folder on the computer that
+made it. Keep the three parts in one folder with their original names before
+uploading. More detail in [OBJ and FBX to GLB](/blog/convert-obj-fbx-to-glb).
+
+![Mesh, material and texture files combined into one model shown in a web viewer](/static/images/blog/inline/share-photogrammetry-3d-scan-a.webp)
+
+## 3. Keep it light
+
+Desktop reconstructions often produce several million triangles and 8K textures:
+fine for archiving, too heavy for a phone. Export a **web version** next to your
+master:
+
+- decimate to roughly **200,000 to 500,000 triangles**;
+- bake or keep textures at **2048 or 4096 pixels**, as JPEG.
+
+AcademicAR compresses geometry with Draco and caps texture size on upload, so a
+moderately heavy scan still becomes phone-ready. For the details, see
+[how to reduce GLB file size](/blog/reduce-glb-file-size). Keep the full-resolution
+master in your archive or repository.
+
+## 4. Upload and set the real size
+
+Upload the GLB, or the OBJ with its MTL and textures, to a project. For OBJ you
+choose the unit it was made in; for any model you can later set the **real
+longest dimension** in centimetres under *Resize model*. Do that whenever the
+scan has no scale, so the pot in AR is the size of the pot on the shelf.
+
+## 5. Share it
+
+Every model gets a **viewer link** and a **QR code**:
+
+- Put the QR code on a museum label, an excavation report, or a poster.
+- [Embed the viewer](/blog/embed-3d-model-website) on a project website.
+- Send the link to colleagues; it opens in the browser, with no account needed
+  to view.
+- On a phone, *View in AR* places the object at real size; see
+  [AR without an app](/blog/view-3d-model-in-ar-without-app).
+
+If you re-scan or clean the model later, *Replace model* keeps the same link and
+QR code, so printed labels never go stale.
+
+![A field researcher scanning a fossil and a colleague viewing it remotely through a shared link](/static/images/blog/inline/share-photogrammetry-3d-scan-b.webp)
+
+## Rights and ethics
+
+Check that you may publish a 3D copy. Museum objects, private collections, and
+cultural heritage can carry reproduction rights or community restrictions, and
+human remains call for particular care and consent. AcademicAR asks you to
+confirm rights and ethics responsibility on every upload. For field and
+collection workflows, see our
+[archaeology AR guide](/blog/ar-for-archaeology-3d-artifacts).
+
+## Frequently asked questions
+
+### Can I share a Polycam scan without a Polycam account?
+
+Yes. Export the scan as GLB or OBJ from Polycam, upload it to AcademicAR, and
+share the viewer link or QR code. People who open it don't need an account or
+an app.
+
+### Why does my OBJ scan look grey after upload?
+
+The textures didn't come along. Upload the .obj together with its .mtl file and
+every texture image it names, keeping the original file names.
+
+### How big should a scan be for the web?
+
+As a rule of thumb, a few hundred thousand triangles and textures of 2048 to
+4096 pixels. That loads quickly on phones and still looks sharp; keep the
+full-resolution version for archiving.
+
+### Will the scan show at real size in AR?
+
+Yes, once its size is right. Photogrammetry has no built-in scale, so set the
+longest dimension in centimetres on the model page; AR then places the object at
+that size.
+
+*[Create a free account](/auth/register) and share your first scan as a link and
+QR code.*
+""",
+    },
 ]
 
 

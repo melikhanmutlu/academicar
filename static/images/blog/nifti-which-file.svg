@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 330" width="960" height="330" role="img" aria-labelledby="t d">
+  <title id="t">Which NIfTI file do you have?</title>
+  <desc id="d">A NIfTI with continuous intensities, such as a T1 MRI or a CT, must be segmented first with a tool such as TotalSegmentator, 3D Slicer or ITK-SNAP. A label map or binary mask can be uploaded directly and becomes one layer per label. A folder of masks, one file per structure, is zipped and uploaded, and each file name becomes a layer name.</desc>
+  <style>
+    .box { fill: #f5f5f5; stroke: #bdbdbd; stroke-width: 1.2; }
+    .hi { fill: #fff4ee; stroke: #ff682c; stroke-width: 1.5; }
+    .lbl { font: 600 15px Inter, system-ui, sans-serif; fill: #202020; }
+    .sub { font: 400 13px Inter, system-ui, sans-serif; fill: #6b6b6b; }
+    .acc { font: 700 13px Inter, system-ui, sans-serif; fill: #c2410c; }
+    .arr { stroke: #202020; stroke-width: 1.4; fill: none; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#202020"/>
+    </marker>
+  </defs>
+  <rect width="960" height="330" fill="#ffffff"/>
+
+  <rect class="box" x="30" y="40" width="270" height="110" rx="10"/>
+  <text class="lbl" x="50" y="74">Intensity image</text>
+  <text class="sub" x="50" y="98">T1/T2 MRI, CT, PET as .nii.gz;</text>
+  <text class="sub" x="50" y="116">hundreds of grey values</text>
+  <text class="acc" x="50" y="138">Segment it first</text>
+  <path class="arr" d="M165 156 L165 186" marker-end="url(#a)"/>
+  <rect class="box" x="30" y="192" width="270" height="90" rx="10"/>
+  <text class="lbl" x="50" y="224">TotalSegmentator,</text>
+  <text class="lbl" x="50" y="246">3D Slicer, ITK-SNAP</text>
+  <text class="sub" x="50" y="268">output: a label map or masks</text>
+
+  <rect class="hi" x="345" y="40" width="270" height="110" rx="10"/>
+  <text class="lbl" x="365" y="74">Label map or mask</text>
+  <text class="sub" x="365" y="98">integer values 0, 1, 2, 3 ...</text>
+  <text class="sub" x="365" y="116">one value per structure</text>
+  <text class="acc" x="365" y="138">Upload as is</text>
+
+  <rect class="hi" x="660" y="40" width="270" height="110" rx="10"/>
+  <text class="lbl" x="680" y="74">Folder of masks</text>
+  <text class="sub" x="680" y="98">liver.nii.gz, spleen.nii.gz ...</text>
+  <text class="sub" x="680" y="116">one file per structure</text>
+  <text class="acc" x="680" y="138">Zip the folder, upload</text>
+
+  <path class="arr" d="M306 237 C340 237, 360 230, 386 214" marker-end="url(#a)"/>
+  <path class="arr" d="M480 156 L480 186" marker-end="url(#a)"/>
+  <path class="arr" d="M795 156 C795 200, 700 214, 620 228" marker-end="url(#a)"/>
+  <rect class="box" x="392" y="192" width="222" height="90" rx="10"/>
+  <text class="lbl" x="412" y="224">3D viewer layers</text>
+  <text class="sub" x="412" y="246">one named, coloured</text>
+  <text class="sub" x="412" y="264">layer per structure</text>
+
+  <text class="sub" x="30" y="316">Label names come from file names, a label table (ITK-SNAP, Slicer .ctbl, JSON) or the NIfTI header.</text>
+</svg>

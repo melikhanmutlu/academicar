@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 360" width="960" height="360" role="img" aria-labelledby="t d">
+  <title id="t">Where GLB weight comes from and what removes it</title>
+  <desc id="d">Too many triangles are fixed by decimation; raw vertex data by Draco compression; oversized textures by resizing to 2048 pixels or less and using JPEG for colour maps; unused data by pruning. AcademicAR applies Draco, pruning and texture capping on upload, and you decimate before upload when a mesh has millions of triangles.</desc>
+  <style>
+    .box { fill: #f5f5f5; stroke: #bdbdbd; stroke-width: 1.2; }
+    .hi { fill: #fff4ee; stroke: #ff682c; stroke-width: 1.5; }
+    .lbl { font: 600 15px Inter, system-ui, sans-serif; fill: #202020; }
+    .sub { font: 400 13px Inter, system-ui, sans-serif; fill: #6b6b6b; }
+    .acc { font: 700 13px Inter, system-ui, sans-serif; fill: #c2410c; }
+    .arr { stroke: #202020; stroke-width: 1.4; fill: none; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#202020"/>
+    </marker>
+  </defs>
+  <rect width="960" height="360" fill="#ffffff"/>
+
+  <text class="lbl" x="40" y="40">What makes it heavy</text>
+  <text class="lbl" x="390" y="40">The fix</text>
+  <text class="lbl" x="720" y="40">Who does it</text>
+
+  <rect class="box" x="30" y="58" width="320" height="58" rx="10"/>
+  <text class="lbl" x="50" y="84">Millions of triangles</text>
+  <text class="sub" x="50" y="104">scans, CT surfaces, CAD tessellation</text>
+  <path class="arr" d="M356 87 L384 87" marker-end="url(#a)"/>
+  <rect class="box" x="390" y="58" width="300" height="58" rx="10"/>
+  <text class="lbl" x="410" y="84">Decimate</text>
+  <text class="sub" x="410" y="104">Blender, MeshLab, Meshmixer</text>
+  <text class="acc" x="720" y="92">You, before upload</text>
+
+  <rect class="box" x="30" y="128" width="320" height="58" rx="10"/>
+  <text class="lbl" x="50" y="154">Uncompressed geometry</text>
+  <text class="sub" x="50" y="174">float positions and normals</text>
+  <path class="arr" d="M356 157 L384 157" marker-end="url(#a)"/>
+  <rect class="hi" x="390" y="128" width="300" height="58" rx="10"/>
+  <text class="lbl" x="410" y="154">Draco compression</text>
+  <text class="sub" x="410" y="174">often 5 to 10 times smaller</text>
+  <text class="acc" x="720" y="162">AcademicAR, automatic</text>
+
+  <rect class="box" x="30" y="198" width="320" height="58" rx="10"/>
+  <text class="lbl" x="50" y="224">Huge textures</text>
+  <text class="sub" x="50" y="244">8K PNG photo textures</text>
+  <path class="arr" d="M356 227 L384 227" marker-end="url(#a)"/>
+  <rect class="hi" x="390" y="198" width="300" height="58" rx="10"/>
+  <text class="lbl" x="410" y="224">Resize to 2048 px</text>
+  <text class="sub" x="410" y="244">JPEG for colour maps</text>
+  <text class="acc" x="720" y="232">AcademicAR caps size</text>
+
+  <rect class="box" x="30" y="268" width="320" height="58" rx="10"/>
+  <text class="lbl" x="50" y="294">Unused data</text>
+  <text class="sub" x="50" y="314">duplicate vertices, orphan materials</text>
+  <path class="arr" d="M356 297 L384 297" marker-end="url(#a)"/>
+  <rect class="hi" x="390" y="268" width="300" height="58" rx="10"/>
+  <text class="lbl" x="410" y="294">Weld and prune</text>
+  <text class="sub" x="410" y="314">no visible change</text>
+  <text class="acc" x="720" y="302">AcademicAR, automatic</text>
+</svg>
