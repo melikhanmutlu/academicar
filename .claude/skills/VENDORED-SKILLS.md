@@ -17,5 +17,6 @@ take precedence over anything these skills suggest.
 | `humanizer/` | https://github.com/blader/humanizer | MIT | 8c307f36 | SKILL.md only |
 | `caveman/` | https://github.com/JuliusBrussee/caveman (`plugins/caveman/skills/caveman`, v4.0.1) | Apache-2.0 | bad48a0e | Skill only: off until `/caveman`, no always-on hook |
 | `last30days/` | https://github.com/mvanhorn/last30days-skill (`skills/last30days`, v3.28.1) | MIT | 832d0959 | Demo `assets/` dropped; Python 3.12+; API keys optional |
+| `understand*/` (9 symlinks) → `../understand-anything/` | https://github.com/Egonex-AI/Understand-Anything (`understand-anything-plugin`, v2.9.7) | MIT | e24fcf6 (2026-10-23) | Whole plugin root vendored in `.claude/understand-anything/` because the scripts import `@understand-anything/core` from it; skill folders here are symlinks. Plugin-root lookup in `understand`, `understand-domain`, `understand-dashboard` SKILL.md also checks `<repo>/.claude/understand-anything`. Auto-update hooks and plugin tests dropped. First run needs `pnpm install` + core build (node_modules/dist stay gitignored). Graph output goes to `.ua/` |
 
 To update one, re-copy the same folder from upstream and bump the commit here.

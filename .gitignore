@@ -38,6 +38,7 @@ pytest-cache-files-*/
 # Ignore local Claude config, but track shared project skills.
 .claude/*
 !.claude/skills/
+!.claude/understand-anything/
 
 # Distribution
 *.egg-info/
