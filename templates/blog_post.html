@@ -67,8 +67,27 @@
     </div>
   </header>
 
+  {# A topic-matched call to action after the second section, where readers
+     who came for a how-to have the answer and are ready to try it. #}
+  {% set cta_box %}
+  <aside class="blog-cta" aria-label="Try AcademicAR">
+    <div class="blog-cta-copy">
+      <p class="blog-cta-title">{{ cta.title }}</p>
+      <p class="blog-cta-text">{{ cta.text }}</p>
+    </div>
+    <a href="{{ url_for('auth.register', utm_source='blog', utm_medium='inline_cta', utm_campaign=post.slug) }}" class="blog-cta-button" data-ga-cta="blog_{{ cta.key }}">{{ cta.button }}</a>
+  </aside>
+  {% endset %}
+  {% set body_parts = (body_html | string).split('<h2') %}
   <div class="blog-article">
-    {{ body_html | safe }}
+    {% if cta and body_parts|length > 3 %}
+      {{ body_parts[:3] | join('<h2') | safe }}
+      {{ cta_box }}
+      {{ ('<h2' ~ (body_parts[3:] | join('<h2'))) | safe }}
+    {% else %}
+      {{ body_html | safe }}
+      {% if cta %}{{ cta_box }}{% endif %}
+    {% endif %}
   </div>
 
   {% if related %}

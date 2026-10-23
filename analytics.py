@@ -597,3 +597,48 @@ def model_snapshot(model, days: int = 30) -> dict:
     # Source names are audience detail: only for plans that include it.
     summary["headline"] = _headline(summary if summary["detailed"] else {**summary, "sources": []})
     return summary
+
+
+# --- Google Analytics 4 events -------------------------------------------
+# Server-side actions (sign-up, upload, purchase, lead) are queued in the
+# session and fired by templates/_google_analytics.html on the next page, and
+# only when the visitor accepted analytics cookies. Never put personal data
+# (email, names, patient details) in the params.
+GA_SESSION_KEY = "ga_events"
+_GA_QUEUE_LIMIT = 10
+
+
+def queue_ga_event(name: str, **params) -> None:
+    if not has_request_context() or not current_app.config.get("GA_MEASUREMENT_ID"):
+        return
+    from flask import session
+
+    try:
+        queued = list(session.get(GA_SESSION_KEY) or [])[-(_GA_QUEUE_LIMIT - 1):]
+        queued.append({"name": name, "params": {k: v for k, v in params.items() if v is not None}})
+        session[GA_SESSION_KEY] = queued
+    except Exception:  # analytics must never break a request
+        current_app.logger.debug("Could not queue GA event %s", name, exc_info=True)
+
+
+def pop_ga_events() -> list[dict]:
+    if not has_request_context():
+        return []
+    from flask import session
+
+    return session.pop(GA_SESSION_KEY, None) or []
+
+
+def ga_content_group(path: str) -> str:
+    if path == "/":
+        return "home"
+    for prefix, group in (
+        ("/blog", "blog"), ("/ar-for", "use_case"), ("/pricing", "pricing"),
+        ("/institutional", "institutional"), ("/view/", "viewer"), ("/m/", "viewer"),
+        ("/s/", "viewer"), ("/c/", "viewer"), ("/demo", "demo"), ("/p/", "project"),
+        ("/i/", "institution"), ("/auth", "auth"),
+        ("/dashboard", "app"), ("/projects", "app"), ("/papers", "app"), ("/models", "app"),
+    ):
+        if path.startswith(prefix):
+            return group
+    return "other"

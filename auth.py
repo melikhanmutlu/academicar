@@ -288,6 +288,8 @@ def register():
         try:
             from analytics import track_event
             track_event("user_registered", owner_user_id=user.id)
+            from analytics import queue_ga_event
+            queue_ga_event("sign_up", method="email")
         except Exception:
             pass  # Analytics must never block registration
         # Lifecycle: best-effort welcome email carrying the confirmation link.
@@ -604,6 +606,8 @@ def google_callback():
         from app import log_audit
         if is_new_user:
             log_audit("user_registered", user_id=user.id, details={"provider": "google"})
+            from analytics import queue_ga_event
+            queue_ga_event("sign_up", method="google")
         else:
             log_audit("user_login", user_id=user.id, details={"provider": "google"})
     except Exception:

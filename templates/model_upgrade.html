@@ -17,7 +17,7 @@
   {% if options %}
     {% set requested_plan = request.args.get('plan') %}
     {% set selected_plan = requested_plan if requested_plan in options|map(attribute='key')|list else options[0].key %}
-    <form id="upgradeForm" method="POST"
+    <form id="upgradeForm" method="POST" data-ga-checkout=""
           action="{{ url_for('upgrade_model_license', model_id=model.id, plan=selected_plan) }}"
           class="upgrade-card reveal-up">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

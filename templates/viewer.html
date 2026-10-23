@@ -3788,6 +3788,7 @@
           body: JSON.stringify({ event: 'viewer_ar_started', model_id: {{ model.id|tojson }} }),
           keepalive: true,
         }).catch(() => {});
+        if (window.aarTrack) window.aarTrack('ar_start', { content_type: 'model' });
       }
       if (event.detail && event.detail.status === 'failed') showQrFallback();
     };

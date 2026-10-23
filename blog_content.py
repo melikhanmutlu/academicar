@@ -201,8 +201,8 @@ interactive model.*
     },
     {
         "slug": "qr-codes-on-academic-posters-guide",
-        "title": "The Complete Guide to QR Codes on Academic Posters",
-        "description": "Best practices for putting QR codes on conference posters: what to link, where to place them, sizing, and how to turn a static poster into an interactive demo.",
+        "title": "QR Codes on Academic Posters: Size, Placement and What to Link",
+        "description": "How big to print a QR code on a conference poster, where to place it, and what it should open, from a PDF to a 3D model that works on any phone.",
         "date": "2026-06-03",
         "updated": "2026-10-19",
         "author": "AcademicAR Team",
@@ -309,8 +309,8 @@ minutes.*
     },
     {
         "slug": "glb-stl-gltf-obj-3d-format-guide",
-        "title": "GLB vs STL vs glTF vs OBJ: Choosing a 3D Format for the Web",
-        "description": "A practical comparison of GLB, glTF, STL, OBJ, and FBX for sharing research 3D models online — which to use, and why GLB usually wins for the web.",
+        "title": "GLB vs OBJ vs STL vs glTF: Which 3D Format to Use?",
+        "description": "GLB, OBJ, STL, glTF and FBX compared side by side: file size, colours, textures and AR support. Short answer: GLB for the web, STL for 3D printing.",
         "date": "2026-06-04",
         "updated": "2026-10-19",
         "author": "AcademicAR Team",
@@ -853,11 +853,22 @@ units makes that choice predictable instead of trial and error.
 CT measures how strongly each voxel attenuates X-rays and rescales it to a
 standard scale, the **Hounsfield unit (HU)**:
 
-- Air is about **-1000 HU**.
-- Water is **0 HU** by definition.
-- Fat sits around **-100 HU**, most soft tissue between **+20 and +80 HU**.
-- Contrast-enhanced blood often reaches **150-400 HU**.
-- Cortical bone ranges from a few hundred to well over **1000 HU**.
+| Tissue or material | Typical HU |
+| --- | --- |
+| Air | -1000 |
+| Lung | -900 to -500 |
+| Fat | -120 to -60 |
+| Water | 0 (by definition) |
+| Cerebrospinal fluid | 0 to +15 |
+| Blood, no contrast | +30 to +45 |
+| Muscle and most soft tissue | +20 to +80 |
+| Liver | +40 to +60 |
+| Blood with contrast | +150 to +400 |
+| Cancellous (spongy) bone | +300 to +800 |
+| Cortical bone | +500 to +1900 |
+| Metal implants | above +2000 |
+
+Values are approximate and vary with the scanner, kV and contrast timing.
 
 Because the scale is calibrated, the same threshold means roughly the same tissue
 across scanners — which is what makes presets possible. MRI, by contrast, has no
@@ -911,6 +922,12 @@ For the whole route from scan to shared model, see
 [DICOM to STL for 3D printing](/blog/dicom-to-stl-3d-printing).
 
 ## Frequently asked questions
+
+### What is the Hounsfield unit of blood?
+
+Unenhanced blood is about +30 to +45 HU; fresh clotted blood is higher, around
++50 to +80 HU. After iodine contrast, blood in the vessels usually measures
++150 to +400 HU, which is why the contrast preset starts at 150 HU.
 
 ### What HU threshold should I use for bone?
 
@@ -2060,6 +2077,24 @@ on the phone.
 
 The CAD export probably didn't include them. Most CAD tools have an option to
 export colours or appearance with STEP; re-export with it switched on.
+
+### What is the difference between STEP and STL?
+
+STEP stores exact CAD surfaces, the assembly tree and part names, so it can be
+edited and measured precisely. STL stores only a triangle mesh with no colours or
+parts, which is what 3D printers need. Convert STEP to STL for printing and to
+GLB for viewing on the web ([format comparison](/blog/glb-stl-gltf-obj-3d-format-guide)).
+
+### How do I open a STEP file in AutoCAD?
+
+Use the IMPORT command and choose the `.step` or `.stp` file; AutoCAD brings it in
+as 3D solids. If you only need to look at the model or show it to someone, a
+browser viewer is quicker than installing CAD.
+
+### Which free program opens STEP files?
+
+FreeCAD opens and edits STEP for free on Windows, Mac and Linux. To view a STEP
+file without installing anything, upload it to a browser viewer and open the link.
 
 *[Upload a STEP file](/auth/register) and open it in your browser and in AR,
 without CAD software.*
@@ -3682,3 +3717,47 @@ def faq_items(body: str) -> list[dict]:
         if question and answer:
             items.append({"question": question, "answer": answer})
     return items
+
+
+# In-article call to action, matched to what the reader came for. The first
+# rule whose keywords appear in the slug or tags wins.
+_BLOG_CTAS = (
+    (("step", "cad"), {
+        "key": "step",
+        "title": "Have a STEP file?",
+        "text": "Upload it and open the assembly in any browser and in AR, with every part as its own layer. No CAD licence needed.",
+        "button": "Open a STEP file free",
+    }),
+    (("dicom", "hounsfield", "segmentation", "slicer", "medical", "surgical", "ct", "nifti"), {
+        "key": "medical",
+        "title": "Turn your scan into a shareable 3D model",
+        "text": "Upload a DICOM series or a segmentation and get a viewer link and QR code. The raw scan is deleted after conversion.",
+        "button": "Convert a CT scan free",
+    }),
+    (("powerpoint", "embed", "embedding", "sketchfab", "papers", "publishing", "figures", "teaching"), {
+        "key": "share",
+        "title": "Share a 3D figure with one link",
+        "text": "Upload a model, then put it in a slide, a web page or a paper's supplementary material. Readers need no app.",
+        "button": "Create a 3D link free",
+    }),
+    (("qr", "posters", "poster"), {
+        "key": "poster",
+        "title": "Put a 3D model behind your poster QR",
+        "text": "Upload STL, OBJ or GLB and print a QR code that opens the model on any phone, in 3D and in AR.",
+        "button": "Make a poster QR free",
+    }),
+)
+_DEFAULT_BLOG_CTA = {
+    "key": "upload",
+    "title": "Open and share a 3D model in seconds",
+    "text": "Upload STL, OBJ, FBX, GLB or STEP and get a viewer link and QR code that work on any phone.",
+    "button": "Upload a model free",
+}
+
+
+def blog_cta(post: dict) -> dict:
+    words = set(" ".join([post.get("slug", "")] + list(post.get("tags") or [])).lower().replace("-", " ").split())
+    for keywords, cta in _BLOG_CTAS:
+        if words & set(keywords):
+            return cta
+    return _DEFAULT_BLOG_CTA

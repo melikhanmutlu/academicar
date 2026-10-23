@@ -214,3 +214,43 @@ def test_google_analytics_skipped_on_admin_and_embeds(client):
 def test_privacy_policy_mentions_google_analytics(client):
     body = client.get("/privacy").get_data(as_text=True)
     assert 'id="cookies"' in body and "Google Analytics" in body
+
+
+def test_placeholder_titles_detected():
+    from app import is_placeholder_title
+
+    for title in ("test", "test1", "Deneme", "deneme 2", "Untitled", "demo-3"):
+        assert is_placeholder_title(title), title
+    for title in ("Aort Kapakçık", "Testicular torsion model", "Temporal bone dissection", None):
+        assert not is_placeholder_title(title), title
+
+
+def test_placeholder_projects_left_out_of_search(client, app):
+    from models import Paper, User, db
+
+    with app.app_context():
+        user = User(email="seo-test@example.com", username="SEOT")
+        user.set_password("password123")
+        db.session.add(user)
+        db.session.flush()
+        db.session.add_all([
+            Paper(title="test1", slug="test1", user_id=user.id, is_public=True),
+            Paper(title="Aort Kapakcik", slug="aort-kapakcik", user_id=user.id, is_public=True),
+        ])
+        db.session.commit()
+
+    sitemap = client.get("/sitemap.xml").get_data(as_text=True)
+    assert "/p/test1<" not in sitemap and "aort-kapakcik" in sitemap
+    assert 'content="noindex,follow"' in client.get("/p/test1").get_data(as_text=True)
+    assert 'content="noindex' not in client.get("/p/aort-kapakcik").get_data(as_text=True)
+
+
+def test_blog_post_has_topic_matched_inline_cta(client):
+    body = client.get("/blog/open-step-stp-file-online").get_data(as_text=True)
+    assert 'class="blog-cta"' in body and "Have a STEP file?" in body
+    assert 'data-ga-cta="blog_step"' in body
+    assert "utm_campaign=open-step-stp-file-online" in body
+    # Placed mid-article: there is a section heading after the box.
+    assert "<h2" in body.split('class="blog-cta"', 1)[1]
+    body = client.get("/blog/hounsfield-units-ct-thresholding-3d").get_data(as_text=True)
+    assert "Turn your scan into a shareable 3D model" in body

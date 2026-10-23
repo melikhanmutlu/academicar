@@ -24,8 +24,16 @@
 <script>
 (function () {
   var GA_ID = {{ config.GA_MEASUREMENT_ID|tojson }};
+  var CONTENT_GROUP = {{ ga_content_group(request.path)|tojson }};
+  // Actions the server saw on the previous request (sign-up, upload, purchase…).
+  var pending = {{ pop_ga_events()|tojson }};
   var KEY = 'aar_cookie_consent';
   var loaded = false;
+  // aarTrack(name, params): send a GA4 event, only with analytics consent.
+  window.aarTrack = function (name, params) {
+    if (loaded) { gtag('event', name, params || {}); }
+    else if (read() !== 'denied') { pending.push({ name: name, params: params || {} }); }
+  };
   function read() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
   function save(v) { try { localStorage.setItem(KEY, v); } catch (e) {} }
   function loadGA() {
@@ -34,7 +42,8 @@
     window.dataLayer = window.dataLayer || [];
     window.gtag = function () { dataLayer.push(arguments); };
     gtag('js', new Date());
-    gtag('config', GA_ID);
+    gtag('config', GA_ID, { content_group: CONTENT_GROUP });
+    pending.splice(0).forEach(function (e) { gtag('event', e.name, e.params || {}); });
     var s = document.createElement('script');
     s.async = true;
     s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(GA_ID);
@@ -72,7 +81,7 @@
     el.querySelector('.aar-accept').addEventListener('click', function () { save('granted'); loadGA(); hide(el); });
     el.querySelector('.aar-decline').addEventListener('click', function () {
       var wasLoaded = loaded;
-      save('denied'); clearGACookies(); hide(el);
+      save('denied'); pending.length = 0; clearGACookies(); hide(el);
       if (wasLoaded) location.reload();
     });
     document.body.appendChild(el);
@@ -82,9 +91,24 @@
   document.addEventListener('DOMContentLoaded', function () {
     if (!read()) show();
     document.addEventListener('click', function (e) {
-      var t = e.target.closest && e.target.closest('[data-cookie-settings]');
-      if (t) { e.preventDefault(); show(); }
+      if (!e.target.closest) return;
+      var t = e.target.closest('[data-cookie-settings]');
+      if (t) { e.preventDefault(); show(); return; }
+      // <a data-ga-cta="label"> marks a call to action worth counting.
+      // Links to sign-up or pricing count as calls to action automatically.
+      var cta = e.target.closest('[data-ga-cta], a[href]');
+      if (!cta) return;
+      var label = cta.getAttribute('data-ga-cta');
+      if (label === null && cta.pathname && /^\/(auth\/register|pricing)\b/.test(cta.pathname) && cta.host === location.host) {
+        label = (cta.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60) || cta.pathname;
+      }
+      if (label) window.aarTrack('cta_click', { label: label, target: cta.pathname || '', location: CONTENT_GROUP });
     });
+    // <form data-ga-checkout="plan"> starts a paid upgrade.
+    document.addEventListener('submit', function (e) {
+      var f = e.target.closest && e.target.closest('form[data-ga-checkout]');
+      if (f) window.aarTrack('begin_checkout', { plan: f.getAttribute('data-ga-checkout') || (f.getAttribute('action') || '').split('/').pop(), transport_type: 'beacon' });
+    }, true);
   });
 })();
 </script>

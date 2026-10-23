@@ -73,6 +73,7 @@ from licensing import (
     strongest_project_plan_key,
 )
 from blog_content import (
+    blog_cta,
     code_post_slugs,
     cover_image_path,
     faq_items,
@@ -135,6 +136,9 @@ from payments import (
 from url_helpers import public_url
 from analytics import (
     ALLOWED_BROWSER_EVENTS,
+    ga_content_group,
+    pop_ga_events,
+    queue_ga_event,
     analytics_snapshot,
     apply_analytics_cookie,
     browser_event_is_duplicate,
@@ -275,6 +279,8 @@ def create_app(test_config: dict | None = None) -> Flask:
     def inject_globals():
         return {
             "current_year": datetime.now(UTC).year,
+            "pop_ga_events": pop_ga_events,
+            "ga_content_group": ga_content_group,
             "asset_version": app.config.get("ASSET_VERSION", ""),
             "format_file_size": format_file_size,
             "public_url": public_url,
@@ -5333,6 +5339,7 @@ def _create_model_for_paper(
         model_id=model.id,
         properties={"source_format": source_format},
     )
+    queue_ga_event("model_upload", format=source_format, plan=model.license_type)
     message = "Model upload accepted. Processing has started in the background."
     if funding_institution is not None:
         message += f" Covered by {funding_institution.name}'s institutional license"
@@ -5448,6 +5455,42 @@ def log_audit(event_type: str, user_id: int | None = None, resource_id: str | No
     except Exception as e:
         logger.exception(f"Failed to log audit event {event_type}: {e}")
         db.session.rollback()
+
+
+_PLACEHOLDER_TITLE_RE = re.compile(
+    r"^\s*(test|testing|deneme|demo|sample|example|untitled|new project|asdf|qwerty|xxx|aaa)[\s_-]*\d*\s*$",
+    re.IGNORECASE,
+)
+
+
+def is_placeholder_title(title: str | None) -> bool:
+    """True for throwaway project titles ("test1", "Deneme 2") that should not
+    be offered to search engines."""
+    return bool(_PLACEHOLDER_TITLE_RE.match(title or ""))
+
+
+def _queue_ga_purchase(model) -> None:
+    """Queue a GA4 purchase for the newest paid payment of ``model``, once."""
+    if not current_app.config.get("GA_MEASUREMENT_ID"):
+        return
+    payment = (
+        Payment.query.filter_by(model_id=model.id, user_id=current_user.id, status="paid")
+        .order_by(Payment.id.desc())
+        .first()
+    )
+    if payment is None:
+        return
+    reported = list(session.get("ga_purchases") or [])
+    if payment.id in reported:
+        return
+    session["ga_purchases"] = (reported + [payment.id])[-20:]
+    queue_ga_event(
+        "purchase",
+        transaction_id=payment.invoice_number or str(payment.id),
+        value=round((payment.amount_kurus or 0) / 100, 2),
+        currency=payment.currency or "TRY",
+        plan=payment.plan_key,
+    )
 
 
 def register_routes(app: Flask) -> None:
@@ -5892,6 +5935,7 @@ def register_routes(app: Flask) -> None:
                 f"From: {name} <{email}>\n\n{message}",
             )
             log_audit("contact_message_submitted", details={"from_email": email})
+            queue_ga_event("generate_lead", form="contact")
             flash("Thanks — your message has been sent. We'll get back to you soon.", "success")
             return redirect(url_for("contact"))
         return render_template("contact.html")
@@ -5948,6 +5992,7 @@ def register_routes(app: Flask) -> None:
                 "institution_inquiry_submitted",
                 details={**inquiry, "delivered": bool(delivered)},
             )
+            queue_ga_event("generate_lead", form="institutional")
             if delivered is False:
                 public_email = current_app.config.get("INSTITUTIONAL_EMAIL") or recipient
                 flash(
@@ -5989,6 +6034,7 @@ def register_routes(app: Flask) -> None:
             date_modified=blog_post_modified_date(post),
             faq=faq_items(post["body"]),
             related=related_posts(post, merged_blog_posts()),
+            cta=blog_cta(post),
         )
 
     @app.route("/i/<slug>")
@@ -6152,6 +6198,8 @@ def register_routes(app: Flask) -> None:
             .all()
         )
         for paper in public_papers:
+            if is_placeholder_title(paper.title):
+                continue  # "test", "deneme 2"…: kept public, but out of search
             try:
                 urls.append(public_url("paper_public", slug=paper.slug))
             except Exception:
@@ -6760,6 +6808,7 @@ def register_routes(app: Flask) -> None:
                 details={"model_id": model.id, "target_type": qr_link.target_type},
             )
         track_event("qr_scanned", owner_user_id=model.user_id, project_id=model.paper_id, model_id=model.id)
+        queue_ga_event("qr_scan")
         if not _paper_visible_to_request(model.paper):
             return _private_project_response(model.paper)
         status = model_access_status(model)
@@ -7103,7 +7152,7 @@ def register_routes(app: Flask) -> None:
             return _private_project_response(paper)
         if not _is_admin_preview(paper.user_id):
             track_event("project_viewed", owner_user_id=paper.user_id, project_id=paper.id)
-        return render_template("paper_public.html", paper=paper)
+        return render_template("paper_public.html", paper=paper, noindex=is_placeholder_title(paper.title))
 
     @app.route("/share/<share_token>")
     def project_share(share_token):
@@ -11133,6 +11182,7 @@ def register_routes(app: Flask) -> None:
             upgraded_model = next((m for m in paper.models if m.id == upgraded_id), None)
             if upgraded_model is not None:
                 upgraded_active = model_access_status(upgraded_model) == "active"
+                _queue_ga_purchase(upgraded_model)
         return render_template(
             "paper_detail.html",
             paper=paper,

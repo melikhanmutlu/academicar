@@ -806,6 +806,7 @@
       await navigator.clipboard.writeText(button.dataset.copyLink);
       if (button.dataset.analyticsModelId) {
         fetch('/analytics/event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'share_link_copied', model_id: button.dataset.analyticsModelId }), keepalive: true }).catch(() => {});
+        if (window.aarTrack) window.aarTrack('share', { method: 'link', content_type: 'model' });
       }
       // Restore the original markup: some buttons hold a long and a short
       // label, and restoring textContent merged them ("Copy linkCopy").
