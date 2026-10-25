@@ -234,6 +234,17 @@ class Config:
     # (e.g. "'self' https://uni.edu") to restrict who may iframe the viewer.
     EMBED_FRAME_ANCESTORS = os.environ.get("EMBED_FRAME_ANCESTORS", "*")
 
+    # Sign-up abuse protection (signup_guard.py). Bot checks = hidden honeypot
+    # field + a signed form timestamp (submissions faster than
+    # SIGNUP_MIN_SECONDS are rejected). Cloudflare Turnstile is added on top
+    # when both keys are set. REQUIRE_EMAIL_VERIFICATION blocks unconfirmed
+    # password accounts from creating projects / uploading models.
+    SIGNUP_BOT_CHECKS = os.environ.get("SIGNUP_BOT_CHECKS", "1").lower() in {"1", "true", "yes", "on"}
+    SIGNUP_MIN_SECONDS = float(os.environ.get("SIGNUP_MIN_SECONDS", 3))
+    TURNSTILE_SITE_KEY = os.environ.get("TURNSTILE_SITE_KEY", "")
+    TURNSTILE_SECRET_KEY = os.environ.get("TURNSTILE_SECRET_KEY", "")
+    REQUIRE_EMAIL_VERIFICATION = os.environ.get("REQUIRE_EMAIL_VERIFICATION", "1").lower() in {"1", "true", "yes", "on"}
+
     # Compliance & Legal
     TERMS_VERSION = os.environ.get("TERMS_VERSION", "1.0")
 

@@ -35,6 +35,10 @@ def app():
             "UPLOAD_RATE_LIMIT_COUNT": 1000,
             # Tests must not depend on the free space of the machine running them.
             "STORAGE_MIN_FREE_BYTES": 0,
+            # Sign-up bot checks and the email-confirmation gate have their own
+            # tests (test_signup_spam.py); other tests register and upload freely.
+            "SIGNUP_BOT_CHECKS": False,
+            "REQUIRE_EMAIL_VERIFICATION": False,
         }
     )
     limiter.reset()

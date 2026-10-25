@@ -15,6 +15,7 @@
         <option value="all" {% if filters.user_role == "all" %}selected{% endif %}>All roles</option>
         <option value="admin" {% if filters.user_role == "admin" %}selected{% endif %}>Admins</option>
         <option value="member" {% if filters.user_role == "member" %}selected{% endif %}>Members</option>
+        <option value="unverified" {% if filters.user_role == "unverified" %}selected{% endif %}>Email not confirmed</option>
       </select>
       <button type="submit" class="admin-btn admin-btn-secondary compact">Filter</button>
       <a href="{{ url_for('admin_dashboard', admin_page='users') }}" class="admin-btn admin-btn-secondary compact">Clear</a>
@@ -35,9 +36,9 @@
             <tr>
               <td>
                 <strong><a href="{{ url_for('admin_user_detail', user_id=user.id) }}">{{ user.username }}</a></strong>
-                <small>{{ user.email }}</small>{% if user.is_admin or user.deactivated_at %}<small class="admin-show-sm">{{ "Admin" if user.is_admin else "" }}{{ " · " if user.is_admin and user.deactivated_at else "" }}{{ "Deactivated" if user.deactivated_at else "" }}</small>{% endif %}
+                <small>{{ user.email }}</small>{% set _flags = (["Admin"] if user.is_admin else []) + (["Unconfirmed"] if not user.email_verified_at else []) + (["Deactivated"] if user.deactivated_at else []) %}{% if _flags %}<small class="admin-show-sm">{{ _flags|join(" · ") }}</small>{% endif %}
               </td>
-              <td class="admin-hide-sm"><span class="status-chip">{{ "Admin" if user.is_admin else "Member" }}</span>{% if user.deactivated_at %} <span class="status-chip is-failed" title="Deactivated {{ user.deactivated_at.strftime('%Y-%m-%d') }}">Deactivated</span>{% endif %}</td>
+              <td class="admin-hide-sm"><span class="status-chip">{{ "Admin" if user.is_admin else "Member" }}</span>{% if not user.email_verified_at %} <span class="status-chip is-queued" title="Email address not confirmed">Unconfirmed</span>{% endif %}{% if user.deactivated_at %} <span class="status-chip is-failed" title="Deactivated {{ user.deactivated_at.strftime('%Y-%m-%d') }}">Deactivated</span>{% endif %}</td>
               <td class="admin-hide-sm admin-nowrap">{{ user.created_at.strftime("%Y-%m-%d") if user.created_at else "-" }}</td>
               <td>
                 <div class="admin-actions">

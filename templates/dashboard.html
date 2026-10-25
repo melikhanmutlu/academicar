@@ -8,7 +8,7 @@
     <div class="inst-status-notice" role="status" data-verify-email-notice>
       <div>
         <strong>Confirm your email address</strong>
-        <p>We sent a link to {{ current_user.email }}. Confirming it is required to join an institution and keeps password resets reaching you.</p>
+        <p>We sent a link to {{ current_user.email }}. Confirm it to create projects, upload models and join an institution.</p>
       </div>
       <form method="POST" action="{{ url_for('auth.resend_verification_email') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

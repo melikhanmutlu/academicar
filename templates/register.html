@@ -26,6 +26,13 @@
 
       <form method="POST" class="space-y-5">
         {{ form.hidden_tag() }}
+        <input type="hidden" name="{{ timing_field }}" value="{{ signup_stamp }}">
+        {# Honeypot: hidden from people and screen readers; bots fill every field. #}
+        <div style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden" aria-hidden="true">
+          <label for="{{ honeypot_field }}">Website</label>
+          <input type="text" id="{{ honeypot_field }}" name="{{ honeypot_field }}" tabindex="-1" autocomplete="off" value="">
+        </div>
+        {% if bot_error %}<p class="text-sm text-red-600" role="alert" data-signup-blocked>{{ bot_error }}</p>{% endif %}
         <div>
           {{ form.username.label(class="field-label") }}
           {{ form.username(class="field-input") }}
@@ -54,8 +61,12 @@
           <span>I accept the <a href="{{ url_for('terms') }}" target="_blank" rel="noopener noreferrer" class="text-[#111827] underline underline-offset-2">Terms of Use</a>, <a href="{{ url_for('privacy') }}" target="_blank" rel="noopener noreferrer" class="text-[#111827] underline underline-offset-2">Privacy Policy</a>, and <a href="{{ url_for('data_protection') }}" target="_blank" rel="noopener noreferrer" class="text-[#111827] underline underline-offset-2">Personal Data Protection Notice</a></span>
         </label>
         {% for e in form.accept_terms.errors %}<p class="text-xs text-red-600 -mt-3">{{ e }}</p>{% endfor %}
+        {% if turnstile_site_key %}
+        <div class="cf-turnstile" data-sitekey="{{ turnstile_site_key }}" data-size="flexible" data-theme="light"></div>
+        {% endif %}
         {{ form.submit(class="btn-primary w-full") }}
       </form>
+      {% if turnstile_site_key %}<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>{% endif %}
 
       <p class="text-sm text-[#5c6473] text-center mt-7">
         Already have an account? <a href="{{ url_for('auth.login') }}" class="text-[#111827] underline underline-offset-4 font-semibold">Log in</a>

@@ -12,6 +12,7 @@ from flask_wtf import FlaskForm
 from wtforms import BooleanField, PasswordField, StringField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, ValidationError
 
+import signup_guard
 from extensions import limiter
 from licensing import get_license_plan
 from payments import PAID_PLAN_KEYS
@@ -206,6 +207,22 @@ def mark_email_verified(user) -> None:
         user.email_verified_at = datetime.now(UTC)
 
 
+def email_verification_pending() -> bool:
+    """True when the signed-in user must confirm their email before creating
+    projects or uploading models (REQUIRE_EMAIL_VERIFICATION; admins exempt)."""
+    if not current_app.config.get("REQUIRE_EMAIL_VERIFICATION", True):
+        return False
+    if not current_user.is_authenticated or getattr(current_user, "is_admin", False):
+        return False
+    return not current_user.is_email_verified
+
+
+EMAIL_VERIFICATION_REQUIRED_MESSAGE = (
+    "Please confirm your email address before creating projects or uploading models. "
+    "Use the link we emailed you, or resend it from your dashboard."
+)
+
+
 def send_verification_email(user, *, welcome: bool = False) -> bool:
     """Email the confirmation link (as part of the welcome email right after
     sign-up). Best effort: returns False when mail is unconfigured/failed."""
@@ -260,7 +277,18 @@ def register():
         return redirect(url_for("dashboard"))
 
     form = RegistrationForm()
-    if form.validate_on_submit():
+    bot_error = None
+    if request.method == "POST":
+        bot_reason = signup_guard.check_signup(request.form, get_remote_address())
+        if bot_reason:
+            # Never log the submitted email: it is usually a stranger's address.
+            current_app.logger.warning("sign-up blocked (%s) from %s", bot_reason, get_remote_address())
+            bot_error = (
+                "We could not confirm you are human. Please complete the check below and try again."
+                if bot_reason == "turnstile"
+                else "We could not process this sign-up. Please wait a moment and try again."
+            )
+    if bot_error is None and form.validate_on_submit():
         user = User(
             username=form.username.data.strip(),
             email=form.email.data.lower().strip(),
@@ -319,7 +347,12 @@ def register():
         "register.html",
         form=form,
         google_oauth_enabled=bool(current_app.config.get("GOOGLE_CLIENT_ID") and current_app.config.get("GOOGLE_CLIENT_SECRET")),
-    )
+        bot_error=bot_error,
+        signup_stamp=signup_guard.issue_form_stamp(),
+        honeypot_field=signup_guard.HONEYPOT_FIELD,
+        timing_field=signup_guard.TIMING_FIELD,
+        turnstile_site_key=signup_guard.turnstile_site_key(),
+    ), (400 if bot_error else 200)
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])

@@ -254,7 +254,10 @@ def _limit_error(target: dict, owner_user_id: int, size: int, medical: bool) -> 
 @limiter.limit("60 per hour", methods=["POST"])
 def create_upload():
     import app as app_module
+    from auth import EMAIL_VERIFICATION_REQUIRED_MESSAGE, email_verification_pending
 
+    if email_verification_pending():
+        return _error(EMAIL_VERIFICATION_REQUIRED_MESSAGE, 403)
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
         return _error("Invalid request.", 400)

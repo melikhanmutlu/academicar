@@ -175,13 +175,15 @@ CONTENT_SECURITY_POLICY = "; ".join(
         "default-src 'self'",
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' "
         "https://unpkg.com https://ajax.googleapis.com https://www.gstatic.com https://cdnjs.cloudflare.com "
-        "https://www.googletagmanager.com",
+        "https://www.googletagmanager.com https://challenges.cloudflare.com",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' data: https://fonts.gstatic.com",
         "img-src 'self' data: blob: https:",
         "connect-src 'self' blob: https://unpkg.com https://ajax.googleapis.com https://www.gstatic.com "
         "https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com",
         "worker-src 'self' blob:",
+        # Cloudflare Turnstile (sign-up bot check) renders in an iframe.
+        "frame-src 'self' https://challenges.cloudflare.com",
         "object-src 'none'",
         "base-uri 'self'",
         # PayTR hosted checkout: the upgrade form POSTs to our own route, which
@@ -7408,6 +7410,42 @@ def register_routes(app: Flask) -> None:
             f"academicar-insights-{days}d.csv",
         )
 
+    def admin_user_filters(args) -> dict:
+        since_raw = (args.get("user_since") or "").strip()
+        try:
+            since = datetime.strptime(since_raw, "%Y-%m-%d") if since_raw else None
+        except ValueError:
+            since, since_raw = None, ""
+        return {
+            "user_q": (args.get("user_q") or "").strip(),
+            "user_role": (args.get("user_role") or "all").strip().lower(),
+            "user_since": since_raw,
+            "_since": since,
+        }
+
+    def admin_users_query(filters: dict):
+        """Users list / CSV export / bulk delete share one filter."""
+        query = User.query
+        if filters["user_q"]:
+            pattern = admin_like_pattern(filters["user_q"])
+            query = query.filter(
+                or_(
+                    func.lower(User.email).like(pattern, escape="\\"),
+                    func.lower(User.username).like(pattern, escape="\\"),
+                )
+            )
+        role = filters["user_role"]
+        if role == "admin":
+            query = query.filter(User.is_admin.is_(True))
+        elif role == "member":
+            query = query.filter(User.is_admin.is_(False))
+        elif role == "unverified":
+            query = query.filter(User.email_verified_at.is_(None))
+        if filters["_since"] is not None:
+            # "Joined on or after" this day (UTC).
+            query = query.filter(User.created_at >= filters["_since"])
+        return query
+
     @app.route("/admin", defaults={"admin_page": "overview"})
     @app.route("/admin/<admin_page>")
     @login_required
@@ -7454,19 +7492,8 @@ def register_routes(app: Flask) -> None:
         qr_status_filter = (request.args.get("qr_status") or "all").strip().lower()
         qr_query_text = (request.args.get("qr_q") or "").strip()
 
-        users_query = User.query
-        if user_query_text:
-            pattern = admin_like_pattern(user_query_text)
-            users_query = users_query.filter(
-                or_(
-                    func.lower(User.email).like(pattern, escape="\\"),
-                    func.lower(User.username).like(pattern, escape="\\"),
-                )
-            )
-        if user_role_filter == "admin":
-            users_query = users_query.filter(User.is_admin.is_(True))
-        elif user_role_filter == "member":
-            users_query = users_query.filter(User.is_admin.is_(False))
+        user_filters = admin_user_filters(request.args)
+        users_query = admin_users_query(user_filters)
 
         # Projects list (admin sees deleted rows too, so it can restore them).
         papers_query = Paper.query.options(selectinload(Paper.author))
@@ -8194,6 +8221,7 @@ def register_routes(app: Flask) -> None:
             filters={
                 "user_q": user_query_text,
                 "user_role": user_role_filter,
+                "user_since": user_filters["user_since"],
                 "model_status": model_status_filter,
                 "model_q": model_query_text,
                 "job_status": job_status_filter,
@@ -8219,16 +8247,7 @@ def register_routes(app: Flask) -> None:
     @login_required
     def admin_users_export():
         require_admin()
-        user_query_text = (request.args.get("user_q") or "").strip()
-        user_role_filter = (request.args.get("user_role") or "all").strip().lower()
-        query = User.query
-        if user_query_text:
-            pattern = admin_like_pattern(user_query_text)
-            query = query.filter(or_(func.lower(User.email).like(pattern, escape="\\"), func.lower(User.username).like(pattern, escape="\\")))
-        if user_role_filter == "admin":
-            query = query.filter(User.is_admin.is_(True))
-        elif user_role_filter == "member":
-            query = query.filter(User.is_admin.is_(False))
+        query = admin_users_query(admin_user_filters(request.args))
         rows = [
             {
                 "id": u.id, "email": u.email, "username": u.username,
@@ -11024,6 +11043,11 @@ def register_routes(app: Flask) -> None:
         ),
     )
     def project_new():
+        from auth import EMAIL_VERIFICATION_REQUIRED_MESSAGE, email_verification_pending
+
+        if email_verification_pending():
+            flash(EMAIL_VERIFICATION_REQUIRED_MESSAGE, "warning")
+            return redirect(url_for("dashboard"))
         if request.method == "POST":
             # A model uploaded in chunks (uploads.py) arrives as ``upload_id``; resolved up
             # front so the staged file is removed whichever way this request ends.
@@ -11539,7 +11563,12 @@ def register_routes(app: Flask) -> None:
     @limiter.limit(upload_rate_limit_value, methods=["POST"], exempt_when=upload_rate_limit_disabled)
     @require_paper_editor
     def upload_model(slug):
+        from auth import EMAIL_VERIFICATION_REQUIRED_MESSAGE, email_verification_pending
+
         paper = active_paper_query().filter_by(slug=slug).first_or_404()
+        if email_verification_pending():
+            flash(EMAIL_VERIFICATION_REQUIRED_MESSAGE, "warning")
+            return redirect(url_for("project_detail", slug=slug))
         file = request.files.get("file") or request.files.get("model_file")
         if not file or not file.filename:
             # Chunked upload (uploads.py): the file is already staged on the server.
