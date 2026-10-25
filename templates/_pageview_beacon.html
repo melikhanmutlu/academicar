@@ -1,0 +1,15 @@
+{# Cookieless page-view beacon for the admin Traffic page (traffic.py, POST /a/pv).
+   Stores nothing on the device, so it runs without cookie consent. Left out of
+   admin pages, embeds and error pages. #}
+{% if not pv_skip|default(false) and not request.path.startswith('/admin') and request.args.get('embed') not in ('true', '1') %}
+<script>
+(function () {
+  try {
+    if (navigator.webdriver) return;
+    var body = JSON.stringify({ p: location.pathname, q: location.search, r: document.referrer });
+    if (navigator.sendBeacon && navigator.sendBeacon('/a/pv', body)) return;
+    fetch('/a/pv', { method: 'POST', body: body, keepalive: true, credentials: 'same-origin' });
+  } catch (e) {}
+})();
+</script>
+{% endif %}

@@ -134,6 +134,7 @@ from payments import (
     plan_amount_minor_units,
 )
 from url_helpers import public_url
+from traffic import mark_qr_visit, record_page_view, traffic_snapshot
 from analytics import (
     ALLOWED_BROWSER_EVENTS,
     ga_content_group,
@@ -5412,7 +5413,7 @@ def register_error_handlers(app: Flask) -> None:
     def file_too_large(error):
         limit = human_file_size(app.config["MAX_CONTENT_LENGTH"])
         flash(f"File size can be at most {limit}.", "danger")
-        return render_template("errors/413.html", limit=limit), 413
+        return render_template("errors/413.html", limit=limit, pv_skip=True), 413
 
     @app.errorhandler(RateLimitExceeded)
     def rate_limit_exceeded(error):
@@ -5428,17 +5429,17 @@ def register_error_handlers(app: Flask) -> None:
 
     @app.errorhandler(403)
     def forbidden(error):
-        return render_template("errors/403.html"), 403
+        return render_template("errors/403.html", pv_skip=True), 403
 
     @app.errorhandler(404)
     def not_found(error):
-        return render_template("errors/404.html"), 404
+        return render_template("errors/404.html", pv_skip=True), 404
 
     @app.errorhandler(500)
     def server_error(error):
         db.session.rollback()
         logger.exception("Unhandled server error")
-        return render_template("errors/500.html"), 500
+        return render_template("errors/500.html", pv_skip=True), 500
 
 
 def log_audit(event_type: str, user_id: int | None = None, resource_id: str | None = None, details: dict | None = None) -> None:
@@ -6811,6 +6812,7 @@ def register_routes(app: Flask) -> None:
             )
         track_event("qr_scanned", owner_user_id=model.user_id, project_id=model.paper_id, model_id=model.id)
         queue_ga_event("qr_scan")
+        mark_qr_visit()
         if not _paper_visible_to_request(model.paper):
             return _private_project_response(model.paper)
         status = model_access_status(model)
@@ -6827,6 +6829,21 @@ def register_routes(app: Flask) -> None:
                 410,
             )
         return redirect(url_for("view_model", model_id=model.id))
+
+    @app.route("/a/pv", methods=["POST"])
+    @csrf.exempt
+    @limiter.limit("60 per minute")
+    def record_pageview_beacon():
+        """Page-view beacon for the admin Traffic page (traffic.py). Sent with
+        navigator.sendBeacon as text/plain JSON: {p: path, q: search, r: referrer}."""
+        try:
+            payload = json.loads(request.get_data(cache=False, as_text=True)[:4000] or "{}")
+        except ValueError:
+            payload = {}
+        if not isinstance(payload, dict):
+            payload = {}
+        result = record_page_view(payload)
+        return ("", 204) if result == "ok" else (jsonify({"ignored": result}), 202)
 
     @app.route("/analytics/event", methods=["POST"])
     @csrf.exempt
@@ -7470,6 +7487,7 @@ def register_routes(app: Flask) -> None:
             "institutions",
             "inquiries",
             "analytics",
+            "traffic",
         }
         if admin_page not in admin_pages:
             abort(404)
@@ -8139,6 +8157,9 @@ def register_routes(app: Flask) -> None:
         )
         analytics = analytics_snapshot(days=30, include_trend=False) if admin_page == "analytics" else None
         funnel = funnel_snapshot(days=30) if admin_page == "analytics" else None
+        traffic = (
+            traffic_snapshot(days=request.args.get("days", type=int) or 30) if admin_page == "traffic" else None
+        )
         pricing_rows = []
         coupons = []
         if admin_page == "pricing":
@@ -8218,6 +8239,7 @@ def register_routes(app: Flask) -> None:
             inquiries_pagination=inquiries_pagination,
             active_page=admin_page,
             analytics=analytics,
+            traffic=traffic,
             filters={
                 "user_q": user_query_text,
                 "user_role": user_role_filter,

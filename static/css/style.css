@@ -9623,3 +9623,29 @@ body.project-detail-page { overflow-x: clip; }
   .blog-article .blog-cta { flex-direction: column; align-items: stretch; padding: 18px; }
   .blog-article .blog-cta .blog-cta-button { justify-content: center; }
 }
+
+/* Admin site traffic (templates/admin/traffic.html); reuses the .ins-* insights blocks. */
+.traffic-note { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 20px; margin: 0 0 16px; color: var(--color-silver-ash); font-size: 13px; }
+.traffic-note strong { color: var(--color-midnight-graphite); font-weight: 600; }
+.traffic-live { display: inline-flex; align-items: center; gap: 6px; }
+.traffic-live i { width: 7px; height: 7px; border-radius: 50%; background: var(--color-sunset-orange); }
+.traffic-page .ins-audience { margin-bottom: 20px; }
+.traffic-table col { width: 15%; }
+.traffic-table col.c-name { width: 70%; }
+.traffic-path { color: var(--color-midnight-graphite); font-weight: 500; text-decoration: none; overflow-wrap: anywhere; }
+.traffic-path:hover { text-decoration: underline; text-underline-offset: 3px; }
+.traffic-utm { display: block; color: var(--color-silver-ash); font-size: 12px; }
+@media (max-width: 720px) {
+  /* Stay a compact table on phones instead of the stacked .ins-table cards. */
+  .traffic-table { display: table; }
+  .traffic-table thead { display: table-header-group; }
+  .traffic-table colgroup { display: table-column-group; }
+  .traffic-table tbody { display: table-row-group; }
+  .traffic-table tr, .traffic-table tbody tr:last-child { display: table-row; border-bottom: 0; }
+  .traffic-table td, .traffic-table td:first-child { display: table-cell; padding: 8px 4px; border-bottom: 1px solid var(--color-light-pearl); }
+  .traffic-table td:not(:first-child) { text-align: right; }
+  .traffic-table th { padding: 6px 4px; }
+  .traffic-table td::before { display: none; }
+  .traffic-table col { width: 20%; }
+  .traffic-table col.c-name { width: 60%; }
+}

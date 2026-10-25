@@ -1,0 +1,161 @@
+{% extends "admin/base.html" %}
+{% from "partials/_insights_macros.html" import kpi, periods, pct, period %}
+{% block admin_title %}Site traffic{% endblock %}
+{% block admin_subtitle %}{% set t = traffic %}Who visits the public site, where they come from and what they read, last {{ period(t.days) }}.{% endblock %}
+{% block admin_actions %}{% set t = traffic %}{{ periods('admin_dashboard', t.days, {'admin_page': 'traffic'}) }}{% endblock %}
+{% block admin_body %}
+{% set t = traffic %}
+<div class="traffic-page">
+  <p class="traffic-note">
+    <span class="traffic-live"><i aria-hidden="true"></i><strong>{{ t.live }}</strong> on the site now</span>
+    <span><strong>{{ t.today_visitors }}</strong> today</span>
+    <span>Cookieless: a visitor is one device per day, so someone who returns on another day counts again. Admins and bots are left out.{% if t.tracking_since %} Collected since {{ t.tracking_since.strftime('%-d %b %Y') }}.{% endif %}</span>
+  </p>
+
+  <section class="ins-kpis">
+    {{ kpi('Unique visitors', t.visitors, ((t.signed_in_visitors ~ ' signed in') if t.signed_in_visitors else none), t.changes.visitors, t.visitors, t.days, sub_title=('Signed-in users among them' if t.signed_in_visitors else none)) }}
+    {{ kpi('Visits', t.visits, none, t.changes.visits, t.visits, t.days, sub_title=none) }}
+    {{ kpi('Page views', t.views, none, t.changes.views, t.views, t.days) }}
+    {{ kpi('Pages per visit', (t.pages_per_visit if t.pages_per_visit is not none else '—'), none, none, none, t.days) }}
+  </section>
+
+  {% set trend = t.trend %}{% set n = trend|length %}{% set tmax = t.trend_max %}
+  {% set gran = {'day': 'Daily', 'week': 'Weekly', 'month': 'Monthly'}[t.granularity] %}
+  <section class="ins-card ins-chart-card" id="trafficChart" data-max-visitors="{{ tmax }}" data-max-views="{{ t.trend_max_views }}">
+    <div class="ins-card-head">
+      <h2>{{ gran }} <span class="ins-series-name" id="trafficSeries">visitors</span></h2>
+      {% if t.has_data %}
+      <div class="ins-chart-tools">
+        <div class="ins-toggle" role="group" aria-label="Series">
+          <button type="button" class="is-active" data-series="visitors" aria-pressed="true">Visitors</button>
+          <button type="button" data-series="views" aria-pressed="false">Page views</button>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {% if t.has_data %}
+      <div class="ins-chart">
+        {% set mid = true %}
+        <div class="ins-y" id="trafficY" aria-hidden="true"><span>{{ tmax }}</span><span>{{ (tmax // 2) if tmax >= 4 else "" }}</span><span>0</span></div>
+        <div class="ins-plot{% if n > 30 %} is-dense{% endif %}{% if mid %} has-mid{% endif %}" id="trafficPlot" role="list" aria-label="{{ gran }} visitors">
+          {% for point in trend %}
+            {% set pos = 'is-left' if loop.index0 < n * 0.2 else ('is-right' if loop.index0 > n * 0.8 else '') %}
+            <div class="ins-col {{ pos }}" role="listitem" tabindex="0" data-visitors="{{ point.visitors }}" data-views="{{ point.views }}"
+                 aria-label="{{ point.label }}: {{ point.visitors }} visitors, {{ point.views }} page views">
+              <i style="height: {{ (point.visitors / tmax * 100)|round(1) }}%"></i>
+              <span class="ins-tip" aria-hidden="true">{{ point.label }}: {{ point.visitors }} visitors &middot; {{ point.views }} views</span>
+            </div>
+          {% endfor %}
+        </div>
+        <div class="ins-x" aria-hidden="true">
+          {% set steps = [n, 6]|min %}
+          {% for k in range(steps) %}
+            {% set idx = ((k * (n - 1) / (steps - 1))|round|int) if steps > 1 else 0 %}
+            <span>{{ trend[idx].label }}</span>
+          {% endfor %}
+        </div>
+      </div>
+    {% else %}
+      <p class="ins-empty">No page views in the last {{ period(t.days) }} yet. Visits are recorded from the moment this version is live.</p>
+    {% endif %}
+  </section>
+
+  {% macro rows_card(title, rows, empty_text, unit='visitors', regions=false, capitalize=false) %}
+    <section class="ins-card">
+      <div class="ins-card-head"><h2>{{ title }}</h2><span>{{ unit }}</span></div>
+      {% if rows %}
+        <ul class="ins-rows">
+          {% for row in rows %}
+            <li>
+              <div><span{% if regions %} data-region="{{ row.label }}" title="{{ row.label }}"{% endif %}>{{ (row.label|capitalize if capitalize else row.label) or 'Unknown' }}</span><strong>{{ row.visitors }} <small>{{ pct(row.pct) }}</small></strong></div>
+              <span class="ins-bar"><i style="width: {{ row.pct or 0 }}%"></i></span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}<p class="ins-empty">{{ empty_text }}</p>{% endif %}
+    </section>
+  {% endmacro %}
+
+  {% macro pages_table(title, rows, note) %}
+    <section class="ins-card">
+      <div class="ins-card-head"><h2>{{ title }}</h2><span>{{ note }}</span></div>
+      {% if rows %}
+        <table class="ins-table traffic-table">
+          <colgroup><col class="c-name"><col><col></colgroup>
+          <thead><tr><th scope="col">Page</th><th scope="col">Visitors</th><th scope="col">Views</th></tr></thead>
+          <tbody>
+            {% for row in rows %}
+              <tr>
+                <td data-label="Page">
+                  <a class="traffic-path" href="{{ row.label }}" target="_blank" rel="noopener">{{ row.title or row.label }}</a>
+                  {% if row.title %}<small>{{ row.label }}</small>{% endif %}
+                </td>
+                <td data-label="Visitors">{{ row.visitors }}</td>
+                <td data-label="Views">{{ row.views }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}<p class="ins-empty">No pages yet.</p>{% endif %}
+    </section>
+  {% endmacro %}
+
+  <div class="ins-audience is-two">
+    {{ rows_card('Sources', t.sources, 'No visits yet.', 'visitors who arrived') }}
+    {{ rows_card('Countries', t.countries, 'No country data yet.', regions=true) }}
+  </div>
+
+  <div class="ins-audience is-two">
+    {{ rows_card('Channels', t.channels, 'No visits yet.', 'visitors who arrived') }}
+    {{ rows_card('Site sections', t.sections, 'No page views yet.') }}
+  </div>
+
+  {{ pages_table('Pages', t.pages, 'unique visitors per page') }}
+
+  {{ pages_table('Landing pages', t.entry_pages, 'first page of a visit') }}
+
+  <div class="ins-audience is-two">
+    {{ rows_card('Devices', t.devices, 'No data yet.', capitalize=true) }}
+    <section class="ins-card">
+      <div class="ins-card-head"><h2>Campaigns</h2><span>UTM links</span></div>
+      {% if t.campaigns %}
+        <ul class="ins-rows">
+          {% for c in t.campaigns %}
+            <li><div><span>{{ c.campaign }}<small class="traffic-utm">{{ c.source or '—' }} / {{ c.medium or '—' }}</small></span><strong>{{ c.visitors }}</strong></div></li>
+          {% endfor %}
+        </ul>
+      {% else %}<p class="ins-empty">No visits from links with utm_campaign yet. Add ?utm_campaign=… to links you share on posters, emails or social posts.</p>{% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+(function () {
+  if (window.Intl && Intl.DisplayNames) {
+    var names = new Intl.DisplayNames(['en'], { type: 'region' });
+    document.querySelectorAll('[data-region]').forEach(function (el) {
+      try { el.textContent = names.of(el.dataset.region) || el.textContent; } catch (e) {}
+    });
+  }
+  var card = document.getElementById('trafficChart'), plot = document.getElementById('trafficPlot');
+  if (!card || !plot) return;
+  var name = document.getElementById('trafficSeries'), ys = document.getElementById('trafficY').children;
+  var btns = card.querySelectorAll('[data-series]');
+  btns.forEach(function (b) {
+    b.addEventListener('click', function () {
+      var key = b.dataset.series;
+      btns.forEach(function (o) { var on = o === b; o.classList.toggle('is-active', on); o.setAttribute('aria-pressed', on); });
+      name.textContent = key === 'views' ? 'page views' : 'visitors';
+      var max = parseFloat(key === 'views' ? card.dataset.maxViews : card.dataset.maxVisitors) || 1;
+      ys[0].textContent = max; ys[1].textContent = max >= 4 ? max / 2 : '';
+      plot.querySelectorAll('.ins-col').forEach(function (c) {
+        c.querySelector('i').style.height = (parseFloat(c.dataset[key]) / max * 100).toFixed(1) + '%';
+      });
+    });
+  });
+})();
+</script>
+{% endblock %}

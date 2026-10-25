@@ -598,6 +598,33 @@ class AnalyticsEvent(db.Model):
     __table_args__ = (db.Index("ix_analytics_events_event_name_occurred_at", "event_name", "occurred_at"),)
 
 
+class PageView(db.Model):
+    """One page view on the public site, for the admin Traffic page (``traffic.py``).
+
+    Cookieless: ``visitor_hash`` is a hash of IP + user agent with a salt that
+    changes every day, so it counts a person once per day and cannot follow
+    them across days. No raw IP or user agent is stored.
+    """
+    __tablename__ = "page_views"
+
+    id = db.Column(db.Integer, primary_key=True)
+    occurred_at = db.Column(db.DateTime, default=utc_now, nullable=False, index=True)
+    path = db.Column(db.String(255), nullable=False, index=True)
+    section = db.Column(db.String(32), nullable=True)
+    visitor_hash = db.Column(db.String(64), nullable=False, index=True)
+    # The first page of a visit (arrived from outside the site, not a click between pages).
+    is_entry = db.Column(db.Boolean, nullable=False, default=False)
+    channel = db.Column(db.String(24), nullable=True)
+    source = db.Column(db.String(120), nullable=True)
+    referrer_domain = db.Column(db.String(255), nullable=True)
+    utm_source = db.Column(db.String(120), nullable=True)
+    utm_medium = db.Column(db.String(120), nullable=True)
+    utm_campaign = db.Column(db.String(120), nullable=True)
+    country_code = db.Column(db.String(2), nullable=True)
+    device_type = db.Column(db.String(16), nullable=True)
+    signed_in = db.Column(db.Boolean, nullable=False, default=False)
+
+
 class BlogPost(db.Model):
     """Admin-authored blog post (Markdown body), managed from the admin panel.
 
