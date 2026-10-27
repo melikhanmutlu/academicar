@@ -10401,28 +10401,9 @@ def register_routes(app: Flask) -> None:
         flash(f"Account reactivated: {user.email}.", "success")
         return redirect(url_for("admin_user_detail", user_id=user.id))
 
-    @app.route("/admin/users/<int:user_id>/delete", methods=["POST"])
-    @login_required
-    def admin_user_delete(user_id):
-        """Permanently delete a user and everything they own.
-
-        Mirrors the self-serve /account/delete flow (files collected up front,
-        financial + audit rows detached rather than destroyed, then the User is
-        deleted so papers -> models cascade). Guards: an admin cannot delete
-        their own account here, and configured (env ADMIN_EMAILS) admins are
-        protected. This is irreversible; the reversible option is Deactivate.
-        """
-        require_admin()
-        user = db.session.get(User, user_id)
-        if not user:
-            abort(404)
-        if user.id == current_user.id:
-            flash("You cannot delete your own account from here.", "warning")
-            return redirect(url_for("admin_user_detail", user_id=user.id))
-        if user_is_configured_admin(user):
-            flash("Configured admin accounts cannot be deleted.", "warning")
-            return redirect(url_for("admin_user_detail", user_id=user.id))
-
+    def delete_user_account(user) -> bool:
+        """Delete a user and everything they own (single and bulk admin delete).
+        Returns False, after a rollback, when the database delete fails."""
         # Collect on-disk files (GLB/USDZ/QR/poster/PDF) before the DB cascade
         # removes the rows we'd need to locate them.
         files_to_remove = []
@@ -10455,15 +10436,80 @@ def register_routes(app: Flask) -> None:
         except SQLAlchemyError:
             db.session.rollback()
             logger.exception("Admin user deletion failed")
-            flash("Could not delete the account. Please try again.", "danger")
-            return redirect(url_for("admin_user_detail", user_id=uid))
+            return False
 
         # Logged only once the deletion has actually committed.
         log_audit("admin_user_deleted", user_id=current_user.id, resource_id=str(uid), details={"email": user_email})
         cleanup_paths(files_to_remove)
         for key in r2_keys:
             mirror_delete(key)
+        return True
+
+    @app.route("/admin/users/<int:user_id>/delete", methods=["POST"])
+    @login_required
+    def admin_user_delete(user_id):
+        """Permanently delete a user and everything they own.
+
+        Mirrors the self-serve /account/delete flow (files collected up front,
+        financial + audit rows detached rather than destroyed, then the User is
+        deleted so papers -> models cascade). Guards: an admin cannot delete
+        their own account here, and configured (env ADMIN_EMAILS) admins are
+        protected. This is irreversible; the reversible option is Deactivate.
+        """
+        require_admin()
+        user = db.session.get(User, user_id)
+        if not user:
+            abort(404)
+        if user.id == current_user.id:
+            flash("You cannot delete your own account from here.", "warning")
+            return redirect(url_for("admin_user_detail", user_id=user.id))
+        if user_is_configured_admin(user):
+            flash("Configured admin accounts cannot be deleted.", "warning")
+            return redirect(url_for("admin_user_detail", user_id=user.id))
+
+        user_email = user.email
+        uid = user.id
+        if not delete_user_account(user):
+            flash("Could not delete the account. Please try again.", "danger")
+            return redirect(url_for("admin_user_detail", user_id=uid))
         flash(f"Account permanently deleted: {user_email}.", "success")
+        return redirect(admin_return_url("users"))
+
+    ADMIN_BULK_DELETE_LIMIT = 200
+
+    @app.route("/admin/users/bulk-delete", methods=["POST"])
+    @login_required
+    def admin_users_bulk_delete():
+        """Permanently delete the users ticked on the Users page.
+
+        Admin accounts (including the acting admin and configured admins) are
+        always skipped, so a bulk delete can only remove members.
+        """
+        require_admin()
+        ids = []
+        for raw in request.form.getlist("user_ids"):
+            try:
+                ids.append(int(raw))
+            except (TypeError, ValueError):
+                continue
+        ids = list(dict.fromkeys(ids))[:ADMIN_BULK_DELETE_LIMIT]
+        if not ids:
+            flash("Select at least one user to delete.", "warning")
+            return redirect(admin_return_url("users"))
+        deleted = skipped = failed = 0
+        for user in User.query.filter(User.id.in_(ids)).all():
+            if user.is_admin or user.id == current_user.id or user_is_configured_admin(user):
+                skipped += 1
+            elif delete_user_account(user):
+                deleted += 1
+            else:
+                failed += 1
+        message = f"Deleted {deleted} {'account' if deleted == 1 else 'accounts'}."
+        if skipped:
+            message += f" Skipped {skipped} admin {'account' if skipped == 1 else 'accounts'}."
+        if failed:
+            message += f" {failed} could not be deleted; try again."
+        flash(message, "warning" if (failed or not deleted) else "success")
         return redirect(admin_return_url("users"))
 
     def _read_blog_form() -> dict:

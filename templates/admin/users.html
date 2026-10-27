@@ -21,6 +21,13 @@
       <a href="{{ url_for('admin_dashboard', admin_page='users') }}" class="admin-btn admin-btn-secondary compact">Clear</a>
       <a href="{{ url_for('admin_users_export', user_q=filters.user_q or None, user_role=filters.user_role if filters.user_role != 'all' else None) }}" class="admin-btn admin-btn-secondary compact">Download CSV</a>
     </form>
+    <form id="users-bulk-form" method="POST" action="{{ url_for('admin_users_bulk_delete') }}" class="admin-actions admin-bulk-action" data-users-bulk
+          onsubmit="var n=this.querySelector('[data-bulk-submit]').dataset.count;return window.confirm('Permanently delete the ' + n + ' selected users and ALL of their projects, models and files? Admin accounts are skipped. This cannot be undone.');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next" value="{{ request.full_path }}">
+      <label class="admin-select-all"><input type="checkbox" class="admin-select-box" data-bulk-all> Select all on this page</label>
+      <button type="submit" class="admin-btn admin-btn-danger compact" data-bulk-submit data-count="0" disabled>Delete selected (0)</button>
+    </form>
     <div class="table-wrap">
       <table class="data-table admin-table admin-users-table">
         <thead>
@@ -35,8 +42,13 @@
           {% for user in users %}
             <tr>
               <td>
-                <strong><a href="{{ url_for('admin_user_detail', user_id=user.id) }}">{{ user.username }}</a></strong>
-                <small>{{ user.email }}</small>{% set _flags = (["Admin"] if user.is_admin else []) + (["Unconfirmed"] if not user.email_verified_at else []) + (["Deactivated"] if user.deactivated_at else []) %}{% if _flags %}<small class="admin-show-sm">{{ _flags|join(" · ") }}</small>{% endif %}
+                <div class="admin-user-cell">
+                  {% if not user.is_admin and user.id != current_user.id and not user_is_configured_admin(user) %}<input type="checkbox" name="user_ids" value="{{ user.id }}" form="users-bulk-form" class="admin-select-box" data-bulk-item aria-label="Select {{ user.email }}">{% else %}<span class="admin-select-box" aria-hidden="true"></span>{% endif %}
+                  <div>
+                    <strong><a href="{{ url_for('admin_user_detail', user_id=user.id) }}">{{ user.username }}</a></strong>
+                    <small>{{ user.email }}</small>{% set _flags = (["Admin"] if user.is_admin else []) + (["Unconfirmed"] if not user.email_verified_at else []) + (["Deactivated"] if user.deactivated_at else []) %}{% if _flags %}<small class="admin-show-sm">{{ _flags|join(" · ") }}</small>{% endif %}
+                  </div>
+                </div>
               </td>
               <td class="admin-hide-sm"><span class="status-chip">{{ "Admin" if user.is_admin else "Member" }}</span>{% if not user.email_verified_at %} <span class="status-chip is-queued" title="Email address not confirmed">Unconfirmed</span>{% endif %}{% if user.deactivated_at %} <span class="status-chip is-failed" title="Deactivated {{ user.deactivated_at.strftime('%Y-%m-%d') }}">Deactivated</span>{% endif %}</td>
               <td class="admin-hide-sm admin-nowrap">{{ user.created_at.strftime("%Y-%m-%d") if user.created_at else "-" }}</td>
@@ -70,4 +82,29 @@
     </div>
     {{ render_pagination(users_pagination, 'admin_dashboard', {'admin_page': 'users'}) }}
   </section>
+  <script>
+    (function () {
+      var all = document.querySelector("[data-bulk-all]");
+      var items = Array.prototype.slice.call(document.querySelectorAll("[data-bulk-item]"));
+      var button = document.querySelector("[data-bulk-submit]");
+      if (!button) return;
+      if (all && !items.length) all.disabled = true;
+      function sync() {
+        var n = items.filter(function (box) { return box.checked; }).length;
+        button.dataset.count = n;
+        button.textContent = "Delete selected (" + n + ")";
+        button.disabled = n === 0;
+        if (all) {
+          all.checked = n > 0 && n === items.length;
+          all.indeterminate = n > 0 && n < items.length;
+        }
+      }
+      items.forEach(function (box) { box.addEventListener("change", sync); });
+      if (all) all.addEventListener("change", function () {
+        items.forEach(function (box) { box.checked = all.checked; });
+        sync();
+      });
+      sync();
+    })();
+  </script>
 {% endblock %}

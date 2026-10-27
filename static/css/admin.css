@@ -1037,3 +1037,12 @@ a.admin-insight-card:hover { border-color: var(--color-silver-ash); }
 .admin-audience .admin-section { margin: 0; }
 .admin-audience small { color: var(--color-silver-ash); font-weight: 400; }
 /* == end page:analytics == */
+
+/* Users page: bulk-select checkboxes (in the user cell, so the stacked phone
+   layout keeps the name as the row title). */
+.admin-user-cell { display: flex; align-items: flex-start; gap: 12px; }
+.admin-user-cell > div { min-width: 0; }
+.admin-select-box { flex: 0 0 16px; width: 16px; height: 16px; margin: 3px 0 0; }
+.admin-select-all { display: inline-flex; align-items: center; gap: 8px; margin-right: 8px; font-size: 13px; color: var(--color-silver-ash); cursor: pointer; }
+.admin-select-all .admin-select-box { margin: 0; }
+.admin-bulk-action [data-bulk-submit]:disabled { opacity: 0.45; cursor: not-allowed; }

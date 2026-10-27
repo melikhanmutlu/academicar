@@ -219,3 +219,65 @@ def test_admin_users_filter_unverified(app, client):
     assert "Unconfirmed" in html
     csv = client.get("/admin/users/export.csv?user_role=unverified").get_data(as_text=True)
     assert "victim@example.com" in csv and "ok@example.com" not in csv
+
+
+# --- admin bulk delete --------------------------------------------------------
+
+
+def _bulk_setup(app):
+    with app.app_context():
+        from auth import mark_email_verified
+        admin = User(email="adm@example.com", username="Adm", is_admin=True)
+        admin.set_password("password123")
+        mark_email_verified(admin)
+        other_admin = User(email="adm2@example.com", username="Adm2", is_admin=True)
+        other_admin.set_password("password123")
+        keep = User(email="keep@example.com", username="Keep")
+        keep.set_password("password123")
+        bots = [User(email=f"bot{i}@example.com", username="user5x4gdddz342ds") for i in range(3)]
+        for bot in bots:
+            bot.set_password("password123")
+        db.session.add_all([admin, other_admin, keep, *bots])
+        db.session.commit()
+        return admin.id, other_admin.id, keep.id, [b.id for b in bots]
+
+
+def test_users_page_has_bulk_checkboxes_except_admins(app, client):
+    admin_id, other_admin_id, keep_id, bot_ids = _bulk_setup(app)
+    login(client, "adm@example.com")
+    html = client.get("/admin/users").get_data(as_text=True)
+    assert "data-users-bulk" in html
+    for uid in [keep_id, *bot_ids]:
+        assert f'name="user_ids" value="{uid}"' in html
+    for uid in [admin_id, other_admin_id]:
+        assert f'name="user_ids" value="{uid}"' not in html
+
+
+def test_bulk_delete_removes_selected_members_and_skips_admins(app, client):
+    admin_id, other_admin_id, keep_id, bot_ids = _bulk_setup(app)
+    login(client, "adm@example.com")
+    resp = client.post(
+        "/admin/users/bulk-delete",
+        data={"user_ids": [*map(str, bot_ids), str(admin_id), str(other_admin_id), "junk"]},
+        follow_redirects=True,
+    )
+    assert "Deleted 3 accounts." in resp.get_data(as_text=True)
+    with app.app_context():
+        remaining = {u.id for u in User.query.all()}
+    assert remaining == {admin_id, other_admin_id, keep_id}
+
+
+def test_bulk_delete_requires_admin(app, client):
+    _admin_id, _other, keep_id, bot_ids = _bulk_setup(app)
+    login(client, "keep@example.com")
+    resp = client.post("/admin/users/bulk-delete", data={"user_ids": [str(bot_ids[0])]})
+    assert resp.status_code in {302, 403, 404}
+    with app.app_context():
+        assert db.session.get(User, bot_ids[0]) is not None
+
+
+def test_bulk_delete_with_nothing_selected(app, client):
+    _bulk_setup(app)
+    login(client, "adm@example.com")
+    resp = client.post("/admin/users/bulk-delete", data={}, follow_redirects=True)
+    assert "Select at least one user to delete." in resp.get_data(as_text=True)
