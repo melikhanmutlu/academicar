@@ -1,6 +1,7 @@
 /* =====================================================================
    Homepage design A · Kesit (cross-section)
-   White canvas; a scroll-driven dissection of the hero model.
+   White canvas; the print → scan hero from E, then a pinned dissection
+   in which a real section plane cuts the model as you scroll.
    ===================================================================== */
 .hd-a {
   --a-ink: #202020;
@@ -64,139 +65,41 @@ body.hd-a { overflow-x: visible; }
 .a-btn-ghost-light { color: rgba(255,255,255,.85); border-color: rgba(255,255,255,.28); }
 .a-btn-ghost-light:hover { color: #fff; border-color: #fff; }
 
-/* =====================================================================
-   HERO — copy + live model, the four-step route underneath (one screen)
-   ===================================================================== */
-.a-hero { position: relative; background: #fff; padding: 40px 0 44px; overflow: hidden; }
-.a-hero .a-wrap { position: relative; }
-.a-hero-top { display: grid; grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); gap: 32px; align-items: center; }
-.a-title {
-  font-family: var(--a-display);
-  font-weight: 600;
-  font-size: clamp(56px, 7.4vw, 112px);
-  line-height: .94;
-  letter-spacing: -0.045em;
-  margin: 0;
-  text-wrap: balance;
-}
-.a-lead { margin: 32px 0 0; max-width: 540px; font-size: 19px; line-height: 1.5; color: var(--a-ink); }
-.a-hero .a-actions { margin-top: 24px; }
-.a-price { margin: 14px 0 0; font-size: 14px; color: var(--a-ash); }
-
-.a-hero-specimen { position: relative; height: 440px; background: var(--a-cloud); border-radius: 8px; }
 .a-model { width: 100%; height: 100%; --poster-color: transparent; background: transparent; }
-.a-model-poster { width: 100%; height: 100%; background: transparent; }
-.a-specimen-note { position: absolute; left: 20px; bottom: 16px; font-size: 14px; color: var(--a-shale); }
-
-/* ROUTE — the core flow, inside the first screen */
-.a-route-list {
-  list-style: none; margin: 28px 0 0; padding: 24px 0 0;
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px;
-  position: relative;
-}
-/* the cut line that runs along the top of the four steps */
-.a-route-list::before {
-  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px;
-  background: var(--a-orange); transform-origin: left center;
-}
-.a-route-step { position: relative; display: flex; flex-direction: column; }
-.a-route-visual {
-  position: relative; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden;
-  background: var(--a-cloud);
-}
-.a-route-step h2 {
-  display: flex; align-items: center; gap: 10px;
-  font: 600 18px/1.25 var(--a-display); letter-spacing: -0.015em; margin: 14px 0 4px;
-}
-.a-route-num {
-  flex: none; width: 26px; height: 26px;
-  display: inline-grid; place-items: center;
-  border-radius: 200px; border: 1px solid var(--a-ink);
-  font: 600 13px/1 var(--a-display); color: var(--a-ink);
-}
-.a-route-step:last-child .a-route-num { background: var(--a-orange); border-color: var(--a-orange); color: #fff; }
-.a-route-step p { margin: 0; font-size: 14px; line-height: 1.45; color: var(--a-shale); }
-.a-route-step p a { color: var(--a-ink); font-weight: 500; text-decoration: none; border-bottom: 1px solid currentColor; white-space: nowrap; }
-.a-route-step p a:hover { color: var(--a-orange); }
-
-.a-route-make img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.a-route-tags { position: absolute; left: 10px; right: 10px; bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
-.a-route-tags li { font-size: 13px; font-weight: 500; padding: 4px 10px; border-radius: 200px; background: #fff; }
-
-.a-route-upload { display: flex; flex-direction: column; justify-content: center; padding: 14px 16px; background: var(--a-mist); }
-.a-drop { border-radius: 8px; padding: 14px; display: grid; gap: 10px; background: #fff; }
-.a-drop-file { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 14px; }
-.a-drop-file b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.a-drop-file i { font-style: normal; font-size: 13px; font-weight: 600; padding: 3px 8px; border-radius: 200px; background: var(--a-mist); color: var(--a-shale); }
-.a-drop-bar { height: 4px; border-radius: 200px; background: var(--a-mist); overflow: hidden; }
-.a-drop-bar span { display: block; height: 100%; width: 100%; background: var(--a-ink); transform-origin: left center; }
-.a-drop-done { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--a-ink); }
-.a-drop-done svg { width: 16px; height: 16px; color: var(--a-orange); flex: none; }
-
-/* step 3: crop the recording to the readable Layers list */
-.a-route-view { background: #1c1c1c; border-color: #1c1c1c; }
-.a-route-view img { width: 100%; height: 100%; object-fit: cover; display: block; transform: scale(2.1); transform-origin: 4% 70%; }
-
-.a-route-print { background: var(--a-ivory); }
-.a-sheet {
-  position: absolute; left: 16%; top: 12%; width: 40%; height: 100%;
-  background: #fff; border-radius: 2px;
-  padding: 7% 6%; display: flex; flex-direction: column; gap: 7%;
-  transform: rotate(-3deg);
-}
-.a-sheet span { display: block; background: #e2e2e2; border-radius: 2px; height: 5px; }
-.a-sheet .a-sheet-title { height: 8px; width: 80%; background: var(--a-ink); }
-.a-sheet .a-sheet-short { width: 60%; }
-.a-sheet .a-sheet-fig { height: 26%; background: #f2e3d9; }
-.a-sheet-qr {
-  position: absolute; right: 14%; top: 50%;
-  width: 30%; height: auto; aspect-ratio: 1; padding: 5px;
-  background: #fff; border-radius: 4px;
-  image-rendering: pixelated; transform: translateY(-50%) rotate(2deg);
-}
-
-/* one orchestrated entrance: the cut line draws through, the upload bar fills */
-.a-hero.is-armed .a-route-list::before { transform: scaleX(0); transition: transform 1400ms cubic-bezier(.2,.7,.2,1) 300ms; }
-.a-hero.is-armed .a-drop-bar span { transform: scaleX(.08); transition: transform 1100ms ease 700ms; }
-.a-hero.is-armed .a-drop-done { opacity: 0; transition: opacity 300ms ease 1700ms; }
-.a-hero.is-armed.is-in .a-route-list::before { transform: none; }
-.a-hero.is-armed.is-in .a-drop-bar span { transform: none; }
-.a-hero.is-armed.is-in .a-drop-done { opacity: 1; }
 
 /* =====================================================================
-   DISSECTION — sticky model beside three short steps
+   DISSECTION — pinned while scrolling: three steps on the left, the model
+   on the right turns, is cut open by a real section plane, then closes.
    ===================================================================== */
-.a-dissect { padding: 80px 0; background: #fff; }
-.a-dissect-grid { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 6fr); gap: 56px; align-items: start; }
-.a-callouts { list-style: none; margin: 40px 0 0; padding: 0; }
+.a-dissect { position: relative; height: 300vh; background: #fff; }
+.a-dissect-pin {
+  position: sticky; top: var(--a-header);
+  height: calc(100vh - var(--a-header)); min-height: 560px;
+  display: flex; align-items: center;
+}
+.a-dissect-pin > .a-wrap { width: 100%; }
+.a-dissect-grid { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 6fr); gap: 56px; align-items: center; }
+.a-callouts { list-style: none; margin: 36px 0 0; padding: 0; display: grid; }
 .a-callout {
-  min-height: 22vh; padding: 0 0 0 24px;
+  padding: 18px 0 18px 24px;
   border-left: 3px solid var(--a-mist);
-  display: flex; flex-direction: column; justify-content: center;
+  cursor: pointer;
   transition: border-color 300ms ease;
 }
-.a-callout:last-child { min-height: 20vh; }
 .a-callout.is-current { border-left-color: var(--a-orange); }
-.a-callout h3 { font: 600 28px/1.15 var(--a-display); letter-spacing: -0.025em; margin: 0 0 10px; color: var(--a-ash); transition: color 300ms ease; }
+.a-callout h3 { font: 600 26px/1.15 var(--a-display); letter-spacing: -0.025em; margin: 0 0 8px; color: var(--a-ash); transition: color 300ms ease; }
 .a-callout.is-current h3 { color: var(--a-ink); }
 .a-callout p { margin: 0; font-size: 17px; line-height: 1.5; color: var(--a-ink); max-width: 400px; }
-.a-callout-qr { display: block; width: 96px; height: 96px; margin-top: 16px; border-radius: 4px; padding: 4px; background: #fff; image-rendering: pixelated; }
+.a-callout-qr { display: block; width: 88px; height: 88px; margin-top: 14px; border-radius: 4px; padding: 4px; background: #fff; image-rendering: pixelated; }
 
-.a-dissect-stage { position: sticky; top: calc(var(--a-header) + 32px); }
 .a-specimen {
   position: relative; height: min(68vh, 600px); min-height: 420px;
   border-radius: 8px; background: var(--a-cloud); overflow: hidden;
 }
-.a-specimen .a-model { position: relative; z-index: 1; transform: scale(calc(1 + var(--a-zoom, 0) * 0.08)); }
-.a-plane { position: absolute; inset: 6% 0; pointer-events: none; z-index: 2; opacity: var(--a-plane-on, 0); transition: opacity 300ms ease; }
-.a-plane span {
-  position: absolute; top: 0; bottom: 0; left: 50%;
-  width: 34%;
-  transform: translateX(calc(-50% + var(--a-plane-x, 0) * 1%)) perspective(900px) rotateY(58deg);
-  background: rgba(255,104,44,.16);
-  border: 2px solid var(--a-orange);
-  border-radius: 2px;
-}
+.a-specimen .a-model { position: relative; z-index: 1; }
+/* the section plane's outline, projected from the 3D plane that clips the model */
+.a-cut { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; opacity: 0; overflow: visible; }
+.a-cut polygon { fill: rgba(255,104,44,.08); stroke: var(--a-orange); stroke-width: 2; stroke-linejoin: round; }
 .a-rail { position: absolute; left: 24px; right: 24px; bottom: 20px; height: 3px; background: var(--a-mist); z-index: 3; }
 .a-rail-fill { position: absolute; left: 0; top: 0; height: 3px; width: calc(100% * var(--a-progress, 0)); background: var(--a-orange); }
 
@@ -342,21 +245,21 @@ body.hd-a { overflow-x: visible; }
    ===================================================================== */
 @media (max-width: 1023px) {
   .a-wrap { padding: 0 24px; }
-  .a-hero { padding: 32px 0 40px; }
-  .a-hero-top { grid-template-columns: 1fr; gap: 8px; }
-  .a-hero-specimen { height: 280px; margin-top: 24px; }
-  .a-route-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 20px; }
 
-  .a-dissect { padding: 64px 0 40px; }
-  .a-dissect-grid { grid-template-columns: 1fr; gap: 0; }
+  /* Phone and tablet: still pinned, stacked — the model on top, the three steps
+     below it; only the current step shows its sentence so everything fits. */
+  .a-dissect { height: 300vh; }
+  .a-dissect-pin { height: calc(100svh - var(--a-header)); min-height: 0; align-items: flex-start; padding-top: 20px; }
+  .a-dissect-grid { grid-template-columns: 1fr; gap: 16px; align-items: start; }
   .a-dissect-steps { display: contents; }
-  .a-dissect-steps > .a-h2 { order: 0; margin-bottom: 20px; }
-  /* On a phone the model sits above the three steps instead of pinning over them. */
-  .a-dissect-stage { order: 1; position: relative; top: auto; }
-  .a-callouts { order: 2; margin-top: 28px; display: grid; gap: 28px; }
-  .a-specimen { height: 300px; min-height: 0; }
-  .a-callout, .a-callout:last-child { min-height: 0; }
-  .a-callout h3 { color: var(--a-ink); }
+  .a-dissect-steps > .a-h2 { order: 0; font-size: 26px; }
+  .a-dissect-stage { order: 1; }
+  .a-callouts { order: 2; margin-top: 0; }
+  .a-specimen { height: min(46svh, 400px); min-height: 0; }
+  .a-callout { padding: 10px 0 10px 16px; }
+  .a-callout h3 { font-size: 19px; margin: 0; }
+  .a-callout p { font-size: 15px; margin-top: 6px; }
+  .a-callout:not(.is-current) p, .a-callout-qr { display: none; }
 
   .a-tools { padding: 72px 0; }
   .a-tools-grid { grid-template-columns: 1fr; gap: 20px; }
@@ -385,15 +288,6 @@ body.hd-a { overflow-x: visible; }
 }
 
 @media (max-width: 600px) {
-  .a-title { font-size: 48px; line-height: .98; }
-  .a-lead { font-size: 16px; }
-  .a-route-list { grid-template-columns: 1fr; gap: 24px; }
-  .a-route-step { display: grid; grid-template-columns: 120px minmax(0, 1fr); column-gap: 14px; align-items: start; }
-  .a-route-visual { grid-row: span 2; }
-  .a-route-step h2 { margin-top: 0; font-size: 16px; }
-  .a-route-tags { display: none; }
-  .a-route-upload { padding: 0; align-items: center; }
-  .a-drop { width: 220px; flex: none; transform: scale(.5); }
   .a-head-split { flex-direction: column; align-items: flex-start; }
   .a-inst-list { grid-template-columns: 1fr; }
   .a-spec div { grid-template-columns: 1fr; gap: 4px; }
@@ -407,8 +301,7 @@ body.hd-a { overflow-x: visible; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .a-screen-video, .a-callout, .a-guide-cover img, .a-plane { transition: none !important; }
-  .a-route-list::before, .a-drop-bar span, .a-drop-done { transition: none !important; transform: none !important; opacity: 1 !important; }
+  .a-screen-video, .a-callout, .a-guide-cover img { transition: none !important; }
   .a-drift-row, .a-drift-row-alt { transform: none; }
 }
 

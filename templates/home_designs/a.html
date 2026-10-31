@@ -1,6 +1,7 @@
 {% extends "home_designs/_base.html" %}
 
 {% block hd_head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/home-designs/e.css', v=asset_version) }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/home-designs/a.css', v=asset_version) }}">
 {% endblock %}
 
@@ -8,150 +9,157 @@
 {% set clip_base = url_for('static', filename='videos/home/') %}
 {% set still_base = url_for('static', filename='images/home/') %}
 
-<!-- ===================== HERO: what it is + the four-step route ===================== -->
-<section class="a-hero" aria-labelledby="a-hero-title">
-  <div class="a-wrap">
-    <div class="a-hero-top">
-      <div class="a-hero-copy">
-        <h1 class="a-title" id="a-hero-title">Your paper, in 3D.</h1>
-        <p class="a-lead">
-          Publish the 3D model behind your figure, not a screenshot of it. Readers turn it, cut it and open it in AR from a QR code on your paper, poster, thesis or slide.
+<!-- ===================== HERO: print → scan → model (from design E) ===================== -->
+<section class="e-hero hd-e" data-e-hero>
+  <div class="e-hero-pin">
+    <div class="e-hero-inner">
+      <div class="e-hero-copy">
+        <h1 class="e-hero-title">Print the code. Hold the model.</h1>
+        <p class="e-hero-lead">
+          Upload a 3D model or CT scan and print its QR code on a poster, thesis or slide. Readers scan it and the model opens in 3D or AR, with no app.
         </p>
-        <div class="a-actions">
-          <a href="{{ url_for('auth.register') }}" class="a-btn a-btn-dark">Start publishing</a>
-          <a href="{{ url_for('demo_mitochondria_ar', source='home_a') }}" class="a-btn a-btn-line">Open the live example</a>
+        <div class="e-hero-actions">
+          <a href="{{ url_for('auth.register') }}" class="e-btn e-btn-dark">Start publishing</a>
+          <a href="{{ url_for('demo_mitochondria_ar', source='home_a_hero') }}" class="e-btn e-btn-line">Open the demo model</a>
         </div>
-        <p class="a-price">Free to start. Pay per model only when it needs to stay online.</p>
+        <p class="e-hero-price">Free to start. Pay per model only when it needs to stay online.</p>
+        <ol class="e-hero-steps" aria-label="How it works">
+          <li><a href="#formats"><span class="e-step-n">1</span>Make the model</a></li>
+          <li><a href="#formats"><span class="e-step-n">2</span>Upload it</a></li>
+          <li><a href="#tools"><span class="e-step-n">3</span>Explore in 3D</a></li>
+          <li><a href="#dissect"><span class="e-step-n">4</span>Print the QR</a></li>
+        </ol>
       </div>
 
-      <div class="a-hero-specimen">
-        <model-viewer
-          class="a-model"
-          data-a-hero-model
-          src="{{ url_for('static', filename='models/model.compressed.glb') }}"
-          alt="Interactive 3D model of a mitochondrion"
-          camera-controls
-          touch-action="pan-y"
-          disable-zoom
-          disable-pan
-          interaction-prompt="none"
-          camera-orbit="20deg 70deg 9.5m"
-          field-of-view="30deg"
-          interpolation-decay="80"
-          rotation-per-second="10deg"
-          auto-rotate-delay="0"
-          exposure="1.0"
-          shadow-intensity="0"
-          tone-mapping="neutral"
-          environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
-          loading="eager"
-          reveal="auto">
-          <img slot="poster" class="hd-poster" src="{{ url_for('static', filename='images/home/a/mito-live.webp') }}" alt="" aria-hidden="true">
-        </model-viewer>
-        <span class="a-specimen-note">A live mitochondrion. Drag to turn it.</span>
+      <div class="e-desk" data-e-desk>
+        <button type="button" class="e-replay" data-e-replay hidden>Play the scan again</button>
+        <div class="e-stage" data-e-stage>
+          <!-- printed poster -->
+          <article class="e-sheet" data-e-layer="0.5" aria-label="Example of a printed poster with a QR code">
+            <div class="e-sheet-inner">
+              <header class="e-sheet-head">
+                <p class="e-sheet-title">Inner-membrane cristae of a mitochondrion: a cross-section model</p>
+                <p class="e-sheet-authors">A. Researcher, B. Colleague</p>
+                <p class="e-sheet-aff">Department of Cell Biology</p>
+              </header>
+              <div class="e-sheet-body">
+                <div class="e-sheet-col">
+                  <p class="e-sheet-h">Abstract</p>
+                  <span class="e-bar"></span><span class="e-bar"></span><span class="e-bar e-bar-s"></span>
+                  <span class="e-bar"></span><span class="e-bar e-bar-m"></span>
+                  <p class="e-sheet-h">Methods</p>
+                  <span class="e-bar"></span><span class="e-bar e-bar-s"></span><span class="e-bar"></span>
+                  <span class="e-bar e-bar-m"></span>
+                  <p class="e-sheet-h">Results</p>
+                  <span class="e-bar"></span><span class="e-bar"></span><span class="e-bar e-bar-s"></span>
+                  <span class="e-bar"></span><span class="e-bar e-bar-m"></span>
+                </div>
+                <figure class="e-sheet-fig">
+                  <div class="e-fig-frame" data-e-figure>
+                    <img class="e-fig-print" data-e-print src="{{ url_for('static', filename='images/home/e/mito-print.webp') }}" alt="" width="523" height="289">
+                  </div>
+                  <figcaption class="e-fig-cap">
+                    <span><b>Fig. 1</b> Mitochondrion, cut open to show the cristae. Scan the code for the 3D model.</span>
+                    <span class="e-qr" data-e-qr>
+                      <img src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code that opens the demo model in 3D and AR" width="120" height="120">
+                    </span>
+                  </figcaption>
+                  <div class="e-fig2" aria-hidden="true">
+                    <div class="e-fig2-plot"><i style="height:38%"></i><i style="height:56%"></i><i style="height:47%"></i><i style="height:88%"></i><i style="height:62%"></i><i style="height:30%"></i></div>
+                    <p><b>Fig. 2</b> Cristae density by region.</p>
+                  </div>
+                  <p class="e-sheet-h e-sheet-h-gap">Conclusions</p>
+                  <span class="e-bar"></span><span class="e-bar e-bar-m"></span>
+                </figure>
+              </div>
+            </div>
+          </article>
+
+          <!-- live model rising out of the figure -->
+          <div class="e-rise" data-e-rise>
+            <model-viewer class="e-rise-model"
+              src="{{ url_for('static', filename='models/model.compressed.glb') }}"
+              alt="Live 3D model of a mitochondrion"
+              camera-controls disable-zoom auto-rotate
+              rotation-per-second="18deg"
+              camera-orbit="35deg 65deg 9m" field-of-view="30deg"
+              interaction-prompt="none"
+              exposure="1.0" shadow-intensity="0" tone-mapping="neutral"
+              environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
+              loading="lazy" reveal="auto">
+            </model-viewer>
+            <span class="e-rise-shadow" aria-hidden="true"></span>
+            <span class="e-rise-tag">Live model. Drag to rotate.</span>
+          </div>
+
+          <!-- phone -->
+          <div class="e-phone" data-e-phone aria-hidden="true">
+            <div class="e-phone-screen">
+              <div class="e-cam">
+                <img class="e-cam-qr" src="{{ url_for('demo_mitochondria_qr') }}" alt="" width="120" height="120">
+                <span class="e-cam-corners"></span>
+                <span class="e-cam-line"></span>
+                <span class="e-cam-hint">Point at the code</span>
+              </div>
+              <img class="e-phone-ar" src="{{ url_for('static', filename='images/home/e/ar-screen.webp') }}" alt="" width="562" height="1233">
+              <span class="e-phone-island"></span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-
-    <ol class="a-route-list" data-a-route aria-label="From your model to a QR on the page">
-      <li class="a-route-step">
-        <div class="a-route-visual a-route-make">
-          <img src="{{ url_for('static', filename='images/blog/covers/3d-slicer-export-share.webp') }}" alt="A CT segmentation exported from 3D Slicer as a 3D mesh" decoding="async" width="640" height="360">
-          <ul class="a-route-tags" aria-label="Typical sources">
-            <li>3D Slicer</li><li>CAD</li><li>Scanner</li>
-          </ul>
-        </div>
-        <h2><span class="a-route-num" aria-hidden="true">1</span>Make the model</h2>
-        <p>Segment a scan, export from CAD or scan an object. <a href="{{ url_for('blog_post', slug='dicom-to-3d-model-guide') }}">DICOM to 3D guide</a></p>
-      </li>
-
-      <li class="a-route-step">
-        <div class="a-route-visual a-route-upload" aria-hidden="true">
-          <div class="a-drop">
-            <span class="a-drop-file"><b>calcaneus.stl</b><i>STL</i></span>
-            <span class="a-drop-bar"><span></span></span>
-            <span class="a-drop-done">
-              <svg viewBox="0 0 16 16"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              Converted to GLB + USDZ
-            </span>
-          </div>
-        </div>
-        <h2><span class="a-route-num" aria-hidden="true">2</span>Upload to AcademicAR</h2>
-        <p>Converted and compressed for the web and AR.</p>
-      </li>
-
-      <li class="a-route-step">
-        <div class="a-route-visual a-route-view">
-          <img src="{{ still_base }}layers.webp" alt="The Layers panel in the AcademicAR viewer, listing calcaneus, lateral plate and screws" decoding="async" width="960" height="540">
-        </div>
-        <h2><span class="a-route-num" aria-hidden="true">3</span>Explore it in the viewer</h2>
-        <p>Rotate, cut, measure and save views.</p>
-      </li>
-
-      <li class="a-route-step">
-        <div class="a-route-visual a-route-print">
-          <div class="a-sheet" aria-hidden="true">
-            <span class="a-sheet-title"></span>
-            <span class="a-sheet-line"></span>
-            <span class="a-sheet-line a-sheet-short"></span>
-            <span class="a-sheet-fig"></span>
-            <span class="a-sheet-line"></span>
-          </div>
-          <img class="a-sheet-qr" src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code printed on a poster, opening the model in AR" width="96" height="96">
-        </div>
-        <h2><span class="a-route-num" aria-hidden="true">4</span>Add the QR to your work</h2>
-        <p>The link stays the same when you replace the model.</p>
-      </li>
-    </ol>
   </div>
 </section>
 
-<!-- ===================== DISSECTION: sticky model, three short steps ===================== -->
-<section class="a-dissect" data-a-dissect aria-labelledby="a-dissect-title">
-  <div class="a-wrap a-dissect-grid">
-    <div class="a-dissect-steps">
-      <h2 class="a-h2 a-h2-left" id="a-dissect-title">What a reader can do with it</h2>
-      <ol class="a-callouts">
-        <li class="a-callout" data-callout="0">
-          <h3>Turn it in any browser</h3>
-          <p>Drag to rotate. No login, no app, no plug-in.</p>
-        </li>
-        <li class="a-callout" data-callout="1">
-          <h3>Cut it to see inside</h3>
-          <p>A section plane on any axis, and a 2D slice you can measure.</p>
-        </li>
-        <li class="a-callout" data-callout="2">
-          <h3>Scan the QR, place it on the desk</h3>
-          <p>Phones open it in AR straight from the browser. Try this one.</p>
-          <img class="a-callout-qr" src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code that opens this mitochondrion in AR" width="88" height="88" loading="lazy">
-        </li>
-      </ol>
-    </div>
+<!-- ===================== DISSECTION: pinned while scrolling; the plane really cuts the model ===================== -->
+<section class="a-dissect" id="dissect" data-a-dissect aria-labelledby="a-dissect-title">
+  <div class="a-dissect-pin">
+    <div class="a-wrap a-dissect-grid">
+      <div class="a-dissect-steps">
+        <h2 class="a-h2 a-h2-left" id="a-dissect-title">What a reader can do with it</h2>
+        <ol class="a-callouts">
+          <li class="a-callout is-current" data-callout="0">
+            <h3>Turn it in any browser</h3>
+            <p>Drag to rotate. No login, no app, no plug-in.</p>
+          </li>
+          <li class="a-callout" data-callout="1">
+            <h3>Cut it to see inside</h3>
+            <p>A section plane on any axis, and a 2D slice you can measure.</p>
+          </li>
+          <li class="a-callout" data-callout="2">
+            <h3>Scan the QR, place it on the desk</h3>
+            <p>Phones open it in AR straight from the browser. Try this one.</p>
+            <img class="a-callout-qr" src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code that opens this mitochondrion in AR" width="88" height="88" loading="lazy">
+          </li>
+        </ol>
+      </div>
 
-    <div class="a-dissect-stage">
-      <div class="a-specimen">
-        <model-viewer
-          class="a-model"
-          data-a-model
-          src="{{ url_for('static', filename='models/model.compressed.glb') }}"
-          alt="The same mitochondrion, turning and cut by a section plane as you scroll"
-          camera-controls
-          touch-action="pan-y"
-          disable-zoom
-          disable-pan
-          interaction-prompt="none"
-          camera-orbit="20deg 70deg 9.5m"
-          field-of-view="30deg"
-          interpolation-decay="80"
-          exposure="1.0"
-          shadow-intensity="0"
-          tone-mapping="neutral"
-          environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
-          loading="lazy"
-          reveal="auto">
-          <img slot="poster" class="hd-poster" src="{{ url_for('static', filename='images/home/a/mito-live.webp') }}" alt="" aria-hidden="true">
-        </model-viewer>
-        <div class="a-plane" aria-hidden="true"><span></span></div>
-        <div class="a-rail" aria-hidden="true"><span class="a-rail-fill"></span></div>
+      <div class="a-dissect-stage">
+        <div class="a-specimen">
+          <model-viewer
+            class="a-model"
+            data-a-model
+            src="{{ url_for('static', filename='models/model.compressed.glb') }}"
+            alt="The same mitochondrion, turning and cut open by a section plane as you scroll"
+            camera-controls
+            touch-action="pan-y"
+            disable-zoom
+            disable-pan
+            interaction-prompt="none"
+            camera-orbit="20deg 70deg 9.5m"
+            field-of-view="30deg"
+            interpolation-decay="80"
+            exposure="1.0"
+            shadow-intensity="0"
+            tone-mapping="neutral"
+            environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
+            loading="eager"
+            reveal="auto">
+            <img slot="poster" class="hd-poster" src="{{ url_for('static', filename='images/home/a/mito-live.webp') }}" alt="" aria-hidden="true">
+          </model-viewer>
+          <svg class="a-cut" data-a-cut aria-hidden="true" focusable="false"><polygon points="0,0 0,0 0,0 0,0"/></svg>
+          <div class="a-rail" aria-hidden="true"><span class="a-rail-fill"></span></div>
+        </div>
       </div>
     </div>
   </div>
@@ -201,7 +209,7 @@
 </section>
 
 <!-- ===================== FORMATS: in → out, partial parallax ===================== -->
-<section class="a-formats" data-a-formats>
+<section class="a-formats" id="formats" data-a-formats>
   <div class="a-drift" aria-hidden="true">
     <div class="a-drift-row" data-drift="-1">GLB&nbsp;&nbsp;STL&nbsp;&nbsp;OBJ&nbsp;&nbsp;FBX&nbsp;&nbsp;STEP&nbsp;&nbsp;STP&nbsp;&nbsp;DICOM&nbsp;&nbsp;NIfTI&nbsp;&nbsp;NRRD&nbsp;&nbsp;DICOM-SEG&nbsp;&nbsp;GLB&nbsp;&nbsp;STL&nbsp;&nbsp;OBJ&nbsp;&nbsp;FBX&nbsp;&nbsp;STEP</div>
     <div class="a-drift-row a-drift-row-alt" data-drift="1">viewer link&nbsp;&nbsp;AR&nbsp;&nbsp;QR code&nbsp;&nbsp;embed&nbsp;&nbsp;scenes&nbsp;&nbsp;figures&nbsp;&nbsp;viewer link&nbsp;&nbsp;AR&nbsp;&nbsp;QR code&nbsp;&nbsp;embed&nbsp;&nbsp;scenes</div>
@@ -350,5 +358,6 @@
 
 {% block hd_scripts %}
 <script type="module" src="https://unpkg.com/@google/model-viewer@4.3.0/dist/model-viewer.min.js" crossorigin="anonymous"></script>
+<script src="{{ url_for('static', filename='js/home-designs/e.js', v=asset_version) }}" defer></script>
 <script src="{{ url_for('static', filename='js/home-designs/a.js', v=asset_version) }}" defer></script>
 {% endblock %}

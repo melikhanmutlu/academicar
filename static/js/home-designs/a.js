@@ -1,64 +1,216 @@
-// Homepage design A · Kesit — live hero model, a short scroll-driven dissection,
+// Homepage design A · Kesit — a pinned, scroll-driven dissection that really cuts the model,
 // a tool picker, drifting format type and the click-to-play showreel.
 (() => {
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const desktop = window.matchMedia('(min-width: 1024px)');
   const clamp = (v, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v));
 
-  /* ---------------- Hero: gentle turn of the live model, then the route draws in ---------------- */
-  const heroModel = document.querySelector('[data-a-hero-model]');
-  if (heroModel && !reduceMotion) heroModel.setAttribute('auto-rotate', '');
-  const hero = document.querySelector('.a-hero');
-  if (hero && !reduceMotion) {
-    hero.classList.add('is-armed');
-    requestAnimationFrame(() => requestAnimationFrame(() => hero.classList.add('is-in')));
-  }
-
-  /* ---------------- Dissection: sticky model, three steps drive camera + section plane ---------------- */
+  /* ---------------- Dissection: pinned while the three steps play; the plane really cuts ----------------
+     The section is tall and its inner frame sticks, so scrolling moves through
+     "turn", "cut" and "AR" before the page continues. The cut is a three.js clipping plane on the
+     model's own materials (reached through model-viewer's private scene symbol, as the viewer's
+     Section tool does) and the orange outline is that plane projected to the screen. */
   const dissect = document.querySelector('[data-a-dissect]');
   if (dissect) {
     const model = dissect.querySelector('[data-a-model]');
     const steps = [...dissect.querySelectorAll('[data-callout]')];
     const list = dissect.querySelector('.a-callouts');
-    let lastOrbit = '';
+    const cutSvg = dissect.querySelector('[data-a-cut]');
+    const cutPoly = cutSvg && cutSvg.querySelector('polygon');
+    const pin = dissect.querySelector('.a-dissect-pin');
+    const pinned = () => getComputedStyle(pin).position === 'sticky';
+    const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+    let progress = 0;
     let lastOn = -1;
+    let lastOrbit = '';
 
-    const update = () => {
+    // ---- three.js access (null when model-viewer's internals differ: the page then just turns the model)
+    const plane = { normal: null, constant: 0 };
+    let ctx = null;
+    let cutOn = false;
+    const sceneOf = () => {
+      const key = Object.getOwnPropertySymbols(model).find((s) => s.description === 'scene');
+      const scene = key && model[key];
+      return scene && typeof scene.traverse === 'function' ? scene : null;
+    };
+    const rendererOf = () => {
+      let proto = model;
+      let key = null;
+      while (proto && !key) {
+        key = Object.getOwnPropertySymbols(proto).find((s) => s.description === 'renderer') || null;
+        proto = Object.getPrototypeOf(proto);
+      }
+      return key ? model[key] : null;
+    };
+    const prepare = () => {
+      try {
+        const scene = sceneOf();
+        const three = rendererOf()?.threeRenderer;
+        const root = scene && ((scene.models && scene.models[0]) || scene.target);
+        if (!scene || !three || !root || !('localClippingEnabled' in three)) return null;
+        const meshes = [];
+        let Vec3 = null;
+        let Mat4 = null;
+        root.traverse((o) => {
+          if (!o.isMesh || !o.material || !o.geometry) return;
+          meshes.push(o);
+          Vec3 = Vec3 || o.position.constructor;
+          Mat4 = Mat4 || o.matrixWorld.constructor;
+        });
+        if (!meshes.length) return null;
+        root.updateMatrixWorld(true);
+        const toRoot = new Mat4().copy(root.matrixWorld).invert();
+        const c = new Vec3();
+        const min = [Infinity, Infinity, Infinity];
+        const max = [-Infinity, -Infinity, -Infinity];
+        meshes.forEach((mesh) => {
+          if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+          const b = mesh.geometry.boundingBox;
+          const m = new Mat4().multiplyMatrices(toRoot, mesh.matrixWorld);
+          for (let k = 0; k < 8; k += 1) {
+            c.set(k & 1 ? b.max.x : b.min.x, k & 2 ? b.max.y : b.min.y, k & 4 ? b.max.z : b.min.z).applyMatrix4(m);
+            [c.x, c.y, c.z].forEach((v, i) => { min[i] = Math.min(min[i], v); max[i] = Math.max(max[i], v); });
+          }
+        });
+        if (!min.every(Number.isFinite)) return null;
+        // Cut across the model's shortest axis, so the plane opens it along its length.
+        const size = max.map((v, i) => v - min[i]);
+        const axis = size.indexOf(Math.min(...size));
+        plane.normal = new Vec3();
+        return {
+          scene, three, root, meshes, Vec3, min, max, size, axis,
+          centre: min.map((v, i) => (v + max[i]) / 2),
+          p: new Vec3(), n: new Vec3(), corner: new Vec3(),
+          sides: new Map(),
+        };
+      } catch (e) { return null; }
+    };
+    const eachMaterial = (fn) => ctx.meshes.forEach((mesh) => {
+      (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).forEach((m) => m && fn(m));
+    });
+    const setCut = (on) => {
+      if (!ctx || on === cutOn) return;
+      cutOn = on;
+      if (on) ctx.three.localClippingEnabled = true;
+      eachMaterial((m) => {
+        if (on) {
+          if (!ctx.sides.has(m)) ctx.sides.set(m, m.side);
+          m.clippingPlanes = [plane];
+          m.side = 2; // DoubleSide: the inside faces show through the cut
+        } else {
+          m.clippingPlanes = null;
+          if (ctx.sides.has(m)) m.side = ctx.sides.get(m);
+        }
+        m.needsUpdate = true;
+      });
+    };
+    // offset: 0 = through the centre, 1 = just outside the top (nothing removed).
+    const placePlane = (offset) => {
+      const { root, centre, size, axis, p, n } = ctx;
+      root.updateMatrixWorld();
+      p.set(centre[0], centre[1], centre[2]);
+      p.setComponent(axis, centre[axis] + offset * (size[axis] / 2 + 0.02 * size[axis]));
+      p.applyMatrix4(root.matrixWorld);
+      n.set(axis === 0 ? 1 : 0, axis === 1 ? 1 : 0, axis === 2 ? 1 : 0).transformDirection(root.matrixWorld).negate();
+      plane.normal.copy(n);
+      plane.constant = -n.dot(p);
+    };
+    // The plane's outline, a little larger than the model, projected onto the stage.
+    const drawOutline = (offset, alpha) => {
+      if (!cutPoly) return;
+      const camera = ctx.scene.camera || (ctx.scene.getCamera && ctx.scene.getCamera());
+      if (!camera || alpha <= 0.01) { cutSvg.style.opacity = '0'; return; }
+      const { root, centre, size, axis, min, max, corner } = ctx;
+      const [u, v] = [0, 1, 2].filter((i) => i !== axis);
+      const w = model.clientWidth;
+      const h = model.clientHeight;
+      cutSvg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+      const pad = 0.08;
+      const pts = [[0, 0], [1, 0], [1, 1], [0, 1]].map(([a, b]) => {
+        corner.set(0, 0, 0);
+        corner.setComponent(axis, centre[axis] + offset * (size[axis] / 2 + 0.02 * size[axis]));
+        corner.setComponent(u, (a ? max[u] : min[u]) + (a ? 1 : -1) * size[u] * pad);
+        corner.setComponent(v, (b ? max[v] : min[v]) + (b ? 1 : -1) * size[v] * pad);
+        corner.applyMatrix4(root.matrixWorld).project(camera);
+        return `${((corner.x + 1) / 2 * w).toFixed(1)},${((1 - corner.y) / 2 * h).toFixed(1)}`;
+      });
+      cutPoly.setAttribute('points', pts.join(' '));
+      cutSvg.style.opacity = alpha.toFixed(3);
+    };
+
+    // ---- scroll → progress, current step, camera, cut
+    const readProgress = () => {
+      if (pinned()) {
+        const r = dissect.getBoundingClientRect();
+        return clamp(-r.top / Math.max(1, r.height - window.innerHeight));
+      }
       const r = list.getBoundingClientRect();
       const mid = window.innerHeight * 0.55;
-      const p = clamp((mid - r.top) / Math.max(1, r.height));
+      return clamp((mid - r.top) / Math.max(1, r.height));
+    };
+    const cutAmount = (p) => {
+      // Step 2 (cut): the plane comes down to the centre; step 3 (AR): it lifts away again.
+      if (p < 0.36) return 0;
+      if (p < 0.6) return ease(clamp((p - 0.36) / 0.2));
+      if (p < 0.72) return 1;
+      return 1 - ease(clamp((p - 0.72) / 0.14));
+    };
+    const frame = () => {
+      const p = progress;
       dissect.style.setProperty('--a-progress', p.toFixed(4));
-
-      let on = 0;
-      steps.forEach((s, i) => { if (s.getBoundingClientRect().top < mid) on = i; });
+      const on = Math.min(steps.length - 1, Math.floor(p * steps.length));
       if (on !== lastOn) {
         steps.forEach((s, i) => s.classList.toggle('is-current', i === on));
         lastOn = on;
       }
-      if (reduceMotion) return;
+      if (reduceMotion || !model) return;
 
-      // The plane sweeps across while the "Section" step is current.
-      const third = 1 / steps.length;
-      const planeT = clamp((p - third) / third);
-      dissect.style.setProperty('--a-plane-on', on === 1 ? 1 : 0);
-      dissect.style.setProperty('--a-plane-x', (-70 + planeT * 140).toFixed(2));
-      dissect.style.setProperty('--a-zoom', clamp((p - 0.66) / 0.3).toFixed(3));
-
-      const theta = 20 + p * 300;
-      const phi = 70 - 18 * Math.sin(p * Math.PI);
-      const radius = (9.5 - 1.2 * Math.sin(p * Math.PI)) * (desktop.matches ? 1 : 1.25);
+      // Camera: a half turn while "turn" plays, then look down into the cut, then settle for AR.
+      const k = cutAmount(p);
+      const theta = 20 + p * 220;
+      const phi = 72 - 30 * k;
+      const radius = (9.5 - 0.8 * k) * (desktop.matches ? 1 : 1.25);
       const orbit = `${theta.toFixed(1)}deg ${phi.toFixed(1)}deg ${radius.toFixed(2)}m`;
-      if (model && orbit !== lastOrbit) { model.cameraOrbit = orbit; lastOrbit = orbit; }
+      if (orbit !== lastOrbit) { model.cameraOrbit = orbit; lastOrbit = orbit; }
+
+      if (!ctx && model.loaded) ctx = prepare();
+      if (!ctx) return;
+      const offset = 1 - k; // 1 = above the model, 0 = through its centre
+      setCut(k > 0.001);
+      if (cutOn) placePlane(offset);
+      drawOutline(offset, Math.min(1, k * 3));
+      try { ctx.scene.queueRender(); } catch (e) { /* next frame redraws */ }
     };
 
-    let ticking = false;
-    window.addEventListener('scroll', () => {
-      if (ticking) return;
-      ticking = true;
-      requestAnimationFrame(() => { update(); ticking = false; });
-    }, { passive: true });
-    window.addEventListener('resize', update);
-    update();
+    // Run every frame while the section is on screen, so the outline follows the
+    // camera's own easing; scrolling only moves the target.
+    let running = false;
+    let inView = false;
+    const loop = () => {
+      progress = readProgress();
+      frame();
+      if (inView) requestAnimationFrame(loop); else running = false;
+    };
+    const start = () => { if (!running) { running = true; requestAnimationFrame(loop); } };
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver((entries) => {
+        inView = entries[0].isIntersecting;
+        if (inView) start();
+      }).observe(dissect);
+    } else {
+      inView = true; start();
+    }
+    if (model) model.addEventListener('load', () => { ctx = null; cutOn = false; start(); });
+
+    // Clicking a step jumps to its part of the pinned scroll.
+    steps.forEach((s, i) => {
+      s.addEventListener('click', () => {
+        if (!pinned()) return;
+        const top = window.scrollY + dissect.getBoundingClientRect().top;
+        const span = dissect.offsetHeight - window.innerHeight;
+        window.scrollTo({ top: top + span * ((i + 0.5) / steps.length), behavior: reduceMotion ? 'auto' : 'smooth' });
+      });
+    });
   }
 
   /* ---------------- Tools: pick a tool, play its recording while in view ---------------- */
