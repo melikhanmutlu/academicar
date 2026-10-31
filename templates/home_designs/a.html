@@ -112,7 +112,7 @@
 </section>
 
 <!-- ===================== DISSECTION: pinned while scrolling; the plane really cuts the model ===================== -->
-<section class="a-dissect" id="dissect" data-a-dissect aria-labelledby="a-dissect-title">
+<section class="a-dissect" id="dissect" data-a-dissect data-cut-axis="x" aria-labelledby="a-dissect-title">
   <div class="a-dissect-pin">
     <div class="a-wrap a-dissect-grid">
       <div class="a-dissect-steps">
@@ -166,24 +166,19 @@
 </section>
 
 <!-- ===================== SHOWREEL ===================== -->
-<section class="a-reel" id="showreel">
+<section class="a-reel" id="showreel" aria-labelledby="a-reel-title">
   <div class="a-wrap">
-    <div class="a-reel-layout">
-      <div class="a-reel-copy">
-        <h2 class="a-h2 a-h2-left">Every viewer tool in one minute</h2>
-        <p class="a-sub a-sub-left">With sound. Loads when you press play.</p>
-      </div>
-      <div class="a-reel-frame" data-a-reel>
-        <img class="a-reel-poster" src="{{ url_for('static', filename='images/home/reel/poster-scan.webp') }}"
-             alt="AcademicAR showreel: no app, just scan the QR code" loading="lazy" decoding="async" width="1600" height="900">
-        <video class="a-reel-video" preload="none" playsinline width="1920" height="1080" hidden>
-          <source src="{{ url_for('static', filename='videos/academicar-showreel.mp4') }}" type="video/mp4">
-        </video>
-        <button type="button" class="a-reel-play" aria-label="Play the AcademicAR showreel (1:00)">
-          <span class="a-reel-play-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></span>
-          <span>Play showreel <span class="a-reel-time">1:00</span></span>
-        </button>
-      </div>
+    <h2 class="a-h2 a-h2-left" id="a-reel-title">The whole viewer in one minute</h2>
+    <div class="a-reel-frame" data-a-reel>
+      <img class="a-reel-poster" src="{{ url_for('static', filename='images/home/reel/poster-scan.webp') }}"
+           alt="A frame from the AcademicAR showreel: a phone scanning a QR code, with the words No app. Just scan." loading="lazy" decoding="async" width="1600" height="900">
+      <video class="a-reel-video" preload="none" playsinline width="1920" height="1080" hidden>
+        <source src="{{ url_for('static', filename='videos/academicar-showreel.mp4') }}" type="video/mp4">
+      </video>
+      <button type="button" class="a-reel-play" aria-label="Play the AcademicAR showreel (1:00)">
+        <span class="a-reel-play-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></span>
+        <span>Play showreel <span class="a-reel-time">1:00</span></span>
+      </button>
     </div>
   </div>
 </section>

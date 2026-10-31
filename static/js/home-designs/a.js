@@ -73,9 +73,10 @@
           }
         });
         if (!min.every(Number.isFinite)) return null;
-        // Cut across the model's shortest axis, so the plane opens it along its length.
+        // Cut along the axis named by data-cut-axis (x, y or z); otherwise the shortest one.
         const size = max.map((v, i) => v - min[i]);
-        const axis = size.indexOf(Math.min(...size));
+        const named = { x: 0, y: 1, z: 2 }[dissect.dataset.cutAxis];
+        const axis = named !== undefined ? named : size.indexOf(Math.min(...size));
         plane.normal = new Vec3();
         return {
           scene, three, root, meshes, Vec3, min, max, size, axis,
@@ -171,7 +172,7 @@
       const t = ease(clamp(p / 0.3));
       const theta = 20 + 200 * t;
       const phi = 72 - 24 * t;
-      const radius = 9.5 * (desktop.matches ? 1 : 1.25);
+      const radius = (desktop.matches ? 7 : 11);
       const orbit = `${theta.toFixed(1)}deg ${phi.toFixed(1)}deg ${radius.toFixed(2)}m`;
       if (orbit !== lastOrbit) { model.cameraOrbit = orbit; lastOrbit = orbit; }
 
