@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 330" width="960" height="330" role="img" aria-labelledby="t d">
+  <title id="t">Running a 3D demo in a talk or thesis defence</title>
+  <desc id="d">Save up to twelve scenes, rehearse the tour, put a QR code on a slide so the audience can open the model on their phones, prepare backups, and present.</desc>
+  <style>
+    .box { fill: #f5f5f5; stroke: #bdbdbd; stroke-width: 1.2; }
+    .hi { fill: #fff4ee; stroke: #ff682c; stroke-width: 1.5; }
+    .lbl { font: 600 15px Inter, system-ui, sans-serif; fill: #202020; }
+    .sub { font: 400 13px Inter, system-ui, sans-serif; fill: #6b6b6b; }
+    .acc { font: 700 13px Inter, system-ui, sans-serif; fill: #c2410c; }
+    .arr { stroke: #202020; stroke-width: 1.4; fill: none; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#202020"/>
+    </marker>
+  </defs>
+  <rect width="960" height="330" fill="#ffffff"/>
+
+  <rect class="box" x="20" y="110" width="160" height="100" rx="10"/>
+  <text class="lbl" x="36" y="144">1. Scenes</text>
+  <text class="sub" x="36" y="168">save the views</text>
+  <text class="sub" x="36" y="186">you will need</text>
+
+  <path class="arr" d="M186 160 L206 160" marker-end="url(#a)"/>
+  <rect class="box" x="210" y="110" width="160" height="100" rx="10"/>
+  <text class="lbl" x="226" y="144">2. Rehearse</text>
+  <text class="sub" x="226" y="168">play the tour</text>
+  <text class="sub" x="226" y="186">in order</text>
+
+  <path class="arr" d="M376 160 L396 160" marker-end="url(#a)"/>
+  <rect class="box" x="400" y="110" width="160" height="100" rx="10"/>
+  <text class="lbl" x="416" y="144">3. QR slide</text>
+  <text class="sub" x="416" y="168">audience opens</text>
+  <text class="sub" x="416" y="186">it on phones</text>
+
+  <path class="arr" d="M566 160 L586 160" marker-end="url(#a)"/>
+  <rect class="hi" x="590" y="110" width="160" height="100" rx="10"/>
+  <text class="lbl" x="606" y="144">4. Backups</text>
+  <text class="sub" x="606" y="168">video, stills,</text>
+  <text class="sub" x="606" y="186">offline copy</text>
+
+  <path class="arr" d="M756 160 L776 160" marker-end="url(#a)"/>
+  <rect class="hi" x="780" y="110" width="160" height="100" rx="10"/>
+  <text class="lbl" x="796" y="144">5. Present</text>
+  <text class="sub" x="796" y="168">live demo, one</text>
+  <text class="acc" x="796" y="186">scene per point</text>
+
+  <text class="sub" x="20" y="300">Open the link once on the venue network before your session and keep the backups one click away.</text>
+</svg>

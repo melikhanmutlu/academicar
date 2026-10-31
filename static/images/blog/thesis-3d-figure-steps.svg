@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 330" width="960" height="330" role="img" aria-labelledby="t d">
+  <title id="t">From 3D data to a thesis figure with a live link</title>
+  <desc id="d">Prepare and size the model, upload it, save a fixed view for the printed figure, print the caption with link and QR code, and defend with the same link opening the live model and AR.</desc>
+  <style>
+    .box { fill: #f5f5f5; stroke: #bdbdbd; stroke-width: 1.2; }
+    .hi { fill: #fff4ee; stroke: #ff682c; stroke-width: 1.5; }
+    .lbl { font: 600 15px Inter, system-ui, sans-serif; fill: #202020; }
+    .sub { font: 400 13px Inter, system-ui, sans-serif; fill: #6b6b6b; }
+    .acc { font: 700 13px Inter, system-ui, sans-serif; fill: #c2410c; }
+    .arr { stroke: #202020; stroke-width: 1.4; fill: none; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#202020"/>
+    </marker>
+  </defs>
+  <rect width="960" height="330" fill="#ffffff"/>
+
+  <rect class="box" x="20" y="110" width="160" height="100" rx="10"/>
+  <text class="lbl" x="36" y="144">1. Prepare</text>
+  <text class="sub" x="36" y="168">clean the model,</text>
+  <text class="sub" x="36" y="186">set real size</text>
+
+  <path class="arr" d="M186 160 L206 160" marker-end="url(#a)"/>
+  <rect class="box" x="210" y="110" width="160" height="100" rx="10"/>
+  <text class="lbl" x="226" y="144">2. Upload</text>
+  <text class="sub" x="226" y="168">one model per</text>
+  <text class="sub" x="226" y="186">figure</text>
+
+  <path class="arr" d="M376 160 L396 160" marker-end="url(#a)"/>
+  <rect class="box" x="400" y="110" width="160" height="100" rx="10"/>
+  <text class="lbl" x="416" y="144">3. Save a view</text>
+  <text class="sub" x="416" y="168">fixed angle for</text>
+  <text class="sub" x="416" y="186">the print figure</text>
+
+  <path class="arr" d="M566 160 L586 160" marker-end="url(#a)"/>
+  <rect class="hi" x="590" y="110" width="160" height="100" rx="10"/>
+  <text class="lbl" x="606" y="144">4. Caption</text>
+  <text class="sub" x="606" y="168">link and QR code</text>
+  <text class="sub" x="606" y="186">under the figure</text>
+
+  <path class="arr" d="M756 160 L776 160" marker-end="url(#a)"/>
+  <rect class="hi" x="780" y="110" width="160" height="100" rx="10"/>
+  <text class="lbl" x="796" y="144">5. Defend</text>
+  <text class="sub" x="796" y="168">same link opens</text>
+  <text class="acc" x="796" y="186">the live model</text>
+
+  <text class="sub" x="20" y="300">Use a Review link while the thesis is under examination, then switch the project to public.</text>
+</svg>

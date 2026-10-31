@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 330" width="960" height="330" role="img" aria-labelledby="t d">
+  <title id="t">From Rhino, SketchUp or Revit to a shareable model</title>
+  <desc id="d">Clean the CAD file, export a mesh with materials, upload and set the real size, organise structure walls and roof as named layers, and present with the section plane, scenes and AR.</desc>
+  <style>
+    .box { fill: #f5f5f5; stroke: #bdbdbd; stroke-width: 1.2; }
+    .hi { fill: #fff4ee; stroke: #ff682c; stroke-width: 1.5; }
+    .lbl { font: 600 15px Inter, system-ui, sans-serif; fill: #202020; }
+    .sub { font: 400 13px Inter, system-ui, sans-serif; fill: #6b6b6b; }
+    .acc { font: 700 13px Inter, system-ui, sans-serif; fill: #c2410c; }
+    .arr { stroke: #202020; stroke-width: 1.4; fill: none; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#202020"/>
+    </marker>
+  </defs>
+  <rect width="960" height="330" fill="#ffffff"/>
+
+  <rect class="box" x="20" y="110" width="160" height="100" rx="10"/>
+  <text class="lbl" x="36" y="144">1. Clean</text>
+  <text class="sub" x="36" y="168">purge unused</text>
+  <text class="sub" x="36" y="186">layers, hide guides</text>
+
+  <path class="arr" d="M186 160 L206 160" marker-end="url(#a)"/>
+  <rect class="box" x="210" y="110" width="160" height="100" rx="10"/>
+  <text class="lbl" x="226" y="144">2. Export</text>
+  <text class="sub" x="226" y="168">GLB, OBJ or FBX</text>
+  <text class="sub" x="226" y="186">with materials</text>
+
+  <path class="arr" d="M376 160 L396 160" marker-end="url(#a)"/>
+  <rect class="box" x="400" y="110" width="160" height="100" rx="10"/>
+  <text class="lbl" x="416" y="144">3. Upload</text>
+  <text class="sub" x="416" y="168">set real size,</text>
+  <text class="sub" x="416" y="186">longest side</text>
+
+  <path class="arr" d="M566 160 L586 160" marker-end="url(#a)"/>
+  <rect class="hi" x="590" y="110" width="160" height="100" rx="10"/>
+  <text class="lbl" x="606" y="144">4. Layers</text>
+  <text class="sub" x="606" y="168">structure, walls,</text>
+  <text class="sub" x="606" y="186">roof by name</text>
+
+  <path class="arr" d="M756 160 L776 160" marker-end="url(#a)"/>
+  <rect class="hi" x="780" y="110" width="160" height="100" rx="10"/>
+  <text class="lbl" x="796" y="144">5. Present</text>
+  <text class="sub" x="796" y="168">section plane,</text>
+  <text class="acc" x="796" y="186">scenes and AR</text>
+
+  <text class="sub" x="20" y="300">Meshes carry the look; use STEP when reviewers need exact CAD geometry.</text>
+</svg>

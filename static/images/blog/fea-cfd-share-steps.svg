@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 330" width="960" height="330" role="img" aria-labelledby="t d">
+  <title id="t">Sharing FEA and CFD results as an interactive 3D model</title>
+  <desc id="d">Solve in your simulation tool, export the result as a coloured mesh, convert to GLB and check scale and units, separate geometry and result layers, then share one link with a scene for each load case.</desc>
+  <style>
+    .box { fill: #f5f5f5; stroke: #bdbdbd; stroke-width: 1.2; }
+    .hi { fill: #fff4ee; stroke: #ff682c; stroke-width: 1.5; }
+    .lbl { font: 600 15px Inter, system-ui, sans-serif; fill: #202020; }
+    .sub { font: 400 13px Inter, system-ui, sans-serif; fill: #6b6b6b; }
+    .acc { font: 700 13px Inter, system-ui, sans-serif; fill: #c2410c; }
+    .arr { stroke: #202020; stroke-width: 1.4; fill: none; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#202020"/>
+    </marker>
+  </defs>
+  <rect width="960" height="330" fill="#ffffff"/>
+
+  <rect class="box" x="20" y="110" width="160" height="100" rx="10"/>
+  <text class="lbl" x="36" y="144">1. Solve</text>
+  <text class="sub" x="36" y="168">FEA or CFD run</text>
+  <text class="sub" x="36" y="186">in your solver</text>
+
+  <path class="arr" d="M186 160 L206 160" marker-end="url(#a)"/>
+  <rect class="box" x="210" y="110" width="160" height="100" rx="10"/>
+  <text class="lbl" x="226" y="144">2. Export</text>
+  <text class="sub" x="226" y="168">coloured mesh</text>
+  <text class="sub" x="226" y="186">OBJ, FBX or GLB</text>
+
+  <path class="arr" d="M376 160 L396 160" marker-end="url(#a)"/>
+  <rect class="box" x="400" y="110" width="160" height="100" rx="10"/>
+  <text class="lbl" x="416" y="144">3. Convert</text>
+  <text class="sub" x="416" y="168">GLB, check scale</text>
+  <text class="sub" x="416" y="186">and units</text>
+
+  <path class="arr" d="M566 160 L586 160" marker-end="url(#a)"/>
+  <rect class="hi" x="590" y="110" width="160" height="100" rx="10"/>
+  <text class="lbl" x="606" y="144">4. Layers</text>
+  <text class="sub" x="606" y="168">geometry, hotspot,</text>
+  <text class="sub" x="606" y="186">streamlines</text>
+
+  <path class="arr" d="M756 160 L776 160" marker-end="url(#a)"/>
+  <rect class="hi" x="780" y="110" width="160" height="100" rx="10"/>
+  <text class="lbl" x="796" y="144">5. Share</text>
+  <text class="sub" x="796" y="168">link, one scene</text>
+  <text class="acc" x="796" y="186">per load case</text>
+
+  <text class="sub" x="20" y="300">Bake the colour map into the model and print the units and colour scale in the caption.</text>
+</svg>

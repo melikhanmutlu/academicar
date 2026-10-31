@@ -3632,6 +3632,1119 @@ that size.
 QR code.*
 """,
     },
+    {
+        "slug": "3d-models-in-thesis-dissertation",
+        "title": "How to Put Interactive 3D Models in Your Thesis or Dissertation",
+        "description": "A practical way to give a thesis chapter a live 3D model: prepare and size the model, save fixed views for print, add a link and QR code to the caption, and keep it working through examination and AR.",
+        "date": "2026-10-31",
+        "author": "AcademicAR Team",
+        "tags": ["thesis", "dissertation", "3D publishing", "QR codes", "how-to"],
+        "persona": "Doctoral and master's students",
+        "read_minutes": 7,
+        "body": """\
+![An open thesis with a QR code beside a 3D figure and a phone showing the same model](/static/images/blog/covers/3d-models-in-thesis-dissertation.webp)
+
+A thesis is the one document where you can show every specimen, scan and
+simulation you spent years on. It is also a PDF or a printed book, which flattens
+all of that into still pictures. Examiners then have to take your word for what
+the model looks like from the back. A live 3D model fixes this: the printed
+figure stays exactly as it is, and a link and QR code in the caption open the
+real model, in 3D and in AR, on any phone or laptop.
+
+![From 3D data to a thesis figure: prepare, upload, save a view, caption, defend](/static/images/blog/thesis-3d-figure-steps.svg)
+
+## 1. Decide which figures deserve a live model
+
+Not every figure needs one. Pick the ones where depth changes the argument: a
+bone defect, a fossil's internal structure, a stress hotspot, a building
+section, an excavated find. One model per figure keeps each caption's link short
+and each page of your thesis self-explanatory. For the rest, a normal image is
+fine.
+
+## 2. Prepare and upload the model
+
+Convert whatever you have to a format the viewer takes (GLB, STL, OBJ, FBX, STEP
+or a medical scan), clean it, and upload it. Two details matter for a thesis:
+
+- **Set the real size** with *Resize model* (the real longest dimension in cm),
+  so the model is correct in AR and in your measurements.
+- **Keep it light.** Uploads are optimised on the way in, and a model that opens
+  in a second on a phone is one examiners will actually open. See
+  [how to reduce GLB file size](/blog/reduce-glb-file-size) if your export is huge.
+
+![An open thesis page showing a 3D bone figure with a QR code in its caption](/static/images/blog/inline/3d-models-in-thesis-dissertation-a.webp)
+
+## 3. Save a fixed view for the printed figure
+
+The printed page needs one good picture. Set the camera, layers and background
+you want, then capture it for the figure, and use the same view as the model's
+starting view so the live version matches the print. If the figure has several
+parts, use [saved scenes](/blog/saved-scenes-guided-tours-3d-teaching) so each
+panel (a), (b), (c) has its own link. More on figure quality in
+[publication-ready 3D figures](/blog/publication-ready-3d-figures-comparisons).
+
+## 4. Write the caption: link, QR code and a plain-text fallback
+
+Under the figure put a short caption, a QR code, and the link as text:
+
+> **Figure 4.2.** Reconstruction of the left femur, anterior view. Interactive
+> model: academicar.com/m/abc123 (QR code).
+
+Print the QR code at least 2 to 3 cm wide with a clear margin, and always include
+the text link, because PDFs get read on screens where a QR code cannot be
+scanned. The sizing rules are in
+[QR codes on academic posters](/blog/qr-codes-on-academic-posters-guide) and apply
+equally to a printed thesis. The QR code points to a stable address, so it keeps
+working if you later replace the model with a corrected version.
+
+## 5. Control who sees it until you graduate
+
+While the thesis is under examination you may not want the data public. Use a
+**Review link**: the project stays unlisted, and only people with the link can
+open it. Send it to your examiners, and switch the project to public when the
+thesis is approved and any embargo ends. If the model comes from patients, the
+anonymisation and ethics confirmations apply as for any upload, see
+[anonymising medical 3D models](/blog/anonymise-medical-3d-models-ethics-checklist).
+
+![A doctoral defence room with a candidate at a lectern, a slide with a 3D bone model and a QR code](/static/images/blog/inline/3d-models-in-thesis-dissertation-b.webp)
+
+## 6. Use the same link at the defence
+
+The model you embedded in the thesis is also your defence prop. Put the same QR
+code on a slide, or open the link live, and walk the committee through your
+scenes. Practical tips are in
+[running a 3D demo in a talk or thesis defence](/blog/conference-talk-thesis-defence-3d-demo).
+Afterwards, archive the source files with a DOI so the thesis stays
+reproducible: [cite and archive 3D models](/blog/cite-and-archive-3d-models-zenodo-fair).
+
+## Frequently asked questions
+
+### Will the 3D model work inside the thesis PDF?
+
+The PDF carries the image, the caption and the link. Readers tap or scan to open
+the model in their browser. This is more reliable than embedding 3D inside the
+PDF, which most readers no longer support.
+
+### What if my university requires a printed, bound copy?
+
+The QR code and the text link in the caption work on paper. Keep the figure
+readable without the model, and treat the live version as an extra for readers
+who want to explore.
+
+### Do I need a university repository record as well?
+
+Check your university's rules. Many require the thesis itself to be deposited,
+and a repository can also hold the source files of the model. The viewer link
+makes the model easy to explore; the deposit makes it durable.
+
+### Can I change the model after I printed the QR code?
+
+Yes. Replace the model and the viewer link and QR code stay the same, so the
+printed copies keep pointing at the latest version. If an examiner asked for a
+correction, you can update the model without reprinting anything.
+
+*[Create a free account](/auth/register) and give your thesis figures a live
+3D model behind a QR code.*
+""",
+    },
+    {
+        "slug": "3d-supplementary-material-journal-submission",
+        "title": "How to Add a 3D Model as Supplementary Material to a Journal Submission",
+        "description": "Make your 3D data reviewable and citable: check the journal's rules, send referees a private Review link, cite the model in the figure caption and supplement list, and go public when the paper is published.",
+        "date": "2026-10-31",
+        "author": "AcademicAR Team",
+        "tags": ["scientific publishing", "supplementary material", "peer review", "3D publishing", "how-to"],
+        "persona": "Authors submitting to journals",
+        "read_minutes": 7,
+        "body": """\
+![A journal manuscript with a figure panel beside a laptop showing the interactive 3D model of the same figure](/static/images/blog/covers/3d-supplementary-material-journal-submission.webp)
+
+Reviewers are asked to judge a 3D result from two or three still pictures. A
+fracture pattern, a protein surface, a reconstructed fossil: the argument often
+lives in the angle you did not print. Supplementary 3D material lets reviewers
+check it themselves. Journals differ on what they accept, so the aim is a setup
+that works with strict rules and generous ones: a reviewable link, a static
+fallback, and a clean citation.
+
+![Adding a 3D model to a journal submission: check rules, upload, review link, cite, publish](/static/images/blog/journal-supplementary-3d-steps.svg)
+
+## 1. Read the author guidelines first
+
+Look for three things in the journal's instructions: whether **external links**
+in supplementary files are allowed, whether the journal **hosts 3D files** itself,
+and any **file size or format limits**. Most journals accept a link plus a static
+figure, and some publish the link in the online article. If the rules are
+unclear, ask the editorial office before you submit. It is a one-line email.
+
+## 2. Upload the model and set it up for review
+
+Upload the model, set the real size, and open it as a stranger would: on a phone
+and on a laptop, with no account. Check that the starting view is the one your
+figure shows, and that any layers are named in plain words (bone, implant,
+cartilage). Reviewers will click through them. If your model is medical, finish
+the confirmations first, see
+[anonymising medical 3D models](/blog/anonymise-medical-3d-models-ethics-checklist).
+
+![A reviewer at a laptop opening a private review link to a 3D model](/static/images/blog/inline/3d-supplementary-material-journal-submission-a.webp)
+
+## 3. Send referees a Review link, not a public one
+
+Peer review is usually confidential and often blind. Set the project to
+**Review link**: it is unlisted, so only people who receive the address can open
+it, and it does not need an account. Put the link in the cover letter or the
+supplementary file list. If the review is double blind, check that the model
+title, layer names and any attribution do not reveal your identity or
+institution.
+
+## 4. Cite the model where it is used
+
+Reviewers should never have to hunt for it. In the figure caption write, for
+example, *"Interactive 3D model: [link]. Layers can be switched on and off."*
+In the supplementary list, give it its own item: *"Supplementary Model S1:
+interactive 3D reconstruction of specimen A."* Include the text address as well
+as the QR code, since the PDF is read on screens. For figures that compare two
+conditions, [publication-ready 3D figures and comparisons](/blog/publication-ready-3d-figures-comparisons)
+shows how to make both views reproducible.
+
+## 5. Attach a static fallback
+
+Always include ordinary images of the key views, and consider a short screen
+recording. Some reviewers work offline or behind a firewall, and some journals
+will strip links from files. The fallback protects your argument; the live model
+is the bonus.
+
+![A submission checklist beside a manuscript and a QR code](/static/images/blog/inline/3d-supplementary-material-journal-submission-b.webp)
+
+## 6. Go public at publication and archive the source
+
+When the paper is accepted, switch the project from **Review link** to
+**public** and use the final link in the published version. For long-term
+availability, deposit the source files with a DOI, as described in
+[cite and archive 3D models](/blog/cite-and-archive-3d-models-zenodo-fair). The
+journal cares about the paper; funders and readers care about the data. For the
+broader picture see
+[interactive 3D figures in scientific publishing](/blog/interactive-3d-figures-scientific-publishing).
+
+## Frequently asked questions
+
+### Will the journal accept a link instead of a file?
+
+Many do, as supplementary information or in the data availability statement.
+Some require files to be hosted by the journal. Check the guidelines, and give
+both a link and a static figure to be safe.
+
+### Can reviewers open the model without creating an account?
+
+Yes. A Review link opens in any browser, on a phone or a computer, without an
+account and without installing anything.
+
+### What if the review is double blind?
+
+Use a neutral model title and layer names, avoid logos and institutional text in
+the model, and do not mention your name in the project description. Switch the
+details back on when the paper is published.
+
+### How do I keep the link working after publication?
+
+Keep the project public and deposit the source files in a repository with a DOI.
+If you improve the model later, replace it: the viewer link stays the same, so
+the published article keeps pointing at a working model.
+
+*[Create a free account](/auth/register) and send your next submission with a 3D
+model reviewers can actually open.*
+""",
+    },
+    {
+        "slug": "cite-and-archive-3d-models-zenodo-fair",
+        "title": "How to Cite and Archive a 3D Model: Zenodo, DOIs and FAIR Data",
+        "description": "Make your 3D data findable and reusable: describe it properly, give readers a stable viewer link, deposit the source files in a repository with a DOI, and cite both in your paper.",
+        "date": "2026-10-31",
+        "author": "AcademicAR Team",
+        "tags": ["open science", "FAIR data", "citation", "3D publishing", "how-to"],
+        "persona": "Researchers, librarians & data stewards",
+        "read_minutes": 7,
+        "body": """\
+![A 3D model connected to an archive box, a citation card and a QR code](/static/images/blog/covers/cite-and-archive-3d-models-zenodo-fair.webp)
+
+A 3D model that only exists on a laptop, or at a link that dies when an account
+lapses, is not research data, it is a demo. Funders and journals increasingly ask
+for data that is **FAIR**: findable, accessible, interoperable and reusable. For
+3D data that means two jobs done together: a **viewer** that lets people explore
+the model in seconds, and an **archive** that preserves the files and gives them a
+citable identifier.
+
+![Citing and archiving a 3D model: describe, viewer link, deposit, cross-link, cite](/static/images/blog/cite-archive-3d-fair-steps.svg)
+
+## 1. Describe the model like a dataset
+
+A model without context cannot be reused. Write a short description that says
+what it is, how it was made, and how it may be used:
+
+- **Title and creators**, including the specimen or object identifier;
+- **Method**: scanner or camera, software, voxel size or number of photos,
+  processing steps, threshold or settings;
+- **Units and scale**, and the coordinate orientation if it matters;
+- **Licence**, for example CC BY 4.0 for open reuse, and any restrictions;
+- **Related paper or project**.
+
+Put this in the viewer project description and in the repository record, so the
+two always agree.
+
+## 2. Give readers a stable viewer link
+
+Upload the model so it has one address and one QR code. Replacing the file later
+keeps the link, so a citation does not break when you fix a mesh. This is the
+link readers will actually use, because it opens in a second with no software.
+For how to prepare the model see
+[how to add 3D models to research papers](/blog/how-to-add-3d-models-to-research-papers).
+
+![A repository shelf of archive boxes, one open showing a 3D model file icon and a metadata card](/static/images/blog/inline/cite-and-archive-3d-models-zenodo-fair-a.webp)
+
+## 3. Deposit the source files in a repository
+
+A viewer is not an archive. Deposit the files someone would need to reproduce
+or reuse the model in **Zenodo**, your **institutional repository**, or a domain
+repository such as MorphoSource for morphology. Include:
+
+- the **model in an open format** (GLB or glTF, OBJ or STL);
+- the **raw or intermediate data** where you are allowed to share it: photo sets,
+  image stacks, segmentation masks;
+- a **README** with the description above.
+
+For medical data, share only what your ethics approval and consent allow. A
+segmented, anonymised surface is often shareable when the raw scan is not, see
+[anonymising medical 3D models](/blog/anonymise-medical-3d-models-ethics-checklist).
+
+## 4. Link the two records to each other
+
+Put the repository **DOI** in the viewer description, and the **viewer link** in
+the repository record. A reader who finds either one can reach the other. AcademicAR
+provides the stable viewer link and QR code; the DOI comes from the repository you
+deposit in, and that is the identifier to cite.
+
+![A citation card with a link chain icon attached to a small 3D model of a vase](/static/images/blog/inline/cite-and-archive-3d-models-zenodo-fair-b.webp)
+
+## 5. Cite it in the paper
+
+Cite the dataset like any other, with creators, title, year, repository and DOI,
+and mention the viewer link in the figure caption and in the data availability
+statement:
+
+> *Data availability.* The 3D model of specimen A is archived at Zenodo
+> (doi:10.5281/zenodo.XXXXXXX) and can be explored interactively at
+> [viewer link].
+
+Many reference managers accept a dataset entry. For the full publishing context
+see [interactive 3D figures in scientific publishing](/blog/interactive-3d-figures-scientific-publishing).
+
+## Frequently asked questions
+
+### Does AcademicAR issue DOIs?
+
+No. A DOI comes from the repository that hosts your files, such as Zenodo or your
+university repository. AcademicAR provides the stable viewer link and QR code
+that make the model easy to explore, and you cite the DOI of the archived data.
+
+### Which file format should I archive?
+
+An open, documented format: GLB or glTF, OBJ, or STL for plain geometry. Keep the
+original raw data as well where you can. Proprietary project files are a poor
+archive format because they depend on specific software.
+
+### What licence should I choose?
+
+CC BY 4.0 is a common choice for open data because it requires attribution and
+allows reuse. Choose a more restrictive licence only if a contract, consent form
+or ethics approval requires it, and state the restriction in the record.
+
+### What happens to the viewer link if I update the model?
+
+Replacing the model keeps the viewer link and QR code. In the repository, publish
+a new version of the record so the DOI history shows what changed.
+
+*[Create a free account](/auth/register) and give your 3D data a stable link you
+can cite next to its archive record.*
+""",
+    },
+    {
+        "slug": "anonymise-medical-3d-models-ethics-checklist",
+        "title": "How to Anonymise a Medical 3D Model Before You Share It: An Ethics Checklist",
+        "description": "A practical checklist for CT and MRI derived 3D models: remove identifiers, check for recognisable features, confirm consent and ethics approval, and understand what happens to the raw scan on upload.",
+        "date": "2026-10-31",
+        "author": "AcademicAR Team",
+        "tags": ["medical imaging", "ethics", "anonymisation", "compliance", "how-to"],
+        "persona": "Clinicians, medical researchers & educators",
+        "read_minutes": 8,
+        "body": """\
+![A head CT bone reconstruction of a skull beside a smooth featureless skin shell](/static/images/blog/covers/anonymise-medical-3d-models-ethics-checklist.webp)
+
+A 3D model made from a patient scan can show more than you intend. The file may
+carry a name in its metadata, the skull may be recognisable, and a rare condition
+can identify a person in a small hospital. Anonymisation is a decision you make
+before you share, not an option you tick afterwards. This checklist walks through
+it step by step. It is a practical guide, not legal advice: your ethics committee,
+data protection officer and local law have the last word.
+
+![Anonymising a medical 3D model: strip, inspect, consent, confirm, share](/static/images/blog/anonymise-medical-3d-steps.svg)
+
+## 1. Strip identifiers from the data
+
+Identifiers hide in more places than the filename:
+
+- **DICOM header tags**: name, ID, birth date, accession number, institution,
+  referring physician, dates. Export an anonymised series from your PACS or from
+  3D Slicer before conversion when you can.
+- **Burned-in text**: some modalities print the name or ID into the image pixels.
+  Look at every slice, not just the first.
+- **Filenames and project titles**: use a neutral code, never initials or dates
+  of birth.
+
+## 2. Check the surface for recognisable features
+
+The model itself can identify someone even when the metadata is clean:
+
+- **Faces**: a soft-tissue reconstruction of a head CT or MRI can be matched to
+  a photograph. Use a bone-only threshold, crop below the eyes, or deface the
+  volume. See
+  [Hounsfield units and CT thresholding](/blog/hounsfield-units-ct-thresholding-3d)
+  for how the threshold decides what is included.
+- **Ears, tattoos, scars, implants with serial numbers**.
+- **Rare anatomy or pathology** in a small population. When the condition itself
+  identifies the patient, consent matters more than any technical step.
+
+![A medical file folder with a checklist and an identification tag being cut off from a scan thumbnail](/static/images/blog/inline/anonymise-medical-3d-models-ethics-checklist-a.webp)
+
+## 3. Confirm consent and ethics approval
+
+Before sharing, have these on record: **patient consent** for sharing images or
+models, or a documented **waiver** from your ethics committee or institutional
+review board; the **approval number** of the study; and, for teaching material,
+the hospital's own policy. If the model is for a publication, the journal will
+also ask. When in doubt, ask before you upload, not after.
+
+## 4. The confirmations on upload
+
+AcademicAR does not treat this as a formality. Every model upload requires the
+compliance confirmations (anonymisation, rights, and ethics responsibility), and
+medical uploads add a **separate medical confirmation** on top. You are stating
+that the data is anonymised, that you hold the rights, and that you take
+responsibility for ethics. Do not tick them to get past the form.
+
+## 5. What happens to the scan you upload
+
+Knowing the pipeline helps you explain it to an ethics committee:
+
+- The conversion runs on the server, and the **raw scan is deleted after
+  conversion**, whether it succeeds or fails.
+- Medical uploads are **never archived or mirrored** like ordinary models.
+- **Patient identifiers are never written to the logs.**
+
+Only the converted surface model remains, and that is what you share.
+
+![A laptop showing a 3D bone model with a review link badge, beside a consent form with a signature line](/static/images/blog/inline/anonymise-medical-3d-models-ethics-checklist-b.webp)
+
+## 6. Share narrowly first
+
+Start with a **Review link**, which is unlisted and opens only for people who
+have the address. Send it to the co-authors or reviewers, check how the model
+looks to a stranger, and only then decide whether it should be public. For the
+conversion itself see [from DICOM to interactive 3D](/blog/dicom-to-3d-model-guide)
+and [segmentations to a 3D viewer](/blog/medical-image-segmentation-to-3d-viewer);
+for the teaching side, [3D models in surgical education and case reports](/blog/3d-models-surgical-education-case-reports).
+
+## Frequently asked questions
+
+### Is a bone-only model automatically anonymous?
+
+Not automatically. It is much harder to match than a face, but unusual anatomy,
+implants and rare pathology can still identify a person. Combine a bone-only
+threshold with consent or a documented waiver.
+
+### Do I need to remove DICOM tags before uploading?
+
+Anonymise the series at the source whenever you can. Do not rely on the converter
+for it: your own export step is where you control exactly which tags leave the
+hospital system.
+
+### What happens to my raw scan after upload?
+
+It is deleted after the conversion finishes, successful or not, and it is never
+archived or mirrored. Patient identifiers are not written to logs.
+
+### Can I share the model publicly for teaching?
+
+Yes, if your consent or ethics approval covers it. Start with a Review link,
+check the model as a stranger would, and switch to public only when you are sure
+it is anonymous and permitted.
+
+*[Create a free account](/auth/register) and convert a scan with the compliance
+steps built in.*
+""",
+    },
+    {
+        "slug": "micro-ct-specimens-share-3d-morphology",
+        "title": "How to Share Micro-CT Specimens as Interactive 3D Morphology",
+        "description": "Turn a micro-CT scan of a fossil, insect or tissue sample into named 3D layers readers can rotate, slice and measure, with a link you can cite in the paper.",
+        "date": "2026-10-31",
+        "author": "AcademicAR Team",
+        "tags": ["micro-CT", "morphology", "segmentation", "medical imaging", "how-to"],
+        "persona": "Morphologists, palaeontologists & zoologists",
+        "read_minutes": 8,
+        "body": """\
+![A small fossil skull inside a micro-CT scanner ring, a slice beside it and the rendered 3D model on a laptop](/static/images/blog/covers/micro-ct-specimens-share-3d-morphology.webp)
+
+Micro-CT lets you look inside a specimen without cutting it, but the usual output
+is a stack of thousands of slices that nobody opens except you. Papers show three
+or four renders, and a reader who wants to check a suture, a canal or a tooth
+row cannot. Turned into named 3D layers, the same scan becomes something a
+reader can rotate, slice and measure on a phone. Here is the route from scanner
+to link.
+
+![Sharing micro-CT specimens: scan, segment, convert, measure, share](/static/images/blog/micro-ct-morphology-steps.svg)
+
+## 1. Scan and record the numbers that matter
+
+Write down the **voxel size** (isotropic resolution in micrometres), scanner and
+settings, and the specimen identifier. These go into your methods and into the
+model description. Without the voxel size, nobody can scale or reproduce your
+measurements. Keep the reconstructed volume (a TIFF stack or similar) as your
+archive copy.
+
+## 2. Segment the structures
+
+Load the stack into **3D Slicer** or similar (an image sequence import works for
+TIFF stacks), and separate what matters: bone, tooth, canal, matrix, soft tissue
+stain. Use a threshold for simple cases and the Segment Editor for the rest.
+Give each structure a **clear name**, because the names become the layer labels
+in the viewer. If you are new to this, the guide to
+[exporting from 3D Slicer](/blog/3d-slicer-export-share) walks through the
+export.
+
+![A micro-CT slice stack with one structure highlighted in orange and the same structure shown as a 3D surface](/static/images/blog/inline/micro-ct-specimens-share-3d-morphology-a.webp)
+
+## 3. Convert the segmentation to named layers
+
+Export the segmentation as **NIfTI** or **NRRD** (including .seg.nrrd), or as a
+ZIP of masks, and upload it. Each labelled structure becomes its own named
+layer, so readers can switch the matrix off and look at the canal. The details of
+formats are in [NIfTI segmentation to 3D model](/blog/nifti-segmentation-to-3d-model)
+and [segmentations to a 3D viewer](/blog/medical-image-segmentation-to-3d-viewer).
+Large volumes are capped by the medical upload size limit, so crop to the region
+of interest, or downsample the stack when the detail you need allows it.
+
+Uploads of this type are handled as medical inputs, so they ask for the same
+confirmations as other scans. For a fossil or an insect there is no patient data,
+but the confirmations are still required.
+
+## 4. Measure and slice
+
+The viewer computes **per-layer measurements** such as volume and surface area
+(see [measuring anatomy with layer metrics](/blog/measuring-anatomy-3d-layer-metrics)),
+and the **section plane and 2D slice view** let readers cut through the specimen
+and take a two-point measurement across a canal or a tooth
+([section plane and slice view](/blog/section-plane-slice-view-cross-sections)).
+State in the paper that measurements come from the model, and give the voxel
+size so they can be checked.
+
+![A small beetle specimen next to a ruler scale bar and its 3D model with a measurement line across it](/static/images/blog/inline/micro-ct-specimens-share-3d-morphology-b.webp)
+
+## 5. Share with the paper
+
+Put the link and QR code in the figure caption: *"Interactive model with named
+layers: [link]."* Save a few **scenes** (skull only, endocast, full specimen)
+so the paper can point to a particular view. For long-term availability, deposit
+the raw volume and segmentation in a repository such as MorphoSource or Zenodo,
+see [cite and archive 3D models](/blog/cite-and-archive-3d-models-zenodo-fair).
+
+## Frequently asked questions
+
+### Can I upload a TIFF stack directly?
+
+Convert it first to a volume format the converter reads: NRRD or NIfTI for a
+segmentation, or a DICOM series as a ZIP. 3D Slicer or Fiji can import the stack
+and export the volume.
+
+### Does the model keep real-world scale?
+
+Yes, when the voxel spacing is correct in the exported volume. Check the spacing
+in your segmentation tool before export, and state the voxel size in the paper.
+
+### My scan is very large. What should I do?
+
+Crop to the region of interest and downsample if your analysis allows. A cropped,
+labelled segmentation is also a better viewer experience than a whole-volume
+scan, and it stays within the medical upload size limit.
+
+### Can readers measure on the model?
+
+They can use the section plane and the 2D slice view's two-point measure, and the
+layer metrics show volume and area per structure. For publication-grade numbers,
+report the values from your own analysis and cite the model as supporting
+evidence.
+
+*[Create a free account](/auth/register) and turn your next micro-CT scan into a
+model readers can rotate, slice and measure.*
+""",
+    },
+    {
+        "slug": "share-fea-cfd-simulation-results-3d",
+        "title": "How to Share FEA and CFD Simulation Results as an Interactive 3D Model",
+        "description": "Turn a stress or flow result into a 3D model readers can rotate in the browser and in AR: export a coloured mesh, check scale and units, separate geometry from results, and show each load case as a scene.",
+        "date": "2026-10-31",
+        "author": "AcademicAR Team",
+        "tags": ["engineering", "simulation", "FEA", "CFD", "3D figures", "how-to"],
+        "persona": "Mechanical, aerospace & civil engineers",
+        "read_minutes": 7,
+        "body": """\
+![A mechanical bracket with a soft stress colour map on a laptop, with load arrows and an AR view on a phone](/static/images/blog/covers/share-fea-cfd-simulation-results-3d.webp)
+
+A stress plot in a paper is one camera angle chosen by the author. The hotspot
+that matters to a reader may sit on the side you did not show, and a streamline
+plot hides the recirculation behind the part. Simulation results are 3D, and a
+reader who can turn the model checks your claim in seconds. The solver's own
+viewer is not an option for sharing, because it needs the software, a licence
+and the project file. A GLB opens in any browser.
+
+![Sharing FEA and CFD results: solve, export a coloured mesh, convert, layers, share](/static/images/blog/fea-cfd-share-steps.svg)
+
+## 1. Export a surface mesh with the result on it
+
+Most tools can write the **result field painted on the surface**: Ansys,
+Abaqus, COMSOL, OpenFOAM through ParaView, Fusion or SolidWorks Simulation.
+Export a mesh with the colours included, in a format that carries them: **GLB**
+or **OBJ or FBX** with the colours stored in a texture or in the vertices.
+ParaView and Blender are good bridges if your solver cannot export these
+directly. Check the result in the viewer after upload, because the safest way
+to know that the colours survived is to look.
+
+## 2. Bake the colour scale into the model, and print it in the caption
+
+A colour map without a legend is decoration. The legend does not live inside the
+3D model, so put it in the figure caption or next to the QR code:
+
+> **Figure 6.** Von Mises stress (MPa) under a 2 kN tip load. Colour scale
+> 0 to 240 MPa, linear. Interactive model: [link].
+
+State the **units**, the **min and max**, and whether the scale is linear or
+logarithmic. For comparisons between load cases, use the same scale in every
+model, otherwise the colours lie.
+
+![Airflow streamlines in gray around an airfoil cross-section with one orange streamline](/static/images/blog/inline/share-fea-cfd-simulation-results-3d-a.webp)
+
+## 3. Check scale and units after conversion
+
+Solvers work in metres, millimetres or inches, and exports do not always say
+which. After upload, open the model and set the **real size** with *Resize model*
+(the real longest dimension in cm), so a 40 mm bracket is 40 mm in AR. Keep
+the file light as well: a dense solver mesh can run to millions of triangles. The
+upload optimises geometry for the web, and
+[reducing GLB file size](/blog/reduce-glb-file-size) explains what else helps,
+such as exporting the surface only, without the internal volume mesh. Format
+questions are covered in [OBJ and FBX to GLB](/blog/convert-obj-fbx-to-glb).
+
+## 4. Separate geometry from results with layers
+
+A multi-part model gets a **Layers panel**. Export the geometry, the results
+surface, boundary condition markers and streamlines as separate named parts, so
+readers can hide the colour map and see the bare geometry, or isolate one
+streamline bundle. If the design comes from a CAD assembly, keep it as one
+assembly with named parts, see
+[STEP and CAD assemblies in AR](/blog/step-cad-assemblies-ar-engineering).
+
+## 5. One scene per load case
+
+Save a **scene** for each load case or time step, with the camera, layers and
+section you want: *Load case 1, Load case 2, Optimised design*. Readers jump
+between them, and a tour plays them in order. The
+[saved scenes guide](/blog/saved-scenes-guided-tours-3d-teaching) covers it, and
+the section plane lets readers cut through a part to see the interior stress or
+the flow in a channel
+([section plane and slice view](/blog/section-plane-slice-view-cross-sections)).
+
+![Two versions of a bracket side by side, an original solid one with an orange stress hotspot and an optimised lighter one](/static/images/blog/inline/share-fea-cfd-simulation-results-3d-b.webp)
+
+## 6. Put it in the paper, the report or the review
+
+Use the link and QR code in the caption, in the thesis, or in a client report.
+For a design review, a phone with AR shows the optimised bracket at real size
+next to the actual part. For publication-quality still images, the
+[comparison and figure export tools](/blog/publication-ready-3d-figures-comparisons)
+help you put two designs side by side.
+
+## Frequently asked questions
+
+### Which formats keep the result colours?
+
+GLB is the most reliable, and OBJ or FBX can carry colours in a texture or in the
+vertices. Export a test, upload it, and check the colours in the viewer before
+you build the figure around it.
+
+### How do I show the legend of the colour map?
+
+Put it in the figure caption or on the slide next to the QR code, with units, the
+minimum and maximum and the scale type. The viewer shows the model, and the
+caption carries the numbers.
+
+### Can I show a time-dependent or transient result?
+
+Export a few key time steps as separate models or layers and save one scene for
+each. For smooth animations of every step, a video next to the model is the
+better tool.
+
+### My solver mesh is huge. Will it open on a phone?
+
+Export the surface only, remove internal volume elements, and decimate if you
+can. The upload is optimised for the web, and a lighter file opens faster on a
+phone.
+
+*[Create a free account](/auth/register) and share your next simulation result as
+a model readers can turn.*
+""",
+    },
+    {
+        "slug": "rhino-sketchup-revit-to-glb-architecture",
+        "title": "How to Share Rhino, SketchUp and Revit Models as Interactive 3D and AR",
+        "description": "Export your architecture model as a clean mesh, set the real size, name the layers (structure, walls, roof) and present with section planes, saved scenes and AR on site or in the jury room.",
+        "date": "2026-10-31",
+        "author": "AcademicAR Team",
+        "tags": ["architecture", "CAD", "BIM", "augmented reality", "how-to"],
+        "persona": "Architects, architecture students & design researchers",
+        "read_minutes": 7,
+        "body": """\
+![An architectural house model shown in three stages: a CAD wireframe on a laptop, a clean 3D model on a tablet, and in AR on a phone](/static/images/blog/covers/rhino-sketchup-revit-to-glb-architecture.webp)
+
+Architecture models live in heavy design software: Rhino, SketchUp, Revit,
+ArchiCAD. Sending the project file to a jury, a client or a reviewer means they
+need the same software, the same version and a fast computer. A lightweight
+model in a browser needs none of that, and it can open on a tablet on site or in
+AR on the table. The trick is to export a clean mesh with named parts, not the
+whole project.
+
+![From CAD to a shareable model: clean, export, upload, layers, present](/static/images/blog/architecture-cad-to-glb-steps.svg)
+
+## 1. Clean the model before export
+
+A design file carries everything: construction lines, hidden layers, dozens of
+furniture variants, imported site context. Before export:
+
+- **Purge unused layers, blocks and materials.**
+- **Hide or delete guides**, construction planes and annotations.
+- **Remove what readers do not need**: interior furniture on a facade study, or a
+  whole city for a pavilion.
+- **Group by meaning**: structure, walls, floors, roof, glazing, site.
+
+A smaller file loads faster on a phone, and the groups become the layers in the
+viewer.
+
+## 2. Export a mesh with materials
+
+Each tool has a route:
+
+- **SketchUp**: export to **glTF/GLB**, or **OBJ** with materials.
+- **Rhino**: export the visible objects as **OBJ**, **FBX** or **GLB**; mesh the
+  surfaces with a sensible density first.
+- **Revit**: export to **FBX** via the 3D view, or use the IFC to glTF routes some
+  tools offer.
+- **ArchiCAD, Blender, 3ds Max**: **GLB** or **FBX**.
+
+If the tool gives you the choice, **GLB** keeps geometry and materials in one
+file. OBJ needs its MTL and textures uploaded together, see
+[OBJ and FBX to GLB](/blog/convert-obj-fbx-to-glb). When reviewers need exact
+CAD geometry rather than a mesh, share STEP instead, see
+[STEP and CAD assemblies in AR](/blog/step-cad-assemblies-ar-engineering).
+
+![A building model exploded into floating layers with a thin section plane cutting through it](/static/images/blog/inline/rhino-sketchup-revit-to-glb-architecture-a.webp)
+
+## 3. Upload and set the real size
+
+Upload the model and use *Resize model* to enter the real size: the longest
+dimension in centimetres. For an architectural model, think about which size
+you want in AR. A building at 1:1 scale is a walk-through. A 40 cm maquette
+sits on a table. You can reset the size later without losing the link. Large
+uploads are optimised for the web, and if the file is still heavy see
+[reducing GLB file size](/blog/reduce-glb-file-size).
+
+## 4. Name the layers
+
+A multi-part model gets a **Layers panel**. A model with parts named *Structure,
+Walls, Roof, Glazing, Site* is a presentation: switch off the roof to see the
+plan, switch off the walls to see the structure. Give the layers plain names, and
+set a sensible default view so the model opens on the story you want to tell.
+The [architecture and heritage guide](/blog/architecture-3d-models-sections-ar)
+covers the process in more detail.
+
+## 5. Present with sections, scenes and AR
+
+The **section plane** cuts through the building along an axis, and the 2D slice
+view shows the plan or section as a clean outline
+([section planes and slice view](/blog/section-plane-slice-view-cross-sections)).
+Save **scenes** for the views of the presentation: *Site, Plan, Section A,
+Facade, Interior*, and play them as a tour
+([saved scenes](/blog/saved-scenes-guided-tours-3d-teaching)). On a phone or
+tablet, AR places the model on a table or on the site, and a QR code on the board
+or on a printed plan opens it for the jury.
+
+![A design jury table with a printed plan, a tablet showing a 3D pavilion and a QR card](/static/images/blog/inline/rhino-sketchup-revit-to-glb-architecture-b.webp)
+
+## 6. Use the same link for the jury, the thesis and the website
+
+The same link works on the jury board as a QR code, in the thesis as a figure
+caption, and on a project page as an embed
+([embedding a 3D model in a website](/blog/embed-3d-model-website)). Updating the
+model after jury feedback keeps the link and QR code, so the printed boards stay
+correct.
+
+## Frequently asked questions
+
+### Can I upload a Revit or Rhino file directly?
+
+Not the native project file. Export from the software as GLB, OBJ or FBX, or as
+STEP for exact solids, and upload that.
+
+### Will materials and textures survive the export?
+
+Usually, if you export with materials. GLB keeps them inside the file. With OBJ
+upload the MTL file and the texture images together. After upload, check the
+model in the viewer.
+
+### Can reviewers cut through the building?
+
+Yes. The section plane cuts along any axis, and the slice view shows an outline
+with a two-point measurement, in a browser or on a phone.
+
+### How do I show a 1:1 building in AR?
+
+Set the real size with *Resize model* so the longest side matches the building,
+then open the model in AR where there is space. For a table-top maquette, enter
+a smaller size such as 40 cm instead.
+
+*[Create a free account](/auth/register) and give your next design a link the
+jury can open on any phone.*
+""",
+    },
+    {
+        "slug": "archaeology-excavation-finds-3d-report",
+        "title": "How to Put 3D Finds into an Archaeological Excavation Report",
+        "description": "Record finds with a scale bar, capture them with photogrammetry, give each find a model and a QR code in the catalogue, and publish a site report where every plate links to a live 3D object.",
+        "date": "2026-10-31",
+        "author": "AcademicAR Team",
+        "tags": ["archaeology", "excavation", "3D scanning", "QR codes", "how-to"],
+        "persona": "Archaeologists, finds specialists & museum curators",
+        "read_minutes": 7,
+        "body": """\
+![An excavation trench grid seen from above with a pottery sherd on a scale bar, a phone scanning it, and the textured 3D model](/static/images/blog/covers/archaeology-excavation-finds-3d-report.webp)
+
+An excavation report describes hundreds of finds in a few lines each and one
+drawing per object. The specialist sees the sherd in their hand, and the reader
+sees a line drawing. A 3D model for each important find keeps what the drawing
+cannot: the fabric, the wear, the profile from every side. Linked from the
+catalogue entry, it turns a report into an archive that people can explore.
+
+![3D finds in an excavation report: record, capture, reconstruct, link, report](/static/images/blog/archaeology-finds-report-steps.svg)
+
+## 1. Record the find before you scan it
+
+A model is only useful if it can be matched to its context. Before capture,
+write down the **find number, context and trench**, and photograph the object
+with a **scale bar** and a **find tag** in the first frame. This takes ten
+seconds and prevents the most common problem, models nobody can identify a year
+later. Keep the find number in the model title, so the catalogue, the plate and
+the viewer all match.
+
+## 2. Capture with photogrammetry or a phone scanner
+
+For small finds, take 40 to 80 overlapping photos around the object on a
+turntable or a stand, with even light and a plain background. A phone LiDAR
+scanner works for larger objects and features. Include the scale bar in the
+frame. The full workflow, with export options, is in
+[how to share a photogrammetry or LiDAR scan](/blog/share-photogrammetry-3d-scan).
+
+![A stone tool and a coin on a table with a ruler and a numbered find tag, a phone circling them to capture photos](/static/images/blog/inline/archaeology-excavation-finds-3d-report-a.webp)
+
+## 3. Reconstruct at true scale
+
+Reconstruct the model in Polycam, RealityScan, Metashape or Meshroom, crop the
+background, and export **GLB**, or **OBJ with its MTL and textures**. Photogrammetry
+has no built-in scale, so use the scale bar to set the size. In AcademicAR, enter
+the real longest dimension with *Resize model*, and the object appears at that size
+in AR. For how this works see [real-size AR](/blog/true-scale-ar-real-size-3d-models).
+Keep each model light: a few megabytes is plenty for a sherd, and
+[reducing GLB file size](/blog/reduce-glb-file-size) lists what to trim.
+
+## 4. Give every catalogue entry a model and a QR code
+
+Upload the finds as one project per site or per trench, and one model per find.
+Each model has a stable link and QR code, so the catalogue can carry a small QR
+beside the find number. The same QR code works on the printed plate, on the
+museum label and in the online catalogue. If a model gets better, replace it, and
+the printed codes keep pointing at the latest version. Sizing rules for printed
+codes are in [QR codes on academic posters](/blog/qr-codes-on-academic-posters-guide).
+
+![A catalogue page of pottery sherds drawn in line art, each with a tiny QR code](/static/images/blog/inline/archaeology-excavation-finds-3d-report-b.webp)
+
+## 5. Write the report with live 3D links
+
+In the finds chapter, give each model-backed find a line such as *"Sherd 214,
+context 37, rim and neck of a jar. 3D model: [link]."* Keep the drawing in the
+report: it is the conventional record, and the model is the extension. Use a
+**Review link** while the report is under peer review or an embargo, and switch
+the project to public at publication. For site displays, a museum case with a QR
+plaque and AR on the phone brings the find into the visitor's hand, see
+[AR for archaeology](/blog/ar-for-archaeology-3d-artifacts).
+
+## 6. Archive the raw data separately
+
+A viewer is for exploring. For long-term preservation, deposit the photo sets and
+the models in your national archive or a repository with a DOI, see
+[cite and archive 3D models](/blog/cite-and-archive-3d-models-zenodo-fair).
+
+## Frequently asked questions
+
+### Which finds are worth modelling?
+
+Start with diagnostic or unusual pieces: complete vessels, decorated sherds,
+tools with use wear, inscribed objects, and anything fragile that will be
+handled less if the model exists. Do not try to model every sherd.
+
+### How do I make sure the scale is right?
+
+Put a scale bar in the photos, measure the longest side of the model against it,
+and enter the real size with *Resize model*. Check once in AR against a ruler.
+
+### Can I use it for objects under heritage restrictions?
+
+Check the permit and the owner's conditions. Use a Review link while the
+conditions are unclear, and share publicly only what you are permitted to.
+
+### Do I need an expensive scanner?
+
+No. A phone or a camera and a free or low-cost reconstruction app are enough for
+most small finds, provided the photos overlap and the light is even.
+
+*[Create a free account](/auth/register) and put your next find into the
+catalogue as a model with a QR code.*
+""",
+    },
+    {
+        "slug": "true-scale-ar-real-size-3d-models",
+        "title": "How to Show a 3D Model at Real Size in AR (True-Scale Guide)",
+        "description": "Set the real size of your model, open it in AR on iPhone or Android, and compare it to the real object: a practical true-scale workflow for specimens, products and maquettes.",
+        "date": "2026-10-31",
+        "author": "AcademicAR Team",
+        "tags": ["augmented reality", "scale", "measurement", "how-to"],
+        "persona": "Researchers, curators & educators",
+        "read_minutes": 6,
+        "body": """\
+![A real ceramic cup on a table and a phone beside it showing the same cup in AR at identical size, with a ruler](/static/images/blog/covers/true-scale-ar-real-size-3d-models.webp)
+
+AR is most convincing when the model is the same size as the real thing. A
+fossil you can hold up next to the one in the cabinet, a bone at human scale, a
+building as a maquette on the table. Most models arrive at the wrong size: an
+export in millimetres read as metres, or a scan with no scale at all. The fix
+takes a minute, and this guide shows how to get from the wrong size to an AR
+object you can check with a ruler.
+
+![Real-size AR: measure, resize, open in AR, compare, share](/static/images/blog/true-scale-ar-steps.svg)
+
+## 1. Measure the real object
+
+Measure the **longest side** of the real thing, in centimetres or millimetres,
+with a ruler or calipers. That single number is all you need. For a building or a
+site, use the intended maquette size, or the full real size if you plan to walk
+around it. Write the number in your notes.
+
+## 2. Resize the model
+
+On the model page use **Resize model** and enter the real longest dimension in
+centimetres. The model is rescaled, and the viewer link and QR code do not
+change. If you enter the size of an object that has no natural scale, such as a
+photogrammetry scan, include a scale bar in the original photos, as described in
+[sharing a photogrammetry scan](/blog/share-photogrammetry-3d-scan).
+
+![A tiny specimen shown at real size on a fingertip in AR next to a scale bar](/static/images/blog/inline/true-scale-ar-real-size-3d-models-a.webp)
+
+## 3. Open it in AR
+
+On an **iPhone or iPad**, the model opens in Apple's AR Quick Look from a USDZ
+file, which AcademicAR generates for you; see
+[GLB to USDZ for iPhone AR](/blog/glb-to-usdz-iphone-ar). On **Android**, it
+opens with Scene Viewer or WebXR from the GLB. In both cases the viewer link or QR
+code opens the model, and a button starts AR. No app needs to be installed, see
+[viewing a 3D model in AR without an app](/blog/view-3d-model-in-ar-without-app).
+
+## 4. Compare with the real object
+
+Put the real object next to the AR object, or hold a ruler against it. Check the
+longest side first, then a second dimension. If the two are different by a few
+percent, either the measurement or the model is off. Where an exact match
+matters, such as a prosthesis or a mechanical part, fix the model's size before
+you trust AR for decisions.
+
+## 5. Know the limits of AR scale
+
+AR places the object using the phone's tracking, and the camera's view of the
+surface can shift or drift slightly. It is a very good way to convey size, and a
+poor measuring instrument. For measurements use the viewer's measurement
+tools, or the numbers from your original software, and use AR to show the size.
+
+## 6. Tiny and huge objects
+
+For **tiny** objects (a pollen grain, a micro-CT specimen), real size in AR is a
+dot, so use the real-size view to show how small it is and a scaled-up version to
+show detail. Two projects or two models of the same data, one at real size and
+one enlarged, are a clear way to do it. For **huge** objects (a building or a
+site), a maquette scale such as 40 cm on a table is easier to study than 1:1. An
+architecture example is in
+[sharing Rhino, SketchUp and Revit models](/blog/rhino-sketchup-revit-to-glb-architecture).
+
+![A maquette-size building model placed on a table in AR with a measure line along its longest side](/static/images/blog/inline/true-scale-ar-real-size-3d-models-b.webp)
+
+## 7. Share the link or the QR code
+
+Put the QR code on a poster, a label or a display case, with a line such as
+*"Scan to see this object at real size."* The same QR code keeps working if you
+resize or replace the model later. For sizing the printed code see
+[QR codes on academic posters](/blog/qr-codes-on-academic-posters-guide).
+
+## Frequently asked questions
+
+### Why does my model appear at the wrong size in AR?
+
+The file's units were probably misread, or the scan has no scale. Use *Resize
+model* to enter the real longest dimension and the model is corrected, in the
+viewer and in AR.
+
+### Is AR accurate enough to measure with?
+
+It conveys size very well, but tracking can drift by a few percent. Use it to show
+size, and take measurements from the viewer's tools or from your original data.
+
+### Does the QR code change when I resize the model?
+
+No. The viewer link and QR code stay the same, so printed labels and posters
+keep working.
+
+### Do viewers need to install an app?
+
+No. On iPhone and Android the link opens in the browser, and AR starts from a
+button on the page.
+
+*[Create a free account](/auth/register) and show your next model at real size in
+AR.*
+""",
+    },
+    {
+        "slug": "conference-talk-thesis-defence-3d-demo",
+        "title": "How to Run a 3D Demo in a Conference Talk or Thesis Defence",
+        "description": "Plan a live 3D demo that works: save scenes, rehearse a tour, put a QR code on a slide so the audience can open the model, and prepare backups for when the venue network fails.",
+        "date": "2026-10-31",
+        "author": "AcademicAR Team",
+        "tags": ["presentations", "conference talks", "thesis defence", "3D viewer", "how-to"],
+        "persona": "Presenters, PhD candidates & lecturers",
+        "read_minutes": 6,
+        "body": """\
+![A conference stage with a presenter and a large screen showing a 3D heart model with step dots, audience phones raised](/static/images/blog/covers/conference-talk-thesis-defence-3d-demo.webp)
+
+A 3D model in a talk is the moment the room wakes up. It is also the moment
+presentations fail: the file will not open, the network drops, the presenter
+fumbles with a mouse and loses the room. A demo that works is a planned demo.
+This guide covers the setup, from saving the views to what to do when the
+projector shows nothing.
+
+![A 3D demo in a talk: scenes, rehearse, QR slide, backups, present](/static/images/blog/conference-talk-3d-demo-steps.svg)
+
+## 1. Save the views you will need
+
+Do not rotate a model live in front of an audience if you can avoid it. Open the
+model, set up each view you plan to show, and save it as a **scene**: the camera
+angle, the visible layers and any section cut. You can save up to 12 per model. A
+demo of a heart might have *Whole organ, Remove the atria, Section through the
+ventricles, Valve detail*. The mechanism is explained in
+[saved scenes and guided tours](/blog/saved-scenes-guided-tours-3d-teaching).
+
+![A laptop on a lectern with three backup icons linked by thin lines: a video play button, a screenshot frame and a QR code](/static/images/blog/inline/conference-talk-thesis-defence-3d-demo-a.webp)
+
+## 2. Rehearse the tour
+
+Play the scenes in order and time yourself. One scene per point is a good rule:
+you say a sentence, you move to the next scene, the audience sees what you are
+talking about. Rehearse on the machine and the browser you will use, and
+practise the way back to the first scene, since questions often send you
+backwards.
+
+## 3. Put a QR code on a slide
+
+Add a slide with the QR code and the text link, at least a few centimetres wide on
+a standard slide, with a plain background around it. Tell the audience when to
+scan: *"Scan this now and rotate the bone yourselves."* Hands in the air with
+phones is the best signal that your 3D works. If you use PowerPoint, see
+[adding a 3D model to PowerPoint](/blog/add-3d-model-to-powerpoint) for the
+options, from a linked slide to an embedded view.
+
+## 4. Prepare three backups
+
+Networks fail at conferences. Prepare, in this order:
+
+1. **A screen recording** of the tour (a minute or two), embedded in the deck.
+2. **Screenshots** of each scene as normal slides.
+3. **An offline copy** of the model on the laptop, or the viewer link opened in a
+   tab ahead of time, loaded and ready.
+
+Then the worst case is a static slide, and the audience never notices a failure.
+If you also need the model on a printed poster, see
+[QR codes on academic posters](/blog/qr-codes-on-academic-posters-guide).
+
+![A row of three thumbnails showing one 3D heart model from three different angles, connected by arrows](/static/images/blog/inline/conference-talk-thesis-defence-3d-demo-b.webp)
+
+## 5. Test at the venue
+
+Open the link once on the venue network and on the venue machine, in the room if
+you can. Check the sound, the screen resolution and whether the browser allows
+the page. If you present from your own laptop, check that the adapter and the
+display mode are working before the session, not during.
+
+## 6. Present
+
+Keep the demo short, one to three scenes per slide, and talk over it rather than
+about it. Come back to the slides at once when you have made your point. At a
+**thesis defence**, the committee will ask to see a particular angle: use the
+model's own rotation for questions, and keep the saved scenes for the planned
+story. Use the same link you put in the thesis, see
+[putting 3D models in your thesis](/blog/3d-models-in-thesis-dissertation).
+
+## 7. Leave the link behind
+
+Put the link or QR code on your last slide, and in your abstract or your handout,
+so the audience can open the model later. For a project page with the
+full demo, you can also [embed the model in a website](/blog/embed-3d-model-website).
+
+## Frequently asked questions
+
+### How many scenes should a talk demo use?
+
+Three to six is plenty for a ten-minute talk. Each scene should make one point,
+and the tour should end on a view you can talk about while taking questions.
+
+### What if the internet fails during my talk?
+
+Use the backups: a screen recording in the deck, screenshots of each scene, and a
+page opened and loaded before the talk. Never make the talk depend on a live
+network.
+
+### Can the audience open the model on their own phones?
+
+Yes. A QR code on a slide opens the model in the phone's browser with no app, and
+AR starts from a button on the page when the phone supports it.
+
+### Should I use the same link in the thesis and in the defence?
+
+Yes. One link is easier to remember, and the audience can find it in the thesis
+afterwards. Replacing the model keeps the link, so you can update it without
+changing the slides.
+
+*[Create a free account](/auth/register) and build a demo that holds up on stage.*
+""",
+    },
 ]
 
 
