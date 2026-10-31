@@ -90,13 +90,19 @@ body.hd-a { overflow-x: visible; }
 .a-callout h3 { font: 600 26px/1.15 var(--a-display); letter-spacing: -0.025em; margin: 0 0 8px; color: var(--a-ash); transition: color 300ms ease; }
 .a-callout.is-current h3 { color: var(--a-ink); }
 .a-callout p { margin: 0; font-size: 17px; line-height: 1.5; color: var(--a-ink); max-width: 400px; }
-.a-callout-qr { display: block; width: 88px; height: 88px; margin-top: 14px; border-radius: 4px; padding: 4px; background: #fff; image-rendering: pixelated; }
 
 .a-specimen {
-  position: relative; height: min(68vh, 600px); min-height: 420px;
+  position: relative; height: calc(100vh - var(--a-header) - 48px); min-height: 520px;
   border-radius: 8px; background: var(--a-cloud); overflow: hidden;
 }
 .a-specimen .a-model { position: relative; z-index: 1; }
+/* the demo's QR, inside the stage's top-right corner: scan it to open this model in AR */
+.a-specimen-qr {
+  position: absolute; top: 24px; right: 24px; z-index: 3;
+  width: 152px; height: 152px; padding: 8px; border-radius: 8px;
+  background: #fff; box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 0 0 1px var(--a-mist);
+  image-rendering: pixelated;
+}
 /* the section plane's outline, projected from the 3D plane that clips the model */
 .a-cut { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; opacity: 0; overflow: visible; }
 .a-cut polygon { fill: rgba(255,104,44,.08); stroke: var(--a-orange); stroke-width: 2; stroke-linejoin: round; }
@@ -125,39 +131,6 @@ body.hd-a { overflow-x: visible; }
 .a-step-name { display: block; font: 600 19px/1.25 var(--a-display); letter-spacing: -0.015em; color: var(--a-shale); transition: color 200ms ease; }
 .a-step-text { display: block; margin-top: 4px; font-size: 15px; line-height: 1.45; color: var(--a-ink); }
 .a-step.is-active .a-step-name, .a-step:hover .a-step-name { color: var(--a-ink); }
-
-/* =====================================================================
-   FORMATS — drifting type + in/out spec
-   ===================================================================== */
-.a-formats { position: relative; padding: 24px 0 80px; overflow: hidden; background: var(--a-cloud); }
-.a-drift { padding: 48px 0 72px; pointer-events: none; user-select: none; }
-.a-drift-row {
-  font-family: var(--a-display); font-weight: 600;
-  font-size: clamp(56px, 8vw, 120px); line-height: 1; letter-spacing: -0.04em;
-  white-space: nowrap;
-  color: var(--a-ink);
-  transform: translateX(calc(-8% + var(--a-drift, 0) * 1px));
-  will-change: transform;
-}
-.a-drift-row-alt {
-  color: #8a8a8a;
-  transform: translateX(calc(-22% + var(--a-drift-alt, 0) * 1px));
-}
-.a-flow { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); gap: 48px; align-items: start; }
-.a-flow .a-h2 { font-size: clamp(28px, 2.6vw, 36px); }
-.a-spec { margin: 28px 0 0; padding: 0; }
-.a-spec { display: grid; gap: 4px; }
-.a-spec div { display: grid; grid-template-columns: 128px minmax(0,1fr); gap: 16px; padding: 14px 18px; background: #fff; border-radius: 8px; }
-.a-spec dt { font-size: 15px; font-weight: 600; color: var(--a-ink); }
-.a-spec dd { margin: 0; font-size: 15px; line-height: 1.45; color: var(--a-ink); }
-.a-flow-core { display: flex; flex-direction: column; align-items: center; gap: 0; padding-top: 110px; }
-.a-flow-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--a-orange); }
-.a-flow-line { width: 2px; height: 64px; background: var(--a-orange); }
-.a-flow-chip {
-  font-size: 15px; font-weight: 600; color: #fff; text-align: center;
-  background: var(--a-ink); border-radius: 8px;
-  padding: 12px 16px; max-width: 190px;
-}
 
 /* =====================================================================
    TRY IT — real demos, plus a compact field line
@@ -255,22 +228,15 @@ body.hd-a { overflow-x: visible; }
   .a-dissect-steps > .a-h2 { order: 0; font-size: 26px; }
   .a-dissect-stage { order: 1; }
   .a-callouts { order: 2; margin-top: 0; }
-  .a-specimen { height: min(46svh, 400px); min-height: 0; }
+  .a-specimen { height: min(52svh, 460px); min-height: 0; }
   .a-callout { padding: 10px 0 10px 16px; }
   .a-callout h3 { font-size: 19px; margin: 0; }
   .a-callout p { font-size: 15px; margin-top: 6px; }
-  .a-callout:not(.is-current) p, .a-callout-qr { display: none; }
+  .a-callout:not(.is-current) p { display: none; }
+  .a-specimen-qr { top: 12px; right: 12px; width: 96px; height: 96px; padding: 6px; }
 
   .a-tools { padding: 72px 0; }
   .a-tools-grid { grid-template-columns: 1fr; gap: 20px; }
-
-  .a-formats { padding: 16px 0 88px; }
-  .a-drift { padding: 40px 0 48px; }
-  .a-flow { grid-template-columns: 1fr; gap: 24px; }
-  .a-flow-core { flex-direction: row; padding: 0; justify-content: center; }
-  .a-flow-line { width: 32px; height: 1px; background: var(--a-orange); }
-  .a-flow-line:last-of-type { background: var(--a-orange); }
-  .a-flow-chip { white-space: normal; text-align: center; }
 
   .a-try { padding: 72px 0; }
   .a-try-list { grid-template-columns: 1fr; gap: 12px; }
@@ -290,8 +256,6 @@ body.hd-a { overflow-x: visible; }
 @media (max-width: 600px) {
   .a-head-split { flex-direction: column; align-items: flex-start; }
   .a-inst-list { grid-template-columns: 1fr; }
-  .a-spec div { grid-template-columns: 1fr; gap: 4px; }
-  .a-flow-chip { font-size: 14px; padding: 10px 14px; max-width: none; }
   .a-btn { padding: 13px 18px; }
   .a-cta { padding: 80px 0 80px; }
   /* keep the play control off the poster's own words */
@@ -302,7 +266,6 @@ body.hd-a { overflow-x: visible; }
 
 @media (prefers-reduced-motion: reduce) {
   .a-screen-video, .a-callout, .a-guide-cover img { transition: none !important; }
-  .a-drift-row, .a-drift-row-alt { transform: none; }
 }
 
 .a-reel-copy .a-h2 { font-size: clamp(28px, 2.8vw, 38px); }

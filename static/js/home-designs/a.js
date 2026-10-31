@@ -1,5 +1,5 @@
 // Homepage design A · Kesit — a pinned, scroll-driven dissection that really cuts the model,
-// a tool picker, drifting format type and the click-to-play showreel.
+// a tool picker and the click-to-play showreel.
 (() => {
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const desktop = window.matchMedia('(min-width: 1024px)');
@@ -165,11 +165,13 @@
       }
       if (reduceMotion || !model) return;
 
-      // Camera: a half turn while "turn" plays, then look down into the cut, then settle for AR.
+      // Camera: turns only during step 1, tilting down to face the cut; from then on
+      // it holds still so steps 2 and 3 are only the section plane moving.
       const k = cutAmount(p);
-      const theta = 20 + p * 220;
-      const phi = 72 - 30 * k;
-      const radius = (9.5 - 0.8 * k) * (desktop.matches ? 1 : 1.25);
+      const t = ease(clamp(p / 0.3));
+      const theta = 20 + 200 * t;
+      const phi = 72 - 24 * t;
+      const radius = 9.5 * (desktop.matches ? 1 : 1.25);
       const orbit = `${theta.toFixed(1)}deg ${phi.toFixed(1)}deg ${radius.toFixed(2)}m`;
       if (orbit !== lastOrbit) { model.cameraOrbit = orbit; lastOrbit = orbit; }
 
@@ -233,30 +235,6 @@
       new IntersectionObserver((entries) => { visible = entries[0].isIntersecting; show(active); }, { threshold: 0.35 })
         .observe(tools.querySelector('.a-screen'));
     }
-  }
-
-  /* ---------------- Drifting format type (partial parallax) ---------------- */
-  const formats = document.querySelector('[data-a-formats]');
-  if (formats && !reduceMotion) {
-    let ticking = false;
-    const drift = () => {
-      const r = formats.getBoundingClientRect();
-      if (r.bottom > 0 && r.top < window.innerHeight) {
-        const offset = window.innerHeight - r.top;
-        formats.style.setProperty('--a-drift', (offset * -0.18).toFixed(1));
-        formats.style.setProperty('--a-drift-alt', (offset * 0.14).toFixed(1));
-        formats.querySelectorAll('[data-drift]').forEach((row, i) => {
-          row.style.transform = i === 0
-            ? `translateX(calc(-8% + ${(offset * -0.18).toFixed(1)}px))`
-            : `translateX(calc(-30% + ${(offset * 0.14).toFixed(1)}px))`;
-        });
-      }
-      ticking = false;
-    };
-    window.addEventListener('scroll', () => {
-      if (!ticking) { ticking = true; requestAnimationFrame(drift); }
-    }, { passive: true });
-    drift();
   }
 
   /* ---------------- Showreel: load the MP4 only when asked ---------------- */

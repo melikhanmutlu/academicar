@@ -24,8 +24,8 @@
         </div>
         <p class="e-hero-price">Free to start. Pay per model only when it needs to stay online.</p>
         <ol class="e-hero-steps" aria-label="How it works">
-          <li><a href="#formats"><span class="e-step-n">1</span>Make the model</a></li>
-          <li><a href="#formats"><span class="e-step-n">2</span>Upload it</a></li>
+          <li><a href="#showreel"><span class="e-step-n">1</span>Make the model</a></li>
+          <li><a href="#showreel"><span class="e-step-n">2</span>Upload it</a></li>
           <li><a href="#tools"><span class="e-step-n">3</span>Explore in 3D</a></li>
           <li><a href="#dissect"><span class="e-step-n">4</span>Print the QR</a></li>
         </ol>
@@ -128,8 +128,7 @@
           </li>
           <li class="a-callout" data-callout="2">
             <h3>Scan the QR, place it on the desk</h3>
-            <p>Phones open it in AR straight from the browser. Try this one.</p>
-            <img class="a-callout-qr" src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code that opens this mitochondrion in AR" width="88" height="88" loading="lazy">
+            <p>Phones open it in AR straight from the browser. Try the code on the model.</p>
           </li>
         </ol>
       </div>
@@ -157,9 +156,33 @@
             reveal="auto">
             <img slot="poster" class="hd-poster" src="{{ url_for('static', filename='images/home/a/mito-live.webp') }}" alt="" aria-hidden="true">
           </model-viewer>
+          <img class="a-specimen-qr" src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code that opens this mitochondrion in AR" width="160" height="160" loading="lazy">
           <svg class="a-cut" data-a-cut aria-hidden="true" focusable="false"><polygon points="0,0 0,0 0,0 0,0"/></svg>
           <div class="a-rail" aria-hidden="true"><span class="a-rail-fill"></span></div>
         </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== SHOWREEL ===================== -->
+<section class="a-reel" id="showreel">
+  <div class="a-wrap">
+    <div class="a-reel-layout">
+      <div class="a-reel-copy">
+        <h2 class="a-h2 a-h2-left">Every viewer tool in one minute</h2>
+        <p class="a-sub a-sub-left">With sound. Loads when you press play.</p>
+      </div>
+      <div class="a-reel-frame" data-a-reel>
+        <img class="a-reel-poster" src="{{ url_for('static', filename='images/home/reel/poster-scan.webp') }}"
+             alt="AcademicAR showreel: no app, just scan the QR code" loading="lazy" decoding="async" width="1600" height="900">
+        <video class="a-reel-video" preload="none" playsinline width="1920" height="1080" hidden>
+          <source src="{{ url_for('static', filename='videos/academicar-showreel.mp4') }}" type="video/mp4">
+        </video>
+        <button type="button" class="a-reel-play" aria-label="Play the AcademicAR showreel (1:00)">
+          <span class="a-reel-play-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></span>
+          <span>Play showreel <span class="a-reel-time">1:00</span></span>
+        </button>
       </div>
     </div>
   </div>
@@ -208,44 +231,6 @@
   </div>
 </section>
 
-<!-- ===================== FORMATS: in → out, partial parallax ===================== -->
-<section class="a-formats" id="formats" data-a-formats>
-  <div class="a-drift" aria-hidden="true">
-    <div class="a-drift-row" data-drift="-1">GLB&nbsp;&nbsp;STL&nbsp;&nbsp;OBJ&nbsp;&nbsp;FBX&nbsp;&nbsp;STEP&nbsp;&nbsp;STP&nbsp;&nbsp;DICOM&nbsp;&nbsp;NIfTI&nbsp;&nbsp;NRRD&nbsp;&nbsp;DICOM-SEG&nbsp;&nbsp;GLB&nbsp;&nbsp;STL&nbsp;&nbsp;OBJ&nbsp;&nbsp;FBX&nbsp;&nbsp;STEP</div>
-    <div class="a-drift-row a-drift-row-alt" data-drift="1">viewer link&nbsp;&nbsp;AR&nbsp;&nbsp;QR code&nbsp;&nbsp;embed&nbsp;&nbsp;scenes&nbsp;&nbsp;figures&nbsp;&nbsp;viewer link&nbsp;&nbsp;AR&nbsp;&nbsp;QR code&nbsp;&nbsp;embed&nbsp;&nbsp;scenes</div>
-  </div>
-
-  <div class="a-wrap a-flow">
-    <div class="a-flow-col">
-      <h2 class="a-h2 a-h2-left">Bring the file you already have</h2>
-      <dl class="a-spec">
-        <div><dt>Meshes</dt><dd>GLB, STL, OBJ, FBX</dd></div>
-        <div><dt>CAD</dt><dd>STEP / STP assemblies, one layer per part</dd></div>
-        <div><dt>CT and MR</dt><dd>DICOM series as ZIP, with HU presets</dd></div>
-        <div><dt>Segmentations</dt><dd>NIfTI, NRRD, DICOM-SEG, one layer per structure</dd></div>
-      </dl>
-    </div>
-
-    <div class="a-flow-core" aria-hidden="true">
-      <span class="a-flow-dot"></span>
-      <span class="a-flow-line"></span>
-      <span class="a-flow-chip">Converted to GLB + USDZ, compressed for the web</span>
-      <span class="a-flow-line"></span>
-      <span class="a-flow-dot"></span>
-    </div>
-
-    <div class="a-flow-col">
-      <h2 class="a-h2 a-h2-left">Share one link that keeps working</h2>
-      <dl class="a-spec">
-        <div><dt>Viewer</dt><dd>Public or private, in any browser</dd></div>
-        <div><dt>AR</dt><dd>WebXR on Android, Quick Look on iPhone and iPad</dd></div>
-        <div><dt>QR</dt><dd>A short /m/ link that survives replacements</dd></div>
-        <div><dt>Embed</dt><dd>An iframe for your lab or course site</dd></div>
-      </dl>
-    </div>
-  </div>
-</section>
-
 <!-- ===================== TRY IT: real demos only ===================== -->
 <section class="a-try" aria-labelledby="a-try-title">
   <div class="a-wrap">
@@ -274,29 +259,6 @@
       <span>By field:</span>
       {% for d in disciplines %}<a href="{{ url_for('ar_for', discipline=d.slug) }}">{{ d.name }}</a>{% endfor %}
     </p>
-  </div>
-</section>
-
-<!-- ===================== SHOWREEL ===================== -->
-<section class="a-reel" id="showreel">
-  <div class="a-wrap">
-    <div class="a-reel-layout">
-      <div class="a-reel-copy">
-        <h2 class="a-h2 a-h2-left">Every viewer tool in one minute</h2>
-        <p class="a-sub a-sub-left">With sound. Loads when you press play.</p>
-      </div>
-      <div class="a-reel-frame" data-a-reel>
-        <img class="a-reel-poster" src="{{ url_for('static', filename='images/home/reel/poster-scan.webp') }}"
-             alt="AcademicAR showreel: no app, just scan the QR code" loading="lazy" decoding="async" width="1600" height="900">
-        <video class="a-reel-video" preload="none" playsinline width="1920" height="1080" hidden>
-          <source src="{{ url_for('static', filename='videos/academicar-showreel.mp4') }}" type="video/mp4">
-        </video>
-        <button type="button" class="a-reel-play" aria-label="Play the AcademicAR showreel (1:00)">
-          <span class="a-reel-play-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></span>
-          <span>Play showreel <span class="a-reel-time">1:00</span></span>
-        </button>
-      </div>
-    </div>
   </div>
 </section>
 
