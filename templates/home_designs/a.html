@@ -27,7 +27,7 @@
           <li><a href="#showreel"><span class="e-step-n">1</span>Make the model</a></li>
           <li><a href="#showreel"><span class="e-step-n">2</span>Upload it</a></li>
           <li><a href="#tools"><span class="e-step-n">3</span>Explore in 3D</a></li>
-          <li><a href="#dissect"><span class="e-step-n">4</span>Print the QR</a></li>
+          <li><a href="#surfaces"><span class="e-step-n">4</span>Print the QR</a></li>
         </ol>
       </div>
 
@@ -105,60 +105,6 @@
               <span class="e-phone-island"></span>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ===================== DISSECTION: pinned while scrolling; the plane really cuts the model ===================== -->
-<section class="a-dissect" id="dissect" data-a-dissect data-cut-axis="x" aria-labelledby="a-dissect-title">
-  <div class="a-dissect-pin">
-    <div class="a-wrap a-dissect-grid">
-      <div class="a-dissect-steps">
-        <h2 class="a-h2 a-h2-left" id="a-dissect-title">What a reader can do with it</h2>
-        <ol class="a-callouts">
-          <li class="a-callout is-current" data-callout="0">
-            <h3>Turn it in any browser</h3>
-            <p>Drag to rotate. No login, no app, no plug-in.</p>
-          </li>
-          <li class="a-callout" data-callout="1">
-            <h3>Cut it to see inside</h3>
-            <p>A section plane on any axis, and a 2D slice you can measure.</p>
-          </li>
-          <li class="a-callout" data-callout="2">
-            <h3>Scan the QR, place it on the desk</h3>
-            <p>Phones open it in AR straight from the browser. Try the code on the model.</p>
-          </li>
-        </ol>
-      </div>
-
-      <div class="a-dissect-stage">
-        <div class="a-specimen">
-          <model-viewer
-            class="a-model"
-            data-a-model
-            src="{{ url_for('static', filename='models/model.compressed.glb') }}"
-            alt="The same mitochondrion, turning and cut open by a section plane as you scroll"
-            camera-controls
-            touch-action="pan-y"
-            disable-zoom
-            disable-pan
-            interaction-prompt="none"
-            camera-orbit="20deg 70deg 9.5m"
-            field-of-view="30deg"
-            interpolation-decay="80"
-            exposure="1.0"
-            shadow-intensity="0"
-            tone-mapping="neutral"
-            environment-image="{{ url_for('static', filename='environments/studio.webp') }}"
-            loading="eager"
-            reveal="auto">
-            <img slot="poster" class="hd-poster" src="{{ url_for('static', filename='images/home/a/mito-live.webp') }}" alt="" aria-hidden="true">
-          </model-viewer>
-          <img class="a-specimen-qr" src="{{ url_for('demo_mitochondria_qr') }}" alt="QR code that opens this mitochondrion in AR" width="160" height="160" loading="lazy">
-          <svg class="a-cut" data-a-cut aria-hidden="true" focusable="false"><polygon points="0,0 0,0 0,0 0,0"/></svg>
-          <div class="a-rail" aria-hidden="true"><span class="a-rail-fill"></span></div>
         </div>
       </div>
     </div>

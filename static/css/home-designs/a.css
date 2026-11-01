@@ -1,7 +1,6 @@
 /* =====================================================================
    Homepage design A · Kesit (cross-section)
-   White canvas; the print → scan hero from E, then a pinned dissection
-   in which a real section plane cuts the model as you scroll.
+   White canvas; the print → scan hero from E, then the showreel.
    ===================================================================== */
 .hd-a {
   --a-ink: #202020;
@@ -65,68 +64,11 @@ body.hd-a { overflow-x: visible; }
 .a-btn-ghost-light { color: rgba(255,255,255,.85); border-color: rgba(255,255,255,.28); }
 .a-btn-ghost-light:hover { color: #fff; border-color: #fff; }
 
-.a-model { width: 100%; height: 100%; --poster-color: transparent; background: transparent; }
-
-/* =====================================================================
-   DISSECTION — pinned while scrolling: three steps on the left, the model
-   on the right turns, is cut open by a real section plane, then closes.
-   ===================================================================== */
-.a-dissect { position: relative; height: 300vh; background: #fff; }
-.a-dissect-pin {
-  position: sticky; top: var(--a-header);
-  height: calc(100vh - var(--a-header)); min-height: 560px;
-  display: flex; align-items: center;
-}
-.a-dissect-pin > .a-wrap { width: 100%; }
-.a-dissect-grid { display: grid; grid-template-columns: minmax(340px, 4fr) minmax(0, 7fr); gap: 56px; align-items: center; }
-.a-callouts { list-style: none; margin: 56px 0 0; padding: 0; display: grid; gap: 28px; counter-reset: a-step; }
-.a-callout {
-  counter-increment: a-step;
-  padding: 22px 0 22px 28px;
-  border-left: 3px solid var(--a-mist);
-  cursor: pointer;
-  opacity: .32;
-  transition: border-color 300ms ease, opacity 400ms ease, transform 400ms ease;
-}
-.a-callout.is-current { border-left-color: var(--a-orange); opacity: 1; transform: translateX(8px); }
-.a-callout h3 { font: 600 30px/1.12 var(--a-display); letter-spacing: -0.025em; margin: 0 0 10px; color: var(--a-ink); }
-.a-callout h3::before {
-  content: counter(a-step, decimal-leading-zero);
-  display: block; margin-bottom: 8px;
-  font: 600 14px/1 var(--a-body); letter-spacing: .08em; color: var(--a-ash);
-}
-.a-callout.is-current h3::before { color: var(--a-orange); }
-.a-callout p { margin: 0; font-size: 17px; line-height: 1.5; color: var(--a-ink); max-width: 400px; }
-
-.a-specimen {
-  position: relative; aspect-ratio: 4 / 5; height: auto; max-height: calc(100vh - var(--a-header) - 48px); min-height: 520px; margin-left: auto;
-  border-radius: 8px; background: var(--a-cloud); overflow: hidden;
-}
-.a-specimen .a-model { position: relative; z-index: 1; }
-/* step 3: a veil over the model while the QR moves to the centre */
-.a-specimen::after {
-  content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none;
-  background: rgba(245,245,245,.78); opacity: var(--a-qr, 0);
-}
-/* the demo's QR, inside the stage's top-right corner: scan it to open this model in AR;
-   in step 3 the script moves it to the centre and enlarges it */
-.a-specimen-qr {
-  position: absolute; top: 24px; right: 24px; z-index: 4; transform-origin: 50% 50%; will-change: transform;
-  width: 152px; height: 152px; padding: 8px; border-radius: 8px;
-  background: #fff; box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 0 0 1px var(--a-mist);
-  image-rendering: pixelated;
-}
-/* the section plane's outline, projected from the 3D plane that clips the model */
-.a-cut { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; opacity: 0; overflow: visible; }
-.a-cut polygon { fill: rgba(255,104,44,.08); stroke: var(--a-orange); stroke-width: 2; stroke-linejoin: round; }
-.a-rail { position: absolute; left: 24px; right: 24px; bottom: 20px; height: 3px; background: var(--a-mist); z-index: 5; }
-.a-rail-fill { position: absolute; left: 0; top: 0; height: 3px; width: calc(100% * var(--a-progress, 0)); background: var(--a-orange); }
-
 /* =====================================================================
    TOOLS — pick a tool, watch the recording (panel inside the showreel)
    ===================================================================== */
 /* a summary panel of the showreel, right under the video */
-.a-reel-tools { margin-top: 24px; padding: 24px; background: #fff; border-radius: 8px; }
+.a-reel-tools { margin-top: 40px; }
 .a-tools-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 4fr); gap: 48px; align-items: center; }
 .a-screen-frame { position: relative; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; background: #1c1c1c; }
 .a-screen-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 450ms ease; }
@@ -137,7 +79,7 @@ body.hd-a { overflow-x: visible; }
   background: none; border: 0; border-radius: 8px; padding: 16px 18px 16px 22px; position: relative;
   font: inherit; color: inherit; transition: background 200ms ease;
 }
-.a-step:hover { background: var(--a-cloud); }
+.a-step:hover { background: rgba(32,32,32,.04); }
 .a-step.is-active { background: var(--a-mist); }
 .a-step::before { content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px; background: transparent; transition: background 200ms ease; }
 .a-step.is-active::before { background: var(--a-orange); }
@@ -239,26 +181,7 @@ body.hd-a { overflow-x: visible; }
 @media (max-width: 1023px) {
   .a-wrap { padding: 0 24px; }
 
-  /* Phone and tablet: still pinned, stacked — the model on top, the three steps
-     below it; only the current step shows its sentence so everything fits. */
-  .a-dissect { height: 300vh; }
-  .a-dissect-pin { height: calc(100svh - var(--a-header)); min-height: 0; align-items: flex-start; padding-top: 20px; }
-  .a-dissect-grid { grid-template-columns: 1fr; gap: 16px; align-items: start; }
-  .a-dissect-steps { display: contents; }
-  .a-dissect-steps > .a-h2 { order: 0; font-size: 26px; }
-  .a-dissect-stage { order: 1; }
-  .a-callouts { order: 2; margin-top: 0; }
-  .a-specimen { aspect-ratio: auto; height: min(52svh, 460px); min-height: 0; margin-left: 0; }
-  .a-callouts { gap: 0; }
-  .a-callout { padding: 10px 0 10px 16px; opacity: .4; }
-  .a-callout.is-current { transform: none; }
-  .a-callout h3 { font-size: 19px; margin: 0; }
-  .a-callout h3::before { display: none; }
-  .a-callout p { font-size: 15px; margin-top: 6px; }
-  .a-callout:not(.is-current) p { display: none; }
-  .a-specimen-qr { top: 12px; right: 12px; width: 96px; height: 96px; padding: 6px; }
-
-  .a-reel-tools { padding: 12px; margin-top: 16px; }
+  .a-reel-tools { margin-top: 28px; }
   .a-tools-grid { grid-template-columns: 1fr; gap: 20px; }
 
   .a-try { padding: 72px 0; }
@@ -289,7 +212,7 @@ body.hd-a { overflow-x: visible; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .a-screen-video, .a-callout, .a-guide-cover img { transition: none !important; }
+  .a-screen-video, .a-guide-cover img { transition: none !important; }
 }
 
 
