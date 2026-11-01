@@ -25,8 +25,8 @@ def test_landing_pricing_and_viewer_tools_are_present(client):
     landing = client.get("/")
     assert landing.status_code == 200
     landing_html = landing.get_data(as_text=True)
-    assert "GLB, STL, OBJ, FBX, STEP or CT/MR scans" in landing_html
-    assert "View Pricing Plans" in landing_html
+    assert "Print the code" in landing_html
+    assert 'href="/pricing"' in landing_html
 
     pricing = client.get("/pricing")
     assert pricing.status_code == 200

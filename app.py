@@ -5544,19 +5544,7 @@ def register_routes(app: Flask) -> None:
         body = {"status": "stalled" if stalled else "ok", "oldest_pending_seconds": waited}
         return jsonify(body), 503 if stalled else 200
 
-    @app.route("/")
-    def landing():
-        return render_template("landing.html", disciplines=all_disciplines())
-
-    # Alternative homepage designs for review (preview only, noindex, not linked
-    # from the site). The live homepage stays templates/landing.html.
-    @app.route("/design/home")
-    @app.route("/design/home/<variant>")
-    def home_design(variant=None):
-        if variant is None:
-            return render_template("home_designs/index.html", designs=HOME_DESIGNS)
-        if variant not in HOME_DESIGNS:
-            abort(404)
+    def render_home_design(variant, live_home=False):
         posts = []
         for post in merged_blog_posts()[:6]:
             posts.append({**post, "cover": cover_image_path(post.get("body") or "")})
@@ -5566,7 +5554,27 @@ def register_routes(app: Flask) -> None:
             design_key=variant,
             disciplines=all_disciplines(),
             posts=posts,
+            live_home=live_home,
         )
+
+    # The live homepage is design A · Kesit (chosen 2026-11-01); the previous
+    # homepage stays reviewable at /design/home/old.
+    @app.route("/")
+    def landing():
+        return render_home_design("a", live_home=True)
+
+    # Alternative homepage designs for review (preview only, noindex, not linked
+    # from the site).
+    @app.route("/design/home")
+    @app.route("/design/home/<variant>")
+    def home_design(variant=None):
+        if variant is None:
+            return render_template("home_designs/index.html", designs=HOME_DESIGNS)
+        if variant == "old":
+            return render_template("landing.html", disciplines=all_disciplines())
+        if variant not in HOME_DESIGNS:
+            abort(404)
+        return render_home_design(variant)
 
     @app.route("/pricing")
     def pricing():

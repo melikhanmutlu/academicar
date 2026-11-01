@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}AcademicAR - Publish interactive 3D models with your research{% endblock %}
+{% block head %}{% if request.endpoint == "home_design" %}<meta name="robots" content="noindex, nofollow">{% endif %}{% endblock %}
 
 {% block content %}
 <!-- ============================= HERO ============================= -->
