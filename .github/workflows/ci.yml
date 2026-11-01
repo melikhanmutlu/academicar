@@ -1,8 +1,9 @@
 name: CI
 
+# Runs only when started by hand (Actions > CI > Run workflow); pushes and
+# pull requests no longer trigger it, so no "Run failed" emails.
 on:
-  push:
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   tests:

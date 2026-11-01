@@ -219,7 +219,7 @@ Environment variables in `.env` (see `.env.example`):
 - Templates in `templates/` (Jinja2)
 - Static CSS in `static/css/style.css` (custom) + compiled Tailwind `static/css/tailwind.css`
   (linked last in `<head>`, where the old Play CDN injected it). After adding Tailwind
-  classes to a template, run `npm run build:css` and commit the CSS; CI fails if it is stale.
+  classes to a template, run `npm run build:css` and commit the CSS (CI only runs by hand, so check this yourself).
 - Use `{{ public_url(model.id) }}` to generate public viewer links in templates
 
 ## Deployment Notes
