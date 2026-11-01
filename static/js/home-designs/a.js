@@ -16,6 +16,9 @@
     const steps = [...dissect.querySelectorAll('[data-callout]')];
     const list = dissect.querySelector('.a-callouts');
     const cutSvg = dissect.querySelector('[data-a-cut]');
+    const qr = dissect.querySelector('.a-specimen-qr');
+    const stage = dissect.querySelector('.a-specimen');
+    let lastQr = -1;
     const cutPoly = cutSvg && cutSvg.querySelector('polygon');
     const pin = dissect.querySelector('.a-dissect-pin');
     const pinned = () => getComputedStyle(pin).position === 'sticky';
@@ -165,6 +168,22 @@
         lastOn = on;
       }
       if (reduceMotion || !model) return;
+
+      // Step 3: the QR leaves its corner for the centre of the stage and grows;
+      // scrolling back up returns it.
+      const q = ease(clamp((p - 0.74) / 0.12));
+      if (qr && stage && Math.abs(q - lastQr) > 0.0005) {
+        lastQr = q;
+        const sw = stage.clientWidth;
+        const sh = stage.clientHeight;
+        const size = qr.offsetWidth;
+        const inset = qr.offsetTop;
+        const dx = -(sw / 2 - inset - size / 2);
+        const dy = sh / 2 - inset - size / 2;
+        const grow = Math.min(2.4, (Math.min(sw, sh) * 0.55) / size);
+        qr.style.transform = `translate(${(dx * q).toFixed(1)}px, ${(dy * q).toFixed(1)}px) scale(${(1 + (grow - 1) * q).toFixed(3)})`;
+        stage.style.setProperty('--a-qr', q.toFixed(3));
+      }
 
       // Camera: turns only during step 1, tilting down to face the cut; from then on
       // it holds still so steps 2 and 3 are only the section plane moving.

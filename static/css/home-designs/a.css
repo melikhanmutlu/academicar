@@ -103,9 +103,15 @@ body.hd-a { overflow-x: visible; }
   border-radius: 8px; background: var(--a-cloud); overflow: hidden;
 }
 .a-specimen .a-model { position: relative; z-index: 1; }
-/* the demo's QR, inside the stage's top-right corner: scan it to open this model in AR */
+/* step 3: a veil over the model while the QR moves to the centre */
+.a-specimen::after {
+  content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: rgba(245,245,245,.78); opacity: var(--a-qr, 0);
+}
+/* the demo's QR, inside the stage's top-right corner: scan it to open this model in AR;
+   in step 3 the script moves it to the centre and enlarges it */
 .a-specimen-qr {
-  position: absolute; top: 24px; right: 24px; z-index: 3;
+  position: absolute; top: 24px; right: 24px; z-index: 4; transform-origin: 50% 50%; will-change: transform;
   width: 152px; height: 152px; padding: 8px; border-radius: 8px;
   background: #fff; box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 0 0 1px var(--a-mist);
   image-rendering: pixelated;
@@ -113,14 +119,14 @@ body.hd-a { overflow-x: visible; }
 /* the section plane's outline, projected from the 3D plane that clips the model */
 .a-cut { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; opacity: 0; overflow: visible; }
 .a-cut polygon { fill: rgba(255,104,44,.08); stroke: var(--a-orange); stroke-width: 2; stroke-linejoin: round; }
-.a-rail { position: absolute; left: 24px; right: 24px; bottom: 20px; height: 3px; background: var(--a-mist); z-index: 3; }
+.a-rail { position: absolute; left: 24px; right: 24px; bottom: 20px; height: 3px; background: var(--a-mist); z-index: 5; }
 .a-rail-fill { position: absolute; left: 0; top: 0; height: 3px; width: calc(100% * var(--a-progress, 0)); background: var(--a-orange); }
 
 /* =====================================================================
-   TOOLS — pick a tool, watch the recording
+   TOOLS — pick a tool, watch the recording (panel inside the showreel)
    ===================================================================== */
-.a-tools { padding: 80px 0; background: #fff; }
-.a-tools .a-head { margin-bottom: 40px; }
+/* a summary panel of the showreel, right under the video */
+.a-reel-tools { margin-top: 24px; padding: 24px; background: #fff; border-radius: 8px; }
 .a-tools-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 4fr); gap: 48px; align-items: center; }
 .a-screen-frame { position: relative; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; background: #1c1c1c; }
 .a-screen-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 450ms ease; }
@@ -145,10 +151,22 @@ body.hd-a { overflow-x: visible; }
 .a-try { padding: 80px 0; background: #fff; }
 .a-try-list { list-style: none; margin: 36px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
 .a-try-list a {
-  display: block; height: 100%; padding: 28px; background: var(--a-cloud); border-radius: 8px;
-  text-decoration: none; color: inherit; transition: background 160ms ease;
+  display: flex; flex-direction: column; height: 100%; padding: 28px;
+  background: #fff; border: 1px solid #e3e3e3; border-top: 3px solid var(--a-orange); border-radius: 8px;
+  text-decoration: none; color: inherit;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
-.a-try-list a:hover { background: var(--a-mist); }
+.a-try-list a:hover, .a-try-list a:focus-visible {
+  border-color: var(--a-orange); transform: translateY(-3px);
+  box-shadow: 0 12px 28px -16px rgba(32,32,32,.35);
+}
+.a-try-go {
+  margin-top: auto; padding-top: 20px;
+  display: inline-flex; align-items: center; gap: 8px;
+  font: 600 15px/1 var(--a-body); color: var(--a-orange);
+}
+.a-try-go svg { width: 18px; height: 18px; transition: transform 160ms ease; }
+.a-try-list a:hover .a-try-go svg { transform: translateX(4px); }
 .a-try-name { display: block; font: 600 19px/1.25 var(--a-display); letter-spacing: -0.015em; }
 .a-try-text { display: block; margin-top: 8px; font-size: 16px; line-height: 1.5; color: var(--a-ink); }
 .a-fieldline { margin: 40px 0 0; display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 15px; }
@@ -240,7 +258,7 @@ body.hd-a { overflow-x: visible; }
   .a-callout:not(.is-current) p { display: none; }
   .a-specimen-qr { top: 12px; right: 12px; width: 96px; height: 96px; padding: 6px; }
 
-  .a-tools { padding: 72px 0; }
+  .a-reel-tools { padding: 12px; margin-top: 16px; }
   .a-tools-grid { grid-template-columns: 1fr; gap: 20px; }
 
   .a-try { padding: 72px 0; }
@@ -274,3 +292,7 @@ body.hd-a { overflow-x: visible; }
   .a-screen-video, .a-callout, .a-guide-cover img { transition: none !important; }
 }
 
+
+/* Surfaces list borrowed from design E: align it with A's own column */
+.hd-a .e-surfaces .e-wrap { max-width: 1240px; }
+@media (max-width: 1023px) { .hd-a .e-surfaces .e-wrap { padding: 0 24px; } }

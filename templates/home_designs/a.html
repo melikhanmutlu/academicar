@@ -180,49 +180,84 @@
         <span>Play showreel <span class="a-reel-time">1:00</span></span>
       </button>
     </div>
+    <div class="a-reel-tools" id="tools" data-a-tools>
+      {% set tools = [
+        ('layers',  'Layers for every part',     'Hide, recolour or X-ray each structure.'),
+        ('slice',   'Slice view',                'Axial, coronal and sagittal slices with a measure.'),
+        ('measure', 'Measure and label',         'Labels and distances in real units.'),
+        ('scenes',  'Scenes and guided tours',   'Up to 12 saved views, each with its own link and QR.'),
+        ('figure',  'Figure export',             'A PNG with legend, scale bar and QR code.')
+      ] %}
+
+      <div class="a-tools-grid">
+        <div class="a-screen">
+          <div class="a-screen-frame">
+            {% for t in tools %}
+            <video class="a-screen-video{% if loop.first %} is-active{% endif %}" data-screen="{{ loop.index0 }}"
+                   muted playsinline loop preload="none" poster="{{ still_base }}{{ t[0] }}.webp" width="960" height="540"
+                   aria-label="{{ t[1] }}, recorded in the AcademicAR viewer">
+              <source src="{{ clip_base }}{{ t[0] }}.mp4" type="video/mp4">
+            </video>
+            {% endfor %}
+          </div>
+        </div>
+
+        <ul class="a-steps" role="list">
+          {% for t in tools %}
+          <li>
+            <button type="button" class="a-step{% if loop.first %} is-active{% endif %}" data-step="{{ loop.index0 }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">
+              <span class="a-step-name">{{ t[1] }}</span>
+              <span class="a-step-text">{{ t[2] }}</span>
+            </button>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
   </div>
 </section>
 
-<!-- ===================== TOOLS: pick a tool, watch the recording ===================== -->
-<section class="a-tools" id="tools" data-a-tools>
-  <div class="a-wrap">
-    <header class="a-head">
-      <h2 class="a-h2">The rest of the viewer</h2>
-      <p class="a-sub">Recorded in the product. Pick a tool.</p>
-    </header>
-
-    {% set tools = [
-      ('layers',  'Layers for every part',     'Hide, recolour or X-ray each structure.'),
-      ('slice',   'Slice view',                'Axial, coronal and sagittal slices with a measure.'),
-      ('measure', 'Measure and label',         'Labels and distances in real units.'),
-      ('scenes',  'Scenes and guided tours',   'Up to 12 saved views, each with its own link and QR.'),
-      ('figure',  'Figure export',             'A PNG with legend, scale bar and QR code.')
-    ] %}
-
-    <div class="a-tools-grid">
-      <div class="a-screen">
-        <div class="a-screen-frame">
-          {% for t in tools %}
-          <video class="a-screen-video{% if loop.first %} is-active{% endif %}" data-screen="{{ loop.index0 }}"
-                 muted playsinline loop preload="none" poster="{{ still_base }}{{ t[0] }}.webp" width="960" height="540"
-                 aria-label="{{ t[1] }}, recorded in the AcademicAR viewer">
-            <source src="{{ clip_base }}{{ t[0] }}.mp4" type="video/mp4">
-          </video>
-          {% endfor %}
-        </div>
-      </div>
-
-      <ul class="a-steps" role="list">
-        {% for t in tools %}
-        <li>
-          <button type="button" class="a-step{% if loop.first %} is-active{% endif %}" data-step="{{ loop.index0 }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">
-            <span class="a-step-name">{{ t[1] }}</span>
-            <span class="a-step-text">{{ t[2] }}</span>
-          </button>
-        </li>
-        {% endfor %}
-      </ul>
+<!-- ===================== SURFACES: one code for every printed surface (from design E) ===================== -->
+<section class="e-section e-surfaces hd-e" id="surfaces">
+  <div class="e-wrap">
+    <div class="e-head">
+      <h2 class="e-h2">One code for every printed surface.</h2>
     </div>
+
+    <ul class="e-surface-list">
+      {% set surfaces = [
+        ('poster', 'Conference poster', 'Visitors open the model while they stand at your board.', url_for('blog_post', slug='qr-codes-on-academic-posters-guide'), 'Poster QR guide'),
+        ('thesis', 'Thesis and dissertation', 'Examiners rotate the specimen instead of three fixed views.', url_for('blog_post', slug='how-to-add-3d-models-to-research-papers'), 'Adding models to papers'),
+        ('journal', 'Journal article', 'Put the link in the caption so reviewers inspect the geometry.', url_for('blog_post', slug='interactive-3d-figures-scientific-publishing'), 'Interactive figures'),
+        ('slide', 'Lecture slide', 'Students open the structure you are describing, in class.', url_for('blog_post', slug='add-3d-model-to-powerpoint'), '3D in PowerPoint'),
+        ('label', 'Lab station or museum label', 'AR shows the object at true scale on the bench or in the gallery.', url_for('ar_for', discipline='museums'), 'AR for museums'),
+        ('web', 'Lab or project website', 'Embed the same viewer with an iframe; updates show everywhere.', url_for('blog_post', slug='embed-3d-model-website'), 'Embedding guide')
+      ] %}
+      {% for key, title, text, href, link in surfaces %}
+      <li class="e-surface">
+        <div class="e-mini e-mini-{{ key }}" aria-hidden="true">
+          {% if key == 'poster' %}
+            <span class="e-m-sheet"><i></i><i></i><i class="e-m-fig"></i><i></i><b class="e-m-qr"></b></span>
+          {% elif key == 'thesis' %}
+            <span class="e-m-book"><span class="e-m-page"><i></i><i></i><i></i><i></i></span><span class="e-m-page"><i class="e-m-fig"></i><i></i><b class="e-m-qr"></b></span></span>
+          {% elif key == 'journal' %}
+            <span class="e-m-sheet e-m-journal"><i class="e-m-title"></i><i></i><i></i><i class="e-m-fig"></i><i></i><b class="e-m-qr"></b></span>
+          {% elif key == 'slide' %}
+            <span class="e-m-slide"><i class="e-m-title"></i><i class="e-m-fig"></i><b class="e-m-qr"></b></span>
+          {% elif key == 'label' %}
+            <span class="e-m-label"><i class="e-m-title"></i><i></i><i></i><b class="e-m-qr"></b></span>
+          {% else %}
+            <span class="e-m-browser"><span class="e-m-bar"><i></i><i></i><i></i></span><i class="e-m-fig"></i><i></i></span>
+          {% endif %}
+        </div>
+        <div class="e-surface-text">
+          <h3>{{ title }}</h3>
+          <p>{{ text }}</p>
+        </div>
+        <a class="e-surface-link" href="{{ href }}">{{ link }}</a>
+      </li>
+      {% endfor %}
+    </ul>
   </div>
 </section>
 
@@ -235,18 +270,21 @@
         <a href="{{ url_for('demo_mitochondria_ar', source='home_a_try') }}">
           <span class="a-try-name">The mitochondrion, live</span>
           <span class="a-try-text">The model from this page in the viewer, with AR on your phone.</span>
+          <span class="a-try-go">Open the model<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
         </a>
       </li>
       <li>
         <a href="{{ url_for('demo_dashboard', source='home_a') }}">
           <span class="a-try-name">A researcher's dashboard</span>
           <span class="a-try-text">Projects, models, QR codes and access dates, with sample data.</span>
+          <span class="a-try-go">Open the dashboard<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
         </a>
       </li>
       <li>
         <a href="{{ url_for('demo_institution', source='home_a') }}">
           <span class="a-try-name">An institution's panel</span>
           <span class="a-try-text">Quota, members and funded models for a department.</span>
+          <span class="a-try-go">Open the panel<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
         </a>
       </li>
     </ul>
