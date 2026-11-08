@@ -522,6 +522,7 @@
       </div>
       <div class="model-edit-side-actions">
         <a href="{{ url_for('qr_print', model_id=model.id) }}" target="_blank" rel="noopener noreferrer" class="detail-action">View QR</a>
+        {% if model.processing_status == 'ready' %}<button type="button" class="detail-action" data-powerpoint-url="{{ url_for('presentation.powerpoint_prepare', model_id=model.id) }}" data-csrf="{{ csrf_token() }}" title="A copy for PowerPoint (Insert → 3D Models). It is saved inside the slide deck and works offline.">Download for PowerPoint</button>{% endif %}
         <a href="{{ url_for('project_detail', slug=paper.slug) }}" class="detail-action">Back to project</a>
         {% if is_project_owner %}
         <form method="POST" action="{{ url_for('model_delete', model_id=model.id) }}" onsubmit="return confirm('Delete this 3D model? This cannot be undone.');" class="w-full mt-4 pt-4 border-t border-[#e2e8f0]">
@@ -536,6 +537,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/powerpoint-download.js', v=asset_version) }}" defer></script>
 <script src="{{ url_for('static', filename='js/chunked-upload.js', v=asset_version) }}"></script>
 <script>
   // Live processing progress: stored by the worker, so it is also here when you come back.

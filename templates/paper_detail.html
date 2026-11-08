@@ -351,6 +351,7 @@
                     <a href="{{ url_for('embed_settings.embed_page', model_id=m.id) }}" class="model-link-action" aria-label="Embed code and settings" title="Choose what the embedded viewer shows, then copy the iframe code for a website, Moodle/Canvas or a repository page">Embed</a>
                   {% endif %}
                   <a href="{{ url_for('qr_print', model_id=m.id) }}" target="_blank" rel="noopener noreferrer" class="model-link-action">QR</a>
+                  <button type="button" class="model-link-action" data-powerpoint-url="{{ url_for('presentation.powerpoint_prepare', model_id=m.id) }}" data-csrf="{{ csrf_token() }}" title="Download a copy for PowerPoint (Insert → 3D Models). It is saved inside the slide deck and works offline.">PowerPoint</button>
                   <a href="{{ url_for('model_edit', model_id=m.id) }}" class="model-link-action">Edit</a>
                   {% if is_project_owner %}
                   <form method="POST" action="{{ url_for('model_delete', model_id=m.id) }}" class="model-delete-form" onsubmit="return confirm('Delete this 3D model? This cannot be undone.');">
@@ -558,6 +559,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/powerpoint-download.js', v=asset_version) }}" defer></script>
 <script src="{{ url_for('static', filename='js/chunked-upload.js', v=asset_version) }}"></script>
 <script>
   // Dismiss the post-payment success banner.

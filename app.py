@@ -89,6 +89,7 @@ from viewer_lighting import viewer_lighting_bp
 from embed_config import effective_embed_config, clean_embed_config, embed_settings_bp
 from model_media import model_media_bp
 from comparisons import comparisons_bp
+from presentation import presentation_bp, process_powerpoint_glb_job
 from scenes import (
     remove_scene_ar_files,
     scene_ar_enabled,
@@ -277,6 +278,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.register_blueprint(comparisons_bp)
     app.register_blueprint(scenes_bp)
     app.register_blueprint(uploads_bp)
+    app.register_blueprint(presentation_bp)
 
     @app.context_processor
     def inject_globals():
@@ -4814,7 +4816,7 @@ def requeue_layer_metrics(app: Flask, model: Model3D) -> None:
 
 # Jobs that only add a convenience (measurements, scene AR files): when they run
 # out of attempts they are failed on their own and never fail the model.
-OPTIONAL_JOB_TYPES = ("layer_metrics", "scene_ar", "poster", "ar_doctor", "r2_mirror")
+OPTIONAL_JOB_TYPES = ("layer_metrics", "scene_ar", "poster", "ar_doctor", "r2_mirror", "powerpoint_glb")
 
 
 def _fail_scene_ar(job: ConversionJob) -> None:
@@ -4861,6 +4863,8 @@ def enqueue_conversion_job(
             process_ar_doctor_job(app, **job_kwargs)
         elif job_type == "scene_ar":
             process_scene_ar_job(app, **job_kwargs)
+        elif job_type == "powerpoint_glb":
+            process_powerpoint_glb_job(app, **job_kwargs)
         else:
             process_model_upload_job(app, **job_kwargs)
     # Otherwise the ConversionJob row stays "pending" for the isolated worker
@@ -5020,6 +5024,8 @@ def run_next_conversion_job(app: Flask) -> bool:
         process_ar_doctor_job(app, **payload)
     elif job_kind == "scene_ar":
         process_scene_ar_job(app, **payload)
+    elif job_kind == "powerpoint_glb":
+        process_powerpoint_glb_job(app, **payload)
     else:
         process_model_upload_job(app, **payload)
     return True
@@ -7309,6 +7315,10 @@ def register_routes(app: Flask) -> None:
             download_url=url_for("project_attachment_file", slug=slug, attachment_id=attachment.id),
             preview_available=bool(attachment.preview_pdf_path),
             preview_pending=(not attachment.preview_pdf_path and attachment.preview_status in {"pending", "processing"}),
+            present_url=(
+                url_for("presentation.present_material", slug=slug, attachment_id=attachment.id)
+                if attachment.preview_pdf_path and current_user.is_authenticated and can_edit_project(project) else None
+            ),
         )
 
     @app.route("/p/<slug>/materials/<int:attachment_id>/preview")

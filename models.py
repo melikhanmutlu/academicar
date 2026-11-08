@@ -185,6 +185,9 @@ class ProjectAttachment(db.Model):
     # "pending" / "processing" = queued for the worker, "ready", "failed",
     # "unavailable" = no converter installed on the worker host.
     preview_status = db.Column(db.String(20), nullable=True, index=True)
+    # Presenter mode: live 3D model slides placed between the pages,
+    # [{"after": page (0 = before the first), "model_id": ...}] (presentation.py).
+    model_slides = db.Column(db.JSON, nullable=True)
     order_index = db.Column(db.Integer, nullable=False, default=0)
     created_at = db.Column(db.DateTime, default=utc_now)
 

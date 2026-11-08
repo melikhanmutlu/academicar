@@ -7,6 +7,7 @@
   <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
     <a href="{{ url_for('project_detail', slug=paper.slug) if (current_user.is_authenticated and current_user.id == paper.user_id) else project_landing_url(paper) }}" class="nav-link inline-flex">&larr; Back to project</a>
     <div class="flex flex-wrap gap-2">
+      {% if present_url|default(none) %}<a href="{{ present_url }}" class="btn-primary compact" title="Full-screen slides with live 3D models in between. Works offline once prepared.">Present with 3D</a>{% endif %}
       <a href="{{ download_url|default(url_for('paper_public_pdf_file', slug=paper.slug)) }}" download class="btn-secondary compact">Download original</a>
       {% if preview_available|default(true) %}<a href="{{ file_url|default(url_for('paper_public_pdf_file', slug=paper.slug)) }}" target="_blank" rel="noopener noreferrer" class="btn-secondary compact">Open preview</a>{% endif %}
     </div>

@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Present: {{ attachment.title or attachment.original_filename }} - AcademicAR</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/favicon.svg') }}">
+  <script type="module" src="https://unpkg.com/@google/model-viewer@4.3.0/dist/model-viewer.min.js" crossorigin="anonymous"></script>
+  <style>
+    :root { --ink:#202020; --muted:#6b6b6b; --line:#e8e8e8; --soft:#f5f5f5; --mist:#efefef; --accent:#ff682c; }
+    * { box-sizing:border-box; }
+    html, body { margin:0; height:100%; background:var(--mist); color:var(--ink); font:14px/1.4 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    button, select { font:inherit; color:inherit; }
+    .p-shell { display:flex; flex-direction:column; height:100vh; height:100dvh; }
+    .p-bar { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; padding:10px 16px; background:#fff; border-bottom:1px solid var(--line); }
+    .p-back { color:var(--muted); text-decoration:none; white-space:nowrap; }
+    .p-back:hover { color:var(--ink); }
+    .p-title { flex:1 1 220px; min-width:0; }
+    .p-title strong { display:block; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .p-title small { color:var(--muted); }
+    .p-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+    .p-btn { appearance:none; border:1px solid var(--line); background:#fff; border-radius:999px; padding:7px 14px; cursor:pointer; white-space:nowrap; min-height:36px; }
+    .p-btn:hover { border-color:var(--ink); }
+    .p-btn[aria-pressed="true"] { border-color:var(--ink); background:var(--soft); }
+    .p-btn.is-primary { background:var(--ink); border-color:var(--ink); color:#fff; }
+    .p-btn:disabled { opacity:.55; cursor:default; }
+    .p-offline { font-size:13px; color:var(--muted); display:inline-flex; align-items:center; gap:6px; }
+    .p-offline i { width:8px; height:8px; border-radius:50%; background:#c9c9c9; display:inline-block; }
+    .p-offline.is-ready i { background:#16a34a; }
+    .p-offline.is-busy i { background:var(--accent); }
+    .p-main { flex:1; display:flex; min-height:0; }
+    .p-stage { position:relative; flex:1; min-width:0; display:flex; align-items:center; justify-content:center; padding:16px; overflow:hidden; background:var(--mist); }
+    .p-slide { position:relative; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.06), 0 12px 40px rgba(0,0,0,.08); overflow:hidden; }
+    .p-slide canvas { display:block; width:100%; height:100%; }
+    .p-slide model-viewer { position:absolute; inset:0; width:100%; height:100%; background:#fff; --poster-color:#fff; }
+    .p-model-label { position:absolute; left:16px; bottom:14px; z-index:2; display:flex; align-items:center; gap:8px; font-size:13px; color:var(--ink); background:rgba(255,255,255,.88); border:1px solid var(--line); border-radius:999px; padding:5px 12px 5px 8px; pointer-events:none; }
+    .p-model-label b { font-size:11px; letter-spacing:.06em; color:#fff; background:var(--accent); border-radius:999px; padding:2px 7px; }
+    .p-model-hint { position:absolute; right:16px; bottom:14px; z-index:2; font-size:12px; color:var(--muted); pointer-events:none; }
+    .p-spin { position:absolute; right:16px; top:14px; z-index:2; }
+    .p-msg { max-width:440px; text-align:center; color:var(--muted); background:#fff; border:1px solid var(--line); border-radius:12px; padding:24px; }
+    .p-msg strong { display:block; color:var(--ink); font-size:16px; margin-bottom:6px; }
+    .p-nav { display:flex; align-items:center; justify-content:center; gap:10px; padding:10px 16px; background:#fff; border-top:1px solid var(--line); }
+    .p-count { min-width:84px; text-align:center; font-variant-numeric:tabular-nums; color:var(--muted); }
+    .p-edit { width:300px; flex:none; background:#fff; border-left:1px solid var(--line); display:flex; flex-direction:column; min-height:0; }
+    .p-edit[hidden] { display:none; }
+    .p-edit-head { padding:14px 16px; border-bottom:1px solid var(--line); }
+    .p-edit-head h2 { margin:0 0 4px; font-size:15px; }
+    .p-edit-head p { margin:0 0 10px; color:var(--muted); font-size:13px; }
+    .p-add { display:grid; grid-template-columns:1fr; gap:8px; }
+    .p-add select { width:100%; min-width:0; min-height:36px; border:1px solid var(--line); border-radius:8px; padding:7px 8px; background:#fff; }
+    @media (max-width: 760px) { .p-add { grid-template-columns:1fr auto; } }
+    .p-list { list-style:none; margin:0; padding:8px; overflow:auto; flex:1; }
+    .p-list li { display:flex; align-items:center; gap:10px; padding:6px 8px; border-radius:8px; cursor:pointer; }
+    .p-list li:hover { background:var(--soft); }
+    .p-list li.is-current { background:var(--mist); }
+    .p-list .p-thumb { width:64px; height:36px; flex:none; background:var(--soft); border:1px solid var(--line); border-radius:4px; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:11px; color:var(--muted); }
+    .p-list .p-thumb img { width:100%; height:100%; object-fit:contain; background:#fff; }
+    .p-list .is-model .p-thumb { border-color:var(--accent); color:var(--accent); font-weight:600; }
+    .p-list span.p-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .p-remove { appearance:none; border:0; background:none; color:var(--muted); cursor:pointer; padding:4px 6px; border-radius:6px; }
+    .p-remove:hover { color:#b91c1c; background:#fee2e2; }
+    .p-saved { padding:8px 16px 12px; font-size:12px; color:var(--muted); border-top:1px solid var(--line); }
+    .p-black { position:absolute; inset:0; background:#000; z-index:20; display:none; }
+    .p-black.is-on { display:block; }
+    /* Presenting (full screen): only the slide on black, controls on hover. */
+    .p-shell:fullscreen { background:#000; }
+    .p-shell:fullscreen .p-bar, .p-shell:fullscreen .p-edit { display:none; }
+    .p-shell:fullscreen .p-stage { background:#000; padding:0; }
+    .p-shell:fullscreen .p-slide { box-shadow:none; }
+    .p-shell:fullscreen .p-nav { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); border:1px solid rgba(255,255,255,.12); border-radius:999px; background:rgba(32,32,32,.85); color:#fff; opacity:0; transition:opacity .2s; z-index:30; }
+    .p-shell:fullscreen .p-nav:hover, .p-shell:fullscreen.show-nav .p-nav { opacity:1; }
+    .p-shell:fullscreen .p-nav .p-btn { background:transparent; color:#fff; border-color:rgba(255,255,255,.25); }
+    .p-shell:fullscreen .p-count { color:#ddd; }
+    @media (max-width: 760px) {
+      .p-main { flex-direction:column; }
+      .p-edit { width:auto; border-left:0; border-top:1px solid var(--line); max-height:42vh; }
+      .p-stage { padding:10px; }
+      .p-model-hint { display:none; }
+      .p-actions .p-btn { padding:6px 12px; }
+    }
+  </style>
+</head>
+<body>
+<div class="p-shell" id="presenter">
+  <header class="p-bar">
+    <a class="p-back" href="{{ reader_url }}">&larr; Back</a>
+    <div class="p-title">
+      <strong>{{ attachment.title or attachment.original_filename }}</strong>
+      <small>{{ paper.title }}</small>
+    </div>
+    <div class="p-actions">
+      <span class="p-offline" id="offline-status" role="status"><i></i><span>Online only</span></span>
+      <button type="button" class="p-btn" id="offline-btn" title="Save the slides and the 3D models in this browser so the talk runs without internet">Make available offline</button>
+      {% if models %}<button type="button" class="p-btn" id="edit-btn" aria-pressed="false" aria-controls="edit-panel">3D slides</button>{% endif %}
+      <button type="button" class="p-btn is-primary" id="present-btn" title="Full screen (F). Arrow keys, Page Up/Down or a clicker move between slides; B blanks the screen.">Start presenting</button>
+    </div>
+  </header>
+
+  <div class="p-main">
+    <main class="p-stage" id="stage" aria-live="polite">
+      {% if not pdf_url %}
+        <div class="p-msg">
+          {% if preview_pending %}<strong>The slides are being prepared.</strong>This usually takes under a minute. Reload this page in a moment.
+          {% else %}<strong>No slide preview for this file.</strong>Presenter mode needs the PDF preview of the presentation.{% endif %}
+        </div>
+      {% else %}
+        <div class="p-msg" id="loading-msg"><strong>Loading slides…</strong></div>
+      {% endif %}
+      <div class="p-black" id="black" aria-hidden="true"></div>
+    </main>
+
+    {% if models %}
+    <aside class="p-edit" id="edit-panel" hidden aria-label="3D slides">
+      <div class="p-edit-head">
+        <h2>3D slides</h2>
+        <p>Place a live 3D model after any slide. It opens in place during the talk, so there is no window switch.</p>
+        <div class="p-add">
+          <select id="add-model" aria-label="Model">
+            {% for m in models %}<option value="{{ m.id }}">{{ m.name }}</option>{% endfor %}
+          </select>
+          <button type="button" class="p-btn" id="add-btn">Add after this slide</button>
+        </div>
+      </div>
+      <ol class="p-list" id="slide-list"></ol>
+      <div class="p-saved" id="saved-msg">Changes are saved automatically.</div>
+    </aside>
+    {% endif %}
+  </div>
+
+  <nav class="p-nav" aria-label="Slides">
+    <button type="button" class="p-btn" id="prev-btn" aria-label="Previous slide">&larr;</button>
+    <span class="p-count" id="count">–</span>
+    <button type="button" class="p-btn" id="next-btn" aria-label="Next slide">&rarr;</button>
+  </nav>
+</div>
+
+<script type="application/json" id="presenter-data">{{ {
+  "pdf_url": pdf_url,
+  "models": models,
+  "slides": model_slides,
+  "save_url": save_url,
+  "csrf": csrf_token(),
+  "sw_url": url_for('presentation.presenter_service_worker'),
+  "pdfjs": url_for('static', filename='vendor/pdfjs/pdf.min.mjs'),
+  "pdfjs_worker": url_for('static', filename='vendor/pdfjs/pdf.worker.min.mjs'),
+  "model_viewer": "https://unpkg.com/@google/model-viewer@4.3.0/dist/model-viewer.min.js",
+  "draco": ["https://www.gstatic.com/draco/versioned/decoders/1.5.6/draco_wasm_wrapper.js",
+            "https://www.gstatic.com/draco/versioned/decoders/1.5.6/draco_decoder.wasm"],
+  "presenter_js": url_for('static', filename='js/presenter.js', v=asset_version),
+} | tojson }}</script>
+<script type="module" src="{{ url_for('static', filename='js/presenter.js', v=asset_version) }}"></script>
+</body>
+</html>
