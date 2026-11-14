@@ -81,3 +81,85 @@ def test_prune_keeps_the_newest_archives(app, monkeypatch):
             "academic_ar_backup_20260104-000000.zip",
         ]
         assert deleted == [f"admin_backups/{name}" for name in removed]
+
+
+def _fake_archives(app, days):
+    from app import backup_folder
+
+    folder = backup_folder(app)
+    names = []
+    for day in days:
+        name = f"academic_ar_backup_2026010{day}-000000.zip"
+        path = os.path.join(folder, name)
+        with open(path, "wb") as fh:
+            fh.write(b"zip")
+        os.utime(path, (1_700_000_000 + day * 86400,) * 2)
+        names.append(name)
+    return names
+
+
+def test_backup_that_failed_to_mirror_is_kept_locally_and_retried(app, monkeypatch):
+    """A failed offsite upload must not leave the archive nowhere: it stays on
+    the volume past the local retention and the worker uploads it again."""
+    import app as app_module
+    from app import (
+        backup_folder,
+        list_backup_archives,
+        mirror_backup_archive,
+        prune_backup_archives,
+        retry_unmirrored_backups,
+        unmirrored_backup_archives,
+    )
+
+    uploads = []
+    result = {"ok": False}
+
+    def fake_upload(path, key):
+        uploads.append(key)
+        return result["ok"]
+
+    monkeypatch.setattr(app_module, "r2_mirror_enabled", lambda: True)
+    monkeypatch.setattr(app_module, "mirror_file_sync", fake_upload)
+    monkeypatch.setattr(app_module, "mirror_delete", lambda key: None)
+    monkeypatch.setattr(app_module, "BACKUP_MIRROR_ATTEMPTS", 2)
+    monkeypatch.setattr(app_module.time, "sleep", lambda seconds: None)
+    with app.app_context():
+        names = _fake_archives(app, range(1, 5))
+        for name in names:
+            assert mirror_backup_archive(app, name) is False
+        assert len(uploads) == 8  # two attempts each
+        assert sorted(unmirrored_backup_archives(app)) == names
+        assert AuditLog.query.filter_by(event_type="admin_backup_mirror_failed").count() == 4
+
+        # Local retention is 1, but nothing unmirrored may be deleted.
+        prune_backup_archives(app, keep=14, local_keep=1)
+        assert len(list_backup_archives(app)) == 4
+
+        result["ok"] = True
+        assert retry_unmirrored_backups(app) == 4
+        assert unmirrored_backup_archives(app) == []
+        prune_backup_archives(app, keep=14, local_keep=1)
+        assert [b["filename"] for b in list_backup_archives(app)] == [names[-1]]
+        assert not [f for f in os.listdir(backup_folder(app)) if f.endswith(".unmirrored")]
+
+
+def test_backup_mirror_alert_is_sent_once_a_day(app, client, monkeypatch):
+    import app as app_module
+    from app import mirror_backup_archive
+    from ops_alerts import send_backup_mirror_failure_alert
+
+    sent = []
+    monkeypatch.setattr("utils.email.send_email", lambda *args, **kwargs: sent.append(args) or True)
+    monkeypatch.setattr(app_module, "r2_mirror_enabled", lambda: True)
+    monkeypatch.setattr(app_module, "mirror_file_sync", lambda path, key: False)
+    monkeypatch.setattr(app_module, "BACKUP_MIRROR_ATTEMPTS", 1)
+    _make_admin(client)
+    with app.app_context():
+        assert send_backup_mirror_failure_alert() == 0  # nothing pending
+        (name,) = _fake_archives(app, [1])
+        mirror_backup_archive(app, name)
+        assert send_backup_mirror_failure_alert() == 1
+        assert len(sent) >= 1
+        count = len(sent)
+        assert send_backup_mirror_failure_alert() == 0  # deduped for 24 h
+        assert len(sent) == count

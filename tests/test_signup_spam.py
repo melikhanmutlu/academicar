@@ -6,7 +6,7 @@ from unittest import mock
 
 import signup_guard
 from models import User, db
-from tests.conftest import create_user, login, valid_ascii_stl_bytes
+from tests.conftest import create_user, login, register, valid_ascii_stl_bytes
 
 
 def _signup_data(client, email="new@example.com", **extra):
@@ -281,3 +281,37 @@ def test_bulk_delete_with_nothing_selected(app, client):
     login(client, "adm@example.com")
     resp = client.post("/admin/users/bulk-delete", data={}, follow_redirects=True)
     assert "Select at least one user to delete." in resp.get_data(as_text=True)
+
+
+def test_unverified_configured_admin_email_is_not_promoted(app, client):
+    """Registering an ADMIN_EMAILS address must not grant admin until the
+    address is confirmed, or anyone could claim an unregistered admin email."""
+    app.config["REQUIRE_EMAIL_VERIFICATION"] = True
+    app.config["ADMIN_EMAILS"] = ["boss@example.com"]
+    register(client, email="boss@example.com")
+    with app.app_context():
+        user = User.query.filter_by(email="boss@example.com").one()
+        assert user.email_verified_at is None
+        assert user.is_admin is False
+    assert client.get("/admin").status_code == 403
+    with app.app_context():
+        assert User.query.filter_by(email="boss@example.com").one().is_admin is False
+        from app import sync_configured_admins
+
+        sync_configured_admins(app)
+        assert User.query.filter_by(email="boss@example.com").one().is_admin is False
+
+
+def test_configured_admin_is_promoted_once_email_is_confirmed(app, client):
+    from auth import _email_verify_serializer
+
+    app.config["REQUIRE_EMAIL_VERIFICATION"] = True
+    app.config["ADMIN_EMAILS"] = ["boss@example.com"]
+    register(client, email="boss@example.com")
+    with app.app_context():
+        user = User.query.filter_by(email="boss@example.com").one()
+        token = _email_verify_serializer().dumps({"uid": user.id, "email": user.email})
+    client.get(f"/auth/verify-email/{token}", follow_redirects=True)
+    with app.app_context():
+        assert User.query.filter_by(email="boss@example.com").one().is_admin is True
+    assert client.get("/admin").status_code == 200

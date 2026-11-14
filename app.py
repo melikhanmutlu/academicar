@@ -1081,6 +1081,10 @@ def configured_admin_emails(app: Flask | None = None) -> set[str]:
 def user_is_configured_admin(user: User | None, app: Flask | None = None) -> bool:
     if not user or not getattr(user, "email", None):
         return False
+    target = app or current_app
+    # Only a confirmed address counts (see auth._apply_configured_admin).
+    if target.config.get("REQUIRE_EMAIL_VERIFICATION", True) and user.email_verified_at is None:
+        return False
     return user.email.strip().lower() in configured_admin_emails(app)
 
 
@@ -1089,7 +1093,11 @@ def sync_configured_admins(app: Flask) -> None:
     if not emails:
         return
     try:
-        users = User.query.filter(func.lower(User.email).in_(emails), User.is_admin.is_(False)).all()
+        users = [
+            user
+            for user in User.query.filter(func.lower(User.email).in_(emails), User.is_admin.is_(False)).all()
+            if user_is_configured_admin(user, app)
+        ]
         for user in users:
             user.is_admin = True
         if users:
@@ -1591,8 +1599,70 @@ def create_backup_archive(app: Flask, created_by_user_id: int | None = None, rea
         resource_id=filename,
         details={"reason": reason, "filename": filename},
     )
-    mirror_file(archive_path, f"admin_backups/{filename}")
+    mirror_backup_archive(app, filename)
     return filename
+
+
+BACKUP_MIRROR_ATTEMPTS = 3
+BACKUP_MIRROR_RETRY_SECONDS = 30
+BACKUP_UNMIRRORED_SUFFIX = ".unmirrored"
+
+
+def unmirrored_backup_archives(app: Flask) -> list[str]:
+    """Archives on the volume whose offsite upload has not succeeded yet
+    (marked by an empty ``<archive>.unmirrored`` file next to them)."""
+    folder = backup_folder(app)
+    names = []
+    for entry in os.listdir(folder):
+        if entry.endswith(BACKUP_UNMIRRORED_SUFFIX):
+            name = entry[: -len(BACKUP_UNMIRRORED_SUFFIX)]
+            if os.path.isfile(os.path.join(folder, name)):
+                names.append(name)
+    return sorted(names)
+
+
+def mirror_backup_archive(app: Flask, filename: str, attempts: int | None = None, audit: bool = True) -> bool:
+    """Upload one archive to the offsite mirror, synchronously and with
+    retries (a multi-GB upload to B2/R2 is regularly cut mid-transfer). Until
+    it succeeds the archive carries an ``.unmirrored`` marker, which keeps it
+    on the volume (prune_backup_archives) and queues it for the worker's
+    retry_unmirrored_backups. True when offsite or when no mirror is set up."""
+    if not r2_mirror_enabled():
+        return True
+    path = os.path.join(backup_folder(app), filename)
+    marker = path + BACKUP_UNMIRRORED_SUFFIX
+    try:
+        open(marker, "a").close()
+    except OSError:
+        logger.warning("Could not mark backup %s as unmirrored", filename, exc_info=True)
+    attempts = attempts or BACKUP_MIRROR_ATTEMPTS
+    for attempt in range(attempts):
+        if mirror_file_sync(path, f"admin_backups/{filename}"):
+            try:
+                os.remove(marker)
+            except OSError:
+                pass
+            return True
+        if attempt + 1 < attempts:
+            time.sleep(BACKUP_MIRROR_RETRY_SECONDS)
+    logger.warning("Backup %s is not in the offsite mirror yet; it stays on the volume and will be retried", filename)
+    if audit:
+        log_audit("admin_backup_mirror_failed", resource_id=filename, details={"filename": filename})
+    return False
+
+
+def retry_unmirrored_backups(app: Flask) -> int:
+    """Worker: upload archives whose offsite copy is still missing. Returns
+    how many reached the mirror."""
+    folder = backup_folder(app)
+    pending = unmirrored_backup_archives(app)
+    for entry in os.listdir(folder):  # markers whose archive was deleted
+        if entry.endswith(BACKUP_UNMIRRORED_SUFFIX) and entry[: -len(BACKUP_UNMIRRORED_SUFFIX)] not in pending:
+            try:
+                os.remove(os.path.join(folder, entry))
+            except OSError:
+                pass
+    return sum(1 for name in pending if mirror_backup_archive(app, name, attempts=1, audit=False))
 
 
 def ensure_daily_backup(app: Flask, created_by_user_id: int | None = None) -> str | None:
@@ -1697,8 +1767,10 @@ def prune_backup_archives(app: Flask, keep: int | None = None, local_keep: int |
                 continue
         mirror_delete(f"admin_backups/{name}")
         removed.append(name)
+    unmirrored = set(unmirrored_backup_archives(app))
     for name, _ in retained[local_keep:]:
-        if name in local_names:
+        # Never drop the only copy: an archive that has not reached the mirror stays.
+        if name in local_names and name not in unmirrored:
             try:
                 os.remove(os.path.join(folder, name))
             except OSError:

@@ -86,6 +86,15 @@ def main() -> None:
                     failed = send_r2_mirror_failure_alert()
                     if failed:
                         app.logger.warning("R2 mirror failure alert sent for %d model(s).", failed)
+                    from app import retry_unmirrored_backups
+                    from ops_alerts import send_backup_mirror_failure_alert
+
+                    uploaded = retry_unmirrored_backups(app)
+                    if uploaded:
+                        app.logger.info("Backup mirror retry uploaded %d archive(s).", uploaded)
+                    pending = send_backup_mirror_failure_alert()
+                    if pending:
+                        app.logger.warning("Backup mirror failure alert sent for %d archive(s).", pending)
             except Exception:
                 app.logger.exception("Unexpected error in R2 mirror failure alert")
             try:

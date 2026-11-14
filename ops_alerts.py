@@ -20,6 +20,7 @@ from models import AuditLog, Model3D, Paper, User, db
 logger = logging.getLogger(__name__)
 
 R2_ALERT_EVENT = "r2_mirror_alert_sent"
+BACKUP_MIRROR_ALERT_EVENT = "backup_mirror_alert_sent"
 
 
 def _admin_recipients() -> list[str]:
@@ -38,11 +39,11 @@ def _admin_recipients() -> list[str]:
     return sorted(emails)
 
 
-def _alerted_within(now: datetime, hours: int = 24) -> bool:
+def _alerted_within(now: datetime, hours: int = 24, event_type: str = R2_ALERT_EVENT) -> bool:
     cutoff = (now - timedelta(hours=hours)).replace(tzinfo=None)
     return (
         AuditLog.query.filter(
-            AuditLog.event_type == R2_ALERT_EVENT,
+            AuditLog.event_type == event_type,
             AuditLog.timestamp >= cutoff,
         ).first()
         is not None
@@ -133,3 +134,39 @@ def send_r2_mirror_failure_alert(now: datetime | None = None, min_failures: int 
         except Exception:
             logger.exception("R2 mirror alert email failed for %s", recipient)
     return failed
+
+
+def send_backup_mirror_failure_alert(now: datetime | None = None) -> int:
+    """Email admins when backup archives are still missing from the offsite
+    mirror after the worker's retry. At most one alert per 24 hours. Returns
+    the number of archives alerted about (0 when nothing was sent)."""
+    from app import unmirrored_backup_archives
+    from utils.email import send_email
+
+    now = now or datetime.now(UTC)
+    pending = unmirrored_backup_archives(current_app)
+    if not pending or _alerted_within(now, event_type=BACKUP_MIRROR_ALERT_EVENT):
+        return 0
+    recipients = _admin_recipients()
+    db.session.add(
+        AuditLog(
+            event_type=BACKUP_MIRROR_ALERT_EVENT,
+            details={"pending": len(pending), "recipients": len(recipients)},
+        )
+    )
+    db.session.commit()
+    subject = f"AcademicAR: {len(pending)} backup archive(s) not in offsite storage"
+    body = (
+        f"{len(pending)} backup archive(s) could not be uploaded to the offsite "
+        "mirror and exist only on the server volume:\n\n"
+        + "\n".join(f"  - {name}" for name in pending)
+        + "\n\nThe worker keeps them on the volume and retries the upload every "
+        "15 minutes. If this alert repeats, check the storage provider.\n\n"
+        "This is an automated once-daily alert from the AcademicAR worker."
+    )
+    for recipient in recipients:
+        try:
+            send_email(recipient, subject, body)
+        except Exception:
+            logger.exception("Backup mirror alert email failed for %s", recipient)
+    return len(pending)

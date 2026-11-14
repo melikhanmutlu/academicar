@@ -265,8 +265,13 @@ def _apply_configured_admin(user: User) -> None:
     if isinstance(admin_emails, str):
         admin_emails = admin_emails.split(",")
     normalized = {str(email).strip().lower() for email in admin_emails if str(email).strip()}
-    if user.email.strip().lower() in normalized:
-        user.is_admin = True
+    if user.email.strip().lower() not in normalized:
+        return
+    # An unconfirmed address proves nothing: without this, anyone could register
+    # an ADMIN_EMAILS address that has no account yet and become admin.
+    if current_app.config.get("REQUIRE_EMAIL_VERIFICATION", True) and user.email_verified_at is None:
+        return
+    user.is_admin = True
 
 
 @auth_bp.route("/register", methods=["GET", "POST"])
@@ -496,6 +501,7 @@ def verify_email(token):
         return redirect(url_for("dashboard") if current_user.is_authenticated else url_for("auth.login"))
     if user.email_verified_at is None:
         mark_email_verified(user)
+        _apply_configured_admin(user)
         db.session.commit()
         try:
             from app import log_audit
